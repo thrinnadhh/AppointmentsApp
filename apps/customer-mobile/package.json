@@ -2,7 +2,7 @@
   "name": "@appointments/customer-mobile",
   "version": "1.0.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -14,13 +14,13 @@
   "dependencies": {
     "@appointments/shared": "workspace:*",
     "@supabase/supabase-js": "^2.45.0",
-    "expo": "~51.0.0",
-    "expo-status-bar": "~1.12.1",
-    "react": "18.2.0",
-    "react-native": "0.74.5"
+    "expo": "~57.0.21",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
   },
   "devDependencies": {
-    "@types/react": "~18.2.45",
+    "@types/react": "~18.3.0",
     "typescript": "^5.4.0"
   }
 }
