@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database, BookingStatus, PaymentStatus, Provider, Resource, ResourceType } from '@appointments/shared';
 
+export type { Provider, Resource, ResourceType };
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
 
@@ -42,6 +44,8 @@ export async function fetchAllProviders(): Promise<(Provider & { resources: Reso
     resources: (p.resources || []).map((r) => ({
       ...r,
       type: r.type as ResourceType,
+      department: r.department || 'General',
+      price: r.price !== null ? Number(r.price) : null,
       attributes: (r.attributes || {}) as Record<string, unknown>,
     })),
   }));
@@ -165,3 +169,115 @@ export async function recordMerchantNoShow(bookingId: string) {
   return data;
 }
 
+export async function fetchAllProfiles() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching profiles:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function adminCreateStaffUser(params: {
+  email: string;
+  password: string;
+  fullName: string;
+  role?: 'admin' | 'merchant' | 'customer';
+  phone?: string;
+}) {
+  const { data, error } = await supabase.rpc('admin_create_user', {
+    p_email: params.email,
+    p_password: params.password,
+    p_full_name: params.fullName,
+    p_role: params.role || 'merchant',
+    p_phone: params.phone || null,
+  });
+
+  if (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function adminCreateVenue(params: {
+  name: string;
+  categoryId: string;
+  address: string;
+  phone: string;
+  openingTime?: string;
+  closingTime?: string;
+  description?: string;
+  email?: string;
+  ownerId?: string;
+}) {
+  const { data, error } = await supabase.rpc('admin_create_venue', {
+    p_name: params.name,
+    p_category_id: params.categoryId,
+    p_address: params.address,
+    p_phone: params.phone,
+    p_opening_time: params.openingTime || '09:00:00',
+    p_closing_time: params.closingTime || '21:00:00',
+    p_description: params.description || null,
+    p_email: params.email || null,
+    p_owner_id: params.ownerId || null,
+  });
+
+  if (error) {
+    console.error('Error creating venue:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function adminCreateDoctorResource(params: {
+  providerId: string;
+  name: string;
+  type: string;
+  department: string;
+  price: number;
+  depositAmount: number;
+  durationMinutes?: number;
+  capacity?: number;
+}) {
+  const { data, error } = await supabase.rpc('admin_create_resource', {
+    p_provider_id: params.providerId,
+    p_name: params.name,
+    p_type: params.type,
+    p_department: params.department,
+    p_price: params.price,
+    p_deposit_amount: params.depositAmount,
+    p_duration_minutes: params.durationMinutes || 30,
+    p_capacity: params.capacity || 1,
+  });
+
+  if (error) {
+    console.error('Error creating doctor/resource:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function getCurrentUserProfile() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return null;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', session.user.id)
+    .single();
+
+  return {
+    user: session.user,
+    profile: profile || null,
+  };
+}
+
+export async function signOutMerchant() {
+  await supabase.auth.signOut();
+}
