@@ -57,6 +57,8 @@ export interface Resource {
   duration_minutes: number;
   capacity: number;
   deposit_amount: number;
+  price?: number | null;
+  department?: string | null;
   attributes: Record<string, unknown>;
   is_active: boolean;
   created_at: string;
@@ -114,6 +116,7 @@ export interface Payment {
 export interface UserProfile {
   id: string;
   phone?: string | null;
+  email?: string | null;
   full_name?: string | null;
   role: UserRole;
   no_show_count: number;

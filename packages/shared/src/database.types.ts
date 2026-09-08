@@ -152,6 +152,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          email: string | null
           full_name: string | null
           id: string
           is_flagged: boolean
@@ -162,6 +163,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id: string
           is_flagged?: boolean
@@ -172,6 +174,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           is_flagged?: boolean
@@ -300,11 +303,13 @@ export type Database = {
           attributes: Json
           capacity: number
           created_at: string
+          department: string | null
           deposit_amount: number
           duration_minutes: number
           id: string
           is_active: boolean
           name: string
+          price: number | null
           provider_id: string
           type: string
           updated_at: string
@@ -313,11 +318,13 @@ export type Database = {
           attributes?: Json
           capacity?: number
           created_at?: string
+          department?: string | null
           deposit_amount?: number
           duration_minutes?: number
           id?: string
           is_active?: boolean
           name: string
+          price?: number | null
           provider_id: string
           type: string
           updated_at?: string
@@ -326,11 +333,13 @@ export type Database = {
           attributes?: Json
           capacity?: number
           created_at?: string
+          department?: string | null
           deposit_amount?: number
           duration_minutes?: number
           id?: string
           is_active?: boolean
           name?: string
+          price?: number | null
           provider_id?: string
           type?: string
           updated_at?: string
@@ -379,6 +388,46 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_user: {
+        Args: {
+          p_email: string
+          p_password: string
+          p_full_name: string
+          p_role?: string
+          p_phone?: string | null
+        }
+        Returns: Json
+      }
+      admin_create_venue: {
+        Args: {
+          p_name: string
+          p_category_id: string
+          p_address: string
+          p_phone: string
+          p_opening_time?: string
+          p_closing_time?: string
+          p_description?: string | null
+          p_email?: string | null
+          p_owner_id?: string | null
+          p_latitude?: number
+          p_longitude?: number
+        }
+        Returns: Json
+      }
+      admin_create_resource: {
+        Args: {
+          p_provider_id: string
+          p_name: string
+          p_type: string
+          p_department?: string
+          p_price?: number
+          p_deposit_amount?: number
+          p_duration_minutes?: number
+          p_capacity?: number
+          p_attributes?: Json
+        }
+        Returns: Json
+      }
       create_booking_hold: {
         Args: {
           p_customer_id: string
