@@ -5,6 +5,7 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   Image,
   SafeAreaView,
   StatusBar,
@@ -16,10 +17,16 @@ import { MOCK_PROVIDERS, fetchProvidersByCategory } from '../services/api';
 interface HomeScreenProps {
   onSelectProvider: (providerId: string) => void;
   onOpenMyBookings: () => void;
+  onOpenProfile?: () => void;
 }
 
-export default function HomeScreen({ onSelectProvider, onOpenMyBookings }: HomeScreenProps) {
+export default function HomeScreen({
+  onSelectProvider,
+  onOpenMyBookings,
+  onOpenProfile,
+}: HomeScreenProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [providers, setProviders] = useState(MOCK_PROVIDERS);
   const [loading, setLoading] = useState(false);
 
@@ -44,12 +51,25 @@ export default function HomeScreen({ onSelectProvider, onOpenMyBookings }: HomeS
     };
   }, [selectedCategory]);
 
-  const filteredProviders = providers;
+  const filteredProviders = providers.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const matchName = p.name?.toLowerCase().includes(q);
+    const matchDesc = p.description?.toLowerCase().includes(q);
+    const matchAddr = p.address?.toLowerCase().includes(q);
+    const matchResource = p.resources?.some(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        (r.attributes as Record<string, string | undefined>)?.specialization?.toLowerCase().includes(q) ||
+        (r as unknown as { department?: string }).department?.toLowerCase().includes(q)
+    );
+    return matchName || matchDesc || matchAddr || matchResource;
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
+
       {/* Top Header */}
       <View style={styles.header}>
         <View>
@@ -60,10 +80,51 @@ export default function HomeScreen({ onSelectProvider, onOpenMyBookings }: HomeS
           <Text style={styles.appTitle}>Instant Appointments</Text>
         </View>
 
-        <TouchableOpacity style={styles.myBookingsButton} onPress={onOpenMyBookings}>
-          <Text style={styles.myBookingsIcon}>📅</Text>
-          <Text style={styles.myBookingsText}>Bookings</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={styles.myBookingsButton}
+            onPress={onOpenMyBookings}
+            accessibilityLabel="My Bookings"
+          >
+            <Text style={styles.myBookingsIcon}>📅</Text>
+            <Text style={styles.myBookingsText}>Bookings</Text>
+          </TouchableOpacity>
+
+          {onOpenProfile && (
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={onOpenProfile}
+              accessibilityLabel="Customer Profile"
+            >
+              <Text style={styles.profileIcon}>👤</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Real-time Search Bar */}
+      <View style={styles.searchBarContainer}>
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search doctors, salons, restaurants, turfs..."
+            placeholderTextColor="#94a3b8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearSearchBtn}
+              accessibilityLabel="Clear search"
+            >
+              <Text style={styles.clearSearchText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Category Pills Bar */}
@@ -125,50 +186,78 @@ export default function HomeScreen({ onSelectProvider, onOpenMyBookings }: HomeS
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionHeading}>Nearby in Tirupati ({filteredProviders.length})</Text>
+        <View style={styles.listHeaderRow}>
+          <Text style={styles.sectionHeading}>
+            {searchQuery ? `Search Results (${filteredProviders.length})` : `Nearby in Tirupati (${filteredProviders.length})`}
+          </Text>
+          {loading && <ActivityIndicator size="small" color="#059669" />}
+        </View>
 
-        {filteredProviders.map((provider) => (
-          <TouchableOpacity
-            key={provider.id}
-            style={styles.providerCard}
-            activeOpacity={0.85}
-            onPress={() => onSelectProvider(provider.id)}
-          >
-            <Image
-              source={{ uri: provider.photos?.[0] || 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400' }}
-              style={styles.providerImage}
-            />
+        {filteredProviders.length === 0 ? (
+          <View style={styles.emptyResults}>
+            <Text style={styles.emptyResultsIcon}>🔎</Text>
+            <Text style={styles.emptyResultsTitle}>No providers found</Text>
+            <Text style={styles.emptyResultsSubtitle}>
+              Try searching for a different doctor, turf, clinic, or clear your search term.
+            </Text>
+            <TouchableOpacity
+              style={styles.resetFilterBtn}
+              onPress={() => {
+                setSearchQuery('');
+                setSelectedCategory('all');
+              }}
+            >
+              <Text style={styles.resetFilterBtnText}>Reset Filters</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          filteredProviders.map((provider) => (
+            <TouchableOpacity
+              key={provider.id}
+              style={styles.providerCard}
+              activeOpacity={0.85}
+              onPress={() => onSelectProvider(provider.id)}
+            >
+              <Image
+                source={{
+                  uri:
+                    provider.photos?.[0] ||
+                    'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400',
+                }}
+                style={styles.providerImage}
+              />
 
-            <View style={styles.providerContent}>
-              <View style={styles.providerHeader}>
-                <Text style={styles.providerName} numberOfLines={1}>
-                  {provider.name}
-                </Text>
-                <View style={styles.distanceBadge}>
-                  <Text style={styles.distanceText}>{provider.distance_km} km</Text>
-                </View>
-              </View>
-
-              <Text style={styles.providerAddress} numberOfLines={1}>
-                {provider.address}
-              </Text>
-
-              <View style={styles.cardFooter}>
-                <View style={styles.slotIndicator}>
-                  <Text style={styles.slotClock}>🕒</Text>
-                  <Text style={styles.slotText}>{provider.next_slot}</Text>
-                </View>
-
-                <View style={styles.depositPill}>
-                  <Text style={styles.depositLabel}>Deposit from </Text>
-                  <Text style={styles.depositAmount}>
-                    ₹{provider.resources[0]?.deposit_amount || 50}
+              <View style={styles.providerContent}>
+                <View style={styles.providerHeader}>
+                  <Text style={styles.providerName} numberOfLines={1}>
+                    {provider.name}
                   </Text>
+                  <View style={styles.distanceBadge}>
+                    <Text style={styles.distanceText}>{provider.distance_km} km</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.providerAddress} numberOfLines={1}>
+                  {provider.address}
+                </Text>
+
+                <View style={styles.cardFooter}>
+                  <View style={styles.slotIndicator}>
+                    <Text style={styles.slotClock}>🕒</Text>
+                    <Text style={styles.slotText}>{provider.next_slot}</Text>
+                  </View>
+
+                  <View style={styles.depositPill}>
+                    <Text style={styles.depositLabel}>Deposit from </Text>
+                    <Text style={styles.depositAmount}>
+                      ₹{provider.resources[0]?.deposit_amount || 50}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -211,6 +300,11 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     marginTop: 2,
   },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   myBookingsButton: {
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 12,
@@ -227,6 +321,54 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#334155',
+  },
+  profileButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileIcon: {
+    fontSize: 16,
+  },
+  searchBarContainer: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  searchIcon: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0f172a',
+    padding: 0,
+  },
+  clearSearchBtn: {
+    padding: 4,
+  },
+  clearSearchText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '700',
   },
   categoryContainer: {
     backgroundColor: '#ffffff',
@@ -275,13 +417,51 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+  listHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionHeading: {
     fontSize: 14,
     fontWeight: '700',
     color: '#64748b',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 12,
+  },
+  emptyResults: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 20,
+  },
+  emptyResultsIcon: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  emptyResultsTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  emptyResultsSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  resetFilterBtn: {
+    marginTop: 16,
+    backgroundColor: '#059669',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  resetFilterBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   providerCard: {
     backgroundColor: '#ffffff',

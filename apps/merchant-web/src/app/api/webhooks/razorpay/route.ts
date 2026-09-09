@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { RazorpayWebhookPayload } from '@appointments/shared';
@@ -5,6 +6,24 @@ import { RazorpayWebhookPayload } from '@appointments/shared';
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
+
+    // Verify webhook signature if secret is configured
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const signature = req.headers.get('x-razorpay-signature');
+    if (webhookSecret) {
+      if (!signature) {
+        return NextResponse.json({ error: 'Missing x-razorpay-signature header' }, { status: 401 });
+      }
+      const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(rawBody)
+        .digest('hex');
+
+      if (signature !== expectedSignature) {
+        return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 });
+      }
+    }
+
     let body: RazorpayWebhookPayload;
 
     try {

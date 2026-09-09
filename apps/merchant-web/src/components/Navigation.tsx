@@ -8,12 +8,14 @@ import {
   Users, 
   LayoutDashboard, 
   Building2, 
-  ShieldCheck,
-  Bell,
-  UserCheck,
-  LogOut,
-  LogIn,
-  Activity
+  ShieldCheck, 
+  Bell, 
+  UserCheck, 
+  LogOut, 
+  LogIn, 
+  Activity,
+  Clock,
+  Settings
 } from 'lucide-react';
 import { supabase, getCurrentUserProfile, signOutMerchant } from '@/lib/supabase';
 
@@ -22,7 +24,9 @@ const NAV_ITEMS = [
   { href: '/venues', label: 'Venues & Businesses', icon: Building2 },
   { href: '/resources', label: 'Doctors & Services', icon: Users },
   { href: '/bookings', label: 'Bookings Queue', icon: CalendarDays },
+  { href: '/schedule', label: 'Availability & Hours', icon: Clock },
   { href: '/team', label: 'Team & Access', icon: UserCheck },
+  { href: '/settings', label: 'Settings & Profile', icon: Settings },
 ];
 
 export default function Navigation() {

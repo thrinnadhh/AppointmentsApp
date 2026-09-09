@@ -7,20 +7,18 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
   // =========================================================================
   test.describe('Merchant Web Screen Navigation & Flow Audit', () => {
 
-    test('1.1 Should navigate to Overview Dashboard and verify all dashboard cards and actions', async ({ page }) => {
+    test('1.1 Should navigate to Overview Dashboard and verify all dashboard cards and navigation links', async ({ page }) => {
       await page.goto('http://localhost:3000/');
       await expect(page.locator('h1')).toContainText('City-Wide Vertical Summary');
 
-      // Check quick action links to internal screens
-      const venuesLink = page.locator('a[href="/venues"]').first();
-      const resourcesLink = page.locator('a[href="/resources"]').first();
-      const teamLink = page.locator('a[href="/team"]').first();
-      const bookingsLink = page.locator('a[href="/bookings"]').first();
-
-      await expect(venuesLink).toBeVisible();
-      await expect(resourcesLink).toBeVisible();
-      await expect(teamLink).toBeVisible();
-      await expect(bookingsLink).toBeVisible();
+      // Check navigation bar items including newly added schedule and settings
+      const nav = page.locator('nav');
+      await expect(nav.locator('a[href="/venues"]')).toBeVisible();
+      await expect(nav.locator('a[href="/resources"]')).toBeVisible();
+      await expect(nav.locator('a[href="/schedule"]')).toBeVisible();
+      await expect(nav.locator('a[href="/team"]')).toBeVisible();
+      await expect(nav.locator('a[href="/bookings"]')).toBeVisible();
+      await expect(nav.locator('a[href="/settings"]')).toBeVisible();
     });
 
     test('1.2 Should navigate to Venues directory, test category filters, and modal controls', async ({ page }) => {
@@ -99,7 +97,32 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       await expect(page.getByText('Saved!')).toBeVisible();
     });
 
-    test('1.7 Should navigate to Login screen and verify authentication form controls', async ({ page }) => {
+    test('1.7 Should navigate to Settings & Profile screen and verify all configuration tabs', async ({ page }) => {
+      await page.goto('http://localhost:3000/settings');
+      await expect(page.getByRole('heading', { name: 'Settings & Profile', level: 1 })).toBeVisible();
+
+      // Verify tab buttons
+      await expect(page.getByRole('button', { name: /Business Profile/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Payments & Gateway/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Notifications & Alerts/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Deposit & Refund Rules/i })).toBeVisible();
+
+      // Switch to Payments tab
+      await page.getByRole('button', { name: /Payments & Gateway/i }).click();
+      await expect(page.getByText('Payment Gateway & Merchant Payout Routing')).toBeVisible();
+
+      // Switch to Policies tab
+      await page.getByRole('button', { name: /Deposit & Refund Rules/i }).click();
+      await expect(page.getByText('Full Refund Cancellation Window')).toBeVisible();
+
+      // Save changes
+      const saveBtn = page.getByRole('button', { name: /Save Changes/i });
+      await expect(saveBtn).toBeVisible();
+      await saveBtn.click();
+      await expect(page.getByText(/Settings Saved!/i)).toBeVisible();
+    });
+
+    test('1.8 Should navigate to Login screen and verify authentication form controls', async ({ page }) => {
       await page.goto('http://localhost:3000/login');
       await expect(page.getByText('Merchant & Admin Access')).toBeVisible();
       await expect(page.locator('#login-email')).toBeVisible();
@@ -107,7 +130,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       await expect(page.getByRole('button', { name: /Sign In to Dashboard/i })).toBeVisible();
     });
 
-    test('1.8 Should render custom 404 Not Found screen on broken route', async ({ page }) => {
+    test('1.9 Should render custom 404 Not Found screen on broken route', async ({ page }) => {
       await page.goto('http://localhost:3000/non-existent-screen-404');
       await expect(page.getByText('404 • Page Not Found')).toBeVisible();
       await expect(page.getByText('Location or Route Not Found')).toBeVisible();
@@ -147,10 +170,12 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBeDefined();
     });
 
-    test('2.4 GET /api/admin/resources check: returns 405 because only POST is implemented', async ({ request }) => {
+    test('2.4 GET /api/admin/resources should return 200 and support providerId filter', async ({ request }) => {
       const res = await request.get('http://localhost:3000/api/admin/resources');
-      // Documenting whether GET is supported or missing
-      expect([405, 404, 200]).toContain(res.status());
+      expect(res.status()).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(Array.isArray(data.resources)).toBe(true);
     });
 
     test('2.5 POST /api/admin/resources should reject missing providerId with 400', async ({ request }) => {
@@ -162,14 +187,22 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBeDefined();
     });
 
-    test('2.6 GET /api/admin/users should return 200 with user profiles', async ({ request }) => {
+    test('2.6 GET /api/admin/bookings should return 200 with bookings list', async ({ request }) => {
+      const res = await request.get('http://localhost:3000/api/admin/bookings');
+      expect(res.status()).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(Array.isArray(data.bookings)).toBe(true);
+    });
+
+    test('2.7 GET /api/admin/users should return 200 with user profiles', async ({ request }) => {
       const res = await request.get('http://localhost:3000/api/admin/users');
       expect(res.status()).toBe(200);
       const data = await res.json();
       expect(Array.isArray(data.users)).toBe(true);
     });
 
-    test('2.7 POST /api/admin/users should reject missing email/password with 400', async ({ request }) => {
+    test('2.8 POST /api/admin/users should reject missing email/password with 400', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/admin/users', {
         data: { fullName: 'Incomplete Staff' },
       });
@@ -178,7 +211,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBeDefined();
     });
 
-    test('2.8 GET /api/cron/release-holds should return 200 and report released count', async ({ request }) => {
+    test('2.9 GET /api/cron/release-holds should return 200 and report released count', async ({ request }) => {
       const res = await request.get('http://localhost:3000/api/cron/release-holds');
       expect(res.status()).toBe(200);
       const data = await res.json();
@@ -186,7 +219,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(typeof data.released_count).toBe('number');
     });
 
-    test('2.9 POST /api/webhooks/razorpay should reject invalid JSON with 400', async ({ request }) => {
+    test('2.10 POST /api/webhooks/razorpay should reject invalid JSON with 400', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/webhooks/razorpay', {
         data: 'INVALID_NON_JSON_PAYLOAD',
         headers: { 'content-type': 'text/plain' },
@@ -196,7 +229,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBeDefined();
     });
 
-    test('2.10 POST /api/bookings/hold should reject missing fields with 400', async ({ request }) => {
+    test('2.11 POST /api/bookings/hold should reject missing fields with 400', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/hold', {
         data: { resource_id: 'invalid-uuid' },
       });
@@ -206,7 +239,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBeDefined();
     });
 
-    test('2.11 POST /api/bookings/confirm should return 404 for non-existent booking', async ({ request }) => {
+    test('2.12 POST /api/bookings/confirm should return 404 for non-existent booking', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/confirm', {
         data: { booking_id: '00000000-0000-0000-0000-000000000000' },
       });
@@ -216,7 +249,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBe('Booking not found');
     });
 
-    test('2.12 POST /api/bookings/cancel should return 404 for non-existent booking', async ({ request }) => {
+    test('2.13 POST /api/bookings/cancel should return 404 for non-existent booking', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/cancel', {
         data: { booking_id: '00000000-0000-0000-0000-000000000000' },
       });
@@ -226,7 +259,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBe('Booking not found');
     });
 
-    test('2.13 POST /api/bookings/reschedule should return 404 for non-existent booking', async ({ request }) => {
+    test('2.14 POST /api/bookings/reschedule should return 404 for non-existent booking', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/reschedule', {
         data: {
           booking_id: '00000000-0000-0000-0000-000000000000',
@@ -240,7 +273,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBe('Booking not found');
     });
 
-    test('2.14 POST /api/bookings/no-show should reject non-existent booking with error', async ({ request }) => {
+    test('2.15 POST /api/bookings/no-show should reject non-existent booking with error', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/no-show', {
         data: { booking_id: '00000000-0000-0000-0000-000000000000' },
       });
@@ -255,15 +288,40 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
   // =========================================================================
   test.describe('Customer Mobile Screen Navigation & Flow Audit', () => {
 
-    test('3.1 Should verify Customer HomeScreen navigation items and trust banner', async ({ page }) => {
+    test('3.1 Should verify Customer HomeScreen navigation items, search bar, and trust banner', async ({ page }) => {
       await page.goto('http://localhost:8081');
       await expect(page.getByText('Tirupati, AP')).toBeVisible();
       await expect(page.getByText('Instant Appointments')).toBeVisible();
       await expect(page.getByText('Bookings')).toBeVisible();
       await expect(page.getByText(/guarantees your slot with zero waiting/i)).toBeVisible();
+
+      // Test real-time search input
+      const searchInput = page.getByPlaceholder(/Search doctors, salons, restaurants/i);
+      await expect(searchInput).toBeVisible();
+      await searchInput.fill('Dental');
+      await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible();
+
+      // Clear search
+      await searchInput.fill('');
     });
 
-    test('3.2 Should verify complete Provider Detail view and doctor selection', async ({ page }) => {
+    test('3.2 Should open customer profile modal from HomeScreen header', async ({ page }) => {
+      await page.goto('http://localhost:8081');
+      const profileBtn = page.getByLabel('Customer Profile');
+      await expect(profileBtn).toBeVisible();
+      await profileBtn.click();
+
+      await expect(page.getByText('Customer Profile')).toBeVisible();
+      await expect(page.getByText('Ravi Teja')).toBeVisible();
+      await expect(page.getByText('Total Bookings')).toBeVisible();
+      await expect(page.getByText('Active Slots')).toBeVisible();
+
+      // Close profile
+      await page.getByText('✕').click();
+      await expect(page.getByText('Customer Profile')).not.toBeVisible();
+    });
+
+    test('3.3 Should verify complete Provider Detail view and doctor selection', async ({ page }) => {
       await page.goto('http://localhost:8081');
       const providerCard = page.getByText('Sri Venkateswara Dental & Implant Care');
       await providerCard.click();
@@ -279,7 +337,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       await expect(page.getByText('Instant Appointments')).toBeVisible();
     });
 
-    test('3.3 Should verify My Appointments screen and empty state / bookings list', async ({ page }) => {
+    test('3.4 Should verify My Appointments screen and empty state / bookings list', async ({ page }) => {
       await page.goto('http://localhost:8081');
       await page.getByText('Bookings').click();
 

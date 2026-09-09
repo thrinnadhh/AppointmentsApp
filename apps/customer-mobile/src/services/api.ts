@@ -427,3 +427,47 @@ export function generateAvailableSlots(resource: Resource, selectedDate: Date): 
   return slots;
 }
 
+export async function rescheduleBookingOnSupabase(
+  bookingId: string,
+  newSlotStart: string,
+  newSlotEnd: string
+) {
+  try {
+    // Attempt via backend API first if accessible
+    try {
+      const resp = await fetch('http://localhost:3000/api/bookings/reschedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          booking_id: bookingId,
+          new_slot_start: newSlotStart,
+          new_slot_end: newSlotEnd,
+        }),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.success) return json;
+      }
+    } catch {
+      // Fallback directly to Supabase update
+    }
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .update({
+        slot_start: newSlotStart,
+        slot_end: newSlotEnd,
+        status: 'CONFIRMED',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId)
+      .select();
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err) {
+    console.error('Error rescheduling booking:', err);
+    throw err;
+  }
+}
+

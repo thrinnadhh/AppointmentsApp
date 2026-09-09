@@ -1,15 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Modal,
+  TouchableOpacity,
+  SafeAreaView,
+  TextInput,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Resource, Slot, Booking } from '@appointments/shared';
 import HomeScreen from './src/screens/HomeScreen';
 import ProviderDetailScreen from './src/screens/ProviderDetailScreen';
 import CheckoutModal from './src/screens/CheckoutModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
-import { 
-  MOCK_PROVIDERS, 
-  fetchCustomerBookingsFromSupabase, 
-  cancelBookingOnSupabase 
+import {
+  MOCK_PROVIDERS,
+  fetchCustomerBookingsFromSupabase,
+  cancelBookingOnSupabase,
+  rescheduleBookingOnSupabase,
 } from './src/services/api';
 
 type ScreenType = 'HOME' | 'PROVIDER_DETAIL' | 'MY_BOOKINGS';
@@ -20,9 +29,18 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('HOME');
   const [selectedProviderId, setSelectedProviderId] = useState<string>(MOCK_PROVIDERS[0].id);
   const [checkoutVisible, setCheckoutVisible] = useState<boolean>(false);
+  const [profileVisible, setProfileVisible] = useState<boolean>(false);
   const [activeResource, setActiveResource] = useState<Resource | null>(null);
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
-  
+
+  // Customer Profile State
+  const [customerProfile, setCustomerProfile] = useState({
+    name: 'Ravi Teja',
+    phone: '+91 98765 43210',
+    email: 'ravi.teja@customer.tirupati.in',
+    city: 'Tirupati, AP',
+  });
+
   // Stored customer bookings (seeded from Supabase)
   const [customerBookings, setCustomerBookings] = useState<
     (Booking & { provider_name?: string; resource_name?: string })[]
@@ -84,6 +102,21 @@ export default function App() {
     setTimeout(() => setConfirmationToast(null), 4000);
   };
 
+  const handleRescheduleBooking = async (
+    bookingId: string,
+    newSlotStart: string,
+    newSlotEnd: string
+  ) => {
+    try {
+      await rescheduleBookingOnSupabase(bookingId, newSlotStart, newSlotEnd);
+      await loadBookings();
+      setConfirmationToast('Appointment rescheduled successfully!');
+      setTimeout(() => setConfirmationToast(null), 4000);
+    } catch (err) {
+      console.warn('Reschedule failed:', err);
+      throw err;
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -94,6 +127,7 @@ export default function App() {
         <HomeScreen
           onSelectProvider={handleSelectProvider}
           onOpenMyBookings={() => setCurrentScreen('MY_BOOKINGS')}
+          onOpenProfile={() => setProfileVisible(true)}
         />
       )}
 
@@ -110,6 +144,7 @@ export default function App() {
           onBack={() => setCurrentScreen('HOME')}
           bookings={customerBookings}
           onCancelBooking={handleCancelBooking}
+          onRescheduleBooking={handleRescheduleBooking}
         />
       )}
 
@@ -121,6 +156,75 @@ export default function App() {
         onClose={() => setCheckoutVisible(false)}
         onPaymentSuccess={handlePaymentSuccess}
       />
+
+      {/* Customer Profile Modal */}
+      <Modal
+        visible={profileVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setProfileVisible(false)}
+      >
+        <View style={styles.profileModalOverlay}>
+          <SafeAreaView style={styles.profileSheet}>
+            <View style={styles.profileHeader}>
+              <Text style={styles.profileTitle}>Customer Profile</Text>
+              <TouchableOpacity
+                style={styles.closeProfileBtn}
+                onPress={() => setProfileVisible(false)}
+              >
+                <Text style={styles.closeProfileText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.profileContent}>
+              <View style={styles.profileAvatarBox}>
+                <Text style={styles.avatarEmoji}>👤</Text>
+                <View>
+                  <Text style={styles.profileName}>{customerProfile.name}</Text>
+                  <Text style={styles.profileCity}>{customerProfile.city}</Text>
+                </View>
+              </View>
+
+              <View style={styles.profileFields}>
+                <View style={styles.profileField}>
+                  <Text style={styles.fieldLabel}>MOBILE PHONE</Text>
+                  <Text style={styles.fieldValue}>{customerProfile.phone}</Text>
+                </View>
+
+                <View style={styles.profileField}>
+                  <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
+                  <Text style={styles.fieldValue}>{customerProfile.email}</Text>
+                </View>
+
+                <View style={styles.profileStatsRow}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statNum}>{customerBookings.length}</Text>
+                    <Text style={styles.statLabel}>Total Bookings</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statNum}>
+                      {customerBookings.filter((b) => b.status === 'CONFIRMED').length}
+                    </Text>
+                    <Text style={styles.statLabel}>Active Slots</Text>
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.viewBookingsFromProfileBtn}
+                onPress={() => {
+                  setProfileVisible(false);
+                  setCurrentScreen('MY_BOOKINGS');
+                }}
+              >
+                <Text style={styles.viewBookingsFromProfileText}>
+                  View Appointments ({customerBookings.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
 
       {/* Confirmation Toast Alert */}
       {confirmationToast && (
@@ -158,5 +262,132 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  profileModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  profileSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 32,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  profileTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  closeProfileBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeProfileText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  profileContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  profileAvatarBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 20,
+  },
+  avatarEmoji: {
+    fontSize: 36,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  profileCity: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
+    marginTop: 2,
+  },
+  profileFields: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  profileField: {
+    backgroundColor: '#f8fafc',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+    letterSpacing: 0.5,
+  },
+  fieldValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginTop: 4,
+  },
+  profileStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#ecfdf5',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    alignItems: 'center',
+  },
+  statNum: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065f46',
+    marginTop: 2,
+  },
+  viewBookingsFromProfileBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  viewBookingsFromProfileText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
