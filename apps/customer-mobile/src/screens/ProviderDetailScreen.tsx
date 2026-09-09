@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,7 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Resource, Slot } from '@appointments/shared';
-import { MOCK_PROVIDERS, generateAvailableSlots } from '../services/api';
+import { MOCK_PROVIDERS, generateAvailableSlots, fetchProviderById } from '../services/api';
 
 interface ProviderDetailScreenProps {
   providerId: string;
@@ -22,10 +22,30 @@ export default function ProviderDetailScreen({
   onBack,
   onProceedToHold,
 }: ProviderDetailScreenProps) {
-  const provider = MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
-  const [selectedResource, setSelectedResource] = useState<Resource>(provider.resources[0]);
+  const initialProvider = MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
+  const [provider, setProvider] = useState(initialProvider);
+  const [selectedResource, setSelectedResource] = useState<Resource>(
+    initialProvider.resources?.[0] || MOCK_PROVIDERS[0].resources[0]
+  );
   const [selectedDateIndex, setSelectedDateIndex] = useState<number>(0);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      const p = await fetchProviderById(providerId);
+      if (isMounted && p) {
+        setProvider(p as any);
+        if (p.resources && p.resources.length > 0) {
+          setSelectedResource(p.resources[0]);
+        }
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [providerId]);
 
   // Generate 3 date options (Today, Tomorrow, Day after)
   const dates = [0, 1, 2].map((offset) => {
@@ -34,7 +54,7 @@ export default function ProviderDetailScreen({
     return d;
   });
 
-  const availableSlots = generateAvailableSlots(selectedResource, dates[selectedDateIndex]);
+  const availableSlots = selectedResource ? generateAvailableSlots(selectedResource, dates[selectedDateIndex]) : [];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -168,7 +188,7 @@ export default function ProviderDetailScreen({
       <View style={styles.stickyFooter}>
         <View style={styles.footerSummary}>
           <Text style={styles.footerLabel}>Deposit to hold:</Text>
-          <Text style={styles.footerPrice}>₹{selectedResource.deposit_amount}</Text>
+          <Text style={styles.footerPrice}>₹{selectedResource?.deposit_amount || 0}</Text>
         </View>
 
         <TouchableOpacity

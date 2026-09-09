@@ -262,6 +262,30 @@ export async function fetchProvidersByCategory(categoryId?: string) {
   }
 }
 
+export async function fetchProviderById(providerId: string) {
+  const mock = MOCK_PROVIDERS.find((p) => p.id === providerId);
+  if (mock) return mock;
+
+  try {
+    const { data, error } = await supabase
+      .from('providers')
+      .select('*, resources(*)')
+      .eq('id', providerId)
+      .single();
+
+    if (error || !data) return MOCK_PROVIDERS[0];
+
+    return {
+      ...data,
+      distance_km: 1.5,
+      next_slot: 'Today, Available',
+      resources: (data as any).resources || [],
+    };
+  } catch {
+    return MOCK_PROVIDERS[0];
+  }
+}
+
 interface CustomerBookingRow extends Booking {
   providers?: { name: string } | null;
   resources?: { name: string } | null;

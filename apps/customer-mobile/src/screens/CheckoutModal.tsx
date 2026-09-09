@@ -159,7 +159,7 @@ export default function CheckoutModal({
           <View style={styles.policyCard}>
             <Text style={styles.policyTitle}>🛡️ Cancellation & Reschedule Policy</Text>
             <Text style={styles.policyText}>
-              • Free cancellation or reschedule up to <strong>1 hour before</strong> slot start.{'\n'}
+              • Free cancellation or reschedule up to 1 hour before slot start.{'\n'}
               • Deposit is automatically carried over on reschedule or refunded on cancellation.{'\n'}
               • Late cancellation or no-show forfeits deposit to the merchant.
             </Text>
