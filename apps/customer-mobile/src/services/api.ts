@@ -217,20 +217,35 @@ export async function fetchProvidersByCategory(categoryId?: string) {
       .select('*, resources(*)')
       .eq('status', 'ACTIVE');
 
-    if (categoryId && categoryId !== 'all') {
-      query = query.eq('category_id', categoryId);
+    const CATEGORY_MAP: Record<string, string> = {
+      clinic: 'clinics',
+      clinics: 'clinics',
+      salon: 'salons',
+      salons: 'salons',
+      gaming: 'gaming',
+      restaurant: 'restaurants',
+      restaurants: 'restaurants',
+      pet: 'pets',
+      pets: 'pets',
+    };
+    const dbCat = categoryId && categoryId !== 'all' ? (CATEGORY_MAP[categoryId.toLowerCase()] || categoryId) : null;
+
+    if (dbCat) {
+      query = query.eq('category_id', dbCat);
     }
 
     const { data, error } = await query;
+    const norm = (c: string) => (c || '').toLowerCase().replace(/s$/, '');
+
     if (error) {
       console.warn('Supabase fetch failed, falling back to cached providers:', error);
       if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
-      return MOCK_PROVIDERS.filter((p) => p.category_id === categoryId);
+      return MOCK_PROVIDERS.filter((p) => norm(p.category_id) === norm(categoryId));
     }
 
     if (!data || data.length === 0) {
       if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
-      return MOCK_PROVIDERS.filter((p) => p.category_id === categoryId);
+      return MOCK_PROVIDERS.filter((p) => norm(p.category_id) === norm(categoryId));
     }
 
     // Map database rows with Tirupati localized metadata
