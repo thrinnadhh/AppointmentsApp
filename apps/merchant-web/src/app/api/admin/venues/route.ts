@@ -41,9 +41,22 @@ export async function POST(request: Request) {
       );
     }
 
+    const CATEGORY_MAP: Record<string, string> = {
+      clinic: 'clinics',
+      clinics: 'clinics',
+      salon: 'salons',
+      salons: 'salons',
+      gaming: 'gaming',
+      restaurant: 'restaurants',
+      restaurants: 'restaurants',
+      pet: 'pets',
+      pets: 'pets',
+    };
+    const dbCategoryId = CATEGORY_MAP[categoryId.toLowerCase()] || categoryId;
+
     const { data, error } = await supabase.rpc('admin_create_venue', {
       p_name: name,
-      p_category_id: categoryId,
+      p_category_id: dbCategoryId,
       p_address: address,
       p_phone: phone,
       p_opening_time: openingTime || '09:00:00',

@@ -137,9 +137,10 @@ export default function MerchantOverviewPage() {
   };
 
   // Platform Vertical Summation Metrics
-  const clinicsCount = providers.filter((p) => p.category_id === 'clinic').length;
-  const salonsCount = providers.filter((p) => p.category_id === 'salon').length;
-  const gamingCount = providers.filter((p) => p.category_id === 'gaming').length;
+  const normCategory = (c: string) => (c || '').toLowerCase().replace(/s$/, '');
+  const clinicsCount = providers.filter((p) => normCategory(p.category_id) === 'clinic').length;
+  const salonsCount = providers.filter((p) => normCategory(p.category_id) === 'salon').length;
+  const gamingCount = providers.filter((p) => normCategory(p.category_id) === 'gaming').length;
   const totalDoctors = providers.reduce((acc, p) => acc + (p.resources ? p.resources.length : 0), 0);
 
   const confirmedCount = bookings.filter((b) => b.status === 'CONFIRMED').length;

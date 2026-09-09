@@ -117,8 +117,11 @@ export default function VenuesPage() {
     }
   };
 
+  const normCategory = (c: string) => (c || '').toLowerCase().replace(/s$/, '');
+
   const getCategoryIcon = (catId: string) => {
-    switch (catId) {
+    const key = normCategory(catId);
+    switch (key) {
       case 'clinic':
         return <Stethoscope className="w-4 h-4 text-emerald-600" />;
       case 'salon':
@@ -135,7 +138,8 @@ export default function VenuesPage() {
   };
 
   const getCategoryBadgeClass = (catId: string) => {
-    switch (catId) {
+    const key = normCategory(catId);
+    switch (key) {
       case 'clinic':
         return 'bg-emerald-50 text-emerald-800 border-emerald-200';
       case 'salon':
@@ -158,7 +162,7 @@ export default function VenuesPage() {
       v.phone.includes(searchQuery);
 
     if (selectedCategory === 'all') return matchesSearch;
-    return matchesSearch && v.category_id === selectedCategory;
+    return matchesSearch && normCategory(v.category_id) === normCategory(selectedCategory);
   });
 
   return (
@@ -333,6 +337,7 @@ export default function VenuesPage() {
                   </div>
                   <Link
                     href={`/resources?providerId=${venue.id}`}
+                    aria-label={`Manage Staff for ${venue.name}`}
                     className="inline-flex items-center text-xs font-bold text-emerald-700 hover:text-emerald-900 group"
                   >
                     Manage Staff
@@ -382,7 +387,7 @@ export default function VenuesPage() {
                 <input
                   id="venue-name"
                   name="venueName"
-                  aria-label="Business or Venue Name"
+                  aria-label="Business / Venue Name"
                   type="text"
                   required
                   value={name}

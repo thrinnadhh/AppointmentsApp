@@ -31,6 +31,8 @@ next-env.d.ts
 .idea/
 
 # Testing & Logs
+test-results/
+playwright-report/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

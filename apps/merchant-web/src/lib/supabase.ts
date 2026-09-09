@@ -215,9 +215,22 @@ export async function adminCreateVenue(params: {
   email?: string;
   ownerId?: string;
 }) {
+  const CATEGORY_MAP: Record<string, string> = {
+    clinic: 'clinics',
+    clinics: 'clinics',
+    salon: 'salons',
+    salons: 'salons',
+    gaming: 'gaming',
+    restaurant: 'restaurants',
+    restaurants: 'restaurants',
+    pet: 'pets',
+    pets: 'pets',
+  };
+  const dbCategoryId = CATEGORY_MAP[params.categoryId.toLowerCase()] || params.categoryId;
+
   const { data, error } = await supabase.rpc('admin_create_venue', {
     p_name: params.name,
-    p_category_id: params.categoryId,
+    p_category_id: dbCategoryId,
     p_address: params.address,
     p_phone: params.phone,
     p_opening_time: params.openingTime || '09:00:00',
