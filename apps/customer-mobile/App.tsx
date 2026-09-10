@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   TextInput,
+  BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Resource, Slot, Booking } from '@appointments/shared';
@@ -23,15 +24,29 @@ import {
 
 type ScreenType = 'HOME' | 'PROVIDER_DETAIL' | 'MY_BOOKINGS';
 
+export interface NavigationEntry {
+  screen: ScreenType;
+  providerId?: string;
+  categoryId?: string | null;
+}
+
 const DEMO_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<ScreenType>('HOME');
-  const [selectedProviderId, setSelectedProviderId] = useState<string>(MOCK_PROVIDERS[0].id);
+  // Navigation History Stack ensures returning from booking goes to exactly where the user left off
+  const [history, setHistory] = useState<NavigationEntry[]>([
+    { screen: 'HOME', categoryId: null },
+  ]);
   const [checkoutVisible, setCheckoutVisible] = useState<boolean>(false);
   const [profileVisible, setProfileVisible] = useState<boolean>(false);
   const [activeResource, setActiveResource] = useState<Resource | null>(null);
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
+
+  // Derive current screen and state from the top of the history stack
+  const currentEntry = history[history.length - 1] || { screen: 'HOME', categoryId: null };
+  const currentScreen = currentEntry.screen;
+  const activeCategoryId = currentEntry.categoryId ?? null;
+  const selectedProviderId = currentEntry.providerId ?? MOCK_PROVIDERS[0].id;
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
@@ -63,10 +78,86 @@ export default function App() {
     loadBookings();
   }, [loadBookings]);
 
-  const handleSelectProvider = (providerId: string) => {
-    setSelectedProviderId(providerId);
-    setCurrentScreen('PROVIDER_DETAIL');
-  };
+  // Navigate backward through history stack
+  const handleGoBack = useCallback(() => {
+    if (checkoutVisible) {
+      setCheckoutVisible(false);
+      return true;
+    }
+    if (profileVisible) {
+      setProfileVisible(false);
+      return true;
+    }
+    if (currentScreen === 'MY_BOOKINGS') {
+      // Returning from bookings goes back to where the user was browsing (HOME with activeCategoryId preserved)
+      setHistory((prev) => {
+        const lastHomeIdx = prev.map((e) => e.screen === 'HOME').lastIndexOf(true);
+        if (lastHomeIdx >= 0) {
+          return prev.slice(0, lastHomeIdx + 1);
+        }
+        return [{ screen: 'HOME', categoryId: activeCategoryId }];
+      });
+      return true;
+    }
+    if (currentScreen === 'PROVIDER_DETAIL') {
+      // Returning from provider detail goes back to the category venues list
+      setHistory((prev) => {
+        const lastHomeIdx = prev.map((e) => e.screen === 'HOME').lastIndexOf(true);
+        if (lastHomeIdx >= 0) {
+          return prev.slice(0, lastHomeIdx + 1);
+        }
+        return [{ screen: 'HOME', categoryId: activeCategoryId }];
+      });
+      return true;
+    }
+    if (currentScreen === 'HOME' && activeCategoryId) {
+      // User is on Category view and presses Back: return to 5-Category Hub
+      setHistory([{ screen: 'HOME', categoryId: null }]);
+      return true;
+    }
+    if (history.length > 1) {
+      setHistory((prev) => prev.slice(0, -1));
+      return true;
+    }
+    return false;
+  }, [checkoutVisible, profileVisible, currentScreen, activeCategoryId, history.length]);
+
+  // Category selection handler with history stack awareness
+  const handleSelectCategory = useCallback((catId: string | null) => {
+    if (catId === null) {
+      // Returning to All Categories hub: pop back to root hub if in history
+      setHistory((prev) => {
+        const lastHubIdx = prev.map((e) => e.screen === 'HOME' && !e.categoryId).lastIndexOf(true);
+        if (lastHubIdx >= 0) {
+          return prev.slice(0, lastHubIdx + 1);
+        }
+        return [...prev, { screen: 'HOME', categoryId: null }];
+      });
+    } else {
+      setHistory((prev) => {
+        const top = prev[prev.length - 1];
+        if (top && top.screen === 'HOME' && top.categoryId !== null) {
+          // Switch category in-place for horizontal bar tabs to prevent redundant stack build-up
+          return [...prev.slice(0, -1), { screen: 'HOME', categoryId: catId }];
+        }
+        return [...prev, { screen: 'HOME', categoryId: catId }];
+      });
+    }
+  }, []);
+
+  const handleSelectProvider = useCallback((providerId: string) => {
+    setHistory((prev) => [
+      ...prev,
+      { screen: 'PROVIDER_DETAIL', providerId, categoryId: activeCategoryId },
+    ]);
+  }, [activeCategoryId]);
+
+  const handleOpenMyBookings = useCallback(() => {
+    setHistory((prev) => [
+      ...prev,
+      { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
+    ]);
+  }, [selectedProviderId, activeCategoryId]);
 
   const handleProceedToHold = (resource: Resource, slot: Slot) => {
     setActiveResource(resource);
@@ -78,7 +169,11 @@ export default function App() {
     await loadBookings();
     setCheckoutVisible(false);
     setConfirmationToast(`Booking Confirmed on Supabase! Deposit ₹${activeResource?.deposit_amount} captured.`);
-    setCurrentScreen('MY_BOOKINGS');
+    // Push MY_BOOKINGS onto history so clicking back returns to where the user left off (Provider Detail)
+    setHistory((prev) => [
+      ...prev,
+      { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
+    ]);
 
     setTimeout(() => {
       setConfirmationToast(null);
@@ -118,6 +213,22 @@ export default function App() {
     }
   };
 
+  // Hardware Back Navigation (Android)
+  useEffect(() => {
+    const backSub = BackHandler.addEventListener('hardwareBackPress', handleGoBack);
+    return () => backSub.remove();
+  }, [handleGoBack]);
+
+  // Browser Popstate Back Navigation (Web Preview & Mobile Browsers)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.addEventListener) return;
+    const onPopState = () => {
+      handleGoBack();
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [handleGoBack]);
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -125,8 +236,10 @@ export default function App() {
       {/* Screen Router */}
       {currentScreen === 'HOME' && (
         <HomeScreen
+          selectedCategory={activeCategoryId}
+          onSelectCategory={handleSelectCategory}
           onSelectProvider={handleSelectProvider}
-          onOpenMyBookings={() => setCurrentScreen('MY_BOOKINGS')}
+          onOpenMyBookings={handleOpenMyBookings}
           onOpenProfile={() => setProfileVisible(true)}
         />
       )}
@@ -134,14 +247,14 @@ export default function App() {
       {currentScreen === 'PROVIDER_DETAIL' && (
         <ProviderDetailScreen
           providerId={selectedProviderId}
-          onBack={() => setCurrentScreen('HOME')}
+          onBack={handleGoBack}
           onProceedToHold={handleProceedToHold}
         />
       )}
 
       {currentScreen === 'MY_BOOKINGS' && (
         <MyBookingsScreen
-          onBack={() => setCurrentScreen('HOME')}
+          onBack={handleGoBack}
           bookings={customerBookings}
           onCancelBooking={handleCancelBooking}
           onRescheduleBooking={handleRescheduleBooking}
@@ -214,7 +327,7 @@ export default function App() {
                 style={styles.viewBookingsFromProfileBtn}
                 onPress={() => {
                   setProfileVisible(false);
-                  setCurrentScreen('MY_BOOKINGS');
+                  handleOpenMyBookings();
                 }}
               >
                 <Text style={styles.viewBookingsFromProfileText}>
@@ -240,6 +353,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  screenContainer: {
+    flex: 1,
+  },
+  hiddenScreen: {
+    display: 'none',
   },
   toastContainer: {
     position: 'absolute',

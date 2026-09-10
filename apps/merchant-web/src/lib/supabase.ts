@@ -3,10 +3,40 @@ import { Database, BookingStatus, PaymentStatus, Provider, Resource, ResourceTyp
 
 export type { Provider, Resource, ResourceType };
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY — set them in .env, no fallback project is used'
+  );
+}
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+// Service-role client for trusted server-only code (webhooks, cron jobs).
+// NEVER import this in a component that ships to the browser — the service
+// role key bypasses RLS entirely. SUPABASE_SERVICE_ROLE_KEY must not have a
+// NEXT_PUBLIC_ prefix, or it would be bundled into client-side JS.
+// Built lazily on first use so importing this module never throws for code
+// that only needs the plain `supabase` client above.
+let _supabaseAdmin: (typeof supabase) | null = null;
+
+export function getSupabaseAdmin(): typeof supabase {
+  if (!_supabaseAdmin) {
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!key) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY — required for server-only routes');
+      }
+      return supabase;
+    }
+    _supabaseAdmin = createClient<Database>(supabaseUrl!, key, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }) as unknown as typeof supabase;
+  }
+  return _supabaseAdmin;
+}
 
 export interface MerchantBookingWithDetails {
   id: string;
@@ -118,6 +148,19 @@ export async function updateBookingStatus(
   status: Database['public']['Enums']['booking_status'],
   paymentStatus?: Database['public']['Enums']['payment_status']
 ) {
+  if (status === 'CANCELLED') {
+    const { data, error } = await supabase.rpc('cancel_booking', {
+      p_booking_id: bookingId,
+      p_reason: 'Merchant status update',
+      p_initiated_by: 'MERCHANT',
+    });
+    if (error) {
+      console.error('Error cancelling booking:', error);
+      throw error;
+    }
+    return data;
+  }
+
   const updates: Partial<Database['public']['Tables']['bookings']['Update']> = {
     status,
     updated_at: new Date().toISOString(),
@@ -140,19 +183,19 @@ export async function updateBookingStatus(
 }
 
 export async function rescheduleBookingSlot(bookingId: string, newStartIso: string, newEndIso: string) {
-  const { data, error } = await supabase
-    .from('bookings')
-    .update({
-      slot_start: newStartIso,
-      slot_end: newEndIso,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', bookingId)
-    .select();
+  const { data, error } = await supabase.rpc('reschedule_booking_slot', {
+    p_booking_id: bookingId,
+    p_new_slot_start: newStartIso,
+    p_new_slot_end: newEndIso,
+  });
 
   if (error) {
     console.error('Error rescheduling booking:', error);
     throw error;
+  }
+  const result = data as { success?: boolean; error?: string };
+  if (result && !result.success) {
+    throw new Error(result.error || 'Failed to reschedule booking');
   }
   return data;
 }
@@ -194,7 +237,7 @@ export async function adminCreateStaffUser(params: {
     p_password: params.password,
     p_full_name: params.fullName,
     p_role: params.role || 'merchant',
-    p_phone: params.phone || null,
+    p_phone: params.phone || undefined,
   });
 
   if (error) {
@@ -235,9 +278,9 @@ export async function adminCreateVenue(params: {
     p_phone: params.phone,
     p_opening_time: params.openingTime || '09:00:00',
     p_closing_time: params.closingTime || '21:00:00',
-    p_description: params.description || null,
-    p_email: params.email || null,
-    p_owner_id: params.ownerId || null,
+    p_description: params.description || undefined,
+    p_email: params.email || undefined,
+    p_owner_id: params.ownerId || undefined,
   });
 
   if (error) {

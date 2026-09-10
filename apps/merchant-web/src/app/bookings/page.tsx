@@ -66,7 +66,6 @@ export default function BookingsManagementPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookings' },
         (payload) => {
-          console.log('Realtime event received on Bookings page:', payload);
           const newStatus = (payload.new as { status?: string })?.status;
           setFeedbackToast(`Realtime Sync: Slot ${newStatus || 'updated'}`);
           loadData();

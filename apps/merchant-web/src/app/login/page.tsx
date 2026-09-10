@@ -168,12 +168,13 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Demo Credentials Switcher */}
+        {/* Quick Demo Credentials Switcher — DEV ONLY */}
+        {process.env.NODE_ENV === 'development' && (
         <div className="pt-6 border-t border-slate-200">
           <div className="flex items-center gap-1.5 mb-3">
             <KeyRound className="w-4 h-4 text-emerald-600" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-              Demo Credentials (Pre-Configured)
+              Demo Credentials (Dev Only)
             </h3>
           </div>
           <div className="space-y-2">
@@ -235,6 +236,7 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
+        )}
 
         <div className="flex items-center justify-center gap-2 text-xs text-slate-400 text-center">
           <ShieldCheck className="w-4 h-4 text-emerald-600" />

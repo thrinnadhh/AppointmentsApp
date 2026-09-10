@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { RecordNoShowRequest, RecordNoShowResponse } from '@appointments/shared';
 
 interface RpcNoShowResult {
@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase.rpc('record_no_show', {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin.rpc('record_no_show', {
       p_booking_id: booking_id,
     });
 

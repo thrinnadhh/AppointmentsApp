@@ -3,22 +3,44 @@ import {
   Category, 
   Provider, 
   Resource, 
+  ResourceType,
   Slot, 
   Booking, 
   CreateHoldResult, 
   VERTICALS,
-  Database
+  Database,
+  resolveCategoryId,
+  normCategory
 } from '@appointments/shared';
 
 declare const process: { env: Record<string, string | undefined> };
+declare const __DEV__: boolean | undefined;
+const isDev = typeof __DEV__ !== 'undefined' ? Boolean(__DEV__) : process.env.NODE_ENV !== 'production';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
+export type ProviderWithDetails = Provider & {
+  distance_km: number;
+  next_slot: string;
+  resources: Resource[];
+};
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY — set them in .env, no fallback project is used'
+  );
+}
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Base URL for the merchant-web backend API (e.g. the reschedule route).
+// Must be set to the deployed backend URL in any non-local build — localhost
+// only resolves on the same machine the app is running on, never on a real device.
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+
 // Seed data for immediate local preview/offline operation
-export const MOCK_PROVIDERS: (Provider & { distance_km: number; next_slot: string; resources: Resource[] })[] = [
+export const MOCK_PROVIDERS: ProviderWithDetails[] = [
   {
     id: '11111111-1111-1111-1111-111111111111',
     category_id: 'clinics',
@@ -209,63 +231,111 @@ export const MOCK_PROVIDERS: (Provider & { distance_km: number; next_slot: strin
   },
 ];
 
+// In-memory cache for fast instant restoration without network flicker
+const categoryProvidersCache = new Map<string, ProviderWithDetails[]>();
+
+export function getCachedProvidersByCategory(categoryId?: string): ProviderWithDetails[] | null {
+  const key = categoryId || 'all';
+  return categoryProvidersCache.get(key) || null;
+}
+
 // Enhanced Supabase Service for Customer Mobile Application
-export async function fetchProvidersByCategory(categoryId?: string) {
+export async function fetchProvidersByCategory(categoryId?: string): Promise<ProviderWithDetails[]> {
+  const cacheKey = categoryId || 'all';
+  if (categoryProvidersCache.has(cacheKey)) {
+    const cached = categoryProvidersCache.get(cacheKey)!;
+    if (cached.length > 0) {
+      return cached;
+    }
+  }
+
   try {
     let query = supabase
       .from('providers')
       .select('*, resources(*)')
       .eq('status', 'ACTIVE');
 
-    const CATEGORY_MAP: Record<string, string> = {
-      clinic: 'clinics',
-      clinics: 'clinics',
-      salon: 'salons',
-      salons: 'salons',
-      gaming: 'gaming',
-      restaurant: 'restaurants',
-      restaurants: 'restaurants',
-      pet: 'pets',
-      pets: 'pets',
-    };
-    const dbCat = categoryId && categoryId !== 'all' ? (CATEGORY_MAP[categoryId.toLowerCase()] || categoryId) : null;
+    const dbCat = categoryId && categoryId !== 'all' ? resolveCategoryId(categoryId) : null;
 
     if (dbCat) {
       query = query.eq('category_id', dbCat);
     }
 
     const { data, error } = await query;
-    const norm = (c: string) => (c || '').toLowerCase().replace(/s$/, '');
 
     if (error) {
-      console.warn('Supabase fetch failed, falling back to cached providers:', error);
-      if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
-      return MOCK_PROVIDERS.filter((p) => norm(p.category_id) === norm(categoryId));
+      console.warn('Supabase fetch failed:', error);
+      if (isDev) {
+        if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
+        return MOCK_PROVIDERS.filter((p) => normCategory(p.category_id) === normCategory(categoryId));
+      }
+      return [];
     }
 
     if (!data || data.length === 0) {
-      if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
-      return MOCK_PROVIDERS.filter((p) => norm(p.category_id) === norm(categoryId));
+      if (isDev) {
+        if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
+        return MOCK_PROVIDERS.filter((p) => normCategory(p.category_id) === normCategory(categoryId));
+      }
+      return [];
     }
 
     // Map database rows with Tirupati localized metadata
-    return (data as (Provider & { resources?: Resource[] })[]).map((prov, idx: number) => ({
-      ...prov,
-      distance_km: Number((1.2 + idx * 0.7).toFixed(1)),
-      next_slot: 'Today, Available',
-      resources: prov.resources || [],
-    }));
+    const result = data.map((prov, idx: number): ProviderWithDetails => {
+      const resources: Resource[] = (prov.resources || []).map((r) => ({
+        id: r.id,
+        provider_id: r.provider_id,
+        name: r.name,
+        type: r.type as ResourceType,
+        department: r.department,
+        price: r.price,
+        deposit_amount: r.deposit_amount,
+        duration_minutes: r.duration_minutes,
+        capacity: r.capacity,
+        attributes: (r.attributes && typeof r.attributes === 'object' ? r.attributes : {}) as Record<string, unknown>,
+        is_active: r.is_active,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      }));
+
+      return {
+        id: prov.id,
+        owner_id: prov.owner_id,
+        category_id: prov.category_id,
+        sub_category_id: prov.sub_category_id,
+        name: prov.name,
+        description: prov.description,
+        address: prov.address,
+        city: prov.city,
+        latitude: Number(prov.latitude),
+        longitude: Number(prov.longitude),
+        phone: prov.phone,
+        email: prov.email,
+        opening_time: prov.opening_time,
+        closing_time: prov.closing_time,
+        photos: prov.photos,
+        status: prov.status,
+        created_at: prov.created_at,
+        updated_at: prov.updated_at,
+        distance_km: Number((1.2 + idx * 0.7).toFixed(1)),
+        next_slot: 'Today, Available',
+        resources,
+      };
+    });
+
+    categoryProvidersCache.set(cacheKey, result);
+    return result;
   } catch (err) {
     console.warn('Network error in fetchProvidersByCategory:', err);
-    if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
-    return MOCK_PROVIDERS.filter((p) => p.category_id === categoryId);
+    if (isDev) {
+      if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
+      return MOCK_PROVIDERS.filter((p) => normCategory(p.category_id) === normCategory(categoryId));
+    }
+    return [];
   }
 }
 
-export async function fetchProviderById(providerId: string) {
-  const mock = MOCK_PROVIDERS.find((p) => p.id === providerId);
-  if (mock) return mock;
-
+export async function fetchProviderById(providerId: string): Promise<ProviderWithDetails | null> {
   try {
     const { data, error } = await supabase
       .from('providers')
@@ -273,16 +343,57 @@ export async function fetchProviderById(providerId: string) {
       .eq('id', providerId)
       .single();
 
-    if (error || !data) return MOCK_PROVIDERS[0];
+    if (error || !data) {
+      if (isDev) {
+        return MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
+      }
+      return null;
+    }
+
+    const resources: Resource[] = (data.resources || []).map((r) => ({
+      id: r.id,
+      provider_id: r.provider_id,
+      name: r.name,
+      type: r.type as ResourceType,
+      department: r.department,
+      price: r.price,
+      deposit_amount: r.deposit_amount,
+      duration_minutes: r.duration_minutes,
+      capacity: r.capacity,
+      attributes: (r.attributes && typeof r.attributes === 'object' ? r.attributes : {}) as Record<string, unknown>,
+      is_active: r.is_active,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+    }));
 
     return {
-      ...data,
+      id: data.id,
+      owner_id: data.owner_id,
+      category_id: data.category_id,
+      sub_category_id: data.sub_category_id,
+      name: data.name,
+      description: data.description,
+      address: data.address,
+      city: data.city,
+      latitude: Number(data.latitude),
+      longitude: Number(data.longitude),
+      phone: data.phone,
+      email: data.email,
+      opening_time: data.opening_time,
+      closing_time: data.closing_time,
+      photos: data.photos,
+      status: data.status,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
       distance_km: 1.5,
       next_slot: 'Today, Available',
-      resources: (data as any).resources || [],
+      resources,
     };
   } catch {
-    return MOCK_PROVIDERS[0];
+    if (isDev) {
+      return MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
+    }
+    return null;
   }
 }
 
@@ -357,6 +468,26 @@ export async function confirmBookingPaymentOnSupabase(
   bookingId: string,
   paymentGatewayId: string = 'pay_simulated_upi'
 ) {
+  // Attempt via backend API first if configured
+  if (API_BASE_URL) {
+    try {
+      const resp = await fetch(`${API_BASE_URL}/api/bookings/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          booking_id: bookingId,
+          gateway_payment_id: paymentGatewayId,
+        }),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.success) return json;
+      }
+    } catch {
+      // Fall through to direct Supabase or local handling
+    }
+  }
+
   try {
     const { data, error } = await supabase
       .from('bookings')
@@ -369,9 +500,19 @@ export async function confirmBookingPaymentOnSupabase(
       .eq('id', bookingId)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      if (isDev) {
+        console.warn('Direct confirmation bypassed or fell back in dev mode:', error.message);
+        return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED' }];
+      }
+      throw error;
+    }
     return data;
   } catch (err) {
+    if (isDev) {
+      console.warn('Confirm booking dev fallback:', err);
+      return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED' }];
+    }
     console.error('Error confirming booking in Supabase:', err);
     throw err;
   }
@@ -433,23 +574,26 @@ export async function rescheduleBookingOnSupabase(
   newSlotEnd: string
 ) {
   try {
-    // Attempt via backend API first if accessible
-    try {
-      const resp = await fetch('http://localhost:3000/api/bookings/reschedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          booking_id: bookingId,
-          new_slot_start: newSlotStart,
-          new_slot_end: newSlotEnd,
-        }),
-      });
-      if (resp.ok) {
-        const json = await resp.json();
-        if (json.success) return json;
+    // Attempt via backend API first if configured
+    const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL;
+    if (apiBase) {
+      try {
+        const resp = await fetch(`${apiBase}/api/bookings/reschedule`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            booking_id: bookingId,
+            new_slot_start: newSlotStart,
+            new_slot_end: newSlotEnd,
+          }),
+        });
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.success) return json;
+        }
+      } catch {
+        // Fallback directly to Supabase update
       }
-    } catch {
-      // Fallback directly to Supabase update
     }
 
     const { data, error } = await supabase

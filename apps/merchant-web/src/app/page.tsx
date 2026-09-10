@@ -36,6 +36,7 @@ import {
   Resource
 } from '@/lib/supabase';
 import { INITIAL_MERCHANT_PROVIDER, INITIAL_BOOKINGS, INITIAL_RESOURCES } from '@/lib/mock-data';
+import { normCategory } from '@appointments/shared';
 
 export default function MerchantOverviewPage() {
   const [providers, setProviders] = useState<(Provider & { resources?: Resource[] })[]>([INITIAL_MERCHANT_PROVIDER]);
@@ -137,7 +138,6 @@ export default function MerchantOverviewPage() {
   };
 
   // Platform Vertical Summation Metrics
-  const normCategory = (c: string) => (c || '').toLowerCase().replace(/s$/, '');
   const clinicsCount = providers.filter((p) => normCategory(p.category_id) === 'clinic').length;
   const salonsCount = providers.filter((p) => normCategory(p.category_id) === 'salon').length;
   const gamingCount = providers.filter((p) => normCategory(p.category_id) === 'gaming').length;

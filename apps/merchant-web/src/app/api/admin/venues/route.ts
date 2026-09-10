@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -54,7 +54,8 @@ export async function POST(request: Request) {
     };
     const dbCategoryId = CATEGORY_MAP[categoryId.toLowerCase()] || categoryId;
 
-    const { data, error } = await supabase.rpc('admin_create_venue', {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin.rpc('admin_create_venue', {
       p_name: name,
       p_category_id: dbCategoryId,
       p_address: address,

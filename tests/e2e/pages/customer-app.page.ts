@@ -14,13 +14,21 @@ export class CustomerAppPage {
   readonly myBookingsBtn: Locator;
   readonly trustBanner: Locator;
 
-  // Category Filter Locators
+  // Category Filter Locators (The 5 core service mini-logos)
   readonly allCategoriesChip: Locator;
   readonly clinicsChip: Locator;
   readonly restaurantsChip: Locator;
   readonly gamingChip: Locator;
   readonly salonsChip: Locator;
   readonly petsChip: Locator;
+
+  // Search Bar Locators
+  readonly searchInput: Locator;
+  readonly clearSearchBtn: Locator;
+  readonly searchResultsHeading: Locator;
+  readonly emptySearchResults: Locator;
+  readonly resetSearchBtn: Locator;
+  readonly providerCards: Locator;
 
   // Detail Screen Locators
   readonly backButton: Locator;
@@ -53,15 +61,23 @@ export class CustomerAppPage {
     this.locationBadge = page.getByText('Tirupati, AP');
     this.appTitle = page.getByText('Instant Appointments');
     this.myBookingsBtn = page.getByText('Bookings');
-    this.trustBanner = page.getByText(/guarantees your slot with zero waiting/i);
+    this.trustBanner = page.getByText(/guarantees your slot with zero waiting/i).first();
 
-    // Categories (matching VERTICALS constant names)
-    this.allCategoriesChip = page.getByText('All Categories');
-    this.clinicsChip = page.getByText('Hospitals & Clinics', { exact: true });
-    this.restaurantsChip = page.getByText('Restaurants & Dining', { exact: true });
-    this.gamingChip = page.getByText('Gaming & Turf', { exact: true });
-    this.salonsChip = page.getByText('Salons & Spas', { exact: true });
-    this.petsChip = page.getByText('Pet Care & Clinic', { exact: true });
+    // The 5 Category Mini-Logos
+    this.allCategoriesChip = page.getByText('← All Categories');
+    this.clinicsChip = page.getByText('Hospitals & Clinics', { exact: true }).first();
+    this.restaurantsChip = page.getByText('Restaurants & Dining', { exact: true }).first();
+    this.gamingChip = page.getByText('Gaming & Turf', { exact: true }).first();
+    this.salonsChip = page.getByText('Salons & Spas', { exact: true }).first();
+    this.petsChip = page.getByText('Pet Care & Clinic', { exact: true }).first();
+
+    // Search Bar & Filters
+    this.searchInput = page.getByTestId('customer-search-input');
+    this.clearSearchBtn = page.getByTestId('clear-search-button');
+    this.searchResultsHeading = page.locator('text=/Search Results \\([0-9]+\\)/');
+    this.emptySearchResults = page.getByText(/No venues found in/i);
+    this.resetSearchBtn = page.getByTestId('reset-search-button');
+    this.providerCards = page.getByTestId('provider-card');
 
     // Detail Screen
     this.backButton = page.getByText('← Back');
@@ -94,15 +110,35 @@ export class CustomerAppPage {
   }
 
   async selectCategory(categoryName: string) {
-    const chip = this.page.getByText(categoryName, { exact: true });
+    const chip = this.page.getByText(categoryName, { exact: true }).first();
     await chip.scrollIntoViewIfNeeded();
     await expect(chip).toBeVisible();
     await chip.click();
-    await this.page.waitForTimeout(300);
+    await expect(this.searchInput).toBeVisible();
+  }
+
+  async search(query: string) {
+    await expect(this.searchInput).toBeVisible();
+    await this.searchInput.fill(query);
+  }
+
+  async clearSearch() {
+    await expect(this.clearSearchBtn).toBeVisible();
+    await this.clearSearchBtn.click();
+    await expect(this.clearSearchBtn).not.toBeVisible();
+  }
+
+  async resetSearchFromEmptyState() {
+    await expect(this.resetSearchBtn).toBeVisible();
+    await this.resetSearchBtn.click();
+    await expect(this.emptySearchResults).not.toBeVisible();
   }
 
   async selectProviderByName(name: string) {
     const card = this.page.getByText(name).first();
+    if (!(await card.isVisible().catch(() => false))) {
+      await this.selectCategory('Hospitals & Clinics');
+    }
     await expect(card).toBeVisible();
     await card.click();
     await expect(this.staffSectionHeading).toBeVisible();

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { CancelBookingRequest, CancelBookingResponse, isEligibleForFullRefund } from '@appointments/shared';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { CancelBookingRequest, CancelBookingResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,72 +14,47 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: booking, error: fetchError } = await supabase
-      .from('bookings')
-      .select('id, slot_start, deposit_amount, status, payment_status, gateway_payment_id')
-      .eq('id', booking_id)
-      .single();
+    const supabaseAdmin = getSupabaseAdmin();
 
-    if (fetchError || !booking) {
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('cancel_booking', {
+      p_booking_id: booking_id,
+      p_reason: reason || 'Standard cancellation',
+      p_initiated_by: initiated_by,
+    });
+
+    if (rpcError) {
       return NextResponse.json<CancelBookingResponse>(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
-      );
-    }
-
-    if (booking.status === 'CANCELLED') {
-      return NextResponse.json<CancelBookingResponse>(
-        { success: false, error: 'Booking is already cancelled' },
-        { status: 400 }
-      );
-    }
-
-    // Determine refund eligibility based on 1-hour policy
-    const policyResult = isEligibleForFullRefund(booking.slot_start, initiated_by);
-    const newPaymentStatus = policyResult.eligible ? 'REFUNDED' : 'FORFEITED';
-    const refundAmount = policyResult.eligible ? Number(booking.deposit_amount) : 0;
-
-    // 1. Update booking
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
-        status: 'CANCELLED',
-        payment_status: newPaymentStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', booking_id);
-
-    if (updateError) {
-      return NextResponse.json<CancelBookingResponse>(
-        { success: false, error: updateError.message },
+        { success: false, error: rpcError.message },
         { status: 500 }
       );
     }
 
-    // 2. Update payment ledger
-    if (booking.gateway_payment_id) {
-      await supabase
-        .from('payments')
-        .update({
-          status: newPaymentStatus,
-          updated_at: new Date().toISOString(),
-          metadata: {
-            cancellation_reason: reason || 'Standard cancellation',
-            initiated_by,
-            policy_rule: policyResult.rule,
-          },
-        })
-        .eq('booking_id', booking_id);
+    const result = rpcData as {
+      success: boolean;
+      error?: string;
+      booking_id?: string;
+      status?: 'CANCELLED';
+      payment_status?: 'REFUNDED' | 'FORFEITED';
+      refund_eligible?: boolean;
+      refund_amount?: number;
+    };
+
+    if (!result?.success) {
+      const isNotFound = result?.error === 'Booking not found';
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: result?.error || 'Failed to cancel booking' },
+        { status: isNotFound ? 404 : 400 }
+      );
     }
 
     return NextResponse.json<CancelBookingResponse>(
       {
         success: true,
-        booking_id,
+        booking_id: result.booking_id || booking_id,
         status: 'CANCELLED',
-        payment_status: newPaymentStatus,
-        refund_eligible: policyResult.eligible,
-        refund_amount: refundAmount,
+        payment_status: result.payment_status || 'FORFEITED',
+        refund_eligible: result.refund_eligible ?? false,
+        refund_amount: result.refund_amount !== undefined ? Number(result.refund_amount) : 0,
         error: undefined,
       },
       { status: 200 }

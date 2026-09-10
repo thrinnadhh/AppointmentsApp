@@ -288,14 +288,22 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
   // =========================================================================
   test.describe('Customer Mobile Screen Navigation & Flow Audit', () => {
 
-    test('3.1 Should verify Customer HomeScreen navigation items, search bar, and trust banner', async ({ page }) => {
+    test('3.1 Should verify Customer HomeScreen navigation items, 5 category mini logos, and category search', async ({ page }) => {
       await page.goto('http://localhost:8081');
       await expect(page.getByText('Tirupati, AP')).toBeVisible();
       await expect(page.getByText('Instant Appointments')).toBeVisible();
       await expect(page.getByText('Bookings')).toBeVisible();
       await expect(page.getByText(/guarantees your slot with zero waiting/i)).toBeVisible();
 
-      // Test real-time search input
+      // Verify the 5 category mini logos on first page
+      await expect(page.getByText('Hospitals & Clinics', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Salons & Spas', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Restaurants & Dining', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Gaming & Turf', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Pet Care & Clinic', { exact: true }).first()).toBeVisible();
+
+      // Tap category to view related data & search
+      await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
       const searchInput = page.getByPlaceholder(/Search doctors, salons, restaurants/i);
       await expect(searchInput).toBeVisible();
       await searchInput.fill('Dental');
@@ -323,6 +331,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('3.3 Should verify complete Provider Detail view and doctor selection', async ({ page }) => {
       await page.goto('http://localhost:8081');
+      await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
       const providerCard = page.getByText('Sri Venkateswara Dental & Implant Care');
       await providerCard.click();
 

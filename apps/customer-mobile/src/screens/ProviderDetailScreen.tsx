@@ -9,7 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Resource, Slot } from '@appointments/shared';
-import { MOCK_PROVIDERS, generateAvailableSlots, fetchProviderById } from '../services/api';
+import { MOCK_PROVIDERS, generateAvailableSlots, fetchProviderById, ProviderWithDetails } from '../services/api';
 
 interface ProviderDetailScreenProps {
   providerId: string;
@@ -23,7 +23,7 @@ export default function ProviderDetailScreen({
   onProceedToHold,
 }: ProviderDetailScreenProps) {
   const initialProvider = MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
-  const [provider, setProvider] = useState(initialProvider);
+  const [provider, setProvider] = useState<ProviderWithDetails>(initialProvider);
   const [selectedResource, setSelectedResource] = useState<Resource>(
     initialProvider.resources?.[0] || MOCK_PROVIDERS[0].resources[0]
   );
@@ -35,7 +35,7 @@ export default function ProviderDetailScreen({
     async function load() {
       const p = await fetchProviderById(providerId);
       if (isMounted && p) {
-        setProvider(p as any);
+        setProvider(p);
         if (p.resources && p.resources.length > 0) {
           setSelectedResource(p.resources[0]);
         }
@@ -60,12 +60,19 @@ export default function ProviderDetailScreen({
     <SafeAreaView style={styles.safeArea}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+        >
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.topBarTitle} numberOfLines={1}>
-          {provider.name}
-        </Text>
+        <View style={styles.topBarCenter}>
+          <Text style={styles.topBarTitle} numberOfLines={1}>
+            {provider.name}
+          </Text>
+        </View>
         <View style={{ width: 60 }} />
       </View>
 
@@ -194,7 +201,12 @@ export default function ProviderDetailScreen({
         <TouchableOpacity
           style={[styles.holdButton, !selectedSlot && styles.holdButtonDisabled]}
           disabled={!selectedSlot}
-          onPress={() => selectedSlot && onProceedToHold(selectedResource, selectedSlot)}
+          onPress={() => {
+            if (selectedSlot) {
+              const currentSlot = selectedSlot;
+              onProceedToHold(selectedResource, currentSlot);
+            }
+          }}
         >
           <Text style={styles.holdButtonText}>
             {selectedSlot ? 'Hold Slot & Pay Deposit →' : 'Select a Time Slot'}
@@ -230,11 +242,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
+  topBarCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    marginHorizontal: 8,
+  },
   topBarTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0f172a',
-    maxWidth: 200,
+    textAlign: 'center',
+    maxWidth: 220,
+  },
+  brandSubtitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+    letterSpacing: 0.5,
+    marginTop: 1,
   },
   container: {
     flex: 1,

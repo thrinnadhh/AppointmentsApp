@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   try {
@@ -9,7 +9,8 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    let query = supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
       .from('bookings')
       .select(`
         *,

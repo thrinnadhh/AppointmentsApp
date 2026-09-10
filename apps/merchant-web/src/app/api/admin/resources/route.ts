@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   try {
@@ -49,7 +49,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await supabase.rpc('admin_create_resource', {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin.rpc('admin_create_resource', {
       p_provider_id: providerId,
       p_name: name,
       p_type: type,

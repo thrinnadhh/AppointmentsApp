@@ -428,6 +428,22 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_booking: {
+        Args: {
+          p_booking_id: string
+          p_initiated_by?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      confirm_booking_payment: {
+        Args: {
+          p_booking_id: string
+          p_deposit_amount?: number
+          p_gateway_payment_id: string
+        }
+        Returns: Json
+      }
       create_booking_hold: {
         Args: {
           p_customer_id: string
@@ -437,8 +453,17 @@ export type Database = {
         }
         Returns: Json
       }
+      is_admin: { Args: never; Returns: boolean }
       record_no_show: { Args: { p_booking_id: string }; Returns: Json }
       release_expired_holds: { Args: never; Returns: Json }
+      reschedule_booking_slot: {
+        Args: {
+          p_booking_id: string
+          p_new_slot_end: string
+          p_new_slot_start: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       booking_status:

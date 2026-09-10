@@ -55,12 +55,8 @@ export default function Navigation() {
             role: (userProfile.user.user_metadata?.role as string) || 'merchant',
           });
         } else {
-          // Default demo session fallback for display
-          setCurrentUser({
-            email: 'admin@appointments-tirupati.com',
-            fullName: 'Super Admin (Platform Owner)',
-            role: 'admin',
-          });
+          // No session — don't fake a user; the Sign In button will show
+          setCurrentUser(null);
         }
       } catch (err) {
         console.warn('Auth check fallback:', err);

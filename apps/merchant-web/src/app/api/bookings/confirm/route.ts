@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { ConfirmPaymentRequest, ConfirmPaymentResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
@@ -14,51 +14,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: booking, error: fetchError } = await supabase
-      .from('bookings')
-      .select('id, status, deposit_amount')
-      .eq('id', booking_id)
-      .single();
-
-    if (fetchError || !booking) {
-      return NextResponse.json<ConfirmPaymentResponse>(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
-      );
-    }
-
-    const resolvedAmount = deposit_amount ?? booking.deposit_amount ?? 100;
+    const supabaseAdmin = getSupabaseAdmin();
     const resolvedGatewayId = gateway_payment_id || `sim_${Date.now()}`;
 
-    // 1. Update booking
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
-        status: 'CONFIRMED',
-        payment_status: 'CAPTURED',
-        gateway_payment_id: resolvedGatewayId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', booking_id);
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: resolvedGatewayId,
+      p_deposit_amount: deposit_amount ?? undefined,
+    });
 
-    if (updateError) {
+    if (rpcError) {
       return NextResponse.json<ConfirmPaymentResponse>(
-        { success: false, error: updateError.message },
+        { success: false, error: rpcError.message },
         { status: 500 }
       );
     }
 
-    // 2. Record payment in ledger
-    const { error: paymentError } = await supabase.from('payments').insert({
-      booking_id,
-      gateway_payment_id: resolvedGatewayId,
-      amount: resolvedAmount,
-      currency: 'INR',
-      status: 'CAPTURED',
-    });
-
-    if (paymentError) {
-      console.warn('Payment insert notice:', paymentError.message);
+    const result = rpcData as { success: boolean; error?: string };
+    if (!result?.success) {
+      const isNotFound = result?.error === 'Booking not found';
+      return NextResponse.json<ConfirmPaymentResponse>(
+        { success: false, error: result?.error || 'Failed to confirm booking' },
+        { status: isNotFound ? 404 : 400 }
+      );
     }
 
     return NextResponse.json<ConfirmPaymentResponse>(
