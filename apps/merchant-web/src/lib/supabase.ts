@@ -40,6 +40,7 @@ export function getSupabaseAdmin(): typeof supabase {
 
 export interface MerchantBookingWithDetails {
   id: string;
+  reference_code?: string | null;
   customer_id: string;
   provider_id: string;
   resource_id: string;

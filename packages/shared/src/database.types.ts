@@ -24,6 +24,7 @@ export type Database = {
           id: string
           payment_status: Database["public"]["Enums"]["payment_status"]
           provider_id: string
+          reference_code: string | null
           resource_id: string
           slot_end: string
           slot_start: string
@@ -39,6 +40,7 @@ export type Database = {
           id?: string
           payment_status?: Database["public"]["Enums"]["payment_status"]
           provider_id: string
+          reference_code?: string | null
           resource_id: string
           slot_end: string
           slot_start: string
@@ -54,6 +56,7 @@ export type Database = {
           id?: string
           payment_status?: Database["public"]["Enums"]["payment_status"]
           provider_id?: string
+          reference_code?: string | null
           resource_id?: string
           slot_end?: string
           slot_start?: string
@@ -461,6 +464,12 @@ export type Database = {
           p_booking_id: string
           p_new_slot_end: string
           p_new_slot_start: string
+        }
+        Returns: Json
+      }
+      search_directory: {
+        Args: {
+          p_query?: string
         }
         Returns: Json
       }

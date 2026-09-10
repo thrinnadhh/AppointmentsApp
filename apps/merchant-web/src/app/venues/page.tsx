@@ -156,9 +156,12 @@ export default function VenuesPage() {
   };
 
   const filteredVenues = venues.filter((v) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch = 
-      v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      v.name.toLowerCase().includes(q) ||
+      v.address.toLowerCase().includes(q) ||
+      (v.description && v.description.toLowerCase().includes(q)) ||
+      (v.resources && v.resources.some((r) => r.name.toLowerCase().includes(q) || (r.department && r.department.toLowerCase().includes(q)))) ||
       v.phone.includes(searchQuery);
 
     if (selectedCategory === 'all') return matchesSearch;

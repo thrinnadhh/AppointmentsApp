@@ -32,7 +32,7 @@ export default function BookingPassModal({
     month: 'short',
     year: 'numeric',
   });
-  const passId = `APT-${booking.id.slice(0, 8).toUpperCase()}`;
+  const passId = booking.reference_code || `TPT-${booking.id.slice(0, 6).toUpperCase()}`;
 
   const handleDirections = () => {
     Alert.alert(

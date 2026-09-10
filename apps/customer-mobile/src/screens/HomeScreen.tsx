@@ -11,12 +11,13 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
-import { VERTICALS } from '@appointments/shared';
+import { VERTICALS, normCategory } from '@appointments/shared';
 import {
   MOCK_PROVIDERS,
   fetchProvidersByCategory,
   ProviderWithDetails,
   getCachedProvidersByCategory,
+  searchDirectoryOnSupabase,
 } from '../services/api';
 
 interface VerticalVisual {
@@ -123,6 +124,7 @@ export default function HomeScreen({
     }
   };
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [fuzzyResults, setFuzzyResults] = useState<ProviderWithDetails[] | null>(null);
   const [providers, setProviders] = useState<ProviderWithDetails[]>(() => {
     const cached = getCachedProvidersByCategory(selectedCategory || undefined);
     if (cached && cached.length > 0) return cached;
@@ -204,20 +206,53 @@ export default function HomeScreen({
     };
   }, [selectedCategory]);
 
-  const filteredProviders = providers.filter((p) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.trim().toLowerCase();
-    const matchName = p.name?.toLowerCase().includes(q);
-    const matchDesc = p.description?.toLowerCase().includes(q);
-    const matchAddr = p.address?.toLowerCase().includes(q);
-    const matchResource = p.resources?.some(
-      (r) =>
-        r.name?.toLowerCase().includes(q) ||
-        (r.attributes as Record<string, string | undefined>)?.specialization?.toLowerCase().includes(q) ||
-        r.department?.toLowerCase().includes(q)
-    );
-    return matchName || matchDesc || matchAddr || matchResource;
-  });
+  // Typo-tolerant fuzzy search via Supabase pg_trgm
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q || q.length < 3) {
+      setFuzzyResults(null);
+      return;
+    }
+
+    let isCurrent = true;
+    const timeout = setTimeout(async () => {
+      try {
+        const results = await searchDirectoryOnSupabase(q);
+        if (isCurrent && results.length > 0) {
+          const scoped = selectedCategory && selectedCategory !== 'all'
+            ? results.filter((p) => normCategory(p.category_id) === normCategory(selectedCategory))
+            : results;
+          setFuzzyResults(scoped.length > 0 ? scoped : results);
+        } else if (isCurrent) {
+          setFuzzyResults(null);
+        }
+      } catch {
+        if (isCurrent) setFuzzyResults(null);
+      }
+    }, 250);
+
+    return () => {
+      isCurrent = false;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery, selectedCategory]);
+
+  const filteredProviders = fuzzyResults && fuzzyResults.length > 0
+    ? fuzzyResults
+    : providers.filter((p) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.trim().toLowerCase();
+        const matchName = p.name?.toLowerCase().includes(q);
+        const matchDesc = p.description?.toLowerCase().includes(q);
+        const matchAddr = p.address?.toLowerCase().includes(q);
+        const matchResource = p.resources?.some(
+          (r) =>
+            r.name?.toLowerCase().includes(q) ||
+            (r.attributes as Record<string, string | undefined>)?.specialization?.toLowerCase().includes(q) ||
+            r.department?.toLowerCase().includes(q)
+        );
+        return matchName || matchDesc || matchAddr || matchResource;
+      });
 
   const currentVertical = getVerticalInfo(selectedCategory || undefined);
   const currentVisual = getVerticalVisual(selectedCategory || undefined);

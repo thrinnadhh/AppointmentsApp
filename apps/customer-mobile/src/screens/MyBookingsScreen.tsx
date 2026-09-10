@@ -123,7 +123,14 @@ export default function MyBookingsScreen({
             return (
               <View key={booking.id} style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.providerName}>{booking.provider_name || 'Service Provider'}</Text>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.providerName}>{booking.provider_name || 'Service Provider'}</Text>
+                    {booking.reference_code && (
+                      <View style={styles.refCodeBadge}>
+                        <Text style={styles.refCodeText}>Ref: {booking.reference_code}</Text>
+                      </View>
+                    )}
+                  </View>
                   <View
                     style={[
                       styles.statusBadge,
@@ -368,8 +375,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#0f172a',
-    flex: 1,
-    marginRight: 8,
+  },
+  refCodeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 3,
+  },
+  refCodeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0f172a',
+    fontFamily: 'Courier',
   },
   statusBadge: {
     paddingHorizontal: 8,

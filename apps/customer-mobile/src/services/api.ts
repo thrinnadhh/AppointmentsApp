@@ -431,12 +431,72 @@ export async function fetchCustomerBookingsFromSupabase(customerId: string = '99
   }
 }
 
+export async function searchDirectoryOnSupabase(query: string): Promise<ProviderWithDetails[]> {
+  try {
+    const { data, error } = await supabase.rpc('search_directory', {
+      p_query: query,
+    });
+
+    if (error || !data) {
+      console.warn('Supabase fuzzy search failed:', error);
+      return [];
+    }
+
+    const rawList = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
+    return rawList.map((prov, idx: number): ProviderWithDetails => {
+      const rawResources = Array.isArray(prov.resources) ? prov.resources : [];
+      const resources: Resource[] = rawResources.map((r: Record<string, unknown>) => ({
+        id: String(r.id),
+        provider_id: String(r.provider_id),
+        name: String(r.name),
+        type: r.type as ResourceType,
+        department: r.department ? String(r.department) : null,
+        price: typeof r.price === 'number' ? r.price : null,
+        deposit_amount: Number(r.deposit_amount) || 0,
+        duration_minutes: Number(r.duration_minutes) || 30,
+        capacity: Number(r.capacity) || 1,
+        attributes: (r.attributes && typeof r.attributes === 'object' ? r.attributes : {}) as Record<string, unknown>,
+        is_active: Boolean(r.is_active),
+        created_at: String(r.created_at || new Date().toISOString()),
+        updated_at: String(r.updated_at || new Date().toISOString()),
+      }));
+
+      return {
+        id: String(prov.id),
+        owner_id: prov.owner_id ? String(prov.owner_id) : null,
+        category_id: String(prov.category_id),
+        sub_category_id: prov.sub_category_id ? String(prov.sub_category_id) : null,
+        name: String(prov.name),
+        description: prov.description ? String(prov.description) : null,
+        address: String(prov.address || ''),
+        city: String(prov.city || 'Tirupati'),
+        latitude: Number(prov.latitude) || 13.6288,
+        longitude: Number(prov.longitude) || 79.4192,
+        phone: String(prov.phone || ''),
+        email: prov.email ? String(prov.email) : null,
+        opening_time: String(prov.opening_time || '09:00:00'),
+        closing_time: String(prov.closing_time || '21:00:00'),
+        photos: Array.isArray(prov.photos) ? (prov.photos as string[]) : null,
+        status: (prov.status as Provider['status']) || 'ACTIVE',
+        created_at: String(prov.created_at || new Date().toISOString()),
+        updated_at: String(prov.updated_at || new Date().toISOString()),
+        distance_km: Number((1.2 + idx * 0.7).toFixed(1)),
+        next_slot: 'Today, Available',
+        resources,
+      };
+    });
+  } catch (err) {
+    console.warn('Network error in searchDirectoryOnSupabase:', err);
+    return [];
+  }
+}
+
 export async function createHoldOnSupabase(
   customerId: string,
   resourceId: string,
   slotStart: string,
   slotEnd: string
-): Promise<{ success: boolean; booking_id?: string; deposit_amount?: number; error?: string }> {
+): Promise<{ success: boolean; booking_id?: string; reference_code?: string; deposit_amount?: number; error?: string }> {
   try {
     const { data, error } = await supabase.rpc('create_booking_hold', {
       p_customer_id: customerId,
@@ -450,10 +510,11 @@ export async function createHoldOnSupabase(
       return { success: false, error: error.message };
     }
 
-    const result = data as { success?: boolean; booking_id?: string; deposit_amount?: number; error?: string } | null;
+    const result = data as { success?: boolean; booking_id?: string; reference_code?: string; deposit_amount?: number; error?: string } | null;
     return {
       success: result?.success ?? true,
       booking_id: result?.booking_id,
+      reference_code: result?.reference_code,
       deposit_amount: result?.deposit_amount,
       error: result?.error,
     };

@@ -85,6 +85,7 @@ export interface Slot {
 
 export interface Booking {
   id: string;
+  reference_code?: string | null;
   customer_id: string;
   provider_id: string;
   resource_id: string;
@@ -128,6 +129,7 @@ export interface UserProfile {
 export interface CreateHoldResult {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
   deposit_amount?: number;
   hold_expires_at?: string;
   error?: string;

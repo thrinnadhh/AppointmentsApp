@@ -42,7 +42,7 @@ CREATE OR REPLACE FUNCTION public.admin_create_user(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   v_user_id uuid := gen_random_uuid();
@@ -69,7 +69,7 @@ BEGIN
     RAISE EXCEPTION 'User with this email already exists';
   END IF;
 
-  v_encrypted_pw := crypt(p_password, gen_salt('bf'));
+  v_encrypted_pw := extensions.crypt(p_password, extensions.gen_salt('bf'));
   v_phone := COALESCE(p_phone, '+91' || lpad((floor(random() * 9000000000) + 1000000000)::text, 10, '0'));
 
   INSERT INTO auth.users (
