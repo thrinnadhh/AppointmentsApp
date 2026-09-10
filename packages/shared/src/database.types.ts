@@ -388,43 +388,43 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_resource: {
+        Args: {
+          p_attributes?: Json
+          p_capacity?: number
+          p_department?: string
+          p_deposit_amount?: number
+          p_duration_minutes?: number
+          p_name: string
+          p_price?: number
+          p_provider_id: string
+          p_type: string
+        }
+        Returns: Json
+      }
       admin_create_user: {
         Args: {
           p_email: string
-          p_password: string
           p_full_name: string
+          p_password: string
+          p_phone?: string
           p_role?: string
-          p_phone?: string | null
         }
         Returns: Json
       }
       admin_create_venue: {
         Args: {
-          p_name: string
-          p_category_id: string
           p_address: string
-          p_phone: string
-          p_opening_time?: string
+          p_category_id: string
           p_closing_time?: string
-          p_description?: string | null
-          p_email?: string | null
-          p_owner_id?: string | null
+          p_description?: string
+          p_email?: string
           p_latitude?: number
           p_longitude?: number
-        }
-        Returns: Json
-      }
-      admin_create_resource: {
-        Args: {
-          p_provider_id: string
           p_name: string
-          p_type: string
-          p_department?: string
-          p_price?: number
-          p_deposit_amount?: number
-          p_duration_minutes?: number
-          p_capacity?: number
-          p_attributes?: Json
+          p_opening_time?: string
+          p_owner_id?: string
+          p_phone: string
         }
         Returns: Json
       }
@@ -438,7 +438,7 @@ export type Database = {
         Returns: Json
       }
       record_no_show: { Args: { p_booking_id: string }; Returns: Json }
-      release_expired_holds: { Args: Record<string, never>; Returns: Json }
+      release_expired_holds: { Args: never; Returns: Json }
     }
     Enums: {
       booking_status:

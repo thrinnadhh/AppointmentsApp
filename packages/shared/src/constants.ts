@@ -52,3 +52,35 @@ export const VERTICALS = [
     unitName: 'Vet / Groomer',
   },
 ] as const;
+
+/**
+ * Canonical mapping from user-facing category names (singular/plural)
+ * to database category_id values. Single source of truth — do not
+ * duplicate this in app-level code.
+ */
+export const CATEGORY_MAP: Record<string, string> = {
+  clinic: 'clinics',
+  clinics: 'clinics',
+  hospital: 'clinics',
+  hospitals: 'clinics',
+  salon: 'salons',
+  salons: 'salons',
+  spa: 'salons',
+  gaming: 'gaming',
+  turf: 'gaming',
+  restaurant: 'restaurants',
+  restaurants: 'restaurants',
+  dining: 'restaurants',
+  pet: 'pets',
+  pets: 'pets',
+};
+
+/** Normalize a category string for comparison (lowercase, strip trailing 's') */
+export function normCategory(category: string): string {
+  return (category || '').toLowerCase().replace(/s$/, '');
+}
+
+/** Resolve a user-supplied category to its database category_id */
+export function resolveCategoryId(input: string): string {
+  return CATEGORY_MAP[input.toLowerCase()] || input;
+}

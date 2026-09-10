@@ -14,8 +14,11 @@
     "status": "python3 .agents/scripts/session_manager.py status .",
     "dev:merchant": "pnpm --filter @appointments/merchant-web dev",
     "dev:mobile": "pnpm --filter @appointments/customer-mobile start",
-    "build": "pnpm --filter \"./apps/*\" build",
-    "lint": "pnpm --filter \"./apps/*\" lint"
+    "build": "pnpm -r --if-present build",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test:e2e": "playwright test",
+    "test": "pnpm test:e2e"
   },
   "keywords": [
     "appointments",
