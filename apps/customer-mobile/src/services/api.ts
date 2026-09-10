@@ -335,6 +335,78 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
   }
 }
 
+export async function fetchNearbyProviders(
+  lat: number = 13.6288,
+  lng: number = 79.4192,
+  categoryId?: string,
+  radiusMeters: number = 25000
+): Promise<ProviderWithDetails[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_nearby_providers', {
+      p_lat: lat,
+      p_lng: lng,
+      p_category: categoryId && categoryId !== 'all' ? resolveCategoryId(categoryId) : null,
+      p_radius_meters: radiusMeters,
+    });
+
+    if (error || !data) {
+      console.warn('Supabase get_nearby_providers error, falling back to fetchProvidersByCategory:', error);
+      return fetchProvidersByCategory(categoryId);
+    }
+
+    const rawList = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
+    if (rawList.length === 0) {
+      return fetchProvidersByCategory(categoryId);
+    }
+
+    return rawList.map((prov): ProviderWithDetails => {
+      const rawResources = Array.isArray(prov.resources) ? prov.resources : [];
+      const resources: Resource[] = rawResources.map((r: Record<string, unknown>) => ({
+        id: String(r.id),
+        provider_id: String(r.provider_id),
+        name: String(r.name),
+        type: r.type as ResourceType,
+        department: r.department ? String(r.department) : null,
+        price: typeof r.price === 'number' ? r.price : null,
+        deposit_amount: Number(r.deposit_amount) || 0,
+        duration_minutes: Number(r.duration_minutes) || 30,
+        capacity: Number(r.capacity) || 1,
+        attributes: (r.attributes && typeof r.attributes === 'object' ? r.attributes : {}) as Record<string, unknown>,
+        is_active: Boolean(r.is_active),
+        created_at: String(r.created_at || new Date().toISOString()),
+        updated_at: String(r.updated_at || new Date().toISOString()),
+      }));
+
+      return {
+        id: String(prov.id),
+        owner_id: prov.owner_id ? String(prov.owner_id) : null,
+        category_id: String(prov.category_id),
+        sub_category_id: prov.sub_category_id ? String(prov.sub_category_id) : null,
+        name: String(prov.name),
+        description: prov.description ? String(prov.description) : null,
+        address: String(prov.address || ''),
+        city: String(prov.city || 'Tirupati'),
+        latitude: Number(prov.latitude) || lat,
+        longitude: Number(prov.longitude) || lng,
+        phone: String(prov.phone || ''),
+        email: prov.email ? String(prov.email) : null,
+        opening_time: String(prov.opening_time || '09:00:00'),
+        closing_time: String(prov.closing_time || '21:00:00'),
+        photos: Array.isArray(prov.photos) ? (prov.photos as string[]) : null,
+        status: (prov.status as Provider['status']) || 'ACTIVE',
+        created_at: String(prov.created_at || new Date().toISOString()),
+        updated_at: String(prov.updated_at || new Date().toISOString()),
+        distance_km: Number(prov.distance_km) || 1.2,
+        next_slot: 'Today, Available',
+        resources,
+      };
+    });
+  } catch (err) {
+    console.warn('Network error in fetchNearbyProviders:', err);
+    return fetchProvidersByCategory(categoryId);
+  }
+}
+
 export async function fetchProviderById(providerId: string): Promise<ProviderWithDetails | null> {
   try {
     const { data, error } = await supabase

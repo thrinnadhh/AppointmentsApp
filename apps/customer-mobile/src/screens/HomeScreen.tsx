@@ -15,6 +15,7 @@ import { VERTICALS, normCategory } from '@appointments/shared';
 import {
   MOCK_PROVIDERS,
   fetchProvidersByCategory,
+  fetchNearbyProviders,
   ProviderWithDetails,
   getCachedProvidersByCategory,
   searchDirectoryOnSupabase,
@@ -190,12 +191,12 @@ export default function HomeScreen({
         setLoading(true);
       }
       try {
-        const data = await fetchProvidersByCategory(selectedCategory || undefined);
+        const data = await fetchNearbyProviders(13.6288, 79.4192, selectedCategory || undefined);
         if (isMounted) {
           setProviders(data);
         }
       } catch (e) {
-        console.warn('Error loading providers for category:', e);
+        console.warn('Error loading nearby providers for category:', e);
       } finally {
         if (isMounted) setLoading(false);
       }

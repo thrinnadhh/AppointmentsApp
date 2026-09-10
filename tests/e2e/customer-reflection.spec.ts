@@ -202,4 +202,36 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
       expect(Array.isArray(venue.resources)).toBe(true);
     }
   });
+
+  test('6. Should verify PostGIS spatial RPC get_nearby_providers calculates distance and sorts by proximity', async () => {
+    // Call Supabase PostGIS spatial RPC from Tirupati town center (13.6288, 79.4192)
+    const { data, error } = await customerSupabase.rpc('get_nearby_providers', {
+      p_lat: 13.6288,
+      p_lng: 79.4192,
+      p_category: 'clinics',
+      p_radius_meters: 50000,
+    });
+
+    expect(error).toBeNull();
+    expect(data).toBeDefined();
+    const providers = data as Array<{
+      id: string;
+      name: string;
+      category_id: string;
+      distance_meters: number;
+      distance_km: number;
+      resources: unknown[];
+    }>;
+    expect(providers.length).toBeGreaterThan(0);
+
+    // Verify distance calculation and ascending proximity sort
+    let previousDistance = -1;
+    for (const p of providers) {
+      expect(p.distance_meters).toBeGreaterThanOrEqual(0);
+      expect(p.distance_km).toBeGreaterThanOrEqual(0);
+      expect(p.distance_meters).toBeGreaterThanOrEqual(previousDistance);
+      expect(Array.isArray(p.resources)).toBe(true);
+      previousDistance = p.distance_meters;
+    }
+  });
 });

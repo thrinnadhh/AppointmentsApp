@@ -456,6 +456,15 @@ export type Database = {
         }
         Returns: Json
       }
+      get_nearby_providers: {
+        Args: {
+          p_lat: number
+          p_lng: number
+          p_category?: string | null
+          p_radius_meters?: number
+        }
+        Returns: Json
+      }
       is_admin: { Args: never; Returns: boolean }
       record_no_show: { Args: { p_booking_id: string }; Returns: Json }
       release_expired_holds: { Args: never; Returns: Json }

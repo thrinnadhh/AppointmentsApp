@@ -20,6 +20,7 @@ import {
   fetchCustomerBookingsFromSupabase,
   cancelBookingOnSupabase,
   rescheduleBookingOnSupabase,
+  supabase,
 } from './src/services/api';
 
 type ScreenType = 'HOME' | 'PROVIDER_DETAIL' | 'MY_BOOKINGS';
@@ -76,6 +77,31 @@ export default function App() {
 
   useEffect(() => {
     loadBookings();
+
+    const channel = supabase
+      .channel(`customer-bookings-${DEMO_CUSTOMER_ID}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `customer_id=eq.${DEMO_CUSTOMER_ID}`,
+        },
+        (payload) => {
+          const newStatus = (payload.new as { status?: string })?.status;
+          if (newStatus) {
+            setConfirmationToast(`Appointment update: Status is now ${newStatus}`);
+            setTimeout(() => setConfirmationToast(null), 4000);
+          }
+          loadBookings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [loadBookings]);
 
   // Navigate backward through history stack
