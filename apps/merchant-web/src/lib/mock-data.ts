@@ -57,14 +57,23 @@ export const INITIAL_RESOURCES: Resource[] = [
   },
 ];
 
-export const INITIAL_BOOKINGS: (Booking & { customer_name?: string; customer_phone?: string })[] = [
+export const INITIAL_BOOKINGS: (Booking & {
+  customer_name?: string;
+  customer_phone?: string;
+  provider_name?: string;
+  resource_name?: string;
+  resource_type?: string;
+})[] = [
   {
     id: 'b1111111-1111-1111-1111-111111111111',
     customer_id: 'c1',
     customer_name: 'P. Rajesh Kumar',
     customer_phone: '+91 94401 23456',
     provider_id: '11111111-1111-1111-1111-111111111111',
+    provider_name: 'Sri Venkateswara Dental & Implant Care',
     resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    resource_name: 'Dr. S. K. Murthy (Dental Implant Specialist)',
+    resource_type: 'doctor',
     slot_start: new Date(Date.now() + 1000 * 60 * 90).toISOString(), // in 1.5 hrs
     slot_end: new Date(Date.now() + 1000 * 60 * 120).toISOString(),
     status: 'CONFIRMED',
@@ -80,7 +89,10 @@ export const INITIAL_BOOKINGS: (Booking & { customer_name?: string; customer_pho
     customer_name: 'K. Sneha Lata',
     customer_phone: '+91 98480 54321',
     provider_id: '11111111-1111-1111-1111-111111111111',
+    provider_name: 'Sri Venkateswara Dental & Implant Care',
     resource_id: 'aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    resource_name: 'Dr. A. Radhika (Orthodontics & Braces)',
+    resource_type: 'doctor',
     slot_start: new Date(Date.now() + 1000 * 60 * 240).toISOString(), // in 4 hrs
     slot_end: new Date(Date.now() + 1000 * 60 * 270).toISOString(),
     status: 'CONFIRMED',
@@ -96,7 +108,10 @@ export const INITIAL_BOOKINGS: (Booking & { customer_name?: string; customer_pho
     customer_name: 'V. Naresh Babu',
     customer_phone: '+91 99887 76655',
     provider_id: '11111111-1111-1111-1111-111111111111',
+    provider_name: 'Sri Venkateswara Dental & Implant Care',
     resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    resource_name: 'Dr. S. K. Murthy (Dental Implant Specialist)',
+    resource_type: 'doctor',
     slot_start: new Date(Date.now() + 1000 * 60 * 15).toISOString(), // in 15 mins
     slot_end: new Date(Date.now() + 1000 * 60 * 45).toISOString(),
     status: 'HELD',
@@ -112,7 +127,10 @@ export const INITIAL_BOOKINGS: (Booking & { customer_name?: string; customer_pho
     customer_name: 'M. Haritha',
     customer_phone: '+91 91234 56780',
     provider_id: '11111111-1111-1111-1111-111111111111',
+    provider_name: 'Sri Venkateswara Dental & Implant Care',
     resource_id: 'aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    resource_name: 'Dr. A. Radhika (Orthodontics & Braces)',
+    resource_type: 'doctor',
     slot_start: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
     slot_end: new Date(Date.now() - 1000 * 60 * 150).toISOString(),
     status: 'COMPLETED',
