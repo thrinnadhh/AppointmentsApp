@@ -355,23 +355,23 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Hero Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-16 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Hero Header (Non-sticky to prevent covering content when scrolling) */}
+      <div className="bg-white border-b border-slate-200 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
             <div>
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-700 shadow-2xs">
                   <Compass className="w-5 h-5" />
                 </div>
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
                     Super Admin City Rollout & Expansion Hub
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100/80 text-emerald-800 border border-emerald-200">
                       Live Ops
                     </span>
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
                     Multi-city launch gating, merchant pipeline conversion, and velocity analytics
                   </p>
                 </div>
@@ -379,20 +379,20 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3 self-start md:self-auto">
               <button
                 onClick={() => loadDashboardData()}
                 disabled={refreshing}
-                className="inline-flex items-center px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs disabled:opacity-50"
+                className="inline-flex items-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs disabled:opacity-50"
                 title="Refresh Metrics"
               >
-                <RefreshCw className={`w-4 h-4 mr-1.5 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 mr-2 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
 
               <button
                 onClick={() => setShowAddCityModal(true)}
-                className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-colors shadow-xs"
+                className="inline-flex items-center px-4.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs hover:shadow-sm active:scale-[0.98]"
               >
                 <Plus className="w-4 h-4 mr-1.5" />
                 Expand New City
@@ -401,41 +401,43 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Time-Window and City Scope Bar */}
-          <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div className="mt-6 pt-5 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             {/* Dynamic Time Filters */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
                 Horizon:
               </span>
-              {TIME_WINDOWS.map((win) => {
-                const isActive = selectedWindow === win.id;
-                return (
-                  <button
-                    key={win.id}
-                    onClick={() => setSelectedWindow(win.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                      isActive
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
-                    }`}
-                  >
-                    {win.label}
-                  </button>
-                );
-              })}
+              <div className="inline-flex bg-slate-100/90 p-1 rounded-xl gap-1">
+                {TIME_WINDOWS.map((win) => {
+                  const isActive = selectedWindow === win.id;
+                  return (
+                    <button
+                      key={win.id}
+                      onClick={() => setSelectedWindow(win.id)}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                        isActive
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      {win.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* City Scope Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2 self-start lg:self-auto">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
                 Scope:
               </span>
               <select
                 value={selectedCityFilter}
                 onChange={(e) => setSelectedCityFilter(e.target.value)}
-                className="text-xs font-semibold bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-700 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="all">All Expansion Territories ({cities.length})</option>
                 {cities.map((c) => (
@@ -450,29 +452,31 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Main Executive Body */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-9">
         {/* Top KPI Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Card 1: Completed Appointments */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Completed Bookings
-              </span>
-              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                <CalendarCheck className="w-4 h-4" />
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Completed Bookings
+                </span>
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <CalendarCheck className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {velocity?.completed_bookings ?? 0}
+                </span>
+                <span className="text-xs text-slate-500 font-medium">
+                  of {velocity?.total_bookings ?? 0} total
+                </span>
               </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-slate-900">
-                {velocity?.completed_bookings ?? 0}
-              </span>
-              <span className="text-xs text-slate-500">
-                of {velocity?.total_bookings ?? 0} total
-              </span>
-            </div>
-            <div className="mt-2 flex items-center text-xs font-medium text-emerald-600">
-              <TrendingUp className="w-3 h-3 mr-1" />
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center text-xs font-bold text-emerald-600">
+              <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
               {velocity && velocity.total_bookings > 0
                 ? Math.round((velocity.completed_bookings / velocity.total_bookings) * 100)
                 : 100}
@@ -481,116 +485,125 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Card 2: Merchant Pipeline */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Merchant Funnel
-              </span>
-              <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                <Building2 className="w-4 h-4" />
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Merchant Funnel
+                </span>
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                  <Building2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {velocity?.merchant_funnel?.onboarded_count ?? 0}
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                  +{velocity?.merchant_funnel?.in_progress_count ?? 0} Pending
+                </span>
               </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-slate-900">
-                {velocity?.merchant_funnel?.onboarded_count ?? 0}
-              </span>
-              <span className="text-xs font-bold text-amber-600">
-                + {velocity?.merchant_funnel?.in_progress_count ?? 0} in progress
-              </span>
-            </div>
-            <div className="mt-2 text-xs text-slate-500">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 font-medium">
               Total Managed: {velocity?.merchant_funnel?.total_merchants ?? 0} providers
             </div>
           </div>
 
           {/* Card 3: Cities Rollout Ratio */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Rollout Coverage
-              </span>
-              <div className="p-2 rounded-lg bg-teal-50 text-teal-600">
-                <MapPin className="w-4 h-4" />
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Rollout Coverage
+                </span>
+                <div className="p-2 rounded-xl bg-teal-50 text-teal-600 border border-teal-100">
+                  <MapPin className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-pulse"></span>
+                  {velocity?.cities_overview?.active_cities ?? 0} Active
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                  {velocity?.cities_overview?.expanding_cities ?? 0} Expanding
+                </span>
               </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-slate-900">
-                {velocity?.cities_overview?.active_cities ?? 0} Active
-              </span>
-              <span className="text-xs text-amber-600 font-bold">
-                {velocity?.cities_overview?.expanding_cities ?? 0} Expanding
-              </span>
-            </div>
-            <div className="mt-2 text-xs text-slate-500">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 font-medium">
               {velocity?.cities_overview?.planned_cities ?? 0} Planned on Radar
             </div>
           </div>
 
           {/* Card 4: Gross Deposit Volume */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Deposit Volume
-              </span>
-              <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
-                <DollarSign className="w-4 h-4" />
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Deposit Volume
+                </span>
+                <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  ₹{Number(velocity?.gross_deposit_amount || 0).toLocaleString('en-IN')}
+                </span>
               </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-2xl font-extrabold text-slate-900">
-                ₹{Number(velocity?.gross_deposit_amount || 0).toLocaleString('en-IN')}
-              </span>
-            </div>
-            <div className="mt-2 text-xs text-slate-500">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 font-medium truncate">
               Across confirmed slots ({selectedWindow})
             </div>
           </div>
 
           {/* Card 5: Pre-Launch Demand Waitlist */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Expansion Waitlist
-              </span>
-              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                <Sparkles className="w-4 h-4" />
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Expansion Waitlist
+                </span>
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {waitlist.length}
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Inbound Demand
+                </span>
               </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-slate-900">
-                {waitlist.length}
-              </span>
-              <span className="text-xs font-medium text-emerald-600">
-                Inbound Demand
-              </span>
-            </div>
-            <div className="mt-2 text-xs text-slate-500">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 font-medium">
               Consumer & Merchant Leads
             </div>
           </div>
         </div>
 
         {/* SECTION 1: Multi-City Launch & Rollout Control Matrix */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-emerald-600" />
                 City Expansion & Territory Control Matrix
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-1">
                 Regulate which cities receive live consumer booking traffic vs merchant pre-onboarding
               </p>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <Search className="w-3.5 h-3.5 absolute left-3.5 top-3 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Filter cities..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-44"
+                  className="pl-9 pr-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-56 bg-slate-50/50 text-slate-800 placeholder:text-slate-400"
                 />
               </div>
             </div>
@@ -598,15 +611,15 @@ export default function AdminDashboardPage() {
 
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold">
+              <thead className="bg-slate-50/80 text-slate-500 uppercase tracking-wider font-bold">
                 <tr>
-                  <th className="px-6 py-3.5">Territory</th>
-                  <th className="px-6 py-3.5">Launch State</th>
-                  <th className="px-6 py-3.5">Merchant Progress (Active / Target)</th>
-                  <th className="px-6 py-3.5">Appts in Horizon</th>
-                  <th className="px-6 py-3.5">Gross Volume</th>
-                  <th className="px-6 py-3.5">Waitlist Signals</th>
-                  <th className="px-6 py-3.5 text-right">Expansion Action</th>
+                  <th className="px-6 py-4">Territory</th>
+                  <th className="px-6 py-4">Launch State</th>
+                  <th className="px-6 py-4">Merchant Target Progress</th>
+                  <th className="px-6 py-4">Appts in Horizon</th>
+                  <th className="px-6 py-4">Gross Volume</th>
+                  <th className="px-6 py-4">Waitlist Signals</th>
+                  <th className="px-6 py-4 text-right">Expansion Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -617,20 +630,20 @@ export default function AdminDashboardPage() {
 
                   return (
                     <tr key={city.city_id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4.5">
                         <div className="font-bold text-slate-900 text-sm">{city.city_name}</div>
                         <div className="text-[11px] text-slate-400 uppercase font-mono">ID: {city.city_id}</div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4.5">
                         {getStatusBadge(city.status)}
                       </td>
 
-                      <td className="px-6 py-4">
-                        <div className="w-48">
-                          <div className="flex justify-between text-xs font-semibold mb-1">
-                            <span className="text-slate-900">{onboarded} active</span>
-                            <span className="text-slate-400">Target: {target}</span>
+                      <td className="px-6 py-4.5">
+                        <div className="w-52">
+                          <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
+                            <span className="text-slate-900 font-bold">{onboarded} active</span>
+                            <span className="text-slate-400 font-medium">Target: {target}</span>
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                             <div
@@ -650,33 +663,35 @@ export default function AdminDashboardPage() {
                         </div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4.5">
                         <div className="font-bold text-slate-900">{city.completed_bookings} Completed</div>
                         <div className="text-[11px] text-slate-400">of {city.total_bookings} total</div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4.5">
                         <div className="font-bold text-slate-900">
                           ₹{Number(city.deposit_volume || 0).toLocaleString('en-IN')}
                         </div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4.5">
                         {city.waitlist_count > 0 ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
                             {city.waitlist_count} waiting
                           </span>
                         ) : (
-                          <span className="text-slate-400 text-xs">0 waiting</span>
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                            0 waiting
+                          </span>
                         )}
                       </td>
 
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="px-6 py-4.5 text-right">
+                        <div className="flex items-center justify-end gap-2">
                           {city.status === 'EXPANDING' && (
                             <button
                               onClick={() => handleUpdateCityStatus(city.city_id, 'ACTIVE')}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-xs flex items-center gap-1"
+                              className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
                               title="Go live for customer bookings"
                             >
                               <PlayCircle className="w-3.5 h-3.5" />
@@ -687,7 +702,7 @@ export default function AdminDashboardPage() {
                           {city.status === 'PLANNED' && (
                             <button
                               onClick={() => handleUpdateCityStatus(city.city_id, 'EXPANDING')}
-                              className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs transition-colors shadow-xs flex items-center gap-1"
+                              className="h-8 px-3.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
                               title="Open for merchant onboarding"
                             >
                               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -698,7 +713,7 @@ export default function AdminDashboardPage() {
                           {city.status === 'ACTIVE' && (
                             <button
                               onClick={() => handleUpdateCityStatus(city.city_id, 'PAUSED')}
-                              className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold text-xs transition-colors flex items-center gap-1"
+                              className="h-8 px-3 rounded-lg border border-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold text-xs transition-all flex items-center gap-1.5 active:scale-95"
                               title="Temporarily freeze customer bookings"
                             >
                               <PauseCircle className="w-3.5 h-3.5" />
@@ -709,7 +724,7 @@ export default function AdminDashboardPage() {
                           {city.status === 'PAUSED' && (
                             <button
                               onClick={() => handleUpdateCityStatus(city.city_id, 'ACTIVE')}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-xs flex items-center gap-1"
+                              className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
                             >
                               <PlayCircle className="w-3.5 h-3.5" />
                               Resume
@@ -726,27 +741,27 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* SECTION 2: Merchant Onboarding & Pipeline Funnel */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-200 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="p-6 border-b border-slate-200 space-y-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-emerald-600" />
                   Merchant Onboarding Pipeline & Business Governance
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-1">
                   Search shops, filter by vertical type and city territory, approve verified merchants, or block non-compliant venues
                 </p>
               </div>
 
               {/* Sub Filter Tabs */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+              <div className="inline-flex bg-slate-100 p-1 rounded-xl gap-1 self-start lg:self-auto overflow-x-auto">
                 <button
                   data-testid="admin-merchant-status-tab-all"
                   onClick={() => setMerchantTab('all')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                     merchantTab === 'all'
-                      ? 'bg-white text-slate-900 shadow-xs'
+                      ? 'bg-white text-slate-900 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -755,9 +770,9 @@ export default function AdminDashboardPage() {
                 <button
                   data-testid="admin-merchant-status-tab-active"
                   onClick={() => setMerchantTab('active')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                     merchantTab === 'active'
-                      ? 'bg-white text-emerald-800 shadow-xs'
+                      ? 'bg-white text-emerald-800 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -766,9 +781,9 @@ export default function AdminDashboardPage() {
                 <button
                   data-testid="admin-merchant-status-tab-pending"
                   onClick={() => setMerchantTab('pending')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                     merchantTab === 'pending'
-                      ? 'bg-white text-amber-800 shadow-xs'
+                      ? 'bg-white text-amber-800 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -777,9 +792,9 @@ export default function AdminDashboardPage() {
                 <button
                   data-testid="admin-merchant-status-tab-suspended"
                   onClick={() => setMerchantTab('suspended')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                     merchantTab === 'suspended'
-                      ? 'bg-white text-rose-800 shadow-xs'
+                      ? 'bg-white text-rose-800 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -789,27 +804,27 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Dedicated Filter Bar: Merchant Shop Search, Type/Category Dropdown, City Dropdown */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
               {/* Merchant Search */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <div className="relative flex-1 w-full">
+                <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                 <input
                   data-testid="admin-merchant-search"
                   type="text"
                   placeholder="Search merchant shop, doctor or contact..."
                   value={merchantSearchQuery}
                   onChange={(e) => setMerchantSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                  className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shadow-2xs text-slate-900 placeholder:text-slate-400"
                 />
               </div>
 
               {/* Type / Vertical Filter */}
-              <div className="relative">
+              <div className="w-full sm:w-56">
                 <select
                   data-testid="admin-merchant-type-filter"
                   value={merchantTypeFilter}
                   onChange={(e) => setMerchantTypeFilter(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-slate-700"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-slate-700 shadow-2xs"
                 >
                   <option value="all">All Vertical Types</option>
                   {merchantCategories.map((cat) => (
@@ -821,12 +836,12 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* City Territory Filter */}
-              <div className="relative">
+              <div className="w-full sm:w-48">
                 <select
                   data-testid="admin-merchant-city-filter"
                   value={merchantCityFilter}
                   onChange={(e) => setMerchantCityFilter(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-slate-700"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-slate-700 shadow-2xs"
                 >
                   <option value="all">All Cities</option>
                   {merchantCities.map((city) => (
@@ -841,59 +856,59 @@ export default function AdminDashboardPage() {
 
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold">
+              <thead className="bg-slate-50/80 text-slate-500 uppercase tracking-wider font-bold">
                 <tr>
-                  <th className="px-6 py-3.5">Merchant / Business</th>
-                  <th className="px-6 py-3.5">Category</th>
-                  <th className="px-6 py-3.5">City Territory</th>
-                  <th className="px-6 py-3.5">Bookable Resources</th>
-                  <th className="px-6 py-3.5">Current Status</th>
-                  <th className="px-6 py-3.5 text-right">Verification Action</th>
+                  <th className="px-6 py-4">Merchant / Business</th>
+                  <th className="px-6 py-4">Category</th>
+                  <th className="px-6 py-4">City Territory</th>
+                  <th className="px-6 py-4">Bookable Resources</th>
+                  <th className="px-6 py-4">Current Status</th>
+                  <th className="px-6 py-4 text-right">Verification Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {filteredMerchants.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-xs">
+                    <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
                       No merchants found matching current search or filters.
                     </td>
                   </tr>
                 ) : (
                   filteredMerchants.map((merchant) => (
                     <tr key={merchant.id} data-testid={`merchant-row-${merchant.id}`} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4.5">
                         <div className="font-bold text-slate-900 text-sm">{merchant.name}</div>
-                        <div className="text-[11px] text-slate-400">{merchant.phone || merchant.email}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{merchant.phone || merchant.email}</div>
                       </td>
 
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
+                      <td className="px-6 py-4.5">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/60">
                           {merchant.categories?.name || 'General'}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-800 uppercase tracking-wider text-[11px]">
+                      <td className="px-6 py-4.5">
+                        <span className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
                           {merchant.city}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4.5">
                         <div className="font-bold text-slate-900">
                           {merchant.resources?.[0]?.count ?? 0} resources
                         </div>
                       </td>
 
-                      <td className="px-6 py-4" data-testid={`merchant-status-badge-${merchant.id}`}>
+                      <td className="px-6 py-4.5" data-testid={`merchant-status-badge-${merchant.id}`}>
                         {getMerchantStatusBadge(merchant.status)}
                       </td>
 
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4.5 text-right">
                         {merchant.status === 'PENDING_APPROVAL' ? (
                           <button
                             data-testid={`approve-merchant-btn-${merchant.id}`}
                             onClick={() => handleUpdateMerchantStatus(merchant.id, 'ACTIVE')}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-xs inline-flex items-center gap-1"
+                            className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-xs inline-flex items-center gap-1.5 active:scale-95"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             Approve & Launch
@@ -902,7 +917,7 @@ export default function AdminDashboardPage() {
                           <button
                             data-testid={`block-merchant-btn-${merchant.id}`}
                             onClick={() => handleUpdateMerchantStatus(merchant.id, 'SUSPENDED')}
-                            className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 font-semibold text-xs transition-colors shadow-xs inline-flex items-center gap-1"
+                            className="h-8 px-3 rounded-lg border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-all shadow-2xs inline-flex items-center gap-1.5 active:scale-95"
                             title="Block this merchant shop from accepting appointments"
                           >
                             <Ban className="w-3.5 h-3.5 text-rose-600" />
@@ -912,7 +927,7 @@ export default function AdminDashboardPage() {
                           <button
                             data-testid={`unblock-merchant-btn-${merchant.id}`}
                             onClick={() => handleUpdateMerchantStatus(merchant.id, 'ACTIVE')}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-xs inline-flex items-center gap-1"
+                            className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-xs inline-flex items-center gap-1.5 active:scale-95"
                             title="Unblock and restore merchant shop visibility"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />

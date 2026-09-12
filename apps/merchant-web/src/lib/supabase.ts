@@ -660,11 +660,11 @@ export async function fetchAdminCityWaitlist(cityId?: string): Promise<CityWaitl
     const supabaseAdmin = getSupabaseAdmin();
     let query = supabaseAdmin
       .from('city_waitlist')
-      .select('*, cities(name)')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (cityId && cityId !== 'all') {
-      query = query.eq('city_id', cityId);
+      query = query.ilike('city_name', `%${cityId}%`);
     }
 
     const { data, error } = await query;
