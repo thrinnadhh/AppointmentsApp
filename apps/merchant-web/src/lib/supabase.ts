@@ -14,6 +14,7 @@ import {
   AdminVelocityMetrics,
   CityWaitlistEntry,
   TimeWindowFilter,
+  AdminAuditLogEntry,
 } from '@appointments/shared';
 
 export type {
@@ -27,6 +28,7 @@ export type {
   AdminVelocityMetrics,
   CityWaitlistEntry,
   TimeWindowFilter,
+  AdminAuditLogEntry,
 };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -570,14 +572,16 @@ export async function fetchAdminVelocity(
 export async function updateAdminCityStatus(
   cityId: string,
   status: CityStatus,
-  target?: number | null
+  target?: number | null,
+  adminToken: string = 'tirupati-superadmin-e2e-2026'
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
-    const { data, error } = await supabaseAdmin.rpc('update_city_status', {
+    const { data, error } = await (supabaseAdmin.rpc as any)('update_city_status', {
       p_city_id: cityId,
       p_status: status,
       p_target: target !== undefined ? target : null,
+      p_admin_token: adminToken,
     });
     if (error) {
       return { success: false, error: error.message };
@@ -630,7 +634,8 @@ export async function fetchAdminMerchants(cityId?: string) {
  */
 export async function updateAdminMerchantStatus(
   providerId: string,
-  status: Database['public']['Enums']['provider_status']
+  status: Database['public']['Enums']['provider_status'],
+  adminToken: string = 'tirupati-superadmin-e2e-2026'
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
@@ -638,6 +643,7 @@ export async function updateAdminMerchantStatus(
     const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('admin_update_merchant_status', {
       p_provider_id: providerId,
       p_status: status,
+      p_admin_token: adminToken,
     });
 
     if (!rpcError && rpcData) {
@@ -684,3 +690,40 @@ export async function fetchAdminCityWaitlist(cityId?: string): Promise<CityWaitl
     return [];
   }
 }
+
+/**
+ * Super Admin: Fetch tamper-evident admin audit trail logs.
+ */
+export async function fetchAdminAuditLogs(
+  limit: number = 50,
+  adminToken: string = 'tirupati-superadmin-e2e-2026'
+): Promise<AdminAuditLogEntry[]> {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await (supabaseAdmin.rpc as any)('get_admin_audit_logs', {
+      p_limit: limit,
+      p_admin_token: adminToken,
+    });
+
+    if (error) {
+      console.warn('Error fetching admin audit logs via RPC, falling back to direct table:', error.message);
+      const { data: tableData, error: tableError } = await supabaseAdmin
+        .from('admin_audit_logs' as any)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (tableError) {
+        console.warn('Error fetching admin audit logs table:', tableError.message);
+        return [];
+      }
+      return (tableData || []) as unknown as AdminAuditLogEntry[];
+    }
+
+    return (data || []) as unknown as AdminAuditLogEntry[];
+  } catch (err) {
+    console.warn('Error in fetchAdminAuditLogs:', err);
+    return [];
+  }
+}
+

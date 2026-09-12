@@ -48,6 +48,13 @@ export class AdminDashboardPage {
   readonly waitlistHeading: Locator;
   readonly waitlistTable: Locator;
 
+  // Audit Trail & Security Ledger
+  readonly auditSection: Locator;
+  readonly auditHeading: Locator;
+  readonly auditSearchInput: Locator;
+  readonly auditTable: Locator;
+  readonly auditRows: Locator;
+
   // Add City Modal Locators
   readonly addCityModal: Locator;
   readonly cityIdInput: Locator;
@@ -102,6 +109,13 @@ export class AdminDashboardPage {
     // Section 3: Demand Waitlist
     this.waitlistHeading = page.getByRole('heading', { name: /Pre-Launch Expansion Waitlist & Demand Signals/i });
     this.waitlistTable = page.locator('table').nth(2);
+
+    // Section 4: Audit Trail & Security Ledger
+    this.auditSection = page.getByTestId('admin-audit-section');
+    this.auditHeading = page.getByRole('heading', { name: /Administrative Audit Trail & Security Ledger/i });
+    this.auditSearchInput = page.getByTestId('audit-search-input');
+    this.auditTable = page.locator('table').nth(3);
+    this.auditRows = page.getByTestId('audit-log-rows');
 
     // Modal
     this.addCityModal = page.locator('text=Expand to New Territory').locator('..');

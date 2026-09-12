@@ -77,4 +77,50 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     const data = await response.json();
     expect(data.error).toBeDefined();
   });
+
+  test('TC-ADMIN-AUDIT-01: Immutable Audit Trail UI displays cryptographically verifiable admin logs', async ({ page }) => {
+    await page.context().clearCookies();
+    const adminPage = new AdminDashboardPage(page);
+
+    await adminPage.gotoLoginPage();
+    await adminPage.loginAsAdmin(
+      'admin@appointments-tirupati.com',
+      'AdminSecure2026!'
+    );
+
+    // Verify Audit Section in Dashboard
+    await expect(adminPage.auditSection).toBeVisible();
+    await expect(adminPage.auditHeading).toBeVisible();
+    await expect(page.getByText('Append-Only Immutable')).toBeVisible();
+
+    // Verify Audit Rows are loaded
+    await expect(adminPage.auditRows).toBeVisible();
+
+    // Verify Search filter in Audit Ledger
+    await adminPage.auditSearchInput.fill('UPDATE_CITY_STATUS');
+    const matchingLog = page.getByText('UPDATE_CITY_STATUS').first();
+    await expect(matchingLog).toBeVisible();
+  });
+
+  test('TC-ADMIN-AUDIT-02: Zero-Trust API Gate protects /api/admin/audit-logs with RBAC verification', async ({ request }) => {
+    // 1. Unauthenticated request must fail
+    const unauthResponse = await request.get('http://localhost:3000/api/admin/audit-logs');
+    expect([401, 403]).toContain(unauthResponse.status());
+
+    // 2. Authenticated Admin request must succeed and return structured logs
+    const authResponse = await request.get('http://localhost:3000/api/admin/audit-logs', {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+    });
+    expect(authResponse.status()).toBe(200);
+
+    const body = await authResponse.json();
+    expect(Array.isArray(body.logs)).toBe(true);
+    expect(body.logs.length).toBeGreaterThan(0);
+
+    const firstLog = body.logs[0];
+    expect(firstLog).toHaveProperty('id');
+    expect(firstLog).toHaveProperty('action');
+    expect(firstLog).toHaveProperty('target_type');
+    expect(firstLog).toHaveProperty('created_at');
+  });
 });

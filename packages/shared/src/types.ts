@@ -232,3 +232,16 @@ export interface AdminVelocityMetrics {
     total_cities: number;
   };
 }
+
+export interface AdminAuditLogEntry {
+  id: string;
+  admin_id: string | null;
+  admin_name: string | null;
+  admin_email: string | null;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  details: Record<string, any>;
+  ip_address: string | null;
+  created_at: string;
+}
