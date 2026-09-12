@@ -244,6 +244,10 @@ export function getCachedProvidersByCategory(categoryId?: string): ProviderWithD
   return categoryProvidersCache.get(key) || null;
 }
 
+export function clearProvidersCache(): void {
+  categoryProvidersCache.clear();
+}
+
 // Enhanced Supabase Service for Customer Mobile Application
 export async function fetchProvidersByCategory(categoryId?: string): Promise<ProviderWithDetails[]> {
   const cacheKey = categoryId || 'all';

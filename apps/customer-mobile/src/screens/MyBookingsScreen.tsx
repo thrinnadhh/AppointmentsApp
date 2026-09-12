@@ -133,7 +133,7 @@ export default function MyBookingsScreen({
             });
 
             return (
-              <View key={booking.id} style={styles.card}>
+              <View key={booking.id} style={styles.card} testID={`booking-card-${booking.id}`}>
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={styles.providerName}>{booking.provider_name || 'Service Provider'}</Text>

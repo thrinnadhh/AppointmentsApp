@@ -92,6 +92,16 @@ export default function ProviderDetailScreen({
           <Text style={styles.description}>{provider.description}</Text>
         </View>
 
+        {/* Suspended Venue Warning */}
+        {provider.status === 'SUSPENDED' && (
+          <View style={styles.suspendedBanner} testID="customer-provider-suspended-banner">
+            <Text style={styles.suspendedBannerTitle}>⚠️ Business Temporarily Suspended</Text>
+            <Text style={styles.suspendedBannerText}>
+              This venue has been blocked by platform administration and is not accepting new appointments at this time.
+            </Text>
+          </View>
+        )}
+
         {/* 1. Select Resource / Staff */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>1. Select Staff / Unit</Text>
@@ -199,17 +209,24 @@ export default function ProviderDetailScreen({
         </View>
 
         <TouchableOpacity
-          style={[styles.holdButton, !selectedSlot && styles.holdButtonDisabled]}
-          disabled={!selectedSlot}
+          style={[
+            styles.holdButton,
+            (!selectedSlot || provider.status === 'SUSPENDED') && styles.holdButtonDisabled,
+          ]}
+          disabled={!selectedSlot || provider.status === 'SUSPENDED'}
           onPress={() => {
-            if (selectedSlot) {
+            if (selectedSlot && provider.status !== 'SUSPENDED') {
               const currentSlot = selectedSlot;
               onProceedToHold(selectedResource, currentSlot);
             }
           }}
         >
           <Text style={styles.holdButtonText}>
-            {selectedSlot ? 'Hold Slot & Pay Deposit →' : 'Select a Time Slot'}
+            {provider.status === 'SUSPENDED'
+              ? 'Bookings Suspended'
+              : selectedSlot
+              ? 'Hold Slot & Pay Deposit →'
+              : 'Select a Time Slot'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -466,5 +483,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  suspendedBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#fff1f2',
+    borderWidth: 1.5,
+    borderColor: '#fca5a5',
+  },
+  suspendedBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#9f1239',
+    marginBottom: 4,
+  },
+  suspendedBannerText: {
+    fontSize: 12,
+    color: '#be123c',
+    lineHeight: 17,
   },
 });

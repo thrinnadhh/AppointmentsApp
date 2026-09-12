@@ -64,15 +64,22 @@ export default function MerchantOverviewPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [fetchedProviders, fetchedBookings, fetchedProfiles] = await Promise.all([
+      const [fetchedProviders, fetchedBookings, fetchedProfiles, ownProviderRes] = await Promise.all([
         fetchAllProviders(),
         fetchMerchantBookings(selectedProviderId),
         fetchAllProfiles(),
+        fetch(`/api/merchant/provider?id=${selectedProviderId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       ]);
 
-      if (fetchedProviders && fetchedProviders.length > 0) {
+      if (ownProviderRes?.provider) {
+        setProviders((prev) => {
+          const others = prev.filter((p) => p.id !== ownProviderRes.provider.id);
+          return [ownProviderRes.provider, ...others];
+        });
+      } else if (fetchedProviders && fetchedProviders.length > 0) {
         setProviders(fetchedProviders);
       }
+
       if (fetchedBookings && fetchedBookings.length > 0) {
         setBookings(fetchedBookings);
       }
@@ -194,6 +201,37 @@ export default function MerchantOverviewPage() {
           <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono">
             Supabase Realtime
           </span>
+        </div>
+      )}
+
+      {/* Suspended Alert Banner */}
+      {activeProvider.status === 'SUSPENDED' && (
+        <div
+          data-testid="merchant-suspended-banner"
+          className="bg-rose-50 border-2 border-rose-300 text-rose-950 p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm"
+        >
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-rose-100 text-rose-700 shrink-0">
+              <AlertTriangle className="w-6 h-6 text-rose-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-rose-900 flex items-center gap-2">
+                Account Suspended & Blocked by Platform Administration
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 uppercase tracking-wider">
+                  Blocked by Admin
+                </span>
+              </h3>
+              <p className="text-xs sm:text-sm text-rose-700 mt-1">
+                This business ({activeProvider.name}) has been suspended by Platform Administration.
+                New customer bookings, calendar appointments, and search visibility are paused.
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0">
+            <span className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white shadow-xs">
+              Bookings Paused
+            </span>
+          </div>
         </div>
       )}
 

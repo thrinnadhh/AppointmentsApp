@@ -22,7 +22,8 @@ import {
   PauseCircle,
   PlayCircle,
   Compass,
-  DollarSign
+  DollarSign,
+  Ban
 } from 'lucide-react';
 import {
   CityAdminStats,
@@ -67,7 +68,10 @@ export default function AdminDashboardPage() {
   const [selectedWindow, setSelectedWindow] = useState<TimeWindowFilter>('7days');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [merchantTab, setMerchantTab] = useState<'all' | 'pending' | 'active'>('all');
+  const [merchantTab, setMerchantTab] = useState<'all' | 'pending' | 'active' | 'suspended'>('all');
+  const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
+  const [merchantTypeFilter, setMerchantTypeFilter] = useState('all');
+  const [merchantCityFilter, setMerchantCityFilter] = useState('all');
 
   // Core Data
   const [cities, setCities] = useState<CityAdminStats[]>([]);
@@ -156,10 +160,15 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Handle Merchant Approval
+  // Handle Merchant Status Update
   const handleUpdateMerchantStatus = async (providerId: string, newStatus: 'ACTIVE' | 'SUSPENDED') => {
     try {
       setActionFeedback(`Updating merchant status to ${newStatus}...`);
+      // Optimistic update so UI immediately reflects the new status
+      setMerchants((prev) =>
+        prev.map((m) => (m.id === providerId ? { ...m, status: newStatus } : m))
+      );
+
       const res = await fetch('/api/admin/merchants', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -171,12 +180,13 @@ export default function AdminDashboardPage() {
         throw new Error(err.error || 'Failed to update merchant');
       }
 
-      setActionFeedback(`✓ Merchant ${newStatus === 'ACTIVE' ? 'Approved & Onboarded' : 'Suspended'}`);
+      setActionFeedback(`✓ Merchant ${newStatus === 'ACTIVE' ? 'Activated & Visible' : 'Blocked & Suspended'}`);
       await loadDashboardData();
       setTimeout(() => setActionFeedback(null), 3500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error updating merchant';
       setActionFeedback(`⚠️ ${msg}`);
+      await loadDashboardData();
       setTimeout(() => setActionFeedback(null), 4000);
     }
   };
@@ -228,13 +238,51 @@ export default function AdminDashboardPage() {
     c.city_id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const merchantCategories = Array.from(
+    new Set(
+      merchants
+        .map((m) => m.categories?.name)
+        .filter((name): name is string => Boolean(name))
+    )
+  ).sort();
+
+  const merchantCities = Array.from(
+    new Set(
+      merchants
+        .map((m) => m.city)
+        .filter((city): city is string => Boolean(city))
+    )
+  ).sort();
+
   const filteredMerchants = merchants.filter((m) => {
+    const q = merchantSearchQuery.toLowerCase().trim();
     const matchesSearch =
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.city.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      m.name.toLowerCase().includes(q) ||
+      m.city.toLowerCase().includes(q) ||
+      (m.phone && m.phone.toLowerCase().includes(q)) ||
+      (m.email && m.email.toLowerCase().includes(q)) ||
+      (m.categories?.name && m.categories.name.toLowerCase().includes(q));
+
     if (!matchesSearch) return false;
+
+    if (merchantTypeFilter !== 'all') {
+      const catName = m.categories?.name || 'General';
+      if (catName.toLowerCase() !== merchantTypeFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
+    if (merchantCityFilter !== 'all') {
+      if (m.city.toLowerCase() !== merchantCityFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
     if (merchantTab === 'pending') return m.status === 'PENDING_APPROVAL';
     if (merchantTab === 'active') return m.status === 'ACTIVE';
+    if (merchantTab === 'suspended') return m.status === 'SUSPENDED';
+
     return true;
   });
 
@@ -278,7 +326,7 @@ export default function AdminDashboardPage() {
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
-            ONBOARDED
+            ONBOARDED (ACTIVE)
           </span>
         );
       case 'PENDING_APPROVAL':
@@ -292,7 +340,7 @@ export default function AdminDashboardPage() {
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
             <AlertCircle className="w-3 h-3 mr-1 text-rose-600" />
-            SUSPENDED
+            BLOCKED / SUSPENDED
           </span>
         );
     }
@@ -679,49 +727,115 @@ export default function AdminDashboardPage() {
 
         {/* SECTION 2: Merchant Onboarding & Pipeline Funnel */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-emerald-600" />
-                Merchant Onboarding Pipeline Funnel
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Review merchant applications, approve verified venues, and manage provider status
-              </p>
+          <div className="p-5 border-b border-slate-200 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-emerald-600" />
+                  Merchant Onboarding Pipeline & Business Governance
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Search shops, filter by vertical type and city territory, approve verified merchants, or block non-compliant venues
+                </p>
+              </div>
+
+              {/* Sub Filter Tabs */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                <button
+                  data-testid="admin-merchant-status-tab-all"
+                  onClick={() => setMerchantTab('all')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    merchantTab === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({merchants.length})
+                </button>
+                <button
+                  data-testid="admin-merchant-status-tab-active"
+                  onClick={() => setMerchantTab('active')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    merchantTab === 'active'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Active ({merchants.filter((m) => m.status === 'ACTIVE').length})
+                </button>
+                <button
+                  data-testid="admin-merchant-status-tab-pending"
+                  onClick={() => setMerchantTab('pending')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    merchantTab === 'pending'
+                      ? 'bg-white text-amber-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  In Progress ({merchants.filter((m) => m.status === 'PENDING_APPROVAL').length})
+                </button>
+                <button
+                  data-testid="admin-merchant-status-tab-suspended"
+                  onClick={() => setMerchantTab('suspended')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    merchantTab === 'suspended'
+                      ? 'bg-white text-rose-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Blocked ({merchants.filter((m) => m.status === 'SUSPENDED').length})
+                </button>
+              </div>
             </div>
 
-            {/* Sub Filter Tabs */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-              <button
-                onClick={() => setMerchantTab('all')}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                  merchantTab === 'all'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                All ({merchants.length})
-              </button>
-              <button
-                onClick={() => setMerchantTab('pending')}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                  merchantTab === 'pending'
-                    ? 'bg-white text-amber-800 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                In Progress ({merchants.filter((m) => m.status === 'PENDING_APPROVAL').length})
-              </button>
-              <button
-                onClick={() => setMerchantTab('active')}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                  merchantTab === 'active'
-                    ? 'bg-white text-emerald-800 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Active ({merchants.filter((m) => m.status === 'ACTIVE').length})
-              </button>
+            {/* Dedicated Filter Bar: Merchant Shop Search, Type/Category Dropdown, City Dropdown */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              {/* Merchant Search */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  data-testid="admin-merchant-search"
+                  type="text"
+                  placeholder="Search merchant shop, doctor or contact..."
+                  value={merchantSearchQuery}
+                  onChange={(e) => setMerchantSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                />
+              </div>
+
+              {/* Type / Vertical Filter */}
+              <div className="relative">
+                <select
+                  data-testid="admin-merchant-type-filter"
+                  value={merchantTypeFilter}
+                  onChange={(e) => setMerchantTypeFilter(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-slate-700"
+                >
+                  <option value="all">All Vertical Types</option>
+                  {merchantCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* City Territory Filter */}
+              <div className="relative">
+                <select
+                  data-testid="admin-merchant-city-filter"
+                  value={merchantCityFilter}
+                  onChange={(e) => setMerchantCityFilter(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-slate-700"
+                >
+                  <option value="all">All Cities</option>
+                  {merchantCities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -741,12 +855,12 @@ export default function AdminDashboardPage() {
                 {filteredMerchants.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-xs">
-                      No merchants found matching current filter.
+                      No merchants found matching current search or filters.
                     </td>
                   </tr>
                 ) : (
                   filteredMerchants.map((merchant) => (
-                    <tr key={merchant.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={merchant.id} data-testid={`merchant-row-${merchant.id}`} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-slate-900 text-sm">{merchant.name}</div>
                         <div className="text-[11px] text-slate-400">{merchant.phone || merchant.email}</div>
@@ -770,13 +884,14 @@ export default function AdminDashboardPage() {
                         </div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4" data-testid={`merchant-status-badge-${merchant.id}`}>
                         {getMerchantStatusBadge(merchant.status)}
                       </td>
 
                       <td className="px-6 py-4 text-right">
                         {merchant.status === 'PENDING_APPROVAL' ? (
                           <button
+                            data-testid={`approve-merchant-btn-${merchant.id}`}
                             onClick={() => handleUpdateMerchantStatus(merchant.id, 'ACTIVE')}
                             className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-xs inline-flex items-center gap-1"
                           >
@@ -785,17 +900,23 @@ export default function AdminDashboardPage() {
                           </button>
                         ) : merchant.status === 'ACTIVE' ? (
                           <button
+                            data-testid={`block-merchant-btn-${merchant.id}`}
                             onClick={() => handleUpdateMerchantStatus(merchant.id, 'SUSPENDED')}
-                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold text-xs transition-colors"
+                            className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 font-semibold text-xs transition-colors shadow-xs inline-flex items-center gap-1"
+                            title="Block this merchant shop from accepting appointments"
                           >
-                            Suspend
+                            <Ban className="w-3.5 h-3.5 text-rose-600" />
+                            Block Merchant
                           </button>
                         ) : (
                           <button
+                            data-testid={`unblock-merchant-btn-${merchant.id}`}
                             onClick={() => handleUpdateMerchantStatus(merchant.id, 'ACTIVE')}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors"
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-xs inline-flex items-center gap-1"
+                            title="Unblock and restore merchant shop visibility"
                           >
-                            Re-Activate
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Unblock Merchant
                           </button>
                         )}
                       </td>

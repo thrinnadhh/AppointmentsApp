@@ -589,6 +589,15 @@ export async function updateAdminCityStatus(
 export async function fetchAdminMerchants(cityId?: string) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
+    // Try SECURITY DEFINER RPC first to bypass RLS and retrieve all merchants including SUSPENDED
+    const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('admin_fetch_merchants', {
+      p_city_id: cityId && cityId !== 'all' ? cityId : null,
+    });
+
+    if (!rpcError && Array.isArray(rpcData)) {
+      return rpcData;
+    }
+
     let query = supabaseAdmin
       .from('providers')
       .select('*, resources(count), categories(name)')
@@ -619,6 +628,16 @@ export async function updateAdminMerchantStatus(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
+    // Try SECURITY DEFINER RPC first to ensure update succeeds even under strict RLS
+    const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('admin_update_merchant_status', {
+      p_provider_id: providerId,
+      p_status: status,
+    });
+
+    if (!rpcError && rpcData) {
+      return { success: true };
+    }
+
     const { error } = await supabaseAdmin
       .from('providers')
       .update({ status, updated_at: new Date().toISOString() })

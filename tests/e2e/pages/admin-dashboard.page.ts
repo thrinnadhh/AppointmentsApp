@@ -38,6 +38,10 @@ export class AdminDashboardPage {
   readonly merchantTabAll: Locator;
   readonly merchantTabPending: Locator;
   readonly merchantTabActive: Locator;
+  readonly merchantTabSuspended: Locator;
+  readonly merchantSearchInput: Locator;
+  readonly merchantTypeFilterSelect: Locator;
+  readonly merchantCityFilterSelect: Locator;
   readonly merchantTable: Locator;
 
   // Demand Waitlist
@@ -85,10 +89,14 @@ export class AdminDashboardPage {
     this.territoryTable = page.locator('table').first();
 
     // Section 2: Merchant Pipeline
-    this.merchantFunnelHeading = page.getByRole('heading', { name: /Merchant Onboarding Pipeline Funnel/i });
-    this.merchantTabAll = page.getByRole('button', { name: /^All \(/i });
-    this.merchantTabPending = page.getByRole('button', { name: /^In Progress \(/i });
-    this.merchantTabActive = page.getByRole('button', { name: /^Active \(/i });
+    this.merchantFunnelHeading = page.getByRole('heading', { name: /Merchant Onboarding Pipeline/i });
+    this.merchantTabAll = page.getByTestId('admin-merchant-status-tab-all');
+    this.merchantTabPending = page.getByTestId('admin-merchant-status-tab-pending');
+    this.merchantTabActive = page.getByTestId('admin-merchant-status-tab-active');
+    this.merchantTabSuspended = page.getByTestId('admin-merchant-status-tab-suspended');
+    this.merchantSearchInput = page.getByTestId('admin-merchant-search');
+    this.merchantTypeFilterSelect = page.getByTestId('admin-merchant-type-filter');
+    this.merchantCityFilterSelect = page.getByTestId('admin-merchant-city-filter');
     this.merchantTable = page.locator('table').nth(1);
 
     // Section 3: Demand Waitlist
@@ -162,11 +170,28 @@ export class AdminDashboardPage {
     await actionBtn.click();
   }
 
-  async filterMerchantTab(tab: 'all' | 'pending' | 'active') {
+  async searchMerchantShop(query: string) {
+    await expect(this.merchantSearchInput).toBeVisible();
+    await this.merchantSearchInput.fill(query);
+  }
+
+  async filterMerchantType(type: string) {
+    await expect(this.merchantTypeFilterSelect).toBeVisible();
+    await this.merchantTypeFilterSelect.selectOption(type);
+  }
+
+  async filterMerchantCity(city: string) {
+    await expect(this.merchantCityFilterSelect).toBeVisible();
+    await this.merchantCityFilterSelect.selectOption(city);
+  }
+
+  async filterMerchantTab(tab: 'all' | 'pending' | 'active' | 'suspended') {
     if (tab === 'pending') {
       await this.merchantTabPending.click();
     } else if (tab === 'active') {
       await this.merchantTabActive.click();
+    } else if (tab === 'suspended') {
+      await this.merchantTabSuspended.click();
     } else {
       await this.merchantTabAll.click();
     }
@@ -174,10 +199,42 @@ export class AdminDashboardPage {
 
   async expectMerchantInPipeline(merchantName: string, statusText?: string) {
     const row = this.merchantTable.locator('tr', { hasText: merchantName });
-    await expect(row).toBeVisible();
+    await expect(row).toBeVisible({ timeout: 10000 });
     if (statusText) {
-      await expect(row.getByText(new RegExp(statusText, 'i'))).toBeVisible();
+      const escaped = statusText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      await expect(row.getByText(new RegExp(escaped, 'i'))).toBeVisible({ timeout: 10000 });
     }
+  }
+
+  async expectMerchantStatus(merchantName: string, statusText: string) {
+    await this.expectMerchantInPipeline(merchantName, statusText);
+  }
+
+  async expectMerchantVisible(merchantName: string, shouldBeVisible: boolean = true) {
+    const row = this.merchantTable.locator('tr', { hasText: merchantName });
+    if (shouldBeVisible) {
+      await expect(row).toBeVisible({ timeout: 10000 });
+    } else {
+      await expect(row).not.toBeVisible({ timeout: 10000 });
+    }
+  }
+
+  async blockMerchant(merchantName: string) {
+    const row = this.merchantTable.locator('tr', { hasText: merchantName });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    const blockBtn = row.getByRole('button', { name: /Block Merchant/i });
+    await expect(blockBtn).toBeVisible({ timeout: 10000 });
+    await blockBtn.click();
+    await expect(this.page.getByText(/Merchant Blocked & Suspended/i)).toBeVisible({ timeout: 10000 });
+  }
+
+  async unblockMerchant(merchantName: string) {
+    const row = this.merchantTable.locator('tr', { hasText: merchantName });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    const unblockBtn = row.getByRole('button', { name: /Unblock Merchant/i });
+    await expect(unblockBtn).toBeVisible({ timeout: 10000 });
+    await unblockBtn.click();
+    await expect(this.page.getByText(/Merchant Activated & Visible/i)).toBeVisible({ timeout: 10000 });
   }
 
   async approveMerchant(merchantName: string) {

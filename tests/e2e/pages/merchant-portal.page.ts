@@ -25,6 +25,7 @@ export class MerchantPortalPage {
   // Overview Page Locators
   readonly overviewHeading: Locator;
   readonly liveSyncBadge: Locator;
+  readonly suspendedBanner: Locator;
   readonly totalBookingsCard: Locator;
   readonly confirmedBookingsCard: Locator;
   readonly diagnosticButton: Locator;
@@ -86,6 +87,7 @@ export class MerchantPortalPage {
     // Overview Page
     this.overviewHeading = page.getByRole('heading', { name: /City-Wide Vertical Summary|Merchant Dashboard|Overview/i });
     this.liveSyncBadge = page.getByText(/Live Synced|Live Hyperlocal/i).first();
+    this.suspendedBanner = page.getByTestId('merchant-suspended-banner');
     this.totalBookingsCard = page.getByText("Today's Live Appointments").first();
     this.confirmedBookingsCard = page.getByText('slots booked').first();
     this.diagnosticButton = page.getByRole('button', { name: /Run Diagnostics/i });
@@ -132,6 +134,15 @@ export class MerchantPortalPage {
   async goto() {
     await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
     await expect(this.platformTitle).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSuspendedBanner(visible: boolean = true) {
+    if (visible) {
+      await expect(this.suspendedBanner).toBeVisible({ timeout: 10000 });
+      await expect(this.suspendedBanner).toContainText('Account Suspended & Blocked');
+    } else {
+      await expect(this.suspendedBanner).not.toBeVisible({ timeout: 10000 });
+    }
   }
 
   async gotoBookings() {

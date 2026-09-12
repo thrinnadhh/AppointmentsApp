@@ -38,6 +38,7 @@ export async function PATCH(request: Request) {
     }
 
     const result = await updateAdminMerchantStatus(providerId, status);
+    console.log('[API Admin Merchants PATCH]', { providerId, status, result });
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Update failed' }, { status: 400 });
     }

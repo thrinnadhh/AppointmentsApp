@@ -144,6 +144,15 @@ export class CustomerAppPage {
     await expect(this.staffSectionHeading).toBeVisible();
   }
 
+  async expectProviderVisible(name: string, shouldBeVisible: boolean = true) {
+    const card = this.page.getByText(name).first();
+    if (shouldBeVisible) {
+      await expect(card).toBeVisible({ timeout: 10000 });
+    } else {
+      await expect(card).not.toBeVisible({ timeout: 10000 });
+    }
+  }
+
   async selectDateOffset(label: 'Today' | 'Tomorrow') {
     const dateChip = this.page.getByText(label, { exact: true });
     await expect(dateChip).toBeVisible();
@@ -180,16 +189,24 @@ export class CustomerAppPage {
     await expect(this.appTitle).toBeVisible({ timeout: 10000 });
   }
 
+  getBookingCard(identifier: string): Locator {
+    return this.page
+      .locator(`[data-testid="booking-card-${identifier}"]`)
+      .or(this.page.locator('[data-testid^="booking-card-"]').filter({ hasText: identifier }).first())
+      .first();
+  }
+
   async expectBookingInList(identifier: string, expectedStatus: string = 'CONFIRMED') {
-    const card = this.page.locator('div', { hasText: identifier }).first();
+    const card = this.getBookingCard(identifier);
+    await card.scrollIntoViewIfNeeded();
     await expect(card).toBeVisible({ timeout: 10000 });
-    await expect(this.page.getByText(expectedStatus).first()).toBeVisible();
+    await expect(card.getByText(expectedStatus).first()).toBeVisible();
   }
 
   async openBookingPass(identifier?: string) {
-    const passBtn = identifier
-      ? this.page.locator('div', { hasText: identifier }).getByText(/Pass/i).first()
-      : this.page.getByText(/Pass/i).first();
+    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const passBtn = card.getByTestId(/^view-pass-/).or(card.getByText(/Pass/i)).first();
+    await passBtn.scrollIntoViewIfNeeded();
     await expect(passBtn).toBeVisible({ timeout: 10000 });
     await passBtn.click();
     await expect(this.page.getByText('Digital Booking Pass')).toBeVisible({ timeout: 10000 });
@@ -208,22 +225,23 @@ export class CustomerAppPage {
       await dialog.accept();
     });
 
-    const cancelBtn = identifier
-      ? this.page.locator('div', { hasText: identifier }).getByText('Cancel', { exact: true }).first()
-      : this.page.getByText('Cancel', { exact: true }).first();
+    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const cancelBtn = card.getByTestId(/^cancel-/).or(card.getByText('Cancel', { exact: true })).first();
+    await cancelBtn.scrollIntoViewIfNeeded();
     await expect(cancelBtn).toBeVisible({ timeout: 10000 });
     await cancelBtn.click();
   }
 
   async rescheduleBookingFromList(identifier?: string, timeSlot: string = '11:30 AM') {
-    const rescheduleBtn = identifier
-      ? this.page.locator('div', { hasText: identifier }).getByText(/Reschedule/i).first()
-      : this.page.getByText(/Reschedule/i).first();
+    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const rescheduleBtn = card.getByTestId(/^reschedule-/).or(card.getByText(/Reschedule/i)).first();
+    await rescheduleBtn.scrollIntoViewIfNeeded();
     await expect(rescheduleBtn).toBeVisible({ timeout: 10000 });
     await rescheduleBtn.click();
 
     // Select time slot chip
     const slotChip = this.page.getByText(timeSlot, { exact: true }).first();
+    await slotChip.scrollIntoViewIfNeeded();
     await expect(slotChip).toBeVisible({ timeout: 10000 });
     await slotChip.click();
 
@@ -233,7 +251,8 @@ export class CustomerAppPage {
     });
 
     // Confirm Reschedule
-    const confirmBtn = this.page.getByText('Confirm Reschedule', { exact: true });
+    const confirmBtn = this.page.getByTestId('confirm-reschedule-btn').or(this.page.getByText('Confirm Reschedule', { exact: true })).first();
+    await confirmBtn.scrollIntoViewIfNeeded();
     await expect(confirmBtn).toBeVisible();
     await confirmBtn.click();
   }

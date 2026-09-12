@@ -189,3 +189,4 @@ export const test = base.extend<AppTestFixtures>({
 export { expect } from '@playwright/test';
 export { CustomerAppPage } from '../pages/customer-app.page';
 export { MerchantPortalPage } from '../pages/merchant-portal.page';
+export { AdminDashboardPage } from '../pages/admin-dashboard.page';

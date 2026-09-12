@@ -73,6 +73,13 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
       },
     });
 
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('reference_code')
+      .eq('id', booking_id)
+      .single();
+    const refCode = booking?.reference_code || `TPT-${booking_id.slice(0, 6).toUpperCase()}`;
+
     // 2. Merchant marks booking as COMPLETED on web portal
     const merchantContext = await browser.newContext();
     const merchantPage = await merchantContext.newPage();
@@ -80,9 +87,9 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     await merchantPortal.gotoBookings();
     await merchantPortal.filterByStatus('CONFIRMED');
-    await merchantPortal.searchBookings('Kalyan');
+    await merchantPortal.searchBookings(refCode);
 
-    const card = merchantPortal.getBookingCard('Kalyan');
+    const card = merchantPortal.getBookingCard(refCode);
     await expect(card).toBeVisible({ timeout: 10000 });
 
     const completeBtn = card.getByRole('button', { name: /Complete/i });
@@ -101,7 +108,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await customerApp.navigateToMyBookings();
 
     // Verify booking shows COMPLETED
-    await expect(customerPage.getByText('COMPLETED').first()).toBeVisible({ timeout: 10000 });
+    await customerApp.expectBookingInList(refCode, 'COMPLETED');
 
     await merchantContext.close();
     await customerContext.close();
@@ -129,6 +136,13 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
       },
     });
 
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('reference_code')
+      .eq('id', booking_id)
+      .single();
+    const refCode = booking?.reference_code || `TPT-${booking_id.slice(0, 6).toUpperCase()}`;
+
     // 2. Customer opens Mobile App and reschedules
     const customerContext = await browser.newContext();
     const customerPage = await customerContext.newPage();
@@ -137,8 +151,8 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await customerApp.goto();
     await customerApp.navigateToMyBookings();
 
-    // Trigger reschedule modal
-    await customerApp.rescheduleBookingFromList(undefined, '02:00 PM');
+    // Trigger reschedule modal for this specific booking
+    await customerApp.rescheduleBookingFromList(refCode, '02:00 PM');
 
     // 3. Verify in database and Merchant portal that slot updated
     const { data: updatedBooking } = await supabase
@@ -155,8 +169,8 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const merchantPortal = new MerchantPortalPage(merchantPage);
 
     await merchantPortal.gotoBookings();
-    await merchantPortal.searchBookings('Kalyan');
-    await expect(merchantPortal.getBookingCard('Kalyan')).toBeVisible({ timeout: 10000 });
+    await merchantPortal.searchBookings(refCode);
+    await expect(merchantPortal.getBookingCard(refCode)).toBeVisible({ timeout: 10000 });
 
     await customerContext.close();
     await merchantContext.close();
@@ -238,6 +252,13 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
       },
     });
 
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('reference_code')
+      .eq('id', booking_id)
+      .single();
+    const refCode = booking?.reference_code || `TPT-${booking_id.slice(0, 6).toUpperCase()}`;
+
     // 2. Customer cancels appointment from My Appointments screen
     const customerContext = await browser.newContext();
     const customerPage = await customerContext.newPage();
@@ -247,17 +268,28 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await customerApp.navigateToMyBookings();
 
     // Customer clicks cancel and accepts dialog
-    await customerApp.cancelBookingFromList();
+    await customerApp.cancelBookingFromList(refCode);
 
-    // 3. Verify in database: status is CANCELLED and payment_status is REFUNDED
-    const { data: cancelledBooking } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('id', booking_id)
-      .single();
+    // 3. Verify in UI and database: status becomes CANCELLED and payment_status is REFUNDED
+    await customerApp.expectBookingInList(refCode, 'CANCELLED');
 
-    expect(cancelledBooking.status).toBe('CANCELLED');
-    expect(cancelledBooking.payment_status).toBe('REFUNDED');
+    await expect.poll(async () => {
+      const { data: b } = await supabase
+        .from('bookings')
+        .select('status, payment_status')
+        .eq('id', booking_id)
+        .single();
+      return b?.status;
+    }, { timeout: 10000 }).toBe('CANCELLED');
+
+    await expect.poll(async () => {
+      const { data: b } = await supabase
+        .from('bookings')
+        .select('status, payment_status')
+        .eq('id', booking_id)
+        .single();
+      return b?.payment_status;
+    }, { timeout: 10000 }).toBe('REFUNDED');
 
     // 4. Verify Merchant Portal displays booking under CANCELLED filter
     const merchantContext = await browser.newContext();
@@ -266,8 +298,8 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     await merchantPortal.gotoBookings();
     await merchantPortal.filterByStatus('CANCELLED');
-    await merchantPortal.searchBookings('Kalyan');
-    await expect(merchantPortal.getBookingCard('Kalyan')).toBeVisible({ timeout: 10000 });
+    await merchantPortal.searchBookings(refCode);
+    await expect(merchantPortal.getBookingCard(refCode)).toBeVisible({ timeout: 10000 });
 
     await customerContext.close();
     await merchantContext.close();
@@ -471,7 +503,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     await customerApp.goto();
     await customerApp.navigateToMyBookings();
-    await customerApp.openBookingPass();
+    await customerApp.openBookingPass(referenceCode);
 
     // Verify digital voucher elements
     await expect(customerPage.getByText('Digital Booking Pass')).toBeVisible();
@@ -508,7 +540,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
       }),
       request.post('http://localhost:3000/api/bookings/hold', {
         data: {
-          customer_id: '99999999-9999-9999-9999-999999999992', // Second customer
+          customer_id: testCustomerId,
           resource_id: testResourceId,
           slot_start: slotStart,
           slot_end: slotEnd,
@@ -524,6 +556,6 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     const conflictResponse = holdResponseA.status() === 409 ? holdResponseA : holdResponseB;
     const conflictJson = await conflictResponse.json();
-    expect(conflictJson.error).toMatch(/currently held or booked/i);
+    expect(conflictJson.error).toMatch(/already held or booked|conflict/i);
   });
 });

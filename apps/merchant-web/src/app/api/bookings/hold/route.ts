@@ -34,12 +34,23 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Supabase RPC create_booking_hold error:', error);
+      const isConflict =
+        error.code === '23505' ||
+        error.code === '23P01' ||
+        error.message?.includes('duplicate key') ||
+        error.message?.includes('unique constraint') ||
+        error.message?.includes('exclusion') ||
+        error.message?.includes('conflict') ||
+        error.message?.includes('already held');
+
       return NextResponse.json<CreateHoldResponse>(
         {
           success: false,
-          error: error.message,
+          error: isConflict
+            ? 'Slot is already held or booked by another customer'
+            : error.message,
         },
-        { status: 500 }
+        { status: isConflict ? 409 : 500 }
       );
     }
 
