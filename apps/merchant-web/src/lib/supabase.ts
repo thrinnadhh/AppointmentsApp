@@ -1,7 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database, BookingStatus, PaymentStatus, Provider, Resource, ResourceType, NotificationLog } from '@appointments/shared';
+import {
+  Database,
+  BookingStatus,
+  PaymentStatus,
+  Provider,
+  Resource,
+  ResourceType,
+  NotificationLog,
+  City,
+  CityStatus,
+  CityAdminStats,
+  AdminVelocityMetrics,
+  CityWaitlistEntry,
+  TimeWindowFilter,
+} from '@appointments/shared';
 
-export type { Provider, Resource, ResourceType, NotificationLog };
+export type {
+  Provider,
+  Resource,
+  ResourceType,
+  NotificationLog,
+  City,
+  CityStatus,
+  CityAdminStats,
+  AdminVelocityMetrics,
+  CityWaitlistEntry,
+  TimeWindowFilter,
+};
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -479,3 +504,158 @@ export async function fetchBookingNotifications(bookingId: string): Promise<Noti
   }
 }
 
+/**
+ * Super Admin: Fetch comprehensive city rollout & expansion stats.
+ */
+export async function fetchAdminCityStats(): Promise<CityAdminStats[]> {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin.rpc('get_admin_city_stats');
+    if (error) {
+      console.warn('get_admin_city_stats error, falling back to direct table query:', error.message);
+      const { data: citiesData } = await supabaseAdmin.from('cities').select('*').order('name');
+      return (citiesData || []).map((c) => ({
+        city_id: c.id,
+        city_name: c.name,
+        status: c.status as CityStatus,
+        merchant_target: c.merchant_target || 10,
+        onboarded_merchants: 0,
+        in_progress_merchants: 0,
+        total_bookings: 0,
+        completed_bookings: 0,
+        deposit_volume: 0,
+        waitlist_count: 0,
+      }));
+    }
+    return (data as unknown as CityAdminStats[]) || [];
+  } catch (err) {
+    console.warn('Error in fetchAdminCityStats:', err);
+    return [];
+  }
+}
+
+/**
+ * Super Admin: Fetch booking velocity and conversion funnel across time windows.
+ */
+export async function fetchAdminVelocity(
+  timeWindow: TimeWindowFilter = '7days',
+  cityId?: string | null
+): Promise<AdminVelocityMetrics | null> {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin.rpc('get_admin_velocity_analytics', {
+      p_time_window: timeWindow,
+      p_city_id: cityId || null,
+    });
+    if (error) {
+      console.warn('get_admin_velocity_analytics error:', error.message);
+      return null;
+    }
+    return data as unknown as AdminVelocityMetrics;
+  } catch (err) {
+    console.warn('Error in fetchAdminVelocity:', err);
+    return null;
+  }
+}
+
+/**
+ * Super Admin: Update city launch status or merchant quota target.
+ */
+export async function updateAdminCityStatus(
+  cityId: string,
+  status: CityStatus,
+  target?: number | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin.rpc('update_city_status', {
+      p_city_id: cityId,
+      p_status: status,
+      p_target: target !== undefined ? target : null,
+    });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    const res = data as unknown as { success?: boolean; error?: string };
+    return { success: res?.success ?? true, error: res?.error };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Update failed' };
+  }
+}
+
+/**
+ * Super Admin: Fetch merchants with city breakdown and status filter.
+ */
+export async function fetchAdminMerchants(cityId?: string) {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
+      .from('providers')
+      .select('*, resources(count), categories(name)')
+      .order('created_at', { ascending: false });
+
+    if (cityId && cityId !== 'all') {
+      query = query.eq('city_id', cityId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn('Error fetching admin merchants:', error.message);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.warn('Error in fetchAdminMerchants:', err);
+    return [];
+  }
+}
+
+/**
+ * Super Admin: Update merchant onboarding status (e.g. approve PENDING_APPROVAL to ACTIVE).
+ */
+export async function updateAdminMerchantStatus(
+  providerId: string,
+  status: Database['public']['Enums']['provider_status']
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { error } = await supabaseAdmin
+      .from('providers')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', providerId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Merchant update failed' };
+  }
+}
+
+/**
+ * Fetch consumer/merchant waitlist expressions for expanding/planned cities.
+ */
+export async function fetchAdminCityWaitlist(cityId?: string): Promise<CityWaitlistEntry[]> {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
+      .from('city_waitlist')
+      .select('*, cities(name)')
+      .order('created_at', { ascending: false });
+
+    if (cityId && cityId !== 'all') {
+      query = query.eq('city_id', cityId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn('Error fetching waitlist:', error.message);
+      return [];
+    }
+    return (data || []) as unknown as CityWaitlistEntry[];
+  } catch (err) {
+    console.warn('Error in fetchAdminCityWaitlist:', err);
+    return [];
+  }
+}

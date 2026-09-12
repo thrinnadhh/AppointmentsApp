@@ -117,6 +117,89 @@ export type Database = {
         }
         Relationships: []
       }
+      cities: {
+        Row: {
+          created_at: string
+          country: string
+          id: string
+          latitude: number
+          longitude: number
+          merchant_target: number
+          metadata: Json
+          name: string
+          radius_km: number
+          state: string
+          status: "ACTIVE" | "EXPANDING" | "PLANNED" | "PAUSED"
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          country?: string
+          id: string
+          latitude: number
+          longitude: number
+          merchant_target?: number
+          metadata?: Json
+          name: string
+          radius_km?: number
+          state?: string
+          status?: "ACTIVE" | "EXPANDING" | "PLANNED" | "PAUSED"
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          country?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          merchant_target?: number
+          metadata?: Json
+          name?: string
+          radius_km?: number
+          state?: string
+          status?: "ACTIVE" | "EXPANDING" | "PLANNED" | "PAUSED"
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      city_waitlist: {
+        Row: {
+          city_id: string
+          contact_info: string
+          created_at: string
+          id: string
+          notes: string | null
+          role_interest: string
+          user_id: string | null
+        }
+        Insert: {
+          city_id: string
+          contact_info: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          role_interest?: string
+          user_id?: string | null
+        }
+        Update: {
+          city_id?: string
+          contact_info?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          role_interest?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_waitlist_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_logs: {
         Row: {
           booking_id: string
@@ -252,6 +335,7 @@ export type Database = {
           address: string
           category_id: string
           city: string
+          city_id: string | null
           closing_time: string
           created_at: string
           description: string | null
@@ -272,6 +356,7 @@ export type Database = {
           address: string
           category_id: string
           city?: string
+          city_id?: string | null
           closing_time?: string
           created_at?: string
           description?: string | null
@@ -292,6 +377,7 @@ export type Database = {
           address?: string
           category_id?: string
           city?: string
+          city_id?: string | null
           closing_time?: string
           created_at?: string
           description?: string | null
@@ -314,6 +400,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "providers_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
             referencedColumns: ["id"]
           },
           {
@@ -532,6 +625,31 @@ export type Database = {
           p_lng: number
           p_category?: string | null
           p_radius_meters?: number
+        }
+        Returns: Json
+      }
+      get_active_cities: {
+        Args: {
+          p_include_expanding?: boolean
+        }
+        Returns: Json
+      }
+      get_admin_city_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_admin_velocity_analytics: {
+        Args: {
+          p_city_id?: string | null
+          p_time_window?: string
+        }
+        Returns: Json
+      }
+      update_city_status: {
+        Args: {
+          p_city_id: string
+          p_status: string
+          p_target?: number | null
         }
         Returns: Json
       }

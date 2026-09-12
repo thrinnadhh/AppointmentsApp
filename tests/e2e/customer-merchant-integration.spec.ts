@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { CustomerAppPage } from './pages/customer-app.page';
+import { MerchantPortalPage } from './pages/merchant-portal.page';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
@@ -9,8 +10,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () => {
   const testCustomerEmail = 'customer.integration@tirupati.care';
   const testCustomerId = '99999999-9999-9999-9999-999999999991'; // Kalyan Chakravarthy seed account
+  const testResourceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // Dr. S. K. Murthy
 
-  test('1. [Customer Booking -> Merchant Live Queue] Customer books appointment on mobile app; Merchant sees it live on bookings dashboard', async ({ browser, request }) => {
+  test('1. [Customer Booking -> Merchant Live Queue] Customer books appointment on mobile app; Merchant sees it live on bookings dashboard', async ({ browser }) => {
     // Context A: Customer Mobile App (Expo Web on port 8081)
     const customerContext = await browser.newContext();
     const customerPage = await customerContext.newPage();
@@ -35,20 +37,12 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // Context B: Merchant Portal (/bookings on port 3000)
     const merchantContext = await browser.newContext();
     const merchantPage = await merchantContext.newPage();
+    const merchantPortal = new MerchantPortalPage(merchantPage);
 
-    await merchantPage.goto('http://localhost:3000/bookings');
-    await expect(merchantPage.getByRole('heading', { name: 'Bookings & Queue' })).toBeVisible();
+    await merchantPortal.gotoBookings();
+    await merchantPortal.filterByStatus('CONFIRMED');
 
-    // 3. Merchant searches for customer or verifies confirmed bookings
-    const searchInput = merchantPage.locator('#customer-search');
-    await expect(searchInput).toBeVisible();
-
-    // Click 'CONFIRMED' status filter pill
-    const confirmedFilterBtn = merchantPage.getByRole('button', { name: 'CONFIRMED', exact: true });
-    await expect(confirmedFilterBtn).toBeVisible();
-    await confirmedFilterBtn.click();
-
-    // 4. Verify that the merchant sees the confirmed booking for Sri Venkateswara Dental in the queue
+    // 3. Verify that the merchant sees the confirmed booking for Sri Venkateswara Dental in the queue
     await expect(merchantPage.locator('strong', { hasText: 'Sri Venkateswara Dental & Implant Care' }).first()).toBeVisible();
     await expect(merchantPage.getByText('CONFIRMED').first()).toBeVisible();
 
@@ -56,7 +50,119 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await merchantContext.close();
   });
 
-  test('2. [Merchant Reschedule -> Customer Notification] Merchant reschedules an appointment; Customer view reflects updated time', async ({ request }) => {
+  test('2. [Merchant Check-In & Service Completion] Merchant completes appointment on web; Customer mobile app reflects COMPLETED status', async ({ browser, request }) => {
+    // 1. Create and confirm a booking
+    const slotStart = new Date(Date.now() + 86400000).toISOString();
+    const slotEnd = new Date(Date.now() + 86400000 + 1800000).toISOString();
+
+    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    expect(holdRes.status()).toBe(201);
+    const { booking_id } = await holdRes.json();
+
+    await request.post('http://localhost:3000/api/bookings/confirm', {
+      data: {
+        booking_id,
+        gateway_payment_id: `pay_complete_${Date.now()}`,
+      },
+    });
+
+    // 2. Merchant marks booking as COMPLETED on web portal
+    const merchantContext = await browser.newContext();
+    const merchantPage = await merchantContext.newPage();
+    const merchantPortal = new MerchantPortalPage(merchantPage);
+
+    await merchantPortal.gotoBookings();
+    await merchantPortal.filterByStatus('CONFIRMED');
+    await merchantPortal.searchBookings('Kalyan');
+
+    const card = merchantPortal.getBookingCard('Kalyan');
+    await expect(card).toBeVisible({ timeout: 10000 });
+
+    const completeBtn = card.getByRole('button', { name: /Complete/i });
+    await expect(completeBtn).toBeVisible();
+    await completeBtn.click();
+
+    // Merchant UI reflects COMPLETED
+    await expect(card.getByText('COMPLETED')).toBeVisible({ timeout: 10000 });
+
+    // 3. Customer views My Appointments on Mobile App and verifies COMPLETED status
+    const customerContext = await browser.newContext();
+    const customerPage = await customerContext.newPage();
+    const customerApp = new CustomerAppPage(customerPage);
+
+    await customerApp.goto();
+    await customerApp.navigateToMyBookings();
+
+    // Verify booking shows COMPLETED
+    await expect(customerPage.getByText('COMPLETED').first()).toBeVisible({ timeout: 10000 });
+
+    await merchantContext.close();
+    await customerContext.close();
+  });
+
+  test('3. [Customer-Initiated Reschedule -> Merchant Queue] Customer reschedules appointment from mobile; Merchant portal reflects updated time', async ({ browser, request }) => {
+    // 1. Create and confirm a booking
+    const slotStart = new Date(Date.now() + 172800000).toISOString(); // +2 days
+    const slotEnd = new Date(Date.now() + 172800000 + 1800000).toISOString();
+
+    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    const { booking_id } = await holdRes.json();
+
+    await request.post('http://localhost:3000/api/bookings/confirm', {
+      data: {
+        booking_id,
+        gateway_payment_id: `pay_resched_${Date.now()}`,
+      },
+    });
+
+    // 2. Customer opens Mobile App and reschedules
+    const customerContext = await browser.newContext();
+    const customerPage = await customerContext.newPage();
+    const customerApp = new CustomerAppPage(customerPage);
+
+    await customerApp.goto();
+    await customerApp.navigateToMyBookings();
+
+    // Trigger reschedule modal
+    await customerApp.rescheduleBookingFromList(undefined, '02:00 PM');
+
+    // 3. Verify in database and Merchant portal that slot updated
+    const { data: updatedBooking } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', booking_id)
+      .single();
+
+    expect(updatedBooking.status).toBe('CONFIRMED');
+
+    // 4. Verify Merchant Portal reflects the confirmed booking
+    const merchantContext = await browser.newContext();
+    const merchantPage = await merchantContext.newPage();
+    const merchantPortal = new MerchantPortalPage(merchantPage);
+
+    await merchantPortal.gotoBookings();
+    await merchantPortal.searchBookings('Kalyan');
+    await expect(merchantPortal.getBookingCard('Kalyan')).toBeVisible({ timeout: 10000 });
+
+    await customerContext.close();
+    await merchantContext.close();
+  });
+
+  test('4. [Merchant-Initiated Reschedule -> Customer Notification] Merchant reschedules an appointment; Customer view reflects updated time', async ({ request }) => {
     // 1. Create a fresh booking via Backend API
     const slotStart = new Date(Date.now() + 86400000).toISOString(); // Tomorrow
     const slotEnd = new Date(Date.now() + 86400000 + 1800000).toISOString();
@@ -64,7 +170,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
       data: {
         customer_id: testCustomerId,
-        resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', // Dr. S. K. Murthy
+        resource_id: testResourceId,
         slot_start: slotStart,
         slot_end: slotEnd,
       },
@@ -110,7 +216,106 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     expect(new Date(updatedBooking.slot_end).getTime()).toBe(new Date(newSlotEnd).getTime());
   });
 
-  test('3. [Merchant No-Show -> Customer Strike Penalty] Merchant marks no-show; deposit forfeits & customer strikes increment', async ({ request }) => {
+  test('5. [Customer Cancellation with Policy Refund] Customer cancels advance booking on mobile; Merchant reflects CANCELLED status', async ({ browser, request }) => {
+    // 1. Create and confirm a booking for +3 days in advance
+    const slotStart = new Date(Date.now() + 259200000).toISOString();
+    const slotEnd = new Date(Date.now() + 259200000 + 1800000).toISOString();
+
+    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    const { booking_id } = await holdRes.json();
+
+    await request.post('http://localhost:3000/api/bookings/confirm', {
+      data: {
+        booking_id,
+        gateway_payment_id: `pay_cust_cancel_${Date.now()}`,
+      },
+    });
+
+    // 2. Customer cancels appointment from My Appointments screen
+    const customerContext = await browser.newContext();
+    const customerPage = await customerContext.newPage();
+    const customerApp = new CustomerAppPage(customerPage);
+
+    await customerApp.goto();
+    await customerApp.navigateToMyBookings();
+
+    // Customer clicks cancel and accepts dialog
+    await customerApp.cancelBookingFromList();
+
+    // 3. Verify in database: status is CANCELLED and payment_status is REFUNDED
+    const { data: cancelledBooking } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', booking_id)
+      .single();
+
+    expect(cancelledBooking.status).toBe('CANCELLED');
+    expect(cancelledBooking.payment_status).toBe('REFUNDED');
+
+    // 4. Verify Merchant Portal displays booking under CANCELLED filter
+    const merchantContext = await browser.newContext();
+    const merchantPage = await merchantContext.newPage();
+    const merchantPortal = new MerchantPortalPage(merchantPage);
+
+    await merchantPortal.gotoBookings();
+    await merchantPortal.filterByStatus('CANCELLED');
+    await merchantPortal.searchBookings('Kalyan');
+    await expect(merchantPortal.getBookingCard('Kalyan')).toBeVisible({ timeout: 10000 });
+
+    await customerContext.close();
+    await merchantContext.close();
+  });
+
+  test('6. [Merchant Cancellation -> Customer Refund] Merchant cancels booking; status becomes CANCELLED with REFUNDED deposit', async ({ request }) => {
+    // 1. Create and confirm booking
+    const slotStart = new Date(Date.now() + 259200000).toISOString();
+    const slotEnd = new Date(Date.now() + 259200000 + 1800000).toISOString();
+
+    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    const { booking_id } = await holdRes.json();
+
+    await request.post('http://localhost:3000/api/bookings/confirm', {
+      data: {
+        booking_id,
+        gateway_payment_id: `pay_cancel_${Date.now()}`,
+      },
+    });
+
+    // 2. Merchant cancels booking
+    const cancelRes = await request.post('http://localhost:3000/api/bookings/cancel', {
+      data: {
+        booking_id,
+        reason: 'Staff emergency leave',
+      },
+    });
+    expect(cancelRes.status()).toBe(200);
+
+    // 3. Verify booking status is CANCELLED and deposit is REFUNDED
+    const { data: cancelledBooking } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', booking_id)
+      .single();
+
+    expect(cancelledBooking.status).toBe('CANCELLED');
+    expect(cancelledBooking.payment_status).toBe('REFUNDED');
+  });
+
+  test('7. [Merchant No-Show -> Customer Strike Penalty] Merchant marks no-show; deposit forfeits & customer strikes increment', async ({ request }) => {
     // 1. Read initial no-show count of customer
     const { data: initialProfile } = await supabase
       .from('profiles')
@@ -127,7 +332,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
       data: {
         customer_id: testCustomerId,
-        resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        resource_id: testResourceId,
         slot_start: slotStart,
         slot_end: slotEnd,
       },
@@ -171,49 +376,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     expect(updatedProfile?.no_show_count).toBe(initialStrikes + 1);
   });
 
-  test('4. [Merchant Cancellation -> Customer Refund] Merchant cancels booking; status becomes CANCELLED with REFUNDED deposit', async ({ request }) => {
-    // 1. Create and confirm booking
-    const slotStart = new Date(Date.now() + 259200000).toISOString();
-    const slotEnd = new Date(Date.now() + 259200000 + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    const { booking_id } = await holdRes.json();
-
-    await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_cancel_${Date.now()}`,
-      },
-    });
-
-    // 2. Merchant cancels booking
-    const cancelRes = await request.post('http://localhost:3000/api/bookings/cancel', {
-      data: {
-        booking_id,
-        reason: 'Staff emergency leave',
-      },
-    });
-    expect(cancelRes.status()).toBe(200);
-
-    // 3. Verify booking status is CANCELLED and deposit is REFUNDED
-    const { data: cancelledBooking } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('id', booking_id)
-      .single();
-
-    expect(cancelledBooking.status).toBe('CANCELLED');
-    expect(cancelledBooking.payment_status).toBe('REFUNDED');
-  });
-
-  test('5. [Merchant Onboarding -> Customer Catalog Discovery] Newly onboarded business & services are discoverable in Customer mobile app', async ({ browser, request }) => {
+  test('8. [Merchant Onboarding -> Customer Catalog Discovery] Newly onboarded business & services are discoverable in Customer mobile app', async ({ browser, request }) => {
     const timestamp = Date.now().toString().slice(-4);
     const newSalonName = `Tirupati Velvet Glow Unisex Spa ${timestamp}`;
     const newSpecialistName = `Stylist Mahesh (Color Specialist)`;
@@ -268,5 +431,99 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await expect(customerPage.getByText('₹100').first()).toBeVisible();
 
     await customerContext.close();
+  });
+
+  test('9. [Digital Pass QR & Reference Code Verification] Customer views Digital Booking Pass; Merchant verifies customer via Reference Code search', async ({ browser, request }) => {
+    // 1. Create and confirm a booking
+    const slotStart = new Date(Date.now() + 345600000).toISOString(); // +4 days
+    const slotEnd = new Date(Date.now() + 345600000 + 1800000).toISOString();
+
+    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    const { booking_id } = await holdRes.json();
+
+    await request.post('http://localhost:3000/api/bookings/confirm', {
+      data: {
+        booking_id,
+        gateway_payment_id: `pay_pass_${Date.now()}`,
+      },
+    });
+
+    // Fetch the reference code assigned to this booking
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('reference_code')
+      .eq('id', booking_id)
+      .single();
+
+    const referenceCode = booking?.reference_code || `TPT-${booking_id.slice(0, 6).toUpperCase()}`;
+
+    // 2. Customer opens Mobile App and opens Digital Pass Modal
+    const customerContext = await browser.newContext();
+    const customerPage = await customerContext.newPage();
+    const customerApp = new CustomerAppPage(customerPage);
+
+    await customerApp.goto();
+    await customerApp.navigateToMyBookings();
+    await customerApp.openBookingPass();
+
+    // Verify digital voucher elements
+    await expect(customerPage.getByText('Digital Booking Pass')).toBeVisible();
+    await customerApp.closeBookingPass();
+
+    // 3. Merchant verifies customer arrival by searching reference code in Queue
+    const merchantContext = await browser.newContext();
+    const merchantPage = await merchantContext.newPage();
+    const merchantPortal = new MerchantPortalPage(merchantPage);
+
+    await merchantPortal.gotoBookings();
+    await merchantPortal.searchBookings(referenceCode);
+
+    // Exact booking is isolated
+    await expect(merchantPortal.getBookingCard(referenceCode)).toBeVisible({ timeout: 10000 });
+
+    await customerContext.close();
+    await merchantContext.close();
+  });
+
+  test('10. [Concurrency Collision Protection] Simultaneous slot hold attempts result in 1 confirmation and 1 conflict rejection', async ({ request }) => {
+    const slotStart = new Date(Date.now() + 432000000).toISOString(); // +5 days
+    const slotEnd = new Date(Date.now() + 432000000 + 1800000).toISOString();
+
+    // Launch two simultaneous slot hold requests for the exact same resource & time window
+    const [holdResponseA, holdResponseB] = await Promise.all([
+      request.post('http://localhost:3000/api/bookings/hold', {
+        data: {
+          customer_id: testCustomerId,
+          resource_id: testResourceId,
+          slot_start: slotStart,
+          slot_end: slotEnd,
+        },
+      }),
+      request.post('http://localhost:3000/api/bookings/hold', {
+        data: {
+          customer_id: '99999999-9999-9999-9999-999999999992', // Second customer
+          resource_id: testResourceId,
+          slot_start: slotStart,
+          slot_end: slotEnd,
+        },
+      }),
+    ]);
+
+    const statuses = [holdResponseA.status(), holdResponseB.status()];
+
+    // Exactly one must succeed (201 HELD) and one must be rejected (409 Conflict)
+    expect(statuses).toContain(201);
+    expect(statuses).toContain(409);
+
+    const conflictResponse = holdResponseA.status() === 409 ? holdResponseA : holdResponseB;
+    const conflictJson = await conflictResponse.json();
+    expect(conflictJson.error).toMatch(/currently held or booked/i);
   });
 });

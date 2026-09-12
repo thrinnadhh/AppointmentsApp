@@ -37,6 +37,7 @@ export interface Provider {
   description?: string | null;
   address: string;
   city: string;
+  city_id?: string | null;
   latitude: number;
   longitude: number;
   phone: string;
@@ -160,3 +161,74 @@ export interface NotificationLog {
   created_at: string;
 }
 
+export type CityStatus = 'ACTIVE' | 'EXPANDING' | 'PLANNED' | 'PAUSED';
+
+export interface City {
+  id: string;
+  name: string;
+  state: string;
+  country: string;
+  status: CityStatus;
+  latitude: number;
+  longitude: number;
+  radius_km: number;
+  merchant_target: number;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CityWaitlistEntry {
+  id: string;
+  city_id: string;
+  user_id?: string | null;
+  contact_info: string;
+  role_interest: 'merchant' | 'customer' | string;
+  notes?: string | null;
+  created_at: string;
+}
+
+export type TimeWindowFilter = 'today' | '3days' | '7days' | '30days' | 'all';
+
+export interface CityAdminStats {
+  city_id: string;
+  city_name: string;
+  status: CityStatus;
+  merchant_target: number;
+  onboarded_merchants: number;
+  in_progress_merchants: number;
+  total_bookings: number;
+  completed_bookings: number;
+  deposit_volume: number;
+  waitlist_count: number;
+}
+
+export interface AdminVelocityMetrics {
+  time_window: TimeWindowFilter;
+  since: string | null;
+  total_bookings: number;
+  completed_bookings: number;
+  held_bookings: number;
+  confirmed_bookings: number;
+  no_show_bookings: number;
+  cancelled_bookings: number;
+  gross_deposit_amount: number;
+  city_density: Array<{
+    city_id: string;
+    city_name: string;
+    booking_count: number;
+    deposit_sum: number;
+  }>;
+  merchant_funnel: {
+    onboarded_count: number;
+    in_progress_count: number;
+    suspended_count: number;
+    total_merchants: number;
+  };
+  cities_overview: {
+    active_cities: number;
+    expanding_cities: number;
+    planned_cities: number;
+    total_cities: number;
+  };
+}

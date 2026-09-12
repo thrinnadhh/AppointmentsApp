@@ -11,7 +11,7 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
-import { VERTICALS, normCategory } from '@appointments/shared';
+import { VERTICALS, normCategory, City } from '@appointments/shared';
 import {
   MOCK_PROVIDERS,
   fetchProvidersByCategory,
@@ -19,6 +19,8 @@ import {
   ProviderWithDetails,
   getCachedProvidersByCategory,
   searchDirectoryOnSupabase,
+  fetchActiveCities,
+  joinCityWaitlist,
 } from '../services/api';
 
 interface VerticalVisual {
@@ -145,6 +147,43 @@ export default function HomeScreen({
   });
   const [loading, setLoading] = useState(false);
 
+  // Dynamic Multi-City Territory State
+  const [availableCities, setAvailableCities] = useState<City[]>([]);
+  const [selectedCity, setSelectedCity] = useState<{
+    id: string;
+    name: string;
+    state: string;
+    status: string;
+    latitude: number;
+    longitude: number;
+  }>({
+    id: 'tirupati',
+    name: 'Tirupati',
+    state: 'AP',
+    status: 'ACTIVE',
+    latitude: 13.6288,
+    longitude: 79.4192,
+  });
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [waitlistPhone, setWaitlistPhone] = useState('');
+  const [waitlistSuccess, setWaitlistSuccess] = useState<string | null>(null);
+  const [isSubmittingWaitlist, setIsSubmittingWaitlist] = useState(false);
+
+  // Load available expansion territories on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadCities() {
+      const list = await fetchActiveCities(true);
+      if (isMounted && list && list.length > 0) {
+        setAvailableCities(list);
+      }
+    }
+    loadCities();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Load category venue counts on mount
   useEffect(() => {
     let isMounted = true;
@@ -181,17 +220,19 @@ export default function HomeScreen({
     };
   }, []);
 
-  // Fetch providers when category is selected
+  // Fetch providers when category or city territory changes
   useEffect(() => {
     if (!selectedCategory) return;
     let isMounted = true;
     async function load() {
-      const cached = getCachedProvidersByCategory(selectedCategory || undefined);
-      if (!cached || cached.length === 0) {
-        setLoading(true);
-      }
+      setLoading(true);
       try {
-        const data = await fetchNearbyProviders(13.6288, 79.4192, selectedCategory || undefined);
+        const data = await fetchNearbyProviders(
+          selectedCity.latitude,
+          selectedCity.longitude,
+          selectedCategory || undefined,
+          25000
+        );
         if (isMounted) {
           setProviders(data);
         }
@@ -205,7 +246,7 @@ export default function HomeScreen({
     return () => {
       isMounted = false;
     };
-  }, [selectedCategory]);
+  }, [selectedCategory, selectedCity]);
 
   // Typo-tolerant fuzzy search via Supabase pg_trgm
   useEffect(() => {
@@ -303,10 +344,17 @@ export default function HomeScreen({
             <Text style={styles.brandLogoEmoji}>⚡</Text>
           </View>
           <View>
-            <View style={styles.locationBadge}>
+            <TouchableOpacity
+              style={styles.locationBadge}
+              onPress={() => setShowCityModal(true)}
+              activeOpacity={0.7}
+              accessibilityLabel="Select Territory"
+              accessibilityRole="button"
+            >
               <Text style={styles.locationDot}>📍</Text>
-              <Text style={styles.locationCity}>Tirupati, AP</Text>
-            </View>
+              <Text style={styles.locationCity}>{selectedCity.name}, {selectedCity.state}</Text>
+              <Text style={styles.locationChevron}> ▾</Text>
+            </TouchableOpacity>
             <Text style={styles.appTitle}>Instant Appointments</Text>
           </View>
         </View>
@@ -400,7 +448,7 @@ export default function HomeScreen({
               <View style={styles.activeBannerBadgeRow}>
                 <Text style={styles.activeBannerEmoji}>{currentVisual.emoji}</Text>
                 <Text style={[styles.activeBannerTitle, { color: currentVisual.color }]}>
-                  {currentVertical?.name} in Tirupati
+                  {currentVertical?.name} in {selectedCity.name}
                 </Text>
               </View>
               <Text style={styles.activeBannerDesc} numberOfLines={1}>
@@ -512,7 +560,7 @@ export default function HomeScreen({
               <Text style={styles.sectionHeading}>
                 {searchQuery
                   ? `Search Results (${filteredProviders.length})`
-                  : `Nearby in Tirupati (${filteredProviders.length})`}
+                  : `Nearby in ${selectedCity.name} (${filteredProviders.length})`}
               </Text>
               {loading && <ActivityIndicator size="small" color="#059669" />}
             </View>
@@ -611,6 +659,130 @@ export default function HomeScreen({
           </ScrollView>
         </View>
       )}
+
+      {/* City Switcher & Expansion Waitlist Modal */}
+      {showCityModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Choose Territory</Text>
+                <Text style={styles.modalSubtitle}>Live booking cities & pre-launch expansion</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCityModal(false);
+                  setWaitlistSuccess(null);
+                }}
+                style={styles.closeBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Close city selector"
+                testID="close-city-modal-btn"
+              >
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {availableCities.map((c) => {
+                const isCurrent = selectedCity.id === c.id;
+                const isActive = c.status === 'ACTIVE';
+
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[
+                      styles.cityItem,
+                      isCurrent && styles.cityItemActive,
+                    ]}
+                    onPress={() => {
+                      if (isActive) {
+                        setSelectedCity({
+                          id: c.id,
+                          name: c.name,
+                          state: c.state === 'Andhra Pradesh' ? 'AP' : c.state,
+                          status: c.status,
+                          latitude: c.latitude,
+                          longitude: c.longitude,
+                        });
+                        setShowCityModal(false);
+                      }
+                    }}
+                  >
+                    <View style={styles.cityInfo}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.cityName, isCurrent && styles.cityNameActive]}>
+                          {c.name}
+                        </Text>
+                        {isCurrent && <Text style={styles.currentCityCheck}>✓</Text>}
+                      </View>
+                      <Text style={styles.cityState}>
+                        {c.state}, {c.country}
+                      </Text>
+                    </View>
+
+                    <View style={{ alignItems: 'flex-end' }}>
+                      {isActive ? (
+                        <View style={styles.activePill}>
+                          <Text style={styles.activePillText}>LIVE NOW</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.expandingPill}>
+                          <Text style={styles.expandingPillText}>EXPANDING SOON</Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Pre-launch Inbound Waitlist Box */}
+              <View style={styles.waitlistContainer}>
+                <Text style={styles.waitlistTitle}>Want appointments in another city?</Text>
+                <Text style={styles.waitlistSubtitle}>
+                  Leave your mobile or email. We will notify you first when slots open in your neighborhood.
+                </Text>
+                {waitlistSuccess ? (
+                  <View style={styles.waitlistSuccessBox}>
+                    <Text style={styles.waitlistSuccessText}>{waitlistSuccess}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.waitlistInputRow}>
+                    <TextInput
+                      style={styles.waitlistInput}
+                      placeholder="e.g. 9876543210 or user@domain.com"
+                      placeholderTextColor="#94a3b8"
+                      value={waitlistPhone}
+                      onChangeText={setWaitlistPhone}
+                    />
+                    <TouchableOpacity
+                      style={styles.waitlistSubmitBtn}
+                      disabled={isSubmittingWaitlist}
+                      accessibilityRole="button"
+                      accessibilityLabel="Notify Me"
+                      testID="waitlist-submit-btn"
+                      onPress={async () => {
+                        if (!waitlistPhone.trim()) return;
+                        setIsSubmittingWaitlist(true);
+                        const res = await joinCityWaitlist('nellore', waitlistPhone, 'customer', 'Mobile app home selector');
+                        setIsSubmittingWaitlist(false);
+                        if (res.success) {
+                          setWaitlistSuccess('✓ Noted! You will receive early priority booking.');
+                          setWaitlistPhone('');
+                        }
+                      }}
+                    >
+                      <Text style={styles.waitlistSubmitText}>
+                        {isSubmittingWaitlist ? '...' : 'Notify Me'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -663,6 +835,11 @@ const styles = StyleSheet.create({
     color: '#059669',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  locationChevron: {
+    fontSize: 10,
+    color: '#059669',
+    fontWeight: '700',
   },
   appTitle: {
     fontSize: 18,
@@ -1131,5 +1308,184 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#166534',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+    zIndex: 100,
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 36,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  closeBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+  },
+  closeBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  cityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 8,
+    backgroundColor: '#ffffff',
+  },
+  cityItemActive: {
+    borderColor: '#059669',
+    backgroundColor: '#ecfdf5',
+  },
+  cityInfo: {
+    flex: 1,
+  },
+  cityName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  cityNameActive: {
+    color: '#065f46',
+  },
+  currentCityCheck: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  cityState: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  activePill: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  activePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  expandingPill: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  expandingPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#b45309',
+  },
+  waitlistContainer: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  waitlistTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  waitlistSubtitle: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  waitlistInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  waitlistInput: {
+    flex: 1,
+    height: 38,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 12,
+    color: '#0f172a',
+  },
+  waitlistSubmitBtn: {
+    backgroundColor: '#059669',
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  waitlistSubmitText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  waitlistSuccessBox: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#dcfce7',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  waitlistSuccessText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#166534',
+    textAlign: 'center',
   },
 });

@@ -1,6 +1,7 @@
 import { test as base, expect, Page, BrowserContext } from '@playwright/test';
 import { CustomerAppPage } from '../pages/customer-app.page';
 import { MerchantPortalPage } from '../pages/merchant-portal.page';
+import { AdminDashboardPage } from '../pages/admin-dashboard.page';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
@@ -37,6 +38,7 @@ export interface MultiRoleFixtures {
 export interface AppTestFixtures {
   customerApp: CustomerAppPage;
   merchantPortal: MerchantPortalPage;
+  adminDashboard: AdminDashboardPage;
   multiRole: MultiRoleFixtures;
   supabaseClient: SupabaseClient;
   bookingApi: BookingApiHelper;
@@ -66,6 +68,15 @@ export const test = base.extend<AppTestFixtures>({
     const merchant = new MerchantPortalPage(page);
     await merchant.goto();
     await use(merchant);
+    await context.close();
+  },
+
+  adminDashboard: async ({ browser }, use) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const admin = new AdminDashboardPage(page);
+    await admin.goto();
+    await use(admin);
     await context.close();
   },
 

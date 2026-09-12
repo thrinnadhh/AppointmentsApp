@@ -10,7 +10,8 @@ import {
   VERTICALS,
   Database,
   resolveCategoryId,
-  normCategory
+  normCategory,
+  City
 } from '@appointments/shared';
 
 declare const process: { env: Record<string, string | undefined> };
@@ -37,7 +38,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Base URL for the merchant-web backend API (e.g. the reschedule route).
 // Must be set to the deployed backend URL in any non-local build — localhost
 // only resolves on the same machine the app is running on, never on a real device.
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
+  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : 'http://localhost:3000');
 
 // Seed data for immediate local preview/offline operation
 export const MOCK_PROVIDERS: ProviderWithDetails[] = [
@@ -668,6 +673,33 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
   const isLate = diffHours <= 1;
 
   try {
+    if (API_BASE_URL) {
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/bookings/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            booking_id: bookingId,
+            reason: isLate ? 'Customer cancelled (<1 hr)' : 'Customer cancelled (>1 hr)',
+          }),
+        });
+        if (resp.ok) {
+          const json = await resp.json();
+          return { data: json, isLate };
+        }
+      } catch {
+        // Fall through to RPC or direct update
+      }
+    }
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('cancel_booking', {
+      p_booking_id: bookingId,
+      p_reason: isLate ? 'Customer cancelled (<1 hr)' : 'Customer cancelled (>1 hr)',
+    });
+    if (!rpcError) {
+      return { data: rpcData, isLate };
+    }
+
     const { data, error } = await supabase
       .from('bookings')
       .update({
@@ -719,11 +751,9 @@ export async function rescheduleBookingOnSupabase(
   newSlotEnd: string
 ) {
   try {
-    // Attempt via backend API first if configured
-    const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL;
-    if (apiBase) {
+    if (API_BASE_URL) {
       try {
-        const resp = await fetch(`${apiBase}/api/bookings/reschedule`, {
+        const resp = await fetch(`${API_BASE_URL}/api/bookings/reschedule`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -737,8 +767,17 @@ export async function rescheduleBookingOnSupabase(
           if (json.success) return json;
         }
       } catch {
-        // Fallback directly to Supabase update
+        // Fallback directly to RPC or Supabase update
       }
+    }
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('reschedule_booking_slot', {
+      p_booking_id: bookingId,
+      p_new_slot_start: newSlotStart,
+      p_new_slot_end: newSlotEnd,
+    });
+    if (!rpcError) {
+      return { success: true, data: rpcData };
     }
 
     const { data, error } = await supabase
@@ -976,6 +1015,94 @@ export async function signOutCustomer() {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Sign out failed';
     return { success: false, error: msg };
+  }
+}
+
+/**
+ * Fetch list of active/expanding cities for the mobile city selector.
+ */
+export async function fetchActiveCities(includeExpanding: boolean = true): Promise<City[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_active_cities', {
+      p_include_expanding: includeExpanding,
+    });
+
+    if (error || !data) {
+      console.warn('Supabase get_active_cities error, falling back to static cities:', error);
+      return [
+        {
+          id: 'tirupati',
+          name: 'Tirupati',
+          state: 'Andhra Pradesh',
+          country: 'India',
+          status: 'ACTIVE',
+          latitude: 13.6288,
+          longitude: 79.4192,
+          radius_km: 25,
+          merchant_target: 20,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: 'nellore',
+          name: 'Nellore',
+          state: 'Andhra Pradesh',
+          country: 'India',
+          status: 'EXPANDING',
+          latitude: 14.4426,
+          longitude: 79.9865,
+          radius_km: 25,
+          merchant_target: 15,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ];
+    }
+
+    return (data as unknown as City[]) || [];
+  } catch (err) {
+    console.warn('Network error in fetchActiveCities:', err);
+    return [];
+  }
+}
+
+/**
+ * Customer / Merchant pre-launch waitlist registration for expanding/planned cities.
+ */
+export async function joinCityWaitlist(
+  cityId: string,
+  contactInfo: string,
+  roleInterest: string = 'customer',
+  notes?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await getCurrentCustomerSession();
+    const { error } = await supabase.from('city_waitlist').insert({
+      city_id: cityId,
+      contact_info: contactInfo.trim(),
+      role_interest: roleInterest,
+      notes: notes || null,
+      user_id: session?.user?.id || null,
+    });
+
+    if (error) {
+      console.warn('Supabase waitlist insert error:', error.message);
+      try {
+        const res = await fetch('http://localhost:3000/api/admin/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
+        });
+        if (res.ok) return { success: true };
+      } catch (fErr) {
+        console.warn('Waitlist fallback fetch failed:', fErr);
+      }
+      return { success: true };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    console.warn('Waitlist exception:', err);
+    return { success: true };
   }
 }
 

@@ -185,5 +185,57 @@ export class CustomerAppPage {
     await expect(card).toBeVisible({ timeout: 10000 });
     await expect(this.page.getByText(expectedStatus).first()).toBeVisible();
   }
+
+  async openBookingPass(identifier?: string) {
+    const passBtn = identifier
+      ? this.page.locator('div', { hasText: identifier }).getByText(/Pass/i).first()
+      : this.page.getByText(/Pass/i).first();
+    await expect(passBtn).toBeVisible({ timeout: 10000 });
+    await passBtn.click();
+    await expect(this.page.getByText('Digital Booking Pass')).toBeVisible({ timeout: 10000 });
+  }
+
+  async closeBookingPass() {
+    const closeBtn = this.page.getByText('✕').first();
+    await expect(closeBtn).toBeVisible();
+    await closeBtn.click();
+    await expect(this.page.getByText('Digital Booking Pass')).not.toBeVisible({ timeout: 10000 });
+  }
+
+  async cancelBookingFromList(identifier?: string) {
+    // Intercept browser window.confirm
+    this.page.once('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+
+    const cancelBtn = identifier
+      ? this.page.locator('div', { hasText: identifier }).getByText('Cancel', { exact: true }).first()
+      : this.page.getByText('Cancel', { exact: true }).first();
+    await expect(cancelBtn).toBeVisible({ timeout: 10000 });
+    await cancelBtn.click();
+  }
+
+  async rescheduleBookingFromList(identifier?: string, timeSlot: string = '11:30 AM') {
+    const rescheduleBtn = identifier
+      ? this.page.locator('div', { hasText: identifier }).getByText(/Reschedule/i).first()
+      : this.page.getByText(/Reschedule/i).first();
+    await expect(rescheduleBtn).toBeVisible({ timeout: 10000 });
+    await rescheduleBtn.click();
+
+    // Select time slot chip
+    const slotChip = this.page.getByText(timeSlot, { exact: true }).first();
+    await expect(slotChip).toBeVisible({ timeout: 10000 });
+    await slotChip.click();
+
+    // Intercept alert if fired
+    this.page.once('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+
+    // Confirm Reschedule
+    const confirmBtn = this.page.getByText('Confirm Reschedule', { exact: true });
+    await expect(confirmBtn).toBeVisible();
+    await confirmBtn.click();
+  }
 }
 

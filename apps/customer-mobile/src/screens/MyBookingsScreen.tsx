@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import { Booking } from '@appointments/shared';
 import BookingPassModal from './BookingPassModal';
@@ -39,6 +40,17 @@ export default function MyBookingsScreen({
 
   const handleCancelClick = (bookingId: string, slotStart: string) => {
     const diffHours = (new Date(slotStart).getTime() - Date.now()) / (1000 * 60 * 60);
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const confirmMessage =
+        diffHours > 1
+          ? 'Cancel Appointment: You are cancelling more than 1 hour in advance. Your deposit will be refunded in full. Confirm cancellation?'
+          : 'Late Cancellation Warning: You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
+      if (window.confirm(confirmMessage)) {
+        onCancelBooking(bookingId);
+      }
+      return;
+    }
 
     if (diffHours > 1) {
       Alert.alert(
@@ -176,6 +188,8 @@ export default function MyBookingsScreen({
                       <TouchableOpacity
                         style={styles.passBtn}
                         onPress={() => setSelectedPassBooking(booking)}
+                        accessibilityLabel="View Pass"
+                        testID={`view-pass-${booking.id}`}
                       >
                         <Text style={styles.passBtnText}>🎟️ Pass</Text>
                       </TouchableOpacity>
@@ -183,6 +197,8 @@ export default function MyBookingsScreen({
                       <TouchableOpacity
                         style={styles.rescheduleBtn}
                         onPress={() => setRescheduleTarget(booking)}
+                        accessibilityLabel="Reschedule Booking"
+                        testID={`reschedule-${booking.id}`}
                       >
                         <Text style={styles.rescheduleBtnText}>🔄 Reschedule</Text>
                       </TouchableOpacity>
@@ -190,6 +206,8 @@ export default function MyBookingsScreen({
                       <TouchableOpacity
                         style={styles.cancelBtn}
                         onPress={() => handleCancelClick(booking.id, booking.slot_start)}
+                        accessibilityLabel="Cancel Booking"
+                        testID={`cancel-${booking.id}`}
                       >
                         <Text style={styles.cancelBtnText}>Cancel</Text>
                       </TouchableOpacity>
@@ -286,6 +304,8 @@ export default function MyBookingsScreen({
                 ]}
                 onPress={handleConfirmReschedule}
                 disabled={isSubmittingReschedule}
+                accessibilityLabel="Confirm Reschedule"
+                testID="confirm-reschedule-btn"
               >
                 <Text style={styles.confirmRescheduleText}>
                   {isSubmittingReschedule ? 'Rescheduling...' : 'Confirm Reschedule'}

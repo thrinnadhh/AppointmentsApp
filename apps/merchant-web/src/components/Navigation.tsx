@@ -15,12 +15,14 @@ import {
   LogIn, 
   Activity,
   Clock,
-  Settings
+  Settings,
+  MapPin
 } from 'lucide-react';
 import { supabase, getCurrentUserProfile, signOutMerchant } from '@/lib/supabase';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Overview & Health', icon: LayoutDashboard },
+  { href: '/admin', label: 'City Rollout', icon: MapPin },
   { href: '/venues', label: 'Venues & Businesses', icon: Building2 },
   { href: '/resources', label: 'Doctors & Services', icon: Users },
   { href: '/bookings', label: 'Bookings Queue', icon: CalendarDays },
