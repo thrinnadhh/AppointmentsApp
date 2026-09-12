@@ -99,6 +99,8 @@ export interface Booking {
   created_at: string;
   updated_at: string;
   attachment_url?: string | null;
+  reminder_1h_sent_at?: string | null;
+  reminder_30m_sent_at?: string | null;
   provider?: Provider;
   resource?: Resource;
 }
@@ -135,3 +137,26 @@ export interface CreateHoldResult {
   hold_expires_at?: string;
   error?: string;
 }
+
+export type NotificationEventType =
+  | 'BOOKING_CONFIRMED'
+  | 'BOOKING_REMINDER_1H'
+  | 'BOOKING_REMINDER_30M'
+  | 'BOOKING_CANCELLED';
+
+export type NotificationChannel = 'whatsapp' | 'sms';
+
+export interface NotificationLog {
+  id: string;
+  booking_id: string;
+  recipient_phone: string;
+  recipient_name?: string | null;
+  event_type: NotificationEventType | string;
+  channel: NotificationChannel | string;
+  status: 'QUEUED' | 'SENT' | 'FAILED' | string;
+  message_content: string;
+  provider_response?: Record<string, unknown> | null;
+  sent_at: string;
+  created_at: string;
+}
+

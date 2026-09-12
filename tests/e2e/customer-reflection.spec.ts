@@ -361,5 +361,118 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     // Clean up Supabase session
     await customerSupabase.auth.signOut();
   });
+
+  test('9. Phase 4 Feature 7: Automated WhatsApp & SMS Notifications and 1-Hour & 30-Minute Reminders', async ({ page, request }) => {
+    // 1. Fetch any confirmed booking
+    const { data: bookings, error: bookingsError } = await customerSupabase
+      .from('bookings')
+      .select('id, reference_code, customer_id, provider_id')
+      .eq('status', 'CONFIRMED')
+      .limit(1);
+
+    expect(bookingsError).toBeNull();
+    expect(bookings && bookings.length > 0).toBeTruthy();
+    const testBooking = bookings![0];
+
+    // 2. Dispatch BOOKING_CONFIRMED notification via admin API
+    const notifyRes = await request.post('http://localhost:3000/api/admin/notifications', {
+      data: {
+        booking_id: testBooking.id,
+        event_type: 'BOOKING_CONFIRMED',
+      },
+    });
+    expect(notifyRes.status()).toBe(200);
+    const notifyJson = await notifyRes.json();
+    expect(notifyJson.success).toBe(true);
+    expect(notifyJson.dispatch.success).toBe(true);
+    expect(notifyJson.dispatch.recipient_phone).toBeDefined();
+
+    // 3. Verify notification_logs in Supabase contains both WhatsApp and SMS records
+    const logsRes = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`);
+    expect(logsRes.status()).toBe(200);
+    const logsJson = await logsRes.json();
+    expect(logsJson.success).toBe(true);
+    const confirmedLogs = (logsJson.notifications as Array<{ channel: string; event_type: string }>).filter(
+      (l) => l.event_type === 'BOOKING_CONFIRMED'
+    );
+    const channels = confirmedLogs.map((l) => l.channel);
+    expect(channels).toContain('whatsapp');
+    expect(channels).toContain('sms');
+
+    // 4. Test 1-Hour and 30-Minute Reminders trigger
+    // Update booking slot_start to 50 mins from now to test 1-hour window (40-75 min)
+    const setSlotRes1 = await request.post('http://localhost:3000/api/admin/notifications', {
+      data: {
+        action: 'set_slot_time',
+        booking_id: testBooking.id,
+        minutes_from_now: 50,
+      },
+    });
+    expect(setSlotRes1.status()).toBe(200);
+
+    // Call check_reminders API
+    const reminderRes1 = await request.post('http://localhost:3000/api/admin/notifications', {
+      data: { action: 'check_reminders' },
+    });
+    expect(reminderRes1.status()).toBe(200);
+
+    // Verify 1-hour reminder logged
+    const logsRes1h = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`);
+    const logsJson1h = await logsRes1h.json();
+    const reminder1hLogs = (logsJson1h.notifications as Array<{ event_type: string }>).filter(
+      (l) => l.event_type === 'BOOKING_REMINDER_1H'
+    );
+    expect(reminder1hLogs.length).toBeGreaterThan(0);
+
+    // Update booking slot_start to 20 mins from now to test 30-minute window (10-35 min)
+    const setSlotRes2 = await request.post('http://localhost:3000/api/admin/notifications', {
+      data: {
+        action: 'set_slot_time',
+        booking_id: testBooking.id,
+        minutes_from_now: 20,
+      },
+    });
+    expect(setSlotRes2.status()).toBe(200);
+
+    const reminderRes2 = await request.post('http://localhost:3000/api/admin/notifications', {
+      data: { action: 'check_reminders' },
+    });
+    expect(reminderRes2.status()).toBe(200);
+
+    // Verify 30-minute reminder logged
+    const logsRes30m = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`);
+    const logsJson30m = await logsRes30m.json();
+    const reminder30mLogs = (logsJson30m.notifications as Array<{ event_type: string }>).filter(
+      (l) => l.event_type === 'BOOKING_REMINDER_30M'
+    );
+    expect(reminder30mLogs.length).toBeGreaterThan(0);
+
+    // 5. Test Cancellation notification dispatch
+    const cancelRes = await request.post('http://localhost:3000/api/admin/notifications', {
+      data: {
+        booking_id: testBooking.id,
+        event_type: 'BOOKING_CANCELLED',
+      },
+    });
+    expect(cancelRes.status()).toBe(200);
+
+    // 6. UI Verification in Merchant Web Bookings Queue
+    await page.goto('http://localhost:3000/bookings');
+    await page.waitForLoadState('networkidle');
+
+    // Find and click the WA/SMS Logs button
+    const logsBtn = page.getByRole('button', { name: /WA\/SMS Logs/i }).first();
+    await expect(logsBtn).toBeVisible({ timeout: 10000 });
+    await logsBtn.click();
+
+    // Verify WhatsApp & SMS modal appears
+    await expect(page.getByText('WhatsApp & SMS Communications')).toBeVisible();
+
+    // Close modal
+    const closeBtn = page.getByRole('button', { name: 'Close', exact: true });
+    await closeBtn.click();
+    await expect(page.getByText('WhatsApp & SMS Communications')).not.toBeVisible();
+  });
 });
+
 

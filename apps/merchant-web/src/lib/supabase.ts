@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database, BookingStatus, PaymentStatus, Provider, Resource, ResourceType } from '@appointments/shared';
+import { Database, BookingStatus, PaymentStatus, Provider, Resource, ResourceType, NotificationLog } from '@appointments/shared';
 
-export type { Provider, Resource, ResourceType };
+export type { Provider, Resource, ResourceType, NotificationLog };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -54,6 +54,8 @@ export interface MerchantBookingWithDetails {
   created_at: string;
   updated_at: string;
   attachment_url?: string | null;
+  reminder_1h_sent_at?: string | null;
+  reminder_30m_sent_at?: string | null;
   customer_name?: string;
   customer_phone?: string;
   no_show_count?: number;
@@ -454,3 +456,26 @@ export async function getPrescriptionSignedUrl(
     return null;
   }
 }
+
+/**
+ * Fetch automated WhatsApp and SMS notification logs for a booking.
+ */
+export async function fetchBookingNotifications(bookingId: string): Promise<NotificationLog[]> {
+  try {
+    const { data, error } = await supabase
+      .from('notification_logs')
+      .select('*')
+      .eq('booking_id', bookingId)
+      .order('sent_at', { ascending: false });
+
+    if (error) {
+      console.warn('Failed to fetch notification logs:', error.message);
+      return [];
+    }
+    return (data || []) as NotificationLog[];
+  } catch (err) {
+    console.warn('Error fetching notification logs:', err);
+    return [];
+  }
+}
+

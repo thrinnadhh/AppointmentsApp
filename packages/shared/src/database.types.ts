@@ -31,6 +31,8 @@ export type Database = {
           status: Database["public"]["Enums"]["booking_status"]
           updated_at: string
           attachment_url: string | null
+          reminder_1h_sent_at: string | null
+          reminder_30m_sent_at: string | null
         }
         Insert: {
           attachment_url?: string | null
@@ -43,6 +45,8 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           provider_id: string
           reference_code?: string | null
+          reminder_1h_sent_at?: string | null
+          reminder_30m_sent_at?: string | null
           resource_id: string
           slot_end: string
           slot_start: string
@@ -60,6 +64,8 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           provider_id?: string
           reference_code?: string | null
+          reminder_1h_sent_at?: string | null
+          reminder_30m_sent_at?: string | null
           resource_id?: string
           slot_end?: string
           slot_start?: string
@@ -110,6 +116,56 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      notification_logs: {
+        Row: {
+          booking_id: string
+          channel: string
+          created_at: string
+          event_type: string
+          id: string
+          message_content: string
+          provider_response: Json | null
+          recipient_name: string | null
+          recipient_phone: string
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          booking_id: string
+          channel: string
+          created_at?: string
+          event_type: string
+          id?: string
+          message_content: string
+          provider_response?: Json | null
+          recipient_name?: string | null
+          recipient_phone: string
+          sent_at?: string
+          status?: string
+        }
+        Update: {
+          booking_id?: string
+          channel?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          message_content?: string
+          provider_response?: Json | null
+          recipient_name?: string | null
+          recipient_phone?: string
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
@@ -442,11 +498,22 @@ export type Database = {
         }
         Returns: Json
       }
+      check_and_send_booking_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       confirm_booking_payment: {
         Args: {
           p_booking_id: string
           p_deposit_amount?: number
           p_gateway_payment_id: string
+        }
+        Returns: Json
+      }
+      dispatch_booking_notification: {
+        Args: {
+          p_booking_id: string
+          p_event_type: string
         }
         Returns: Json
       }
@@ -482,6 +549,13 @@ export type Database = {
       search_directory: {
         Args: {
           p_query?: string
+        }
+        Returns: Json
+      }
+      set_booking_slot_for_reminder: {
+        Args: {
+          p_booking_id: string
+          p_minutes_from_now?: number
         }
         Returns: Json
       }
