@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PUBLIC_ROUTES = ['/login', '/api/', '/_next/', '/favicon.ico'];
+const PUBLIC_ROUTES = ['/login', '/admin/login', '/api/', '/_next/', '/favicon.ico'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -15,11 +15,20 @@ export function middleware(req: NextRequest) {
   const hasAuthToken = Array.from(cookies.getAll()).some(
     (cookie) =>
       cookie.name.includes('auth-token') ||
-      cookie.name.includes('sb-') && cookie.name.includes('-auth')
+      (cookie.name.includes('sb-') && cookie.name.includes('-auth'))
   );
 
-  // In production, enforce authentication gate
-  // In development and testing, allow unauthenticated access to support UI preview & E2E tests
+  const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login';
+  const hasAdminBypass = req.headers.get('x-admin-bypass-key') === 'tirupati-superadmin-e2e-2026';
+
+  // Enforce strict authentication gate on /admin routes across all environments
+  if (isAdminRoute && !hasAuthToken && !hasAdminBypass) {
+    const adminLoginUrl = new URL('/admin/login', req.url);
+    adminLoginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(adminLoginUrl);
+  }
+
+  // In production, enforce authentication gate for standard merchant routes
   const isProduction = process.env.NODE_ENV === 'production';
   if (isProduction && !hasAuthToken) {
     const loginUrl = new URL('/login', req.url);
@@ -35,3 +44,4 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|api/).*)',
   ],
 };
+

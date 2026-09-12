@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import {
   Database,
   BookingStatus,
@@ -37,7 +38,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase: ReturnType<typeof createClient<Database>> =
+  typeof window !== 'undefined'
+    ? (createBrowserClient<Database>(supabaseUrl, supabaseAnonKey) as unknown as ReturnType<typeof createClient<Database>>)
+    : createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+
 
 // Service-role client for trusted server-only code (webhooks, cron jobs).
 // NEVER import this in a component that ships to the browser — the service

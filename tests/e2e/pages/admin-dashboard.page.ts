@@ -118,8 +118,31 @@ export class AdminDashboardPage {
 
   async goto() {
     await this.page.goto('http://localhost:3000/admin');
-    await expect(this.pageHeading).toBeVisible();
+    if (this.page.url().includes('/admin/login')) {
+      await this.loginAsAdmin();
+    }
+    await expect(this.pageHeading).toBeVisible({ timeout: 12000 });
   }
+
+  async gotoLoginPage() {
+    await this.page.goto('http://localhost:3000/admin/login');
+    await expect(this.page.getByTestId('admin-login-email')).toBeVisible();
+  }
+
+  async loginAsAdmin(email = 'admin@appointments-tirupati.com', password = 'AdminSecure2026!') {
+    await this.page.getByTestId('admin-login-email').fill(email);
+    await this.page.getByTestId('admin-login-password').fill(password);
+    await this.page.getByTestId('admin-login-submit').click();
+    await expect(this.pageHeading).toBeVisible({ timeout: 15000 });
+  }
+
+  async loginExpectFailure(email: string, password: string) {
+    await this.page.getByTestId('admin-login-email').fill(email);
+    await this.page.getByTestId('admin-login-password').fill(password);
+    await this.page.getByTestId('admin-login-submit').click();
+    await expect(this.page.getByTestId('admin-login-error')).toBeVisible({ timeout: 10000 });
+  }
+
 
   async selectTimeHorizon(horizon: 'today' | '3days' | '7days' | '30days' | 'all') {
     switch (horizon) {

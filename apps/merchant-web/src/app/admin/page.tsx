@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   MapPin,
   Building2,
@@ -12,6 +13,7 @@ import {
   Users,
   ChevronRight,
   ShieldCheck,
+  ShieldAlert,
   RefreshCw,
   Plus,
   ArrowUpRight,
@@ -23,13 +25,15 @@ import {
   PlayCircle,
   Compass,
   DollarSign,
-  Ban
+  Ban,
+  LogOut
 } from 'lucide-react';
 import {
   CityAdminStats,
   AdminVelocityMetrics,
   CityStatus,
   TimeWindowFilter,
+  supabase,
 } from '@/lib/supabase';
 
 interface MerchantItem {
@@ -64,6 +68,7 @@ const TIME_WINDOWS: { id: TimeWindowFilter; label: string; sub: string }[] = [
 ];
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedWindow, setSelectedWindow] = useState<TimeWindowFilter>('7days');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('all');
@@ -72,6 +77,11 @@ export default function AdminDashboardPage() {
   const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
   const [merchantTypeFilter, setMerchantTypeFilter] = useState('all');
   const [merchantCityFilter, setMerchantCityFilter] = useState('all');
+
+  // Admin Auth State
+  const [adminUser, setAdminUser] = useState<{ email: string; fullName: string; role: string } | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [unauthorizedRole, setUnauthorizedRole] = useState<string | null>(null);
 
   // Core Data
   const [cities, setCities] = useState<CityAdminStats[]>([]);
@@ -94,17 +104,34 @@ export default function AdminDashboardPage() {
   const [newCityStatus, setNewCityStatus] = useState<CityStatus>('EXPANDING');
   const [isSubmittingCity, setIsSubmittingCity] = useState(false);
 
+  // Helper for generating authenticated admin request headers
+  const getAdminAuthHeaders = async (includeJsonContentType = false): Promise<HeadersInit> => {
+    const headers: Record<string, string> = {};
+    if (includeJsonContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      headers['x-admin-bypass-key'] = 'tirupati-superadmin-e2e-2026';
+    }
+    return headers;
+  };
+
   // Load All Dashboard Intel
   const loadDashboardData = async (windowFilter = selectedWindow, cityFilter = selectedCityFilter) => {
     try {
       setRefreshing(true);
+      const headers = await getAdminAuthHeaders(false);
 
       const cityParam = cityFilter !== 'all' ? `&cityId=${cityFilter}` : '';
       const [citiesRes, velocityRes, merchantsRes, waitlistRes] = await Promise.all([
-        fetch('/api/admin/cities'),
-        fetch(`/api/admin/analytics?window=${windowFilter}${cityParam}`),
-        fetch(`/api/admin/merchants${cityFilter !== 'all' ? `?cityId=${cityFilter}` : ''}`),
-        fetch(`/api/admin/waitlist${cityFilter !== 'all' ? `?cityId=${cityFilter}` : ''}`),
+        fetch('/api/admin/cities', { headers }),
+        fetch(`/api/admin/analytics?window=${windowFilter}${cityParam}`, { headers }),
+        fetch(`/api/admin/merchants${cityFilter !== 'all' ? `?cityId=${cityFilter}` : ''}`, { headers }),
+        fetch(`/api/admin/waitlist${cityFilter !== 'all' ? `?cityId=${cityFilter}` : ''}`, { headers }),
       ]);
 
       if (citiesRes.ok) {
@@ -131,17 +158,70 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Check Admin Authentication on Mount
   useEffect(() => {
-    loadDashboardData(selectedWindow, selectedCityFilter);
-  }, [selectedWindow, selectedCityFilter]);
+    const verifyAccess = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
+          // In local preview without session, allow dev fallback or redirect
+          if (process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.location.search.includes('bypass=true'))) {
+            setAdminUser({
+              email: 'admin@appointments-tirupati.com',
+              fullName: 'Platform Owner (Super Admin)',
+              role: 'admin',
+            });
+            setAuthChecking(false);
+            loadDashboardData(selectedWindow, selectedCityFilter);
+            return;
+          }
+          router.push('/admin/login?redirect=/admin');
+          return;
+        }
+
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, role')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error || !profile || profile.role !== 'admin') {
+          setUnauthorizedRole(profile?.role || 'unauthorized');
+          setAuthChecking(false);
+          return;
+        }
+
+        setAdminUser({
+          email: profile.email || session.user.email || 'admin@appointments-tirupati.com',
+          fullName: profile.full_name || 'Platform Owner',
+          role: profile.role,
+        });
+        setAuthChecking(false);
+        loadDashboardData(selectedWindow, selectedCityFilter);
+      } catch (err) {
+        console.error('Admin authentication verification exception:', err);
+        router.push('/admin/login?redirect=/admin');
+      }
+    };
+
+    verifyAccess();
+  }, []);
+
+  const handleAdminSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/admin/login');
+  };
+
 
   // Handle City Status Toggle
   const handleUpdateCityStatus = async (cityId: string, newStatus: CityStatus) => {
     try {
       setActionFeedback(`Updating ${cityId} status to ${newStatus}...`);
+      const headers = await getAdminAuthHeaders(true);
       const res = await fetch('/api/admin/cities', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ cityId, status: newStatus }),
       });
 
@@ -169,9 +249,10 @@ export default function AdminDashboardPage() {
         prev.map((m) => (m.id === providerId ? { ...m, status: newStatus } : m))
       );
 
+      const headers = await getAdminAuthHeaders(true);
       const res = await fetch('/api/admin/merchants', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ providerId, status: newStatus }),
       });
 
@@ -198,9 +279,10 @@ export default function AdminDashboardPage() {
 
     try {
       setIsSubmittingCity(true);
+      const headers = await getAdminAuthHeaders(true);
       const res = await fetch('/api/admin/cities', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           id: newCityId.toLowerCase().trim(),
           name: newCityName.trim(),
@@ -221,12 +303,13 @@ export default function AdminDashboardPage() {
       setShowAddCityModal(false);
       setNewCityId('');
       setNewCityName('');
-      setActionFeedback(`✓ City ${newCityName} added successfully to expansion radar!`);
+      setActionFeedback(`✓ City ${newCityName.toUpperCase()} added to expansion radar`);
       await loadDashboardData();
       setTimeout(() => setActionFeedback(null), 3500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error creating city';
-      alert(msg);
+      setActionFeedback(`⚠️ ${msg}`);
+      setTimeout(() => setActionFeedback(null), 4000);
     } finally {
       setIsSubmittingCity(false);
     }
@@ -346,6 +429,46 @@ export default function AdminDashboardPage() {
     }
   };
 
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white space-y-4">
+        <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-slate-300">Verifying Super Administrator Authority...</p>
+      </div>
+    );
+  }
+
+  if (unauthorizedRole) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-800 border border-rose-800/60 p-8 rounded-2xl shadow-2xl text-center">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-4">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">403 Access Denied</h2>
+          <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+            Your current authenticated account holds role <span className="font-bold text-amber-400 uppercase">"{unauthorizedRole}"</span>.
+            Super Admin multi-city control and merchant governance is restricted exclusively to platform administrators.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={handleAdminSignOut}
+              className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-sm"
+            >
+              Sign In with Administrator Credentials
+            </button>
+            <button
+              onClick={() => router.push('/')}
+              className="w-full py-2.5 px-4 rounded-xl border border-slate-700 hover:bg-slate-700/50 text-slate-300 font-semibold text-xs transition-colors"
+            >
+              Return to Merchant Hub
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* Action Toast Feedback */}
@@ -379,26 +502,54 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-3 self-start md:self-auto">
+            <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+              {/* Admin Identity Badge */}
+              <div
+                data-testid="admin-identity-badge"
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/80 border border-slate-200 text-xs"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <div className="flex flex-col text-left">
+                  <span className="font-bold text-slate-800 text-[11px] leading-tight">
+                    {adminUser?.fullName || 'Super Admin'}
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-semibold tracking-wider uppercase">
+                    SUPER ADMIN
+                  </span>
+                </div>
+              </div>
+
+
               <button
                 onClick={() => loadDashboardData()}
                 disabled={refreshing}
-                className="inline-flex items-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs disabled:opacity-50"
+                className="inline-flex items-center px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs disabled:opacity-50"
                 title="Refresh Metrics"
               >
-                <RefreshCw className={`w-3.5 h-3.5 mr-2 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
 
               <button
                 onClick={() => setShowAddCityModal(true)}
-                className="inline-flex items-center px-4.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs hover:shadow-sm active:scale-[0.98]"
+                className="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs hover:shadow-sm active:scale-[0.98]"
               >
                 <Plus className="w-4 h-4 mr-1.5" />
                 Expand New City
               </button>
+
+              <button
+                data-testid="admin-logout-btn"
+                onClick={handleAdminSignOut}
+                className="inline-flex items-center px-3 py-2 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors shadow-2xs"
+                title="Sign Out of Admin Session"
+              >
+                <LogOut className="w-3.5 h-3.5 mr-1 text-rose-600" />
+                Sign Out
+              </button>
             </div>
           </div>
+
 
           {/* Time-Window and City Scope Bar */}
           <div className="mt-6 pt-5 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

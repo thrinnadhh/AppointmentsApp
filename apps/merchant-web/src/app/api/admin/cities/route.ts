@@ -1,13 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   fetchAdminCityStats,
   updateAdminCityStatus,
   getSupabaseAdmin,
   CityStatus,
 } from '@/lib/supabase';
+import { verifyAdminRequest } from '@/lib/auth-admin';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const stats = await fetchAdminCityStats();
     return NextResponse.json({ cities: stats });
   } catch (err) {
@@ -16,8 +22,13 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const body = await request.json();
     const {
       id,
@@ -66,8 +77,13 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const body = await request.json();
     const { cityId, status, target } = body;
 
@@ -102,3 +118,4 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

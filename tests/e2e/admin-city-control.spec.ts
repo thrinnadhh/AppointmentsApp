@@ -13,9 +13,11 @@ test.describe.serial('Super Admin Multi-City Rollout & Expansion Hub', () => {
   test.beforeEach(async ({ request }) => {
     // Reset test territory baseline state for idempotent repeatability
     await request.patch('http://localhost:3000/api/admin/cities', {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { cityId: 'nellore', status: 'EXPANDING' },
     });
   });
+
 
   test('Feature 1: Executive KPI Cards & Dynamic Time-Window Velocity Switcher', async ({
     adminDashboard,

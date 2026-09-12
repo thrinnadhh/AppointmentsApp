@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAdminCityWaitlist, getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAdminRequest } from '@/lib/auth-admin';
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const cityId = searchParams.get('cityId') || undefined;
 
@@ -13,6 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
 
 export async function POST(request: Request) {
   try {

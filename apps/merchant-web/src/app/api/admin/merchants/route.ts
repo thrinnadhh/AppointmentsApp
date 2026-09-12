@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAdminMerchants, updateAdminMerchantStatus } from '@/lib/supabase';
+import { verifyAdminRequest } from '@/lib/auth-admin';
 import { Database } from '@appointments/shared';
 
 type ProviderStatus = Database['public']['Enums']['provider_status'];
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const cityId = searchParams.get('cityId') || undefined;
 
@@ -17,8 +23,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const body = await request.json();
     const { providerId, status } = body;
 
@@ -49,3 +60,4 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
