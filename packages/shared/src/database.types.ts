@@ -485,6 +485,14 @@ export type Database = {
         }
         Returns: Json
       }
+      sync_customer_profile: {
+        Args: {
+          p_email?: string | null
+          p_full_name?: string | null
+          p_phone?: string | null
+        }
+        Returns: Json
+      }
     }
     Enums: {
       booking_status:

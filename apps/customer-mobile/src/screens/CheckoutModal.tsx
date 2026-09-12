@@ -16,6 +16,7 @@ interface CheckoutModalProps {
   visible: boolean;
   resource: Resource | null;
   slot: Slot | null;
+  customerId?: string;
   onClose: () => void;
   onPaymentSuccess: (bookingId: string) => void;
 }
@@ -24,6 +25,7 @@ export default function CheckoutModal({
   visible,
   resource,
   slot,
+  customerId = '99999999-9999-9999-9999-999999999991',
   onClose,
   onPaymentSuccess,
 }: CheckoutModalProps) {
@@ -77,7 +79,7 @@ export default function CheckoutModal({
         { type: 'application/pdf' }
       );
       const res = await uploadPrescriptionDoc(
-        '99999999-9999-9999-9999-999999999991',
+        customerId,
         sampleBlob,
         fileName,
         'application/pdf'
@@ -98,7 +100,7 @@ export default function CheckoutModal({
     try {
       // 1. Acquire atomic hold on Supabase with create_booking_hold RPC
       const holdRes = await createHoldOnSupabase(
-        '99999999-9999-9999-9999-999999999991',
+        customerId,
         resource.id,
         slot.start_time,
         slot.end_time

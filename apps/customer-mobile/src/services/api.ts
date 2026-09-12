@@ -875,3 +875,108 @@ export async function uploadVenueAsset(
   }
 }
 
+/**
+ * Request a 6-digit verification code via Supabase Phone OTP.
+ * Supports E.164 formatting (e.g. +919999999991 or 9999999991).
+ */
+export async function sendPhoneOtp(rawPhone: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const digits = rawPhone.replace(/\D/g, '');
+    const phone = rawPhone.startsWith('+') ? rawPhone : (digits.length === 10 ? `+91${digits}` : `+${digits}`);
+    const { error } = await supabase.auth.signInWithOtp({ phone });
+    if (error) {
+      console.warn('Supabase signInWithOtp error:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to send OTP';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Verify 6-digit OTP token and return authenticated session + user profile.
+ */
+export async function verifyPhoneOtp(
+  rawPhone: string,
+  token: string
+): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
+  try {
+    const digits = rawPhone.replace(/\D/g, '');
+    const phone = rawPhone.startsWith('+') ? rawPhone : (digits.length === 10 ? `+91${digits}` : `+${digits}`);
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone,
+      token,
+      type: 'sms',
+    });
+
+    if (error) {
+      console.warn('Supabase verifyOtp error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      user: data.user,
+      session: data.session,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to verify OTP';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Sync or update customer profile in public.profiles.
+ */
+export async function syncCustomerProfile(
+  fullName?: string,
+  phone?: string,
+  email?: string
+): Promise<{ success: boolean; profile?: unknown; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('sync_customer_profile', {
+      p_full_name: fullName || null,
+      p_phone: phone || null,
+      p_email: email || null,
+    });
+
+    if (error) {
+      console.warn('Supabase sync_customer_profile error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, profile: data };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to sync profile';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Fetch current authenticated user session from Supabase.
+ */
+export async function getCurrentCustomerSession() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sign out customer session.
+ */
+export async function signOutCustomer() {
+  try {
+    await supabase.auth.signOut();
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Sign out failed';
+    return { success: false, error: msg };
+  }
+}
+
+

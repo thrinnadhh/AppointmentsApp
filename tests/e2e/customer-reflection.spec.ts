@@ -285,4 +285,81 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     await customerSupabase.storage.from('venue-assets').remove([uploadVenueData!.path]);
     await customerSupabase.storage.from('prescriptions-and-records').remove([rxPath]);
   });
+
+  test('8. Should verify Supabase Phone OTP Authentication, Verification & Profile Auto-Linking flow', async ({ page }) => {
+    const testPhone = '+919999999991';
+    const testOtp = '123456';
+
+    // 1. Backend Verification: Supabase Auth OTP request and verification
+    const { error: otpSendError } = await customerSupabase.auth.signInWithOtp({ phone: testPhone });
+    expect(otpSendError).toBeNull();
+
+    const { data: verifyData, error: verifyError } = await customerSupabase.auth.verifyOtp({
+      phone: testPhone,
+      token: testOtp,
+      type: 'sms',
+    });
+    expect(verifyError).toBeNull();
+    expect(verifyData.session).toBeDefined();
+    expect(verifyData.user).toBeDefined();
+    expect(verifyData.user?.phone).toContain('9999999991');
+
+    // 2. Verify public.profiles auto-linking trigger / profile existence
+    const { data: profileRow, error: profileError } = await customerSupabase
+      .from('profiles')
+      .select('*')
+      .eq('id', verifyData.user!.id)
+      .single();
+
+    expect(profileError).toBeNull();
+    expect(profileRow).toBeDefined();
+    expect(profileRow.role).toBe('customer');
+
+    // 3. UI Verification: Customer Mobile App Phone OTP Sign In
+    await page.goto('http://localhost:8081');
+    await page.waitForLoadState('networkidle');
+
+    // Open Profile Modal
+    const profileBtn = page.getByLabel('Customer Profile');
+    await expect(profileBtn).toBeVisible({ timeout: 10000 });
+    await profileBtn.click();
+
+    // Verify modal elements
+    await expect(page.getByText('Customer Profile & Sign In')).toBeVisible();
+    await expect(page.getByText('1-Tap Phone OTP Authentication')).toBeVisible();
+
+    // Check Send OTP button
+    const sendOtpBtn = page.getByTestId('btn-send-otp');
+    if (await sendOtpBtn.isVisible()) {
+      await page.waitForTimeout(1500);
+      await sendOtpBtn.click();
+
+      // Verify OTP Code Input appears
+      const otpInput = page.getByTestId('input-otp-code');
+      await expect(otpInput).toBeVisible();
+      await otpInput.fill(testOtp);
+
+      // Click Verify
+      const verifyBtn = page.getByTestId('btn-verify-otp');
+      await verifyBtn.click();
+
+      // Expect Verified state
+      await expect(page.getByText('✅ Verified')).toBeVisible();
+      await expect(page.getByTestId('btn-sign-out')).toBeVisible();
+
+      // Click Sign Out
+      await page.getByTestId('btn-sign-out').click();
+      await expect(page.getByText('⚡ Guest')).toBeVisible();
+    } else {
+      // If already authenticated from previous session, verify sign out works
+      const signOutBtn = page.getByTestId('btn-sign-out');
+      await expect(signOutBtn).toBeVisible();
+      await signOutBtn.click();
+      await expect(page.getByText('⚡ Guest')).toBeVisible();
+    }
+
+    // Clean up Supabase session
+    await customerSupabase.auth.signOut();
+  });
 });
+
