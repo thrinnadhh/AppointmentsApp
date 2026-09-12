@@ -11,7 +11,8 @@ import {
   Search,
   RefreshCw,
   Building2,
-  Sparkles
+  Sparkles,
+  FileText
 } from 'lucide-react';
 import { 
   supabase, 
@@ -20,6 +21,7 @@ import {
   updateBookingStatus, 
   rescheduleBookingSlot, 
   recordMerchantNoShow,
+  getPrescriptionSignedUrl,
   MerchantBookingWithDetails 
 } from '@/lib/supabase';
 import { INITIAL_BOOKINGS, INITIAL_MERCHANT_PROVIDER } from '@/lib/mock-data';
@@ -157,6 +159,19 @@ export default function BookingsManagementPage() {
       setRescheduleModalId(null);
       setNewSlotTime('');
       setTimeout(() => setFeedbackToast(null), 4000);
+    }
+  };
+
+  const handleViewPrescription = async (storagePath: string) => {
+    try {
+      const signedUrl = await getPrescriptionSignedUrl(storagePath, 3600);
+      if (signedUrl) {
+        window.open(signedUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        alert('Could not generate secure link for prescription document.');
+      }
+    } catch (err) {
+      console.error('Error viewing prescription:', err);
     }
   };
 
@@ -316,6 +331,16 @@ export default function BookingsManagementPage() {
                       <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
                         Deposit: ₹{booking.deposit_amount} ({booking.payment_status})
                       </span>
+                      {booking.attachment_url && (
+                        <button
+                          onClick={() => handleViewPrescription(booking.attachment_url!)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-0.5 rounded transition cursor-pointer"
+                          title="Open encrypted prescription document in Supabase Storage"
+                        >
+                          <FileText className="w-3 h-3 text-sky-600" />
+                          Prescription / Doc
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

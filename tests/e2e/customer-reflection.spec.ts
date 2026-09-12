@@ -234,4 +234,55 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
       previousDistance = p.distance_meters;
     }
   });
+
+  test('7. Should verify Supabase Storage Phase 3: Public venue-assets bucket & private prescriptions bucket with signed URLs', async () => {
+    const testFileName = `test_storefront_${Date.now()}.png`;
+    // Minimal 1x1 transparent PNG binary
+    const pngBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+
+    // 1. Upload public venue asset (image/png)
+    const { data: uploadVenueData, error: uploadVenueError } = await customerSupabase.storage
+      .from('venue-assets')
+      .upload(`test-venue/${testFileName}`, pngBuffer, {
+        contentType: 'image/png',
+        upsert: true,
+      });
+
+    expect(uploadVenueError).toBeNull();
+    expect(uploadVenueData?.path).toBeDefined();
+
+    // 2. Verify public URL generation
+    const { data: publicUrlData } = customerSupabase.storage
+      .from('venue-assets')
+      .getPublicUrl(uploadVenueData!.path);
+
+    expect(publicUrlData.publicUrl).toContain('venue-assets');
+
+    // 3. Upload private patient prescription (application/pdf)
+    const rxFileName = `test_rx_${Date.now()}.pdf`;
+    const rxPath = `99999999-9999-9999-9999-999999999991/${rxFileName}`;
+    const pdfBuffer = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
+    const { data: uploadRxData, error: uploadRxError } = await customerSupabase.storage
+      .from('prescriptions-and-records')
+      .upload(rxPath, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+    expect(uploadRxError).toBeNull();
+    expect(uploadRxData?.path).toBe(rxPath);
+
+    // 4. Generate time-limited signed URL for private record
+    const { data: signedUrlData, error: signedUrlError } = await customerSupabase.storage
+      .from('prescriptions-and-records')
+      .createSignedUrl(rxPath, 60);
+
+    expect(signedUrlError).toBeNull();
+    expect(signedUrlData?.signedUrl).toBeDefined();
+    expect(signedUrlData?.signedUrl).toContain('token=');
+
+    // Clean up test objects
+    await customerSupabase.storage.from('venue-assets').remove([uploadVenueData!.path]);
+    await customerSupabase.storage.from('prescriptions-and-records').remove([rxPath]);
+  });
 });

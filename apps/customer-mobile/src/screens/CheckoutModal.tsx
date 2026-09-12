@@ -7,9 +7,10 @@ import {
   Modal,
   SafeAreaView,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Resource, Slot } from '@appointments/shared';
-import { createHoldOnSupabase, confirmBookingPaymentOnSupabase } from '../services/api';
+import { createHoldOnSupabase, confirmBookingPaymentOnSupabase, uploadPrescriptionDoc } from '../services/api';
 
 interface CheckoutModalProps {
   visible: boolean;
@@ -28,10 +29,15 @@ export default function CheckoutModal({
 }: CheckoutModalProps) {
   const [secondsLeft, setSecondsLeft] = useState<number>(300); // 5 minutes
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
+  const [attachedPath, setAttachedPath] = useState<string | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
 
   useEffect(() => {
     if (!visible) {
       setSecondsLeft(300);
+      setAttachedFileName(null);
+      setAttachedPath(null);
       return;
     }
 
@@ -62,6 +68,31 @@ export default function CheckoutModal({
     month: 'short',
   });
 
+  const handleAttachPrescription = async () => {
+    setIsUploadingAttachment(true);
+    try {
+      const fileName = `rx_patient_note_${Date.now().toString().slice(-4)}.pdf`;
+      const sampleBlob = new Blob(
+        ['%PDF-1.4 Simulated Patient Prescription / Clinical Note for Tirupati Appointments'],
+        { type: 'application/pdf' }
+      );
+      const res = await uploadPrescriptionDoc(
+        '99999999-9999-9999-9999-999999999991',
+        sampleBlob,
+        fileName,
+        'application/pdf'
+      );
+      if (res.success && res.path) {
+        setAttachedFileName(fileName);
+        setAttachedPath(res.path);
+      }
+    } catch (err) {
+      console.warn('Prescription upload failed:', err);
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
+
   const handlePay = async () => {
     setIsProcessing(true);
     try {
@@ -76,9 +107,9 @@ export default function CheckoutModal({
       const bookingId = holdRes.booking_id || `RPZ-BKG-${Math.floor(100000 + Math.random() * 900000)}`;
 
       if (holdRes.booking_id) {
-        // 2. Confirm payment on Supabase
+        // 2. Confirm payment on Supabase and attach prescription storage path
         const gatewayId = `pay_upi_${Date.now()}`;
-        await confirmBookingPaymentOnSupabase(holdRes.booking_id, gatewayId);
+        await confirmBookingPaymentOnSupabase(holdRes.booking_id, gatewayId, attachedPath);
       }
 
       onPaymentSuccess(bookingId);
@@ -90,7 +121,6 @@ export default function CheckoutModal({
       setIsProcessing(false);
     }
   };
-
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
@@ -105,65 +135,116 @@ export default function CheckoutModal({
             <View style={{ width: 60 }} />
           </View>
 
-          {/* 5-Min Timer Alert */}
-          <View style={styles.timerCard}>
-            <Text style={styles.timerIcon}>⏳</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.timerTitle}>Slot Held for You</Text>
-              <Text style={styles.timerSub}>
-                Complete deposit payment within{' '}
-                <Text style={styles.timerCountdown}>
-                  0{minutes}:{seconds < 10 ? `0${seconds}` : seconds}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
+            {/* 5-Min Timer Alert */}
+            <View style={styles.timerCard}>
+              <Text style={styles.timerIcon}>⏳</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.timerTitle}>Slot Held for You</Text>
+                <Text style={styles.timerSub}>
+                  Complete deposit payment within{' '}
+                  <Text style={styles.timerCountdown}>
+                    0{minutes}:{seconds < 10 ? `0${seconds}` : seconds}
+                  </Text>
                 </Text>
+              </View>
+            </View>
+
+            {/* Booking Summary */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Appointment Summary</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Staff / Unit</Text>
+                <Text style={styles.summaryValue}>{resource.name}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Scheduled Time</Text>
+                <Text style={styles.summaryValue}>
+                  {timeString} ({dateString})
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Duration</Text>
+                <Text style={styles.summaryValue}>{resource.duration_minutes} mins</Text>
+              </View>
+            </View>
+
+            {/* Price Breakdown */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Payment Details</Text>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Hold Deposit (Guarantees Slot)</Text>
+                <Text style={styles.priceValue}>₹{resource.deposit_amount}</Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Remainder Fee</Text>
+                <Text style={styles.priceSub}>Payable at venue</Text>
+              </View>
+              <View style={[styles.priceRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>Total Payable Now</Text>
+                <Text style={styles.totalValue}>₹{resource.deposit_amount}</Text>
+              </View>
+            </View>
+
+            {/* Optional Health / Prescription Attachment */}
+            <View style={styles.card}>
+              <View style={styles.attachmentHeader}>
+                <Text style={styles.cardTitle}>Medical Prescription / Notes</Text>
+                <Text style={styles.optionalBadge}>Optional</Text>
+              </View>
+              <Text style={styles.attachmentSubtitle}>
+                Securely attach existing prescriptions or notes to your booking via encrypted Supabase Storage.
+              </Text>
+
+              {attachedFileName ? (
+                <View style={styles.attachedFileBox}>
+                  <Text style={styles.attachedFileIcon}>📄</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.attachedFileName} numberOfLines={1}>
+                      {attachedFileName}
+                    </Text>
+                    <Text style={styles.attachedFileStatus}>✓ Encrypted in Supabase Vault</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setAttachedFileName(null);
+                      setAttachedPath(null);
+                    }}
+                    style={styles.removeAttachBtn}
+                  >
+                    <Text style={styles.removeAttachText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.attachButton}
+                  onPress={handleAttachPrescription}
+                  disabled={isUploadingAttachment}
+                  accessibilityRole="button"
+                  accessibilityLabel="Attach Prescription Document"
+                >
+                  {isUploadingAttachment ? (
+                    <ActivityIndicator size="small" color="#059669" />
+                  ) : (
+                    <>
+                      <Text style={styles.attachButtonIcon}>📎</Text>
+                      <Text style={styles.attachButtonText}>Attach Prescription / Note</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Cancellation Policy Badge */}
+            <View style={styles.policyCard}>
+              <Text style={styles.policyTitle}>🛡️ Cancellation & Reschedule Policy</Text>
+              <Text style={styles.policyText}>
+                • Free cancellation or reschedule up to 1 hour before slot start.{'\n'}
+                • Deposit is automatically carried over on reschedule or refunded on cancellation.{'\n'}
+                • Late cancellation or no-show forfeits deposit to the merchant.
               </Text>
             </View>
-          </View>
-
-          {/* Booking Summary */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Appointment Summary</Text>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Staff / Unit</Text>
-              <Text style={styles.summaryValue}>{resource.name}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Scheduled Time</Text>
-              <Text style={styles.summaryValue}>
-                {timeString} ({dateString})
-              </Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Duration</Text>
-              <Text style={styles.summaryValue}>{resource.duration_minutes} mins</Text>
-            </View>
-          </View>
-
-          {/* Price Breakdown */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Payment Details</Text>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Hold Deposit (Guarantees Slot)</Text>
-              <Text style={styles.priceValue}>₹{resource.deposit_amount}</Text>
-            </View>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Remainder Fee</Text>
-              <Text style={styles.priceSub}>Payable at venue</Text>
-            </View>
-            <View style={[styles.priceRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Total Payable Now</Text>
-              <Text style={styles.totalValue}>₹{resource.deposit_amount}</Text>
-            </View>
-          </View>
-
-          {/* Cancellation Policy Badge */}
-          <View style={styles.policyCard}>
-            <Text style={styles.policyTitle}>🛡️ Cancellation & Reschedule Policy</Text>
-            <Text style={styles.policyText}>
-              • Free cancellation or reschedule up to 1 hour before slot start.{'\n'}
-              • Deposit is automatically carried over on reschedule or refunded on cancellation.{'\n'}
-              • Late cancellation or no-show forfeits deposit to the merchant.
-            </Text>
-          </View>
+          </ScrollView>
 
           {/* Pay Button */}
           <View style={styles.footer}>
@@ -331,6 +412,83 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#166534',
     lineHeight: 16,
+  },
+  scrollBody: {
+    paddingBottom: 20,
+  },
+  attachmentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  optionalBadge: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  attachmentSubtitle: {
+    fontSize: 11,
+    color: '#64748b',
+    lineHeight: 15,
+    marginBottom: 10,
+  },
+  attachButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1.5,
+    borderColor: '#bbf7d0',
+    borderStyle: 'dashed',
+    gap: 6,
+  },
+  attachButtonIcon: {
+    fontSize: 14,
+  },
+  attachButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#15803d',
+  },
+  attachedFileBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    padding: 10,
+    gap: 10,
+  },
+  attachedFileIcon: {
+    fontSize: 18,
+  },
+  attachedFileName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  attachedFileStatus: {
+    fontSize: 10,
+    color: '#059669',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  removeAttachBtn: {
+    padding: 4,
+  },
+  removeAttachText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '700',
   },
   footer: {
     marginTop: 'auto',

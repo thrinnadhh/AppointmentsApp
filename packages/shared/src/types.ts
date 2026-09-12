@@ -98,6 +98,7 @@ export interface Booking {
   gateway_payment_id?: string | null;
   created_at: string;
   updated_at: string;
+  attachment_url?: string | null;
   provider?: Provider;
   resource?: Resource;
 }

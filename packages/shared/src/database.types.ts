@@ -30,8 +30,10 @@ export type Database = {
           slot_start: string
           status: Database["public"]["Enums"]["booking_status"]
           updated_at: string
+          attachment_url: string | null
         }
         Insert: {
+          attachment_url?: string | null
           created_at?: string
           customer_id: string
           deposit_amount: number
@@ -48,6 +50,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachment_url?: string | null
           created_at?: string
           customer_id?: string
           deposit_amount?: number

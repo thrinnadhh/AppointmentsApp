@@ -53,6 +53,7 @@ export interface MerchantBookingWithDetails {
   hold_expires_at: string | null;
   created_at: string;
   updated_at: string;
+  attachment_url?: string | null;
   customer_name?: string;
   customer_phone?: string;
   no_show_count?: number;
@@ -337,4 +338,119 @@ export async function getCurrentUserProfile() {
 
 export async function signOutMerchant() {
   await supabase.auth.signOut();
+}
+
+/**
+ * Upload a venue storefront photo, clinic logo, or resource image to 'venue-assets' public bucket.
+ */
+export async function uploadVenueAsset(
+  providerId: string,
+  file: Blob | File | ArrayBuffer,
+  fileName: string,
+  contentType: string = 'image/jpeg'
+): Promise<{ success: boolean; publicUrl?: string; path?: string; error?: string }> {
+  try {
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${providerId}/${Date.now()}-${cleanFileName}`;
+
+    const { data, error } = await supabase.storage
+      .from('venue-assets')
+      .upload(storagePath, file, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn('Venue asset upload error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('venue-assets')
+      .getPublicUrl(storagePath);
+
+    return {
+      success: true,
+      path: data?.path || storagePath,
+      publicUrl: urlData.publicUrl,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Upload failed';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Returns public CDN URL for a venue asset with optional dynamic dimensions/transformations.
+ */
+export function getVenueAssetUrl(
+  pathOrUrl: string,
+  options?: { width?: number; height?: number; quality?: number }
+): string {
+  if (!pathOrUrl) return '';
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+  const { data } = supabase.storage.from('venue-assets').getPublicUrl(pathOrUrl, {
+    transform: {
+      width: options?.width || 600,
+      quality: options?.quality || 80,
+    },
+  });
+  return data?.publicUrl || pathOrUrl;
+}
+
+/**
+ * Upload customer prescription or medical record to private 'prescriptions-and-records' bucket.
+ */
+export async function uploadPrescriptionDoc(
+  customerId: string,
+  file: Blob | File | ArrayBuffer,
+  fileName: string,
+  contentType: string = 'image/jpeg'
+): Promise<{ success: boolean; path?: string; error?: string }> {
+  try {
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${customerId}/${Date.now()}-${cleanFileName}`;
+
+    const { data, error } = await supabase.storage
+      .from('prescriptions-and-records')
+      .upload(storagePath, file, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn('Prescription upload error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, path: data?.path || storagePath };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Upload failed';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Generate a time-limited signed URL for private prescriptions / medical records.
+ */
+export async function getPrescriptionSignedUrl(
+  storagePath: string,
+  expiresInSeconds: number = 3600
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from('prescriptions-and-records')
+      .createSignedUrl(storagePath, expiresInSeconds);
+
+    if (error || !data?.signedUrl) {
+      console.warn('Failed to create signed URL:', error?.message);
+      return null;
+    }
+    return data.signedUrl;
+  } catch (err) {
+    console.warn('Error fetching signed URL:', err);
+    return null;
+  }
 }

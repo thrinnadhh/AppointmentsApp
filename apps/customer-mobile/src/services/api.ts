@@ -599,7 +599,8 @@ export async function createHoldOnSupabase(
 
 export async function confirmBookingPaymentOnSupabase(
   bookingId: string,
-  paymentGatewayId: string = 'pay_simulated_upi'
+  paymentGatewayId: string = 'pay_simulated_upi',
+  attachmentUrl?: string | null
 ) {
   // Attempt via backend API first if configured
   if (API_BASE_URL) {
@@ -622,14 +623,25 @@ export async function confirmBookingPaymentOnSupabase(
   }
 
   try {
+    const updatePayload: {
+      status: 'CONFIRMED';
+      payment_status: 'CAPTURED';
+      gateway_payment_id: string;
+      updated_at: string;
+      attachment_url?: string | null;
+    } = {
+      status: 'CONFIRMED',
+      payment_status: 'CAPTURED',
+      gateway_payment_id: paymentGatewayId,
+      updated_at: new Date().toISOString(),
+    };
+    if (attachmentUrl) {
+      updatePayload.attachment_url = attachmentUrl;
+    }
+
     const { data, error } = await supabase
       .from('bookings')
-      .update({
-        status: 'CONFIRMED',
-        payment_status: 'CAPTURED',
-        gateway_payment_id: paymentGatewayId,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', bookingId)
       .select();
 
@@ -745,6 +757,121 @@ export async function rescheduleBookingOnSupabase(
   } catch (err) {
     console.error('Error rescheduling booking:', err);
     throw err;
+  }
+}
+
+/**
+ * Upload a customer prescription or medical note to private 'prescriptions-and-records' bucket.
+ */
+export async function uploadPrescriptionDoc(
+  customerId: string,
+  fileBytes: Uint8Array | Blob | ArrayBuffer,
+  fileName: string,
+  contentType: string = 'image/jpeg'
+): Promise<{ success: boolean; path?: string; error?: string }> {
+  try {
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${customerId}/${Date.now()}-${cleanFileName}`;
+
+    const { data, error } = await supabase.storage
+      .from('prescriptions-and-records')
+      .upload(storagePath, fileBytes, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn('Prescription upload error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, path: data?.path || storagePath };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Upload failed';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Generate a time-limited signed URL for private prescriptions / medical records.
+ */
+export async function getPrescriptionSignedUrl(
+  storagePath: string,
+  expiresInSeconds: number = 3600
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from('prescriptions-and-records')
+      .createSignedUrl(storagePath, expiresInSeconds);
+
+    if (error || !data?.signedUrl) {
+      console.warn('Failed to create signed URL:', error?.message);
+      return null;
+    }
+    return data.signedUrl;
+  } catch (err) {
+    console.warn('Error fetching signed URL:', err);
+    return null;
+  }
+}
+
+/**
+ * Returns public CDN URL for a venue asset with optional dynamic dimensions/transformations.
+ */
+export function getVenueAssetUrl(
+  pathOrUrl: string,
+  options?: { width?: number; height?: number; quality?: number }
+): string {
+  if (!pathOrUrl) return '';
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+  const { data } = supabase.storage.from('venue-assets').getPublicUrl(pathOrUrl, {
+    transform: {
+      width: options?.width || 600,
+      quality: options?.quality || 80,
+    },
+  });
+  return data?.publicUrl || pathOrUrl;
+}
+
+/**
+ * Upload a venue storefront photo, clinic logo, or resource image to 'venue-assets' public bucket.
+ */
+export async function uploadVenueAsset(
+  providerId: string,
+  fileBytes: Uint8Array | Blob | ArrayBuffer,
+  fileName: string,
+  contentType: string = 'image/jpeg'
+): Promise<{ success: boolean; publicUrl?: string; path?: string; error?: string }> {
+  try {
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${providerId}/${Date.now()}-${cleanFileName}`;
+
+    const { data, error } = await supabase.storage
+      .from('venue-assets')
+      .upload(storagePath, fileBytes, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn('Venue asset upload error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('venue-assets')
+      .getPublicUrl(storagePath);
+
+    return {
+      success: true,
+      path: data?.path || storagePath,
+      publicUrl: urlData.publicUrl,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Upload failed';
+    return { success: false, error: msg };
   }
 }
 

@@ -19,9 +19,10 @@ import {
   HeartHandshake,
   CheckCircle2,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Camera
 } from 'lucide-react';
-import { fetchAllProviders, Provider, Resource } from '@/lib/supabase';
+import { fetchAllProviders, uploadVenueAsset, getVenueAssetUrl, supabase, Provider, Resource } from '@/lib/supabase';
 
 type ProviderWithResources = Provider & { resources: Resource[] };
 
@@ -53,6 +54,27 @@ export default function VenuesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [uploadingVenueId, setUploadingVenueId] = useState<string | null>(null);
+
+  const handleUploadVenuePhoto = async (venueId: string, file: File) => {
+    setUploadingVenueId(venueId);
+    try {
+      const res = await uploadVenueAsset(venueId, file, file.name, file.type);
+      if (res.success && res.publicUrl) {
+        const current = venues.find((v) => v.id === venueId);
+        const existingPhotos = current?.photos || [];
+        const updatedPhotos = [res.publicUrl, ...existingPhotos];
+        await supabase.from('providers').update({ photos: updatedPhotos }).eq('id', venueId);
+        await loadVenues();
+        setSuccessBanner('Storefront photo uploaded to Supabase Storage!');
+        setTimeout(() => setSuccessBanner(null), 4000);
+      }
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+    } finally {
+      setUploadingVenueId(null);
+    }
+  };
 
   const loadVenues = async () => {
     setLoading(true);
@@ -286,6 +308,13 @@ export default function VenuesPage() {
                 key={venue.id}
                 className="bg-white rounded-xl border border-slate-200 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between overflow-hidden"
               >
+                {venue.photos && venue.photos[0] && (
+                  <img
+                    src={getVenueAssetUrl(venue.photos[0], { width: 400, quality: 80 })}
+                    alt={venue.name}
+                    className="w-full h-36 object-cover border-b border-slate-100"
+                  />
+                )}
                 <div className="p-5 space-y-4">
                   {/* Card Top */}
                   <div className="flex items-start justify-between gap-3">
@@ -338,14 +367,30 @@ export default function VenuesPage() {
                     <Users className="w-3.5 h-3.5 text-emerald-600" />
                     <span>{resourceCount} {venue.category_id === 'clinic' ? 'Doctors' : 'Resources / Units'}</span>
                   </div>
-                  <Link
-                    href={`/resources?providerId=${venue.id}`}
-                    aria-label={`Manage Staff for ${venue.name}`}
-                    className="inline-flex items-center text-xs font-bold text-emerald-700 hover:text-emerald-900 group"
-                  >
-                    Manage Staff
-                    <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg cursor-pointer transition">
+                      <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                      {uploadingVenueId === venue.id ? 'Uploading...' : 'Photo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingVenueId === venue.id}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleUploadVenuePhoto(venue.id, file);
+                        }}
+                      />
+                    </label>
+                    <Link
+                      href={`/resources?providerId=${venue.id}`}
+                      aria-label={`Manage Staff for ${venue.name}`}
+                      className="inline-flex items-center text-xs font-bold text-emerald-700 hover:text-emerald-900 group"
+                    >
+                      Manage Staff
+                      <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             );
