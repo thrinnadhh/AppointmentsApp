@@ -39,6 +39,7 @@ export interface AppTestFixtures {
   customerApp: CustomerAppPage;
   merchantPortal: MerchantPortalPage;
   adminDashboard: AdminDashboardPage;
+  unauthenticatedAdmin: AdminDashboardPage;
   multiRole: MultiRoleFixtures;
   supabaseClient: SupabaseClient;
   bookingApi: BookingApiHelper;
@@ -76,6 +77,14 @@ export const test = base.extend<AppTestFixtures>({
     const page = await context.newPage();
     const admin = new AdminDashboardPage(page);
     await admin.goto();
+    await use(admin);
+    await context.close();
+  },
+
+  unauthenticatedAdmin: async ({ browser }, use) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const admin = new AdminDashboardPage(page);
     await use(admin);
     await context.close();
   },

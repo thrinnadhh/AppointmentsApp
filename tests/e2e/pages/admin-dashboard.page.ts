@@ -55,6 +55,15 @@ export class AdminDashboardPage {
   readonly auditTable: Locator;
   readonly auditRows: Locator;
 
+  // Authentication & Security Locators (Phase 1 & 3)
+  readonly loginEmailInput: Locator;
+  readonly loginPasswordInput: Locator;
+  readonly loginSubmitBtn: Locator;
+  readonly loginErrorAlert: Locator;
+  readonly loginSuccessAlert: Locator;
+  readonly identityBadge: Locator;
+  readonly logoutBtn: Locator;
+
   // Multi-Factor Authentication (Phase 3)
   readonly mfaCodeInput: Locator;
   readonly mfaSubmitBtn: Locator;
@@ -63,6 +72,8 @@ export class AdminDashboardPage {
   readonly mfaSkipBtn: Locator;
   readonly mfaStatusBadge: Locator;
   readonly mfaModal: Locator;
+  readonly mfaModalHeading: Locator;
+  readonly mfaCloseBtn: Locator;
 
   // Add City Modal Locators
   readonly addCityModal: Locator;
@@ -126,6 +137,15 @@ export class AdminDashboardPage {
     this.auditTable = page.locator('table').nth(3);
     this.auditRows = page.getByTestId('audit-log-rows');
 
+    // Authentication & Security Locators (Phase 1 & 3)
+    this.loginEmailInput = page.getByTestId('admin-login-email');
+    this.loginPasswordInput = page.getByTestId('admin-login-password');
+    this.loginSubmitBtn = page.getByTestId('admin-login-submit');
+    this.loginErrorAlert = page.getByTestId('admin-login-error');
+    this.loginSuccessAlert = page.getByTestId('admin-login-success');
+    this.identityBadge = page.getByTestId('admin-identity-badge');
+    this.logoutBtn = page.getByTestId('admin-logout-btn');
+
     // MFA Locators
     this.mfaCodeInput = page.getByTestId('admin-mfa-code');
     this.mfaSubmitBtn = page.getByTestId('admin-mfa-submit');
@@ -134,6 +154,8 @@ export class AdminDashboardPage {
     this.mfaSkipBtn = page.getByTestId('admin-mfa-skip');
     this.mfaStatusBadge = page.getByTestId('admin-mfa-status-badge');
     this.mfaModal = page.getByTestId('admin-mfa-modal');
+    this.mfaModalHeading = page.getByRole('heading', { name: /Two-Factor Authentication & Device Security/i });
+    this.mfaCloseBtn = page.getByRole('button', { name: /Close Window/i });
 
     // Modal
     this.addCityModal = page.locator('text=Expand to New Territory').locator('..');
@@ -195,6 +217,30 @@ export class AdminDashboardPage {
     await this.page.getByTestId('admin-login-password').fill(password);
     await this.page.getByTestId('admin-login-submit').click();
     await expect(this.page.getByTestId('admin-login-error')).toBeVisible({ timeout: 10000 });
+  }
+
+  async signOutAdmin() {
+    await expect(this.logoutBtn).toBeVisible({ timeout: 6000 });
+    await this.logoutBtn.click();
+    await expect(this.loginEmailInput).toBeVisible({ timeout: 8000 });
+  }
+
+  async openMfaModal() {
+    await expect(this.mfaStatusBadge).toBeVisible({ timeout: 6000 });
+    await this.mfaStatusBadge.click();
+    await expect(this.mfaModal).toBeVisible({ timeout: 6000 });
+    await expect(this.mfaModalHeading).toBeVisible();
+  }
+
+  async closeMfaModal() {
+    await expect(this.mfaCloseBtn).toBeVisible({ timeout: 6000 });
+    await this.mfaCloseBtn.click();
+    await expect(this.mfaModal).not.toBeVisible({ timeout: 6000 });
+  }
+
+  async filterAuditSearch(query: string) {
+    await expect(this.auditSearchInput).toBeVisible({ timeout: 6000 });
+    await this.auditSearchInput.fill(query);
   }
 
 
