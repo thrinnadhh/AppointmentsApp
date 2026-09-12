@@ -727,3 +727,68 @@ export async function fetchAdminAuditLogs(
   }
 }
 
+export interface AdminMfaStatus {
+  hasMfa: boolean;
+  currentLevel: 'aal1' | 'aal2';
+  nextLevel: 'aal1' | 'aal2';
+  enrolledFactors: Array<{
+    id: string;
+    friendly_name?: string;
+    factor_type: string;
+    status: string;
+    created_at: string;
+  }>;
+}
+
+/**
+ * Check current user's Multi-Factor Authentication status and enrolled factors.
+ */
+export async function checkAdminMfaStatus(): Promise<AdminMfaStatus> {
+  try {
+    const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const { data: factorData, error: factorError } = await supabase.auth.mfa.listFactors();
+
+    if (aalError || factorError) {
+      return {
+        hasMfa: false,
+        currentLevel: 'aal1',
+        nextLevel: 'aal1',
+        enrolledFactors: [],
+      };
+    }
+
+    const verifiedTotp = (factorData?.totp || []).filter((f) => f.status === 'verified');
+
+    return {
+      hasMfa: verifiedTotp.length > 0,
+      currentLevel: (aalData?.currentLevel as 'aal1' | 'aal2') || 'aal1',
+      nextLevel: (aalData?.nextLevel as 'aal1' | 'aal2') || 'aal1',
+      enrolledFactors: factorData?.all || [],
+    };
+  } catch (err) {
+    console.warn('[checkAdminMfaStatus] Error:', err);
+    return {
+      hasMfa: false,
+      currentLevel: 'aal1',
+      nextLevel: 'aal1',
+      enrolledFactors: [],
+    };
+  }
+}
+
+/**
+ * Unenroll an MFA factor (for factor reset or device removal).
+ */
+export async function unenrollAdminMfaFactor(factorId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to unenroll MFA factor' };
+  }
+}
+
+

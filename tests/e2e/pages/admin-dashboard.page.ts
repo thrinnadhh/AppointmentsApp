@@ -55,6 +55,15 @@ export class AdminDashboardPage {
   readonly auditTable: Locator;
   readonly auditRows: Locator;
 
+  // Multi-Factor Authentication (Phase 3)
+  readonly mfaCodeInput: Locator;
+  readonly mfaSubmitBtn: Locator;
+  readonly mfaQrCode: Locator;
+  readonly mfaSecretKey: Locator;
+  readonly mfaSkipBtn: Locator;
+  readonly mfaStatusBadge: Locator;
+  readonly mfaModal: Locator;
+
   // Add City Modal Locators
   readonly addCityModal: Locator;
   readonly cityIdInput: Locator;
@@ -117,6 +126,15 @@ export class AdminDashboardPage {
     this.auditTable = page.locator('table').nth(3);
     this.auditRows = page.getByTestId('audit-log-rows');
 
+    // MFA Locators
+    this.mfaCodeInput = page.getByTestId('admin-mfa-code');
+    this.mfaSubmitBtn = page.getByTestId('admin-mfa-submit');
+    this.mfaQrCode = page.getByTestId('admin-mfa-qr');
+    this.mfaSecretKey = page.getByTestId('admin-mfa-secret');
+    this.mfaSkipBtn = page.getByTestId('admin-mfa-skip');
+    this.mfaStatusBadge = page.getByTestId('admin-mfa-status-badge');
+    this.mfaModal = page.getByTestId('admin-mfa-modal');
+
     // Modal
     this.addCityModal = page.locator('text=Expand to New Territory').locator('..');
     this.cityIdInput = page.getByPlaceholder(/e\.g\. nellore, kadapa/i);
@@ -147,7 +165,29 @@ export class AdminDashboardPage {
     await this.page.getByTestId('admin-login-email').fill(email);
     await this.page.getByTestId('admin-login-password').fill(password);
     await this.page.getByTestId('admin-login-submit').click();
+
+    // In local dev/preview, if MFA stage is prompted, allow smooth skip or completion
+    const skipBtn = this.page.getByTestId('admin-mfa-skip');
+    try {
+      await skipBtn.waitFor({ state: 'visible', timeout: 3000 });
+      await skipBtn.click();
+    } catch {
+      // If no MFA skip prompt, user already proceeded directly
+    }
+
     await expect(this.pageHeading).toBeVisible({ timeout: 15000 });
+  }
+
+  async submitCredentials(email: string, password: string) {
+    await this.page.getByTestId('admin-login-email').fill(email);
+    await this.page.getByTestId('admin-login-password').fill(password);
+    await this.page.getByTestId('admin-login-submit').click();
+  }
+
+  async enterMfaCode(code: string) {
+    await expect(this.mfaCodeInput).toBeVisible({ timeout: 6000 });
+    await this.mfaCodeInput.fill(code);
+    await this.mfaSubmitBtn.click();
   }
 
   async loginExpectFailure(email: string, password: string) {

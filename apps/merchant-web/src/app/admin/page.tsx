@@ -30,6 +30,9 @@ import {
   Lock,
   FileText,
   History,
+  Smartphone,
+  Trash2,
+  X,
 } from 'lucide-react';
 import {
   CityAdminStats,
@@ -37,6 +40,9 @@ import {
   CityStatus,
   TimeWindowFilter,
   AdminAuditLogEntry,
+  AdminMfaStatus,
+  checkAdminMfaStatus,
+  unenrollAdminMfaFactor,
   supabase,
 } from '@/lib/supabase';
 
@@ -86,6 +92,11 @@ export default function AdminDashboardPage() {
   const [adminUser, setAdminUser] = useState<{ email: string; fullName: string; role: string } | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [unauthorizedRole, setUnauthorizedRole] = useState<string | null>(null);
+
+  // 2FA / MFA Security State
+  const [mfaStatus, setMfaStatus] = useState<AdminMfaStatus | null>(null);
+  const [showMfaModal, setShowMfaModal] = useState(false);
+  const [unenrollLoading, setUnenrollLoading] = useState(false);
 
   // Core Data
   const [cities, setCities] = useState<CityAdminStats[]>([]);
@@ -183,6 +194,20 @@ export default function AdminDashboardPage() {
               fullName: 'Platform Owner (Super Admin)',
               role: 'admin',
             });
+            setMfaStatus({
+              hasMfa: true,
+              currentLevel: 'aal2',
+              nextLevel: 'aal2',
+              enrolledFactors: [
+                {
+                  id: 'factor-dev-e2e',
+                  friendly_name: 'Super Admin Key (Hardware/App)',
+                  factor_type: 'totp',
+                  status: 'verified',
+                  created_at: new Date().toISOString(),
+                },
+              ],
+            });
             setAuthChecking(false);
             loadDashboardData(selectedWindow, selectedCityFilter);
             return;
@@ -208,6 +233,15 @@ export default function AdminDashboardPage() {
           fullName: profile.full_name || 'Platform Owner',
           role: profile.role,
         });
+
+        // Query Live MFA Status
+        try {
+          const mfa = await checkAdminMfaStatus();
+          setMfaStatus(mfa);
+        } catch (mfaErr) {
+          console.warn('[Admin] Failed to check MFA status:', mfaErr);
+        }
+
         setAuthChecking(false);
         loadDashboardData(selectedWindow, selectedCityFilter);
       } catch (err) {
@@ -222,6 +256,26 @@ export default function AdminDashboardPage() {
   const handleAdminSignOut = async () => {
     await supabase.auth.signOut();
     router.push('/admin/login');
+  };
+
+  const handleUnenrollFactor = async (factorId: string) => {
+    try {
+      setUnenrollLoading(true);
+      const res = await unenrollAdminMfaFactor(factorId);
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to unenroll MFA factor');
+      }
+      setActionFeedback('✓ 2FA factor unenrolled. Security posture downgraded to AAL1.');
+      const updatedMfa = await checkAdminMfaStatus();
+      setMfaStatus(updatedMfa);
+      setTimeout(() => setActionFeedback(null), 3500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error unenrolling factor';
+      setActionFeedback(`⚠️ ${msg}`);
+      setTimeout(() => setActionFeedback(null), 4000);
+    } finally {
+      setUnenrollLoading(false);
+    }
   };
 
 
@@ -530,6 +584,28 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
+              {/* MFA / 2FA Security Indicator Badge */}
+              {mfaStatus?.hasMfa ? (
+                <button
+                  data-testid="admin-mfa-status-badge"
+                  onClick={() => setShowMfaModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all shadow-2xs group"
+                  title="Two-Factor Authentication Active (Click to inspect security profile)"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                  <span>2FA Active (TOTP)</span>
+                </button>
+              ) : (
+                <button
+                  data-testid="admin-mfa-status-badge"
+                  onClick={() => setShowMfaModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition-all shadow-2xs animate-pulse group"
+                  title="Two-Factor Authentication Recommended (Click to setup)"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
+                  <span>2FA Recommended</span>
+                </button>
+              )}
 
               <button
                 onClick={() => loadDashboardData()}
@@ -1431,6 +1507,128 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2FA / MFA Security Management Modal */}
+      {showMfaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div
+            data-testid="admin-mfa-modal"
+            className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 relative animate-in zoom-in-95"
+          >
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Two-Factor Authentication & Device Security
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Authenticator Assurance Level (AAL2) • Time-Based One-Time Password (TOTP)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMfaModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4">
+              {/* Status Summary Card */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Security Assurance Level
+                  </span>
+                  <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5 mt-0.5">
+                    {mfaStatus?.hasMfa ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        AAL2 (Multi-Factor Enforced)
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        AAL1 (Password Only)
+                      </>
+                    )}
+                  </p>
+                </div>
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                    mfaStatus?.hasMfa
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                  }`}
+                >
+                  {mfaStatus?.hasMfa ? 'VERIFIED' : 'UNPROTECTED'}
+                </span>
+              </div>
+
+              {/* Enrolled Devices */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Enrolled Authenticator Devices ({mfaStatus?.enrolledFactors?.length || 0})
+                </h4>
+
+                {mfaStatus?.enrolledFactors && mfaStatus.enrolledFactors.length > 0 ? (
+                  <div className="space-y-2">
+                    {mfaStatus.enrolledFactors.map((factor) => (
+                      <div
+                        key={factor.id}
+                        className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between shadow-2xs"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Smartphone className="w-4 h-4 text-emerald-600" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">
+                              {factor.friendly_name || 'Super Admin Key'}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              Type: {factor.factor_type.toUpperCase()} • Status: {factor.status}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleUnenrollFactor(factor.id)}
+                          disabled={unenrollLoading}
+                          className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors flex items-center gap-1 disabled:opacity-50"
+                          title="Remove Authenticator Factor"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Revoke</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500">
+                    No active hardware or software authenticator device registered.
+                    <p className="mt-1 text-slate-400">
+                      Sign in through the gateway to configure a new TOTP factor.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-2 pt-3 border-t border-slate-100 flex items-center justify-end">
+              <button
+                onClick={() => setShowMfaModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                Close Window
+              </button>
+            </div>
           </div>
         </div>
       )}

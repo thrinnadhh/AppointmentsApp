@@ -7,6 +7,7 @@ export interface AdminAuthSuccess {
   user: {
     id: string;
     email?: string;
+    aal?: 'aal1' | 'aal2';
   };
   profile: {
     id: string;

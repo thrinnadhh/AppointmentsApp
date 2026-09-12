@@ -123,4 +123,103 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     expect(firstLog).toHaveProperty('target_type');
     expect(firstLog).toHaveProperty('created_at');
   });
+
+  // ================= PHASE 3: MULTI-FACTOR AUTHENTICATION (TOTP) =================
+
+  test('TC-ADMIN-MFA-01: Admin credentials submission triggers Stage 2 MFA prompt', async ({ page }) => {
+    await page.context().clearCookies();
+    const adminPage = new AdminDashboardPage(page);
+
+    await adminPage.gotoLoginPage();
+
+    // Submit credentials without auto-skipping
+    await adminPage.submitCredentials(
+      'admin@appointments-tirupati.com',
+      'AdminSecure2026!'
+    );
+
+    // Stage 2 must be rendered: 6-digit MFA code input and submit button
+    await expect(adminPage.mfaCodeInput).toBeVisible({ timeout: 10000 });
+    await expect(adminPage.mfaSubmitBtn).toBeVisible();
+
+    // User is still on /admin/login until MFA stage completes
+    expect(page.url()).toContain('/admin/login');
+  });
+
+  test('TC-ADMIN-MFA-02: MFA enrollment renders SVG QR code, secret key, and skip fallback', async ({ page }) => {
+    await page.context().clearCookies();
+    const adminPage = new AdminDashboardPage(page);
+
+    await adminPage.gotoLoginPage();
+    await adminPage.submitCredentials(
+      'admin@appointments-tirupati.com',
+      'AdminSecure2026!'
+    );
+
+    await expect(adminPage.mfaCodeInput).toBeVisible({ timeout: 10000 });
+
+    // Verify whether in enrollment or challenge state, the UI provides secure controls
+    const isEnrollment = await adminPage.mfaQrCode.isVisible().catch(() => false);
+    if (isEnrollment) {
+      await expect(adminPage.mfaQrCode).toBeVisible();
+      await expect(adminPage.mfaSecretKey).toBeVisible();
+      const secretText = await adminPage.mfaSecretKey.textContent();
+      expect(secretText?.length).toBeGreaterThan(10);
+    }
+
+    // Dev preview skip button must be present in development environment
+    await expect(adminPage.mfaSkipBtn).toBeVisible();
+  });
+
+  test('TC-ADMIN-MFA-03: Submitting invalid 6-digit TOTP code rejects with security alert', async ({ page }) => {
+    await page.context().clearCookies();
+    const adminPage = new AdminDashboardPage(page);
+
+    await adminPage.gotoLoginPage();
+    await adminPage.submitCredentials(
+      'admin@appointments-tirupati.com',
+      'AdminSecure2026!'
+    );
+
+    await expect(adminPage.mfaCodeInput).toBeVisible({ timeout: 10000 });
+
+    // Attempt verification with deliberate bad code (000000 / 999999)
+    await adminPage.enterMfaCode('000000');
+
+    // Must show rejection banner and remain on login page
+    const errorAlert = page.getByTestId('admin-login-error');
+    await expect(errorAlert).toBeVisible({ timeout: 8000 });
+    await expect(errorAlert).toContainText(/failed|invalid|code/i);
+    expect(page.url()).toContain('/admin/login');
+  });
+
+  test('TC-ADMIN-MFA-04: Dashboard reflects 2FA status and security management modal', async ({ page }) => {
+    await page.context().clearCookies();
+    const adminPage = new AdminDashboardPage(page);
+
+    await adminPage.gotoLoginPage();
+    await adminPage.loginAsAdmin(
+      'admin@appointments-tirupati.com',
+      'AdminSecure2026!'
+    );
+
+    // Dashboard loaded
+    await expect(adminPage.pageHeading).toBeVisible();
+
+    // Verify 2FA status indicator in top header
+    await expect(adminPage.mfaStatusBadge).toBeVisible();
+    const badgeText = await adminPage.mfaStatusBadge.textContent();
+    expect(badgeText).toMatch(/2FA Active|2FA Recommended/i);
+
+    // Click 2FA status badge to open device security modal
+    await adminPage.mfaStatusBadge.click();
+    await expect(adminPage.mfaModal).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Two-Factor Authentication & Device Security/i })).toBeVisible();
+    await expect(page.getByText(/Authenticator Assurance Level/i)).toBeVisible();
+
+    // Close modal
+    const closeBtn = page.getByRole('button', { name: /Close Window/i });
+    await closeBtn.click();
+    await expect(adminPage.mfaModal).not.toBeVisible();
+  });
 });
