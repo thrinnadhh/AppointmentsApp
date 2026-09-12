@@ -167,4 +167,23 @@ export class CustomerAppPage {
     await expect(this.payDepositBtn).toBeVisible();
     await this.payDepositBtn.click();
   }
+
+  async navigateToMyBookings() {
+    await expect(this.myBookingsBtn).toBeVisible();
+    await this.myBookingsBtn.click();
+    await expect(this.myBookingsTitle).toBeVisible({ timeout: 10000 });
+  }
+
+  async backToBrowse() {
+    await expect(this.backToBrowseBtn).toBeVisible();
+    await this.backToBrowseBtn.click();
+    await expect(this.appTitle).toBeVisible({ timeout: 10000 });
+  }
+
+  async expectBookingInList(identifier: string, expectedStatus: string = 'CONFIRMED') {
+    const card = this.page.locator('div', { hasText: identifier }).first();
+    await expect(card).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByText(expectedStatus).first()).toBeVisible();
+  }
 }
+
