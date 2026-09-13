@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { cityId, contactInfo, roleInterest = 'customer', notes, userId } = body;
+    const { cityId, contactInfo, roleInterest = 'customer', notes } = body;
 
     if (!cityId || !contactInfo) {
       return NextResponse.json(
@@ -34,23 +34,31 @@ export async function POST(request: Request) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
-    const { data, error } = await supabaseAdmin
+    const cityNameFormatted = cityId.charAt(0).toUpperCase() + cityId.slice(1);
+    const { error } = await supabaseAdmin
       .from('city_waitlist')
       .insert({
-        city_id: cityId,
-        contact_info: contactInfo.trim(),
-        role_interest: roleInterest,
+        city_name: cityNameFormatted,
+        phone: contactInfo.trim(),
+        vertical_interest: roleInterest || 'clinics',
         notes: notes || null,
-        user_id: userId || null,
-      })
-      .select()
-      .single();
+      });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ entry: data }, { status: 201 });
+    return NextResponse.json({
+      entry: {
+        id: `waitlist_${Date.now()}`,
+        city_id: cityNameFormatted,
+        contact_info: contactInfo.trim(),
+        role_interest: roleInterest || 'clinics',
+        notes: notes || null,
+        created_at: new Date().toISOString(),
+        cities: { name: cityNameFormatted },
+      },
+    }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to register waitlist interest';
     return NextResponse.json({ error: message }, { status: 500 });

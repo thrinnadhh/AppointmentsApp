@@ -694,7 +694,7 @@ export default function AdminDashboardPage() {
         {/* Top KPI Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Card 1: Completed Appointments */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+          <div data-testid="admin-kpi-card-completed" className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -705,7 +705,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                <span data-testid="admin-kpi-completed-value" className="text-2xl font-black text-slate-900 tracking-tight">
                   {velocity?.completed_bookings ?? 0}
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
@@ -723,7 +723,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Card 2: Merchant Pipeline */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+          <div data-testid="admin-kpi-card-merchant" className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -748,7 +748,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Card 3: Cities Rollout Ratio */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+          <div data-testid="admin-kpi-card-cities" className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -763,7 +763,7 @@ export default function AdminDashboardPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-pulse"></span>
                   {velocity?.cities_overview?.active_cities ?? 0} Active
                 </span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
                   {velocity?.cities_overview?.expanding_cities ?? 0} Expanding
                 </span>
               </div>
@@ -774,7 +774,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Card 4: Gross Deposit Volume */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+          <div data-testid="admin-kpi-card-deposit" className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -785,7 +785,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div className="mt-3 flex items-baseline">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                <span data-testid="admin-kpi-deposit-value" className="text-2xl font-black text-slate-900 tracking-tight">
                   ₹{Number(velocity?.gross_deposit_amount || 0).toLocaleString('en-IN')}
                 </span>
               </div>
@@ -796,7 +796,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Card 5: Pre-Launch Demand Waitlist */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
+          <div data-testid="admin-kpi-card-waitlist" className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs relative overflow-hidden flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -807,7 +807,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                <span data-testid="admin-kpi-waitlist-value" className="text-2xl font-black text-slate-900 tracking-tight">
                   {waitlist.length}
                 </span>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">

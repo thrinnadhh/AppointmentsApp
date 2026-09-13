@@ -684,7 +684,16 @@ export async function fetchAdminCityWaitlist(cityId?: string): Promise<CityWaitl
       console.warn('Error fetching waitlist:', error.message);
       return [];
     }
-    return (data || []) as unknown as CityWaitlistEntry[];
+    const normalized = (data || []).map((row: any) => ({
+      id: row.id,
+      city_id: row.city_id || row.city_name,
+      contact_info: row.contact_info || row.phone,
+      role_interest: row.role_interest || row.vertical_interest || 'customer',
+      notes: row.notes,
+      created_at: row.created_at,
+      cities: row.cities || { name: row.city_name || row.city_id },
+    }));
+    return normalized as unknown as CityWaitlistEntry[];
   } catch (err) {
     console.warn('Error in fetchAdminCityWaitlist:', err);
     return [];

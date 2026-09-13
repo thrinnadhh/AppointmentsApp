@@ -23,6 +23,12 @@ export interface BookingApiHelper {
     channel?: 'whatsapp' | 'sms';
     recipientPhone?: string;
   }) => Promise<{ success: boolean; dispatch?: unknown }>;
+  joinWaitlist: (params: {
+    cityId: string;
+    contactInfo: string;
+    roleInterest?: 'customer' | 'merchant';
+    notes?: string;
+  }) => Promise<{ success: boolean; entry?: unknown }>;
 }
 
 export interface MultiRoleFixtures {
@@ -30,6 +36,15 @@ export interface MultiRoleFixtures {
   customerPage: Page;
   merchantPortal: MerchantPortalPage;
   merchantPage: Page;
+}
+
+export interface TriRoleFixtures {
+  customerApp: CustomerAppPage;
+  customerPage: Page;
+  merchantPortal: MerchantPortalPage;
+  merchantPage: Page;
+  adminDashboard: AdminDashboardPage;
+  adminPage: Page;
 }
 
 /**
@@ -41,6 +56,7 @@ export interface AppTestFixtures {
   adminDashboard: AdminDashboardPage;
   unauthenticatedAdmin: AdminDashboardPage;
   multiRole: MultiRoleFixtures;
+  triRole: TriRoleFixtures;
   supabaseClient: SupabaseClient;
   bookingApi: BookingApiHelper;
 }
@@ -167,6 +183,23 @@ export const test = base.extend<AppTestFixtures>({
         const json = await res.json();
         return json;
       },
+
+      async joinWaitlist(params) {
+        const res = await request.post('http://localhost:3000/api/admin/waitlist', {
+          data: {
+            cityId: params.cityId,
+            contactInfo: params.contactInfo,
+            roleInterest: params.roleInterest || 'customer',
+            notes: params.notes,
+          },
+        });
+        if (!res.ok()) {
+          const body = await res.text();
+          throw new Error(`Failed to join waitlist: HTTP ${res.status()} - ${body}`);
+        }
+        const json = await res.json();
+        return { success: true, entry: json.entry };
+      },
     };
 
     await use(api);
@@ -192,6 +225,36 @@ export const test = base.extend<AppTestFixtures>({
 
     await customerContext.close();
     await merchantContext.close();
+  },
+
+  triRole: async ({ browser }, use) => {
+    const customerContext: BrowserContext = await browser.newContext();
+    const customerPage = await customerContext.newPage();
+    const customerApp = new CustomerAppPage(customerPage);
+    await customerApp.goto();
+
+    const merchantContext: BrowserContext = await browser.newContext();
+    const merchantPage = await merchantContext.newPage();
+    const merchantPortal = new MerchantPortalPage(merchantPage);
+    await merchantPortal.goto();
+
+    const adminContext: BrowserContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+    const adminDashboard = new AdminDashboardPage(adminPage);
+    await adminDashboard.goto();
+
+    await use({
+      customerApp,
+      customerPage,
+      merchantPortal,
+      merchantPage,
+      adminDashboard,
+      adminPage,
+    });
+
+    await customerContext.close();
+    await merchantContext.close();
+    await adminContext.close();
   },
 });
 

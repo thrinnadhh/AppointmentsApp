@@ -182,11 +182,14 @@ export class MerchantPortalPage {
     await this.customerSearchInput.fill('');
   }
 
-  getBookingCard(identifier: string): Locator {
+  getBookingCard(identifier?: string): Locator {
+    if (!identifier) {
+      return this.page.locator('.divide-y > div').first();
+    }
     return this.page.locator('.divide-y > div').filter({ hasText: identifier }).first();
   }
 
-  async expectBookingInQueue(identifier: string, expectedStatus?: string) {
+  async expectBookingInQueue(identifier?: string, expectedStatus?: string) {
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible({ timeout: 10000 });
     if (expectedStatus) {

@@ -23,10 +23,13 @@ export class AdminDashboardPage {
 
   // Top KPI Metric Cards
   readonly kpiCompletedBookings: Locator;
+  readonly kpiCompletedValue: Locator;
   readonly kpiMerchantFunnel: Locator;
   readonly kpiRolloutCoverage: Locator;
   readonly kpiDepositVolume: Locator;
+  readonly kpiDepositValue: Locator;
   readonly kpiWaitlist: Locator;
+  readonly kpiWaitlistValue: Locator;
 
   // Territory Control Matrix
   readonly territoryMatrixHeading: Locator;
@@ -105,10 +108,13 @@ export class AdminDashboardPage {
 
     // Top KPIs
     this.kpiCompletedBookings = page.getByText('Completed Bookings', { exact: true });
+    this.kpiCompletedValue = page.getByTestId('admin-kpi-completed-value');
     this.kpiMerchantFunnel = page.getByText('Merchant Funnel', { exact: true });
     this.kpiRolloutCoverage = page.getByText('Rollout Coverage', { exact: true });
     this.kpiDepositVolume = page.getByText('Deposit Volume', { exact: true });
+    this.kpiDepositValue = page.getByTestId('admin-kpi-deposit-value');
     this.kpiWaitlist = page.getByText('Expansion Waitlist', { exact: true });
+    this.kpiWaitlistValue = page.getByTestId('admin-kpi-waitlist-value');
 
     // Section 1: Territory Matrix
     this.territoryMatrixHeading = page.getByRole('heading', { name: /City Expansion & Territory Control Matrix/i });
@@ -389,5 +395,34 @@ export class AdminDashboardPage {
     if (params.status) await this.cityStatusSelect.selectOption(params.status);
     await this.submitCityBtn.click();
     await expect(this.page.getByText(new RegExp(`City ${params.name} added`, 'i'))).toBeVisible();
+  }
+
+  async getCompletedBookingsCount(): Promise<number> {
+    await expect(this.kpiCompletedValue).toBeVisible({ timeout: 10000 });
+    const text = await this.kpiCompletedValue.innerText();
+    return parseInt(text.replace(/[^0-9]/g, ''), 10) || 0;
+  }
+
+  async getDepositVolumeAmount(): Promise<number> {
+    await expect(this.kpiDepositValue).toBeVisible({ timeout: 10000 });
+    const text = await this.kpiDepositValue.innerText();
+    return parseInt(text.replace(/[^0-9]/g, ''), 10) || 0;
+  }
+
+  async getWaitlistCount(): Promise<number> {
+    await expect(this.kpiWaitlistValue).toBeVisible({ timeout: 10000 });
+    const text = await this.kpiWaitlistValue.innerText();
+    return parseInt(text.replace(/[^0-9]/g, ''), 10) || 0;
+  }
+
+  async refreshDashboard() {
+    await this.refreshBtn.click();
+    await expect(this.pageHeading).toBeVisible();
+  }
+
+  async expectAuditEntry(action: string) {
+    await expect(this.auditSection).toBeVisible({ timeout: 10000 });
+    const entry = this.auditTable.locator('tr', { hasText: action }).first();
+    await expect(entry).toBeVisible({ timeout: 10000 });
   }
 }
