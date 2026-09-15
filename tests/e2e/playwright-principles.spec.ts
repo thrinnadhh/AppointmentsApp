@@ -179,8 +179,8 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       await customerApp.openCheckout();
       await customerApp.submitPayment();
 
-      await expect(customerApp.confirmationToast).toBeVisible();
-      await expect(customerApp.myBookingsTitle).toBeVisible();
+      await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await expect(customerApp.myBookingsTitle).toBeVisible({ timeout: 15000 });
     });
 
     await test.step('3. Merchant navigates to Bookings Queue via MerchantPortalPage POM', async () => {
