@@ -46,8 +46,20 @@ export default function MerchantOverviewPage() {
     isSuperAdmin, 
     isLocked, 
     memberships, 
-    switchActiveProvider 
+    switchActiveProvider,
+    isLoading: isTenantLoading,
+    isAuthenticated,
   } = useMerchantTenant();
+
+  // Enforce unauthenticated redirect to /login
+  useEffect(() => {
+    if (!isTenantLoading && !isAuthenticated) {
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      if (params?.get('demo') !== '1') {
+        window.location.href = '/login';
+      }
+    }
+  }, [isTenantLoading, isAuthenticated]);
 
   const [providers, setProviders] = useState<(Provider & { resources?: Resource[] })[]>([
     tenantProvider || INITIAL_MERCHANT_PROVIDER,

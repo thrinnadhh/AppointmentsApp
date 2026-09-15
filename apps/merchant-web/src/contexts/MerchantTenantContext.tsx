@@ -13,6 +13,7 @@ export interface MerchantTenantContextType {
   isSuperAdmin: boolean;
   isLocked: boolean; // True if merchant is locked to their single venue
   isLoading: boolean;
+  isAuthenticated: boolean;
   error: string | null;
   switchActiveProvider: (providerId: string) => Promise<void>;
   refreshTenant: () => Promise<void>;
@@ -27,6 +28,7 @@ const MerchantTenantContext = createContext<MerchantTenantContextType>({
   isSuperAdmin: false,
   isLocked: true,
   isLoading: true,
+  isAuthenticated: false,
   error: null,
   switchActiveProvider: async () => {},
   refreshTenant: async () => {},
@@ -39,6 +41,7 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
   const [memberships, setMemberships] = useState<MerchantMembership[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadTenant = useCallback(async () => {
@@ -48,6 +51,7 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
       const data = await fetchTenantContextData();
       setIsSuperAdmin(data.isSuperAdmin);
       setMemberships(data.memberships);
+      setIsAuthenticated(Boolean(data.user));
 
       if (data.activeProvider) {
         setActiveProvider(data.activeProvider);
@@ -73,9 +77,11 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        setIsAuthenticated(true);
         loadTenant();
       } else {
         // Logged out
+        setIsAuthenticated(false);
         setIsSuperAdmin(false);
         setMemberships([]);
         setActiveProvider(INITIAL_MERCHANT_PROVIDER);
@@ -128,6 +134,7 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
         isSuperAdmin,
         isLocked,
         isLoading,
+        isAuthenticated,
         error,
         switchActiveProvider,
         refreshTenant: loadTenant,

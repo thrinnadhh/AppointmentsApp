@@ -12,11 +12,15 @@ export function middleware(req: NextRequest) {
 
   // Check for Supabase auth cookie (project-ref based naming)
   const cookies = req.cookies;
-  const hasAuthToken = Array.from(cookies.getAll()).some(
-    (cookie) =>
+  const hasAuthToken = Array.from(cookies.getAll()).some((cookie) => {
+    if (cookie.name.includes('code-verifier')) return false;
+    const isSupabaseCookie =
       cookie.name.includes('auth-token') ||
-      (cookie.name.includes('sb-') && cookie.name.includes('-auth'))
-  );
+      (cookie.name.includes('sb-') && cookie.name.includes('-auth'));
+    if (!isSupabaseCookie) return false;
+    const val = cookie.value ? cookie.value.trim() : '';
+    return val.length > 20 && val !== 'base64-deleted';
+  });
 
   const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login';
   const hasAdminBypass = req.headers.get('x-admin-bypass-key') === 'tirupati-superadmin-e2e-2026';
