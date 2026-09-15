@@ -131,8 +131,37 @@ export class MerchantPortalPage {
   }
 
   // Navigation Methods
+  async loginAsMerchant(email = 'svims.clinic@tirupati-appointments.com', password = 'SvimsClinic2026!') {
+    await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
+    const demoBtn = this.page.getByTestId('demo-login-clinic');
+    if (await demoBtn.isVisible().catch(() => false)) {
+      await demoBtn.click();
+    } else {
+      const emailInput = this.page.getByTestId('login-email');
+      if (!(await emailInput.isVisible().catch(() => false))) {
+        await this.page.getByTestId('auth-tab-signin').click();
+      }
+      await expect(emailInput).toBeVisible({ timeout: 10000 });
+      await emailInput.fill(email);
+      await this.page.getByTestId('login-password').fill(password);
+      await this.page.getByTestId('login-submit').click();
+    }
+  }
+
+  async ensureAuthenticated() {
+    const isLogin = await Promise.race([
+      this.page.waitForURL(/\/login/, { timeout: 3000 }).then(() => true).catch(() => false),
+      this.platformTitle.waitFor({ state: 'visible', timeout: 3000 }).then(() => false).catch(() => false),
+    ]);
+
+    if (isLogin || this.page.url().includes('/login')) {
+      await this.loginAsMerchant();
+    }
+  }
+
   async goto() {
     await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
+    await this.ensureAuthenticated();
     await expect(this.platformTitle).toBeVisible({ timeout: 15000 });
   }
 
@@ -147,21 +176,36 @@ export class MerchantPortalPage {
 
   async gotoBookings() {
     await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' });
+    const isLogin = await Promise.race([
+      this.page.waitForURL(/\/login/, { timeout: 3000 }).then(() => true).catch(() => false),
+      this.bookingsHeading.waitFor({ state: 'visible', timeout: 3000 }).then(() => false).catch(() => false),
+    ]);
+
+    if (isLogin || this.page.url().includes('/login')) {
+      await this.loginAsMerchant();
+      await this.page.waitForURL(/.*\/bookings/, { timeout: 10000 }).catch(() => null);
+      if (!this.page.url().includes('/bookings')) {
+        await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' });
+      }
+    }
     await expect(this.bookingsHeading).toBeVisible({ timeout: 15000 });
   }
 
   async gotoTeam() {
     await this.page.goto('http://localhost:3000/team', { waitUntil: 'domcontentloaded' });
+    await this.ensureAuthenticated();
     await expect(this.teamHeading).toBeVisible({ timeout: 15000 });
   }
 
   async gotoVenues() {
     await this.page.goto('http://localhost:3000/venues', { waitUntil: 'domcontentloaded' });
+    await this.ensureAuthenticated();
     await expect(this.page.getByRole('heading', { name: /Venues & Businesses|My Business & Venue Controls/i })).toBeVisible({ timeout: 15000 });
   }
 
   async gotoResources() {
     await this.page.goto('http://localhost:3000/resources', { waitUntil: 'domcontentloaded' });
+    await this.ensureAuthenticated();
     await expect(this.page.getByRole('heading', { name: /Doctors & Service Units|Stylists & Service Stations|Staff & Resources/i })).toBeVisible({ timeout: 15000 });
   }
 

@@ -22,7 +22,8 @@ import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
 
-  const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
+  // Mode: 'register' by default (Onboarding-first self-service entry), or 'signin'
+  const [authMode, setAuthMode] = useState<'signin' | 'register'>('register');
 
   // Sign In Form State
   const [email, setEmail] = useState('');
@@ -46,14 +47,24 @@ export default function LoginPage() {
   useEffect(() => {
     setMounted(true);
 
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const modeParam = params.get('mode');
+      if (modeParam === 'signin' || modeParam === 'register') {
+        setAuthMode(modeParam);
+      }
+    }
+
     // Only auto-redirect if returning from an OAuth callback
     if (typeof window !== 'undefined' && (window.location.search.includes('oauth=') || window.location.hash.includes('access_token'))) {
       const checkSession = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setSuccessMsg('Session detected! Redirecting to Merchant Workspace...');
+          const params = new URLSearchParams(window.location.search);
+          const redirectPath = params.get('redirect') || '/';
           setTimeout(() => {
-            window.location.href = '/';
+            window.location.href = redirectPath;
           }, 800);
         }
       };
@@ -84,7 +95,9 @@ export default function LoginPage() {
 
       if (data.session) {
         setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
-        window.location.href = '/';
+        const params = new URLSearchParams(window.location.search);
+        const redirectPath = params.get('redirect') || '/';
+        window.location.href = redirectPath;
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid login credentials.';
@@ -148,7 +161,9 @@ export default function LoginPage() {
       }
 
       if (signInData.session) {
-        window.location.href = '/';
+        const params = new URLSearchParams(window.location.search);
+        const redirectPath = params.get('redirect') || '/';
+        window.location.href = redirectPath;
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to register shop and merchant.';
@@ -195,7 +210,9 @@ export default function LoginPage() {
 
       if (data.session) {
         setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
-        window.location.href = '/';
+        const params = new URLSearchParams(window.location.search);
+        const redirectPath = params.get('redirect') || '/';
+        window.location.href = redirectPath;
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid login credentials.';
@@ -575,7 +592,7 @@ export default function LoginPage() {
         )}
 
         {/* Quick Demo Credentials Switcher — DEV ONLY */}
-        {process.env.NODE_ENV === 'development' && authMode === 'signin' && (
+        {process.env.NODE_ENV === 'development' && (
           <div className="pt-4 border-t border-slate-200">
             <div className="flex items-center gap-1.5 mb-2.5">
               <KeyRound className="w-3.5 h-3.5 text-emerald-600" />

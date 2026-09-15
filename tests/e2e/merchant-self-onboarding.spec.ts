@@ -119,9 +119,10 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
     // 1. Clear session to simulate returning visitor
     await context.clearCookies();
 
-    // 2. Go to Login page
+    // 2. Go to Login page and switch to Sign In
     await page.goto('http://localhost:3000/login');
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
+    await page.getByTestId('auth-tab-signin').click();
 
     // 3. Fill in custom credentials
     await page.getByTestId('login-email').fill(testEmail);
@@ -139,6 +140,7 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
     // 1. Log in as Super Admin
     await page.goto('http://localhost:3000/login');
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
+    await page.getByTestId('auth-tab-signin').click();
     await page.getByTestId('demo-login-admin').click();
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 15000 });
 
