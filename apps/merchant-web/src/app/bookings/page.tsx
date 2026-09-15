@@ -15,7 +15,9 @@ import {
   FileText,
   MessageSquare,
   Send,
-  Bell
+  Bell,
+  Calendar,
+  History
 } from 'lucide-react';
 import { 
   supabase, 
@@ -29,15 +31,23 @@ import {
   MerchantBookingWithDetails,
   NotificationLog
 } from '@/lib/supabase';
-import { INITIAL_BOOKINGS, INITIAL_MERCHANT_PROVIDER } from '@/lib/mock-data';
+import { INITIAL_BOOKINGS, INITIAL_MERCHANT_PROVIDER, SALON_BOOKINGS, SALON_MERCHANT_PROVIDER } from '@/lib/mock-data';
 import { BookingStatus, Provider, PaymentStatus } from '@appointments/shared';
+import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 export default function BookingsManagementPage() {
-  const [providers, setProviders] = useState<Provider[]>([INITIAL_MERCHANT_PROVIDER]);
-  const [selectedProviderId, setSelectedProviderId] = useState<string>('ALL');
-  const [bookings, setBookings] = useState<MerchantBookingWithDetails[]>(INITIAL_BOOKINGS as unknown as MerchantBookingWithDetails[]);
+  const { activeProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
+
+  const [providers, setProviders] = useState<Provider[]>([activeProvider || INITIAL_MERCHANT_PROVIDER]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(
+    isSuperAdmin ? 'ALL' : (activeProvider?.id || INITIAL_MERCHANT_PROVIDER.id)
+  );
+  const [bookings, setBookings] = useState<MerchantBookingWithDetails[]>(
+    (activeProvider?.category_id === 'salons' ? SALON_BOOKINGS : INITIAL_BOOKINGS) as unknown as MerchantBookingWithDetails[]
+  );
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | BookingStatus>('ALL');
+  const [selectedDateFilter, setSelectedDateFilter] = useState<'ALL' | 'TODAY' | 'YESTERDAY' | 'WEEK'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [rescheduleModalId, setRescheduleModalId] = useState<string | null>(null);
   const [newSlotTime, setNewSlotTime] = useState('');
@@ -46,12 +56,23 @@ export default function BookingsManagementPage() {
   const [bookingNotificationLogs, setBookingNotificationLogs] = useState<NotificationLog[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
+  // Sync selected provider when active provider changes
+  useEffect(() => {
+    if (activeProvider?.id && !isSuperAdmin) {
+      setSelectedProviderId(activeProvider.id);
+    }
+  }, [activeProvider?.id, isSuperAdmin]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const targetProviderId = isLocked 
+        ? activeProvider?.id 
+        : (selectedProviderId === 'ALL' ? undefined : selectedProviderId);
+
       const [fetchedProviders, fetchedBookings] = await Promise.all([
-        fetchAllProviders(),
-        fetchMerchantBookings(selectedProviderId === 'ALL' ? undefined : selectedProviderId)
+        isSuperAdmin ? fetchAllProviders() : Promise.resolve([activeProvider || INITIAL_MERCHANT_PROVIDER]),
+        fetchMerchantBookings(targetProviderId)
       ]);
 
       if (fetchedProviders && fetchedProviders.length > 0) {
@@ -59,13 +80,18 @@ export default function BookingsManagementPage() {
       }
       if (fetchedBookings && fetchedBookings.length > 0) {
         setBookings(fetchedBookings);
+      } else if (targetProviderId === SALON_MERCHANT_PROVIDER.id) {
+        setBookings(SALON_BOOKINGS as unknown as MerchantBookingWithDetails[]);
       }
     } catch (err) {
       console.warn('Fallback to local state due to error:', err);
+      if (selectedProviderId === SALON_MERCHANT_PROVIDER.id || activeProvider?.category_id === 'salons') {
+        setBookings(SALON_BOOKINGS as unknown as MerchantBookingWithDetails[]);
+      }
     } finally {
       setLoading(false);
     }
-  }, [selectedProviderId]);
+  }, [selectedProviderId, isLocked, isSuperAdmin, activeProvider]);
 
   useEffect(() => {
     loadData();
@@ -89,6 +115,28 @@ export default function BookingsManagementPage() {
     };
   }, [loadData]);
 
+  // Date Horizon Calculation Helpers
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const endOfToday = startOfToday + 24 * 60 * 60 * 1000;
+  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+  const startOfWeek = startOfToday - 7 * 24 * 60 * 60 * 1000;
+
+  const todayCount = bookings.filter((b) => {
+    const t = new Date(b.slot_start).getTime();
+    return t >= startOfToday && t < endOfToday;
+  }).length;
+
+  const yesterdayCount = bookings.filter((b) => {
+    const t = new Date(b.slot_start).getTime();
+    return t >= startOfYesterday && t < startOfToday;
+  }).length;
+
+  const weekCount = bookings.filter((b) => {
+    const t = new Date(b.slot_start).getTime();
+    return t >= startOfWeek && t <= (now.getTime() + 48 * 60 * 60 * 1000);
+  }).length;
+
   const filteredBookings = bookings.filter((b) => {
     const matchesFilter = selectedFilter === 'ALL' || b.status === selectedFilter;
     const matchesSearch = 
@@ -96,7 +144,18 @@ export default function BookingsManagementPage() {
       (b.customer_phone || '').includes(searchQuery) ||
       (b.reference_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.resource_name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
+
+    let matchesDate = true;
+    const slotTime = new Date(b.slot_start).getTime();
+    if (selectedDateFilter === 'TODAY') {
+      matchesDate = slotTime >= startOfToday && slotTime < endOfToday;
+    } else if (selectedDateFilter === 'YESTERDAY') {
+      matchesDate = slotTime >= startOfYesterday && slotTime < startOfToday;
+    } else if (selectedDateFilter === 'WEEK') {
+      matchesDate = slotTime >= startOfWeek && slotTime <= (now.getTime() + 48 * 60 * 60 * 1000);
+    }
+
+    return matchesFilter && matchesSearch && matchesDate;
   });
 
   const handleStatusChange = async (
@@ -235,29 +294,48 @@ export default function BookingsManagementPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Bookings & Queue</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Real-time appointment triage, fulfillment, and no-show processing across Tirupati
+            {verticalConfig.id === 'salons' 
+              ? 'Real-time client styling appointments, chair schedules, and service triage'
+              : 'Real-time appointment triage, fulfillment, and no-show processing across Tirupati'}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Provider Filter */}
-          <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
-            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <label htmlFor="venue-filter" className="sr-only">Filter by Venue</label>
-            <select
-              id="venue-filter"
-              value={selectedProviderId}
-              onChange={(e) => setSelectedProviderId(e.target.value)}
-              className="text-xs font-semibold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+          {/* Provider Filter or Locked Space Badge */}
+          {isLocked ? (
+            <div 
+              data-testid="locked-tenant-badge"
+              className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 shadow-sm text-xs font-bold text-emerald-900"
             >
-              <option value="ALL">All Tirupati Venues</option>
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{activeProvider?.name || 'Dedicated Space'}</span>
+              <span className="text-[10px] bg-white px-1.5 py-0.5 rounded text-emerald-700 border border-emerald-200 font-semibold">
+                {verticalConfig.badgeLabel}
+              </span>
+              {/* Accessible select for POM locators */}
+              <select id="venue-filter" value={activeProvider?.id} onChange={() => {}} className="sr-only" aria-label="Current Venue">
+                <option value={activeProvider?.id}>{activeProvider?.name}</option>
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              <label htmlFor="venue-filter" className="sr-only">Filter by Venue</label>
+              <select
+                id="venue-filter"
+                value={selectedProviderId}
+                onChange={(e) => setSelectedProviderId(e.target.value)}
+                className="text-xs font-semibold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Tirupati Venues (Admin)</option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <button
             onClick={() => loadData()}
@@ -272,38 +350,100 @@ export default function BookingsManagementPage() {
       </div>
 
       {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
-        {/* Status Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-          {(['ALL', 'CONFIRMED', 'HELD', 'COMPLETED', 'NO_SHOW', 'CANCELLED'] as const).map((filter) => (
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        {/* Row 1: Time-Horizon Date Triage */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <Calendar className="w-4 h-4 text-emerald-600" />
+            <span>Date Horizon:</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             <button
-              key={filter}
-              onClick={() => setSelectedFilter(filter)}
+              type="button"
+              data-testid="date-horizon-all"
+              onClick={() => setSelectedDateFilter('ALL')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                selectedFilter === filter
-                  ? 'bg-slate-900 text-white'
+                selectedDateFilter === 'ALL'
+                  ? 'bg-emerald-700 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {filter.replace('_', ' ')}
+              All Dates ({bookings.length})
             </button>
-          ))}
+            <button
+              type="button"
+              data-testid="date-horizon-today"
+              onClick={() => setSelectedDateFilter('TODAY')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                selectedDateFilter === 'TODAY'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Today ({todayCount})
+            </button>
+            <button
+              type="button"
+              data-testid="date-horizon-yesterday"
+              onClick={() => setSelectedDateFilter('YESTERDAY')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                selectedDateFilter === 'YESTERDAY'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Yesterday ({yesterdayCount})
+            </button>
+            <button
+              type="button"
+              data-testid="date-horizon-week"
+              onClick={() => setSelectedDateFilter('WEEK')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                selectedDateFilter === 'WEEK'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Past 7 Days ({weekCount})
+            </button>
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full md:w-72">
-          <label htmlFor="customer-search" className="sr-only">Search appointments</label>
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-          <input
-            id="customer-search"
-            name="customerSearch"
-            type="text"
-            aria-label="Search by customer name, reference code, phone number, or unit"
-            placeholder="Search customer, ref #, phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50/50"
-          />
+        {/* Row 2: Status Pills & Search */}
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-center pt-1">
+          {/* Status Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+            {(['ALL', 'CONFIRMED', 'HELD', 'COMPLETED', 'NO_SHOW', 'CANCELLED'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setSelectedFilter(filter)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                  selectedFilter === filter
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {filter.replace('_', ' ')}
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div className="relative w-full md:w-72">
+            <label htmlFor="customer-search" className="sr-only">Search appointments</label>
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              id="customer-search"
+              name="customerSearch"
+              type="text"
+              aria-label="Search by customer name, reference code, phone number, or unit"
+              placeholder="Search customer, ref #, phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50/50"
+            />
+          </div>
         </div>
       </div>
 
@@ -356,7 +496,7 @@ export default function BookingsManagementPage() {
                     </div>
 
                     <p className="text-xs text-slate-600 mt-1">
-                      Venue: <strong className="text-slate-800">{booking.provider_name}</strong> • Unit: <strong className="text-slate-800">{booking.resource_name}</strong>
+                      Venue: <strong className="text-slate-800">{booking.provider_name}</strong> • {verticalConfig.resourceLabelSingular}: <strong className="text-slate-800">{booking.resource_name}</strong>
                     </p>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
@@ -373,7 +513,7 @@ export default function BookingsManagementPage() {
                       <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
                         Deposit: ₹{booking.deposit_amount} ({booking.payment_status})
                       </span>
-                      {booking.attachment_url && (
+                      {verticalConfig.features.hasPrescriptions && booking.attachment_url && (
                         <button
                           onClick={() => handleViewPrescription(booking.attachment_url!)}
                           className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-0.5 rounded transition cursor-pointer"

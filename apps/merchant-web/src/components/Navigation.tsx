@@ -16,24 +16,20 @@ import {
   Activity,
   Clock,
   Settings,
-  MapPin
+  MapPin,
+  Scissors,
+  Stethoscope,
+  Gamepad2,
+  Utensils
 } from 'lucide-react';
 import { supabase, getCurrentUserProfile, signOutMerchant } from '@/lib/supabase';
-
-const NAV_ITEMS = [
-  { href: '/', label: 'Overview & Health', icon: LayoutDashboard },
-  { href: '/admin', label: 'City Rollout', icon: MapPin },
-  { href: '/venues', label: 'Venues & Businesses', icon: Building2 },
-  { href: '/resources', label: 'Doctors & Services', icon: Users },
-  { href: '/bookings', label: 'Bookings Queue', icon: CalendarDays },
-  { href: '/schedule', label: 'Availability & Hours', icon: Clock },
-  { href: '/team', label: 'Team & Access', icon: UserCheck },
-  { href: '/settings', label: 'Settings & Profile', icon: Settings },
-];
+import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
+  const { activeProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
+
   const [currentUser, setCurrentUser] = useState<{
     email?: string;
     fullName?: string;
@@ -57,7 +53,6 @@ export default function Navigation() {
             role: (userProfile.user.user_metadata?.role as string) || 'merchant',
           });
         } else {
-          // No session — don't fake a user; the Sign In button will show
           setCurrentUser(null);
         }
       } catch (err) {
@@ -87,6 +82,27 @@ export default function Navigation() {
     router.push('/login');
   };
 
+  // Determine vertical icon
+  const VerticalIcon = verticalConfig.id === 'salons' 
+    ? Scissors 
+    : verticalConfig.id === 'gaming' 
+    ? Gamepad2 
+    : verticalConfig.id === 'restaurants'
+    ? Utensils
+    : Stethoscope;
+
+  // Adaptive nav items: verticalized resource label, conditionally include /admin for Super Admin only
+  const navItems = [
+    { href: '/', label: 'Overview & Health', icon: LayoutDashboard },
+    ...(isSuperAdmin ? [{ href: '/admin', label: 'Platform Admin', icon: ShieldCheck }] : []),
+    { href: '/venues', label: isLocked ? 'My Venue' : 'Venues & Businesses', icon: Building2 },
+    { href: '/resources', label: verticalConfig.id === 'salons' ? 'Stylists & Services' : 'Doctors & Services', icon: Users },
+    { href: '/bookings', label: 'Bookings Queue', icon: CalendarDays },
+    { href: '/schedule', label: 'Availability & Hours', icon: Clock },
+    { href: '/team', label: 'Team & Access', icon: UserCheck },
+    { href: '/settings', label: 'Settings & Profile', icon: Settings },
+  ];
+
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -94,7 +110,7 @@ export default function Navigation() {
           {/* Brand Logo & Platform Title */}
           <Link href="/" className="flex items-center space-x-3 group">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-              <Building2 className="w-5 h-5" />
+              <VerticalIcon className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -108,14 +124,17 @@ export default function Navigation() {
               </div>
               <p className="text-xs text-slate-500 flex items-center gap-1">
                 <Activity className="w-3 h-3 text-emerald-500 animate-pulse" />
-                Live Hyperlocal Multi-Vertical Platform
+                <span className="font-semibold text-slate-700">{activeProvider?.name || 'Live Multi-Vertical Platform'}</span>
+                <span className="text-[11px] text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded ml-1 font-medium">
+                  {verticalConfig.badgeLabel}
+                </span>
               </p>
             </div>
           </Link>
 
           {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex space-x-1">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
               return (
@@ -153,7 +172,7 @@ export default function Navigation() {
                   <div className="flex items-center justify-end gap-1.5">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     <p className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
-                      {currentUser.role === 'admin' ? 'Super Admin' : 'Merchant'}
+                      {currentUser.role === 'admin' ? 'Super Admin' : `${verticalConfig.badgeLabel} Manager`}
                     </p>
                   </div>
                 </div>
@@ -161,7 +180,7 @@ export default function Navigation() {
                   className="w-9 h-9 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-xs font-bold text-emerald-800 shadow-xs"
                   title={currentUser.email}
                 >
-                  {currentUser.fullName ? currentUser.fullName.substring(0, 2).toUpperCase() : 'AD'}
+                  {currentUser.fullName ? currentUser.fullName.substring(0, 2).toUpperCase() : 'ME'}
                 </div>
                 <button
                   onClick={handleSignOut}
@@ -186,7 +205,7 @@ export default function Navigation() {
 
       {/* Mobile Sub-Navigation Bar */}
       <div className="lg:hidden flex overflow-x-auto border-t border-slate-100 px-2 py-1.5 bg-slate-50/80 gap-1 scrollbar-none">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
           return (

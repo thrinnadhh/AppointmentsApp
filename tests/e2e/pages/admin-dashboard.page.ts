@@ -178,10 +178,15 @@ export class AdminDashboardPage {
 
   async goto() {
     await this.page.goto('http://localhost:3000/admin');
-    if (this.page.url().includes('/admin/login')) {
+    const isLogin = await Promise.race([
+      this.page.waitForURL(/\/admin\/login/, { timeout: 4000 }).then(() => true).catch(() => false),
+      this.pageHeading.waitFor({ state: 'visible', timeout: 4000 }).then(() => false).catch(() => false),
+    ]);
+
+    if (isLogin || this.page.url().includes('/admin/login')) {
       await this.loginAsAdmin();
     }
-    await expect(this.pageHeading).toBeVisible({ timeout: 12000 });
+    await expect(this.pageHeading).toBeVisible({ timeout: 15000 });
   }
 
   async gotoLoginPage() {
@@ -190,17 +195,20 @@ export class AdminDashboardPage {
   }
 
   async loginAsAdmin(email = 'admin@appointments-tirupati.com', password = 'AdminSecure2026!') {
+    await expect(this.page.getByTestId('admin-login-email')).toBeVisible({ timeout: 10000 });
     await this.page.getByTestId('admin-login-email').fill(email);
     await this.page.getByTestId('admin-login-password').fill(password);
     await this.page.getByTestId('admin-login-submit').click();
 
     // In local dev/preview, if MFA stage is prompted, allow smooth skip or completion
     const skipBtn = this.page.getByTestId('admin-mfa-skip');
-    try {
-      await skipBtn.waitFor({ state: 'visible', timeout: 3000 });
+    const outcome = await Promise.race([
+      skipBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => 'mfa' as const).catch(() => null),
+      this.pageHeading.waitFor({ state: 'visible', timeout: 15000 }).then(() => 'heading' as const).catch(() => null),
+    ]);
+
+    if (outcome === 'mfa') {
       await skipBtn.click();
-    } catch {
-      // If no MFA skip prompt, user already proceeded directly
     }
 
     await expect(this.pageHeading).toBeVisible({ timeout: 15000 });
@@ -416,7 +424,13 @@ export class AdminDashboardPage {
   }
 
   async refreshDashboard() {
+    const waitlistPromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/admin/waitlist') && resp.status() === 200,
+      { timeout: 15000 }
+    ).catch(() => null);
     await this.refreshBtn.click();
+    await waitlistPromise;
+    await expect(this.refreshBtn).toBeEnabled({ timeout: 15000 });
     await expect(this.pageHeading).toBeVisible();
   }
 

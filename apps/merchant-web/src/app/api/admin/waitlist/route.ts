@@ -35,12 +35,14 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = getSupabaseAdmin();
     const cityNameFormatted = cityId.charAt(0).toUpperCase() + cityId.slice(1);
-    const { error } = await supabaseAdmin
-      .from('city_waitlist')
+    const { error } = await (supabaseAdmin.from('city_waitlist' as any) as any)
       .insert({
+        city_id: cityId,
         city_name: cityNameFormatted,
+        contact_info: contactInfo.trim(),
         phone: contactInfo.trim(),
-        vertical_interest: roleInterest || 'clinics',
+        role_interest: roleInterest || 'customer',
+        vertical_interest: roleInterest || 'customer',
         notes: notes || null,
       });
 

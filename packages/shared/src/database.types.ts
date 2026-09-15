@@ -294,9 +294,45 @@ export type Database = {
           },
         ]
       }
+      merchant_memberships: {
+        Row: {
+          created_at: string
+          id: string
+          provider_id: string
+          role: 'owner' | 'manager' | 'staff'
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          provider_id: string
+          role?: 'owner' | 'manager' | 'staff'
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          provider_id?: string
+          role?: 'owner' | 'manager' | 'staff'
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_memberships_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
+          default_provider_id: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -308,6 +344,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_provider_id?: string | null
           email?: string | null
           full_name?: string | null
           id: string
@@ -319,6 +356,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_provider_id?: string | null
           email?: string | null
           full_name?: string | null
           id?: string

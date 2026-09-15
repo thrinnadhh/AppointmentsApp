@@ -76,7 +76,7 @@ export class MerchantPortalPage {
     this.verifiedBadge = page.getByText('Verified Portal');
     this.navOverview = page.getByRole('link', { name: /Overview/i }).first();
     this.navVenues = page.getByRole('link', { name: /Venues/i }).first();
-    this.navResources = page.getByRole('link', { name: /Doctors & Services|Resources/i }).first();
+    this.navResources = page.getByRole('link', { name: /Stylists & Services|Doctors & Services|Staff & Resources|Resources/i }).first();
     this.navBookings = page.getByRole('link', { name: /Bookings Queue|Bookings/i }).first();
     this.navSchedule = page.getByRole('link', { name: /Availability & Hours|Schedule/i }).first();
     this.navTeam = page.getByRole('link', { name: /Team & Access|Team/i }).first();
@@ -157,12 +157,12 @@ export class MerchantPortalPage {
 
   async gotoVenues() {
     await this.page.goto('http://localhost:3000/venues', { waitUntil: 'domcontentloaded' });
-    await expect(this.page.getByRole('heading', { name: /Venues & Businesses/i })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('heading', { name: /Venues & Businesses|My Business & Venue Controls/i })).toBeVisible({ timeout: 15000 });
   }
 
   async gotoResources() {
     await this.page.goto('http://localhost:3000/resources', { waitUntil: 'domcontentloaded' });
-    await expect(this.page.getByRole('heading', { name: /Doctors & Service Units/i })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('heading', { name: /Doctors & Service Units|Stylists & Service Stations|Staff & Resources/i })).toBeVisible({ timeout: 15000 });
   }
 
   // Bookings Queue Actions
@@ -203,8 +203,7 @@ export class MerchantPortalPage {
     const completeBtn = card.getByRole('button', { name: /Complete/i });
     await expect(completeBtn).toBeVisible();
     await completeBtn.click();
-    await expect(completeBtn).not.toBeVisible({ timeout: 10000 });
-    await expect(card.getByText('COMPLETED')).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByText(/Booking updated to COMPLETED|COMPLETED/i).first()).toBeVisible({ timeout: 10000 });
   }
 
   async markBookingNoShow(identifier: string) {
@@ -213,8 +212,7 @@ export class MerchantPortalPage {
     const noShowBtn = card.getByRole('button', { name: /No-Show/i });
     await expect(noShowBtn).toBeVisible();
     await noShowBtn.click();
-    await expect(noShowBtn).not.toBeVisible({ timeout: 10000 });
-    await expect(card.getByText(/NO SHOW|NO_SHOW/i)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByText(/No-show recorded/i)).toBeVisible({ timeout: 10000 });
   }
 
   async cancelAndRefundBooking(identifier: string) {

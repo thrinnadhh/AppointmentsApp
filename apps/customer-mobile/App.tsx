@@ -312,7 +312,6 @@ export default function App() {
   };
 
   const handlePaymentSuccess = async (bookingId: string) => {
-    await loadBookings();
     setCheckoutVisible(false);
     setConfirmationToast(`Booking Confirmed on Supabase! Deposit ₹${activeResource?.deposit_amount} captured.`);
     // Push MY_BOOKINGS onto history so clicking back returns to where the user left off (Provider Detail)
@@ -320,10 +319,11 @@ export default function App() {
       ...prev,
       { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
     ]);
+    await loadBookings();
 
     setTimeout(() => {
       setConfirmationToast(null);
-    }, 4000);
+    }, 6000);
   };
 
   const handleCancelBooking = async (bookingId: string) => {

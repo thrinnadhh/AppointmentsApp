@@ -512,7 +512,7 @@ export default function AdminDashboardPage() {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">403 Access Denied</h2>
           <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-            Your current authenticated account holds role <span className="font-bold text-amber-400 uppercase">"{unauthorizedRole}"</span>.
+            Your current authenticated account holds role <span className="font-bold text-amber-400 uppercase">&quot;{unauthorizedRole}&quot;</span>.
             Super Admin multi-city control and merchant governance is restricted exclusively to platform administrators.
           </p>
           <div className="space-y-3">

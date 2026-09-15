@@ -24,71 +24,77 @@ import {
   fetchProviderResources,
   Provider 
 } from '@/lib/supabase';
-import { INITIAL_RESOURCES, INITIAL_MERCHANT_PROVIDER } from '@/lib/mock-data';
+import { INITIAL_RESOURCES, INITIAL_MERCHANT_PROVIDER, SALON_RESOURCES, SALON_MERCHANT_PROVIDER } from '@/lib/mock-data';
 import { Resource, ResourceType } from '@appointments/shared';
-
-const DEPARTMENT_SUGGESTIONS = [
-  'General Medicine',
-  'Cardiology',
-  'Orthopedics',
-  'Pediatrics',
-  'Dental & Implantology',
-  'Dermatology & Skin',
-  'Neurology',
-  'General Surgery',
-  'Hair Styling & Spa',
-  'Cricket Arena & Turf',
-];
+import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 function ResourcesManagementContent() {
   const searchParams = useSearchParams();
   const providerParam = searchParams.get('providerId');
 
-  const [providers, setProviders] = useState<Provider[]>([INITIAL_MERCHANT_PROVIDER]);
+  const { activeProvider: tenantProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
+
+  const [providers, setProviders] = useState<Provider[]>([tenantProvider || INITIAL_MERCHANT_PROVIDER]);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    providerParam || INITIAL_MERCHANT_PROVIDER.id
+    tenantProvider?.id || providerParam || INITIAL_MERCHANT_PROVIDER.id
   );
-  const [resources, setResources] = useState<Resource[]>(INITIAL_RESOURCES);
+  const [resources, setResources] = useState<Resource[]>(
+    (tenantProvider?.category_id === 'salons' ? SALON_RESOURCES : INITIAL_RESOURCES)
+  );
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
 
+  const departmentSuggestions = verticalConfig.departments;
+
   const [formData, setFormData] = useState({
     name: '',
-    type: 'doctor' as ResourceType,
-    department: 'General Medicine',
-    price: 500,
-    deposit_amount: 50,
-    duration_minutes: 30,
+    type: (verticalConfig.id === 'salons' ? 'stylist' : 'doctor') as ResourceType,
+    department: departmentSuggestions[0] || 'General',
+    price: verticalConfig.defaultPrice,
+    deposit_amount: verticalConfig.defaultDeposit,
+    duration_minutes: verticalConfig.defaultDurationMinutes,
     capacity: 1,
     specialization: '',
   });
+
+  // Keep selectedProviderId and formData in sync with tenant context
+  useEffect(() => {
+    if (tenantProvider?.id && !isSuperAdmin) {
+      setSelectedProviderId(tenantProvider.id);
+    }
+  }, [tenantProvider?.id, isSuperAdmin]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [fetchedProviders, fetchedResources] = await Promise.all([
-        fetchAllProviders(),
+        isSuperAdmin ? fetchAllProviders() : Promise.resolve([tenantProvider || INITIAL_MERCHANT_PROVIDER]),
         fetchProviderResources(selectedProviderId),
       ]);
 
       if (fetchedProviders && fetchedProviders.length > 0) {
         setProviders(fetchedProviders);
-        if (providerParam && fetchedProviders.some((p) => p.id === providerParam)) {
+        if (isSuperAdmin && providerParam && fetchedProviders.some((p) => p.id === providerParam)) {
           setSelectedProviderId(providerParam);
         }
       }
       if (fetchedResources && fetchedResources.length > 0) {
         setResources(fetchedResources as Resource[]);
+      } else if (selectedProviderId === SALON_MERCHANT_PROVIDER.id) {
+        setResources(SALON_RESOURCES);
       }
     } catch (err) {
       console.warn('Fallback to local resources:', err);
+      if (selectedProviderId === SALON_MERCHANT_PROVIDER.id) {
+        setResources(SALON_RESOURCES);
+      }
     } finally {
       setLoading(false);
     }
-  }, [selectedProviderId, providerParam]);
+  }, [selectedProviderId, providerParam, isSuperAdmin, tenantProvider]);
 
   useEffect(() => {
     loadData();
@@ -199,31 +205,46 @@ function ResourcesManagementContent() {
             <span className="text-xs text-slate-500">• Individual Pricing & Booking Deposits</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Doctors, Departments & Services
+            {verticalConfig.resourceLabelPlural}, Departments & Services
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Assign doctors to departments (Cardiology, Ortho, Dental) and set custom appointment fees and slot deposits.
+            {verticalConfig.id === 'salons'
+              ? 'Manage senior hair stylists, aesthetic specialists, chairs/stations, and custom salon service pricing.'
+              : 'Assign doctors to departments (Cardiology, Ortho, Dental) and set custom appointment fees and slot deposits.'}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Venue Selector */}
-          <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-3 py-2 shadow-xs">
-            <Building2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <label htmlFor="resource-venue-select" className="sr-only">Select Business</label>
-            <select
-              id="resource-venue-select"
-              value={selectedProviderId}
-              onChange={(e) => setSelectedProviderId(e.target.value)}
-              className="text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer pr-2"
+          {/* Venue Selector or Locked Badge */}
+          {isLocked ? (
+            <div 
+              data-testid="locked-tenant-badge"
+              className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-xs"
             >
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.category_id})
-                </option>
-              ))}
-            </select>
-          </div>
+              <Building2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>{tenantProvider?.name || 'Dedicated Space'}</span>
+              <span className="text-[10px] bg-white px-1.5 py-0.5 rounded text-emerald-700 border border-emerald-200">
+                {verticalConfig.badgeLabel}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-3 py-2 shadow-xs">
+              <Building2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <label htmlFor="resource-venue-select" className="sr-only">Select Business</label>
+              <select
+                id="resource-venue-select"
+                value={selectedProviderId}
+                onChange={(e) => setSelectedProviderId(e.target.value)}
+                className="text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer pr-2"
+              >
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.category_id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <button
             onClick={() => loadData()}
@@ -240,7 +261,7 @@ function ResourcesManagementContent() {
             className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm"
           >
             <Plus className="w-4 h-4 mr-1.5" />
-            Add Doctor / Service
+            Add {verticalConfig.resourceLabelSingular} / Service
           </button>
         </div>
       </div>
@@ -377,7 +398,7 @@ function ResourcesManagementContent() {
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                   <datalist id="dept-list">
-                    {DEPARTMENT_SUGGESTIONS.map((d) => (
+                    {departmentSuggestions.map((d) => (
                       <option key={d} value={d} />
                     ))}
                   </datalist>

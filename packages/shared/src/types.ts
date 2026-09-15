@@ -245,3 +245,39 @@ export interface AdminAuditLogEntry {
   ip_address: string | null;
   created_at: string;
 }
+
+export type TenantRole = 'owner' | 'manager' | 'staff';
+
+export interface MerchantMembership {
+  id: string;
+  user_id: string;
+  provider_id: string;
+  role: TenantRole;
+  created_at: string;
+  updated_at?: string;
+  provider?: Provider;
+}
+
+export type BusinessVertical = 'clinics' | 'salons' | 'gaming' | 'restaurants' | 'pets';
+
+export interface VerticalConfig {
+  id: BusinessVertical;
+  name: string;
+  badgeLabel: string;
+  resourceLabelSingular: string;
+  resourceLabelPlural: string;
+  unitLabelSingular: string;
+  unitLabelPlural: string;
+  customerLabel: string;
+  actionVerb: string;
+  departments: string[];
+  defaultDurationMinutes: number;
+  defaultPrice: number;
+  defaultDeposit: number;
+  features: {
+    hasPrescriptions: boolean;
+    hasTokenNumbers: boolean;
+    hasCustomDurations: boolean;
+    hasTeamCovers: boolean;
+  };
+}

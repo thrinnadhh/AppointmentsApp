@@ -57,6 +57,61 @@ export const INITIAL_RESOURCES: Resource[] = [
   },
 ];
 
+export const SALON_MERCHANT_PROVIDER: Provider = {
+  id: '44444444-4444-4444-4444-444444444444',
+  category_id: 'salons',
+  sub_category_id: 'hair_styling',
+  name: 'Naturals Luxury Salon & Spa',
+  description: 'Premium hair styling, beard grooming, and rejuvenating facials by senior stylists in Tirupati.',
+  address: 'Air Bypass Road, Beside Domino’s Pizza',
+  city: 'Tirupati',
+  latitude: 13.6355,
+  longitude: 79.4123,
+  phone: '+91 98765 43213',
+  email: 'naturals.salon@tirupati-appointments.com',
+  opening_time: '09:30:00',
+  closing_time: '21:00:00',
+  photos: ['https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'],
+  status: 'ACTIVE',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const SALON_RESOURCES: Resource[] = [
+  {
+    id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    provider_id: '44444444-4444-4444-4444-444444444444',
+    name: 'Stylist Vikram (Senior Hair & Beard Artist)',
+    type: 'stylist',
+    duration_minutes: 45,
+    capacity: 1,
+    deposit_amount: 75,
+    attributes: {
+      specialty: 'Trending Fade & Beard Sculpting',
+      station: 'Styling Station 1',
+    },
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'ddddddde-dddd-dddd-dddd-dddddddddddd',
+    provider_id: '44444444-4444-4444-4444-444444444444',
+    name: 'Stylist Kavya (Hair Spa & Makeover Specialist)',
+    type: 'stylist',
+    duration_minutes: 45,
+    capacity: 1,
+    deposit_amount: 75,
+    attributes: {
+      specialty: 'Hair Spa & Rejuvenation Therapy',
+      station: 'Styling Station 2',
+    },
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
 export const INITIAL_BOOKINGS: (Booking & {
   customer_name?: string;
   customer_phone?: string;
@@ -141,3 +196,84 @@ export const INITIAL_BOOKINGS: (Booking & {
     updated_at: new Date().toISOString(),
   },
 ];
+
+export const SALON_BOOKINGS: (Booking & {
+  customer_name?: string;
+  customer_phone?: string;
+  provider_name?: string;
+  resource_name?: string;
+  resource_type?: string;
+})[] = [
+  {
+    id: 'b5555555-5555-5555-5555-555555555551',
+    customer_id: 'c5',
+    customer_name: 'Divya Teja',
+    customer_phone: '+91 94411 22334',
+    provider_id: '44444444-4444-4444-4444-444444444444',
+    provider_name: 'Naturals Luxury Salon & Spa',
+    resource_id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    resource_name: 'Stylist Vikram (Senior Hair & Beard Artist)',
+    resource_type: 'stylist',
+    slot_start: new Date(Date.now() + 1000 * 60 * 60).toISOString(), // in 1 hr
+    slot_end: new Date(Date.now() + 1000 * 60 * 105).toISOString(),
+    status: 'CONFIRMED',
+    payment_status: 'CAPTURED',
+    deposit_amount: 75,
+    gateway_payment_id: 'pay_RPZ_9811231',
+    created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'b5555555-5555-5555-5555-555555555552',
+    customer_id: 'c6',
+    customer_name: 'K. V. Sai Krishna',
+    customer_phone: '+91 98499 55667',
+    provider_id: '44444444-4444-4444-4444-444444444444',
+    provider_name: 'Naturals Luxury Salon & Spa',
+    resource_id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    resource_name: 'Stylist Vikram (Senior Hair & Beard Artist)',
+    resource_type: 'stylist',
+    slot_start: new Date(Date.now() + 1000 * 60 * 150).toISOString(), // in 2.5 hrs
+    slot_end: new Date(Date.now() + 1000 * 60 * 195).toISOString(),
+    status: 'CONFIRMED',
+    payment_status: 'CAPTURED',
+    deposit_amount: 75,
+    gateway_payment_id: 'pay_RPZ_9811232',
+    created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'b5555555-5555-5555-5555-555555555553',
+    customer_id: 'c7',
+    customer_name: 'Meghana Rao',
+    customer_phone: '+91 91234 98765',
+    provider_id: '44444444-4444-4444-4444-444444444444',
+    provider_name: 'Naturals Luxury Salon & Spa',
+    resource_id: 'ddddddde-dddd-dddd-dddd-dddddddddddd',
+    resource_name: 'Stylist Kavya (Hair Spa & Makeover Specialist)',
+    resource_type: 'stylist',
+    slot_start: new Date(Date.now() + 1000 * 60 * 210).toISOString(),
+    slot_end: new Date(Date.now() + 1000 * 60 * 255).toISOString(),
+    status: 'HELD',
+    payment_status: 'PENDING',
+    deposit_amount: 75,
+    hold_expires_at: new Date(Date.now() + 1000 * 60 * 4).toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+export function getFallbackTenantData(providerId?: string | null) {
+  if (providerId === SALON_MERCHANT_PROVIDER.id) {
+    return {
+      provider: SALON_MERCHANT_PROVIDER,
+      resources: SALON_RESOURCES,
+      bookings: SALON_BOOKINGS,
+    };
+  }
+  return {
+    provider: INITIAL_MERCHANT_PROVIDER,
+    resources: INITIAL_RESOURCES,
+    bookings: INITIAL_BOOKINGS,
+  };
+}

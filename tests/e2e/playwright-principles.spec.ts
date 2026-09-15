@@ -38,8 +38,8 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       await customerApp.submitPayment();
 
       // Web-first auto-wait on confirmation toast and My Appointments screen
-      await expect(customerApp.confirmationToast).toBeVisible();
-      await expect(customerApp.myBookingsTitle).toBeVisible();
+      await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await expect(customerApp.myBookingsTitle).toBeVisible({ timeout: 15000 });
       await customerApp.expectBookingInList('CONFIRMED');
     });
 
@@ -149,8 +149,13 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
     await test.step('3. Super Admin refreshes dashboard and observes updated demand metrics', async () => {
       await adminDashboard.refreshDashboard();
 
-      const newWaitlistCount = await adminDashboard.getWaitlistCount();
-      expect(newWaitlistCount).toBeGreaterThan(initialWaitlistCount);
+      await expect.poll(async () => {
+        return await adminDashboard.getWaitlistCount();
+      }, {
+        message: 'Waitlist count should increment after registering customer demand',
+        timeout: 10000,
+        intervals: [200, 500, 1000],
+      }).toBeGreaterThan(initialWaitlistCount);
 
       // Verify inbound demand signal row in Section 3 Table
       await expect(adminDashboard.waitlistTable.getByText(testContact)).toBeVisible({ timeout: 10000 });

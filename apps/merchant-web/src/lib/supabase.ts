@@ -15,6 +15,7 @@ import {
   CityWaitlistEntry,
   TimeWindowFilter,
   AdminAuditLogEntry,
+  MerchantMembership,
 } from '@appointments/shared';
 
 export type {
@@ -29,6 +30,7 @@ export type {
   CityWaitlistEntry,
   TimeWindowFilter,
   AdminAuditLogEntry,
+  MerchantMembership,
 };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -373,6 +375,87 @@ export async function getCurrentUserProfile() {
 
 export async function signOutMerchant() {
   await supabase.auth.signOut();
+}
+
+export async function fetchUserMemberships(userId?: string): Promise<MerchantMembership[]> {
+  try {
+    let targetUserId = userId;
+    if (!targetUserId) {
+      const { data: { session } } = await supabase.auth.getSession();
+      targetUserId = session?.user?.id;
+    }
+    if (!targetUserId) return [];
+
+    const { data, error } = await (supabase.from('merchant_memberships' as any) as any)
+      .select('*, provider:providers(*)')
+      .eq('user_id', targetUserId);
+
+    if (error) {
+      console.warn('Error fetching merchant memberships:', error);
+      return [];
+    }
+    return (data || []) as unknown as MerchantMembership[];
+  } catch (err) {
+    console.warn('Fallback in fetchUserMemberships:', err);
+    return [];
+  }
+}
+
+export async function fetchTenantContextData(): Promise<{
+  profile: any;
+  user: any;
+  memberships: MerchantMembership[];
+  activeProvider: (Provider & { resources?: Resource[] }) | null;
+  isSuperAdmin: boolean;
+}> {
+  const userProfile = await getCurrentUserProfile();
+  if (!userProfile?.user) {
+    return {
+      profile: null,
+      user: null,
+      memberships: [],
+      activeProvider: null,
+      isSuperAdmin: false,
+    };
+  }
+
+  const isSuperAdmin = userProfile.profile?.role === 'admin';
+  const memberships = await fetchUserMemberships(userProfile.user.id);
+
+  let activeProvider: (Provider & { resources?: Resource[] }) | null = null;
+
+  // 1. If profile has a default_provider_id or membership
+  const defaultProviderId = userProfile.profile?.default_provider_id || memberships[0]?.provider_id;
+  if (defaultProviderId) {
+    const { data: prov, error } = await supabase
+      .from('providers')
+      .select('*, resources(*)')
+      .eq('id', defaultProviderId)
+      .single();
+    if (!error && prov) {
+      activeProvider = prov as unknown as (Provider & { resources?: Resource[] });
+    }
+  }
+
+  // 2. If user owns a provider
+  if (!activeProvider && !isSuperAdmin) {
+    const { data: ownedProviders } = await supabase
+      .from('providers')
+      .select('*, resources(*)')
+      .eq('owner_id', userProfile.user.id)
+      .limit(1);
+    if (ownedProviders && ownedProviders.length > 0) {
+      activeProvider = ownedProviders[0] as unknown as (Provider & { resources?: Resource[] });
+    }
+  }
+
+  return {
+    profile: userProfile.profile,
+    user: userProfile.user,
+    memberships,
+    activeProvider,
+    isSuperAdmin,
+  };
 }
 
 /**
