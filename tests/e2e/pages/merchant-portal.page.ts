@@ -160,9 +160,19 @@ export class MerchantPortalPage {
   }
 
   async goto() {
-    await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
+    try {
+      await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
+    } catch {
+      await this.page.waitForLoadState('domcontentloaded').catch(() => null);
+      await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
+    }
     await this.ensureAuthenticated();
     await expect(this.platformTitle).toBeVisible({ timeout: 15000 });
+  }
+
+  async selectProvider(name: string) {
+    await expect(this.venueSelector).toBeVisible({ timeout: 10000 });
+    await this.venueSelector.selectOption({ label: name });
   }
 
   async expectSuspendedBanner(visible: boolean = true) {
@@ -175,7 +185,12 @@ export class MerchantPortalPage {
   }
 
   async gotoBookings() {
-    await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' });
+    try {
+      await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' });
+    } catch {
+      await this.page.waitForLoadState('domcontentloaded').catch(() => null);
+      await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' });
+    }
     const isLogin = await Promise.race([
       this.page.waitForURL(/\/login/, { timeout: 3000 }).then(() => true).catch(() => false),
       this.bookingsHeading.waitFor({ state: 'visible', timeout: 3000 }).then(() => false).catch(() => false),

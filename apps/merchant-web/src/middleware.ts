@@ -5,7 +5,29 @@ const PUBLIC_ROUTES = ['/login', '/admin/login', '/api/', '/_next/', '/favicon.i
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Allow public routes through without auth check
+  // Handle CORS for /api/ routes to allow customer-mobile (port 8081) communication
+  if (pathname.startsWith('/api/')) {
+    const origin = req.headers.get('origin') || '*';
+    if (req.method === 'OPTIONS') {
+      return new NextResponse(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key',
+          'Access-Control-Allow-Credentials': 'true',
+        },
+      });
+    }
+    const res = NextResponse.next();
+    res.headers.set('Access-Control-Allow-Origin', origin);
+    res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key');
+    res.headers.set('Access-Control-Allow-Credentials', 'true');
+    return res;
+  }
+
+  // Allow other public routes through without auth check
   if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
   }

@@ -160,10 +160,20 @@ export class CustomerAppPage {
   }
 
   async selectFirstSlot() {
-    const slotChips = this.page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ });
-    const firstSlot = slotChips.first();
-    await expect(firstSlot).toBeVisible();
-    await firstSlot.click();
+    // Look for slot chips that are not disabled
+    const slotChips = this.page.locator('div[role="button"], [role="button"]').filter({ hasText: /^[0-9]{2}:[0-9]{2} (AM|PM)$/ });
+    const count = await slotChips.count();
+    for (let i = 0; i < count; i++) {
+      const chip = slotChips.nth(i);
+      const isDisabled = await chip.getAttribute('aria-disabled');
+      if (isDisabled !== 'true') {
+        await chip.click();
+        return;
+      }
+    }
+
+    const fallbackChips = this.page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ });
+    await fallbackChips.first().click();
   }
 
   async openCheckout() {
