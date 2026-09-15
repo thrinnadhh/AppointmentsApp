@@ -40,9 +40,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
 // only resolves on the same machine the app is running on, never on a real device.
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ||
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:3000'
-    : 'http://localhost:3000');
+  (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost'
+    ? `http://${window.location.hostname}:3000`
+    : (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'http://192.168.0.150:3000'));
 
 // Seed data for immediate local preview/offline operation
 export const MOCK_PROVIDERS: ProviderWithDetails[] = [
@@ -1092,7 +1094,7 @@ export async function joinCityWaitlist(
     if (error) {
       console.warn('Supabase waitlist insert error:', error.message);
       try {
-        const res = await fetch('http://localhost:3000/api/admin/waitlist', {
+        const res = await fetch(`${API_BASE_URL}/api/admin/waitlist`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
