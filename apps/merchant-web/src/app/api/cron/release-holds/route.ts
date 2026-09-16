@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 interface RpcReleaseResult {
   success: boolean;
@@ -17,7 +17,8 @@ export async function POST() {
 
 async function handleRelease() {
   try {
-    const { data, error } = await supabase.rpc('release_expired_holds');
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin.rpc('release_expired_holds');
 
     if (error) {
       return NextResponse.json(

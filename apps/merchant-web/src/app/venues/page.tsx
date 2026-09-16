@@ -19,9 +19,11 @@ import {
   HeartHandshake,
   CheckCircle2,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Camera
 } from 'lucide-react';
-import { fetchAllProviders, Provider, Resource } from '@/lib/supabase';
+import { fetchAllProviders, uploadVenueAsset, getVenueAssetUrl, supabase, Provider, Resource } from '@/lib/supabase';
+import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 type ProviderWithResources = Provider & { resources: Resource[] };
 
@@ -35,6 +37,8 @@ const CATEGORIES = [
 ];
 
 export default function VenuesPage() {
+  const { activeProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
+
   const [venues, setVenues] = useState<ProviderWithResources[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,14 +57,42 @@ export default function VenuesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [uploadingVenueId, setUploadingVenueId] = useState<string | null>(null);
+
+  const handleUploadVenuePhoto = async (venueId: string, file: File) => {
+    setUploadingVenueId(venueId);
+    try {
+      const res = await uploadVenueAsset(venueId, file, file.name, file.type);
+      if (res.success && res.publicUrl) {
+        const current = venues.find((v) => v.id === venueId);
+        const existingPhotos = current?.photos || [];
+        const updatedPhotos = [res.publicUrl, ...existingPhotos];
+        await supabase.from('providers').update({ photos: updatedPhotos }).eq('id', venueId);
+        await loadVenues();
+        setSuccessBanner('Storefront photo uploaded to Supabase Storage!');
+        setTimeout(() => setSuccessBanner(null), 4000);
+      }
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+    } finally {
+      setUploadingVenueId(null);
+    }
+  };
 
   const loadVenues = async () => {
     setLoading(true);
     try {
       const data = await fetchAllProviders();
-      setVenues(data);
+      if (data && data.length > 0) {
+        setVenues(data);
+      } else if (activeProvider) {
+        setVenues([{ ...activeProvider, resources: [] } as ProviderWithResources]);
+      }
     } catch (err) {
       console.error('Failed to load venues:', err);
+      if (activeProvider) {
+        setVenues([{ ...activeProvider, resources: [] } as ProviderWithResources]);
+      }
     } finally {
       setLoading(false);
     }
@@ -68,7 +100,7 @@ export default function VenuesPage() {
 
   useEffect(() => {
     loadVenues();
-  }, []);
+  }, [activeProvider]);
 
   const handleCreateVenue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,15 +187,25 @@ export default function VenuesPage() {
     }
   };
 
-  const filteredVenues = venues.filter((v) => {
-    const matchesSearch = 
-      v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.phone.includes(searchQuery);
+  const filteredVenues = venues
+    .filter((v) => {
+      if (isLocked && activeProvider) {
+        return v.id === activeProvider.id;
+      }
+      return true;
+    })
+    .filter((v) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = 
+        v.name.toLowerCase().includes(q) ||
+        v.address.toLowerCase().includes(q) ||
+        (v.description && v.description.toLowerCase().includes(q)) ||
+        (v.resources && v.resources.some((r) => r.name.toLowerCase().includes(q) || (r.department && r.department.toLowerCase().includes(q)))) ||
+        v.phone.includes(searchQuery);
 
-    if (selectedCategory === 'all') return matchesSearch;
-    return matchesSearch && normCategory(v.category_id) === normCategory(selectedCategory);
-  });
+      if (selectedCategory === 'all') return matchesSearch;
+      return matchesSearch && normCategory(v.category_id) === normCategory(selectedCategory);
+    });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -171,38 +213,48 @@ export default function VenuesPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-              Multi-Business Onboarding
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+              isLocked
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+            }`}>
+              {isLocked ? `Locked Merchant Space: ${verticalConfig.name}` : 'Multi-Business Onboarding'}
             </span>
-            <span className="text-xs text-slate-500">• Live Tirupati Directory</span>
+            <span className="text-xs text-slate-500">
+              {isLocked ? `• ${activeProvider?.name}` : '• Live Tirupati Directory'}
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            Venues, Clinics & Centers
+            {isLocked ? `My Business & Venue Controls` : 'Venues, Clinics & Centers'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Register and manage clinics, hospitals, salons, gaming turfs, restaurants, and pet care hubs across Tirupati.
+            {isLocked
+              ? `Manage storefront profiles, operating hours, photos, and settings for ${activeProvider?.name}.`
+              : 'Register and manage clinics, hospitals, salons, gaming turfs, restaurants, and pet care hubs across Tirupati.'}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={loadVenues}
-            className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs"
+            className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
             title="Refresh List"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
             Refresh
           </button>
-          <button
-            onClick={() => {
-              setIsModalOpen(true);
-              setFormError(null);
-            }}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add New Business / Venue
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => {
+                setIsModalOpen(true);
+                setFormError(null);
+              }}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Business / Venue
+            </button>
+          )}
         </div>
       </div>
 
@@ -215,7 +267,7 @@ export default function VenuesPage() {
           </div>
           <button 
             onClick={() => setSuccessBanner(null)}
-            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 px-2 py-1 rounded"
+            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 px-2 py-1 rounded cursor-pointer"
           >
             Dismiss
           </button>
@@ -224,26 +276,28 @@ export default function VenuesPage() {
 
       {/* Category Pills & Search */}
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {CATEGORIES.map((cat) => {
-            const Icon = cat.icon;
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                  isSelected
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 mr-1.5 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
+        {!isLocked && (
+          <div className="flex flex-wrap items-center gap-2">
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 mr-1.5 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="relative max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -252,7 +306,7 @@ export default function VenuesPage() {
             name="venueSearch"
             aria-label="Search businesses by name, address, or phone"
             type="text"
-            placeholder="Search businesses by name, address, or phone..."
+            placeholder={isLocked ? "Search your venue details..." : "Search businesses by name, address, or phone..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
@@ -283,6 +337,13 @@ export default function VenuesPage() {
                 key={venue.id}
                 className="bg-white rounded-xl border border-slate-200 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between overflow-hidden"
               >
+                {venue.photos && venue.photos[0] && (
+                  <img
+                    src={getVenueAssetUrl(venue.photos[0], { width: 400, quality: 80 })}
+                    alt={venue.name}
+                    className="w-full h-36 object-cover border-b border-slate-100"
+                  />
+                )}
                 <div className="p-5 space-y-4">
                   {/* Card Top */}
                   <div className="flex items-start justify-between gap-3">
@@ -333,16 +394,43 @@ export default function VenuesPage() {
                 <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold">
                     <Users className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{resourceCount} {venue.category_id === 'clinic' ? 'Doctors' : 'Resources / Units'}</span>
+                    <span>
+                      {resourceCount}{' '}
+                      {venue.category_id === 'clinic'
+                        ? 'Doctors'
+                        : venue.category_id === 'salons' || venue.category_id === 'salon'
+                        ? 'Stylists'
+                        : 'Resources / Units'}
+                    </span>
                   </div>
-                  <Link
-                    href={`/resources?providerId=${venue.id}`}
-                    aria-label={`Manage Staff for ${venue.name}`}
-                    className="inline-flex items-center text-xs font-bold text-emerald-700 hover:text-emerald-900 group"
-                  >
-                    Manage Staff
-                    <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg cursor-pointer transition">
+                      <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                      {uploadingVenueId === venue.id ? 'Uploading...' : 'Photo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingVenueId === venue.id}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleUploadVenuePhoto(venue.id, file);
+                        }}
+                      />
+                    </label>
+                    <Link
+                      href={`/resources?providerId=${venue.id}`}
+                      aria-label={`Manage Staff for ${venue.name}`}
+                      className="inline-flex items-center text-xs font-bold text-emerald-700 hover:text-emerald-900 group"
+                    >
+                      {venue.category_id === 'salons' || venue.category_id === 'salon'
+                        ? 'Manage Stylists'
+                        : venue.category_id === 'clinic'
+                        ? 'Manage Doctors'
+                        : 'Manage Staff'}
+                      <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             );

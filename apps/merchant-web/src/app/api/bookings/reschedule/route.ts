@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { RescheduleBookingRequest, RescheduleBookingResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
@@ -14,69 +14,47 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Fetch current booking to identify resource
-    const { data: booking, error: fetchError } = await supabase
-      .from('bookings')
-      .select('id, resource_id, status')
-      .eq('id', booking_id)
-      .single();
+    const supabaseAdmin = getSupabaseAdmin();
 
-    if (fetchError || !booking) {
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('reschedule_booking_slot', {
+      p_booking_id: booking_id,
+      p_new_slot_start: new_slot_start,
+      p_new_slot_end: new_slot_end,
+    });
+
+    if (rpcError) {
       return NextResponse.json<RescheduleBookingResponse>(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
-      );
-    }
-
-    if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
-      return NextResponse.json<RescheduleBookingResponse>(
-        { success: false, error: `Cannot reschedule a ${booking.status.toLowerCase()} booking` },
-        { status: 400 }
-      );
-    }
-
-    // 2. Check if new slot is already occupied
-    const { data: conflict } = await supabase
-      .from('bookings')
-      .select('id')
-      .eq('resource_id', booking.resource_id)
-      .eq('slot_start', new_slot_start)
-      .in('status', ['HELD', 'PENDING_PAYMENT', 'CONFIRMED'])
-      .neq('id', booking_id)
-      .maybeSingle();
-
-    if (conflict) {
-      return NextResponse.json<RescheduleBookingResponse>(
-        { success: false, error: 'The requested new slot is already booked or held' },
-        { status: 409 }
-      );
-    }
-
-    // 3. Update slot timestamps
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
-        slot_start: new_slot_start,
-        slot_end: new_slot_end,
-        status: 'CONFIRMED',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', booking_id);
-
-    if (updateError) {
-      return NextResponse.json<RescheduleBookingResponse>(
-        { success: false, error: updateError.message },
+        { success: false, error: rpcError.message },
         { status: 500 }
+      );
+    }
+
+    const result = rpcData as {
+      success: boolean;
+      error?: string;
+      booking_id?: string;
+      slot_start?: string;
+      slot_end?: string;
+      status?: 'CONFIRMED';
+    };
+
+    if (!result?.success) {
+      const isNotFound = result?.error === 'Booking not found';
+      const isConflict = result?.error === 'The requested new slot is already booked or held';
+      const status = isNotFound ? 404 : isConflict ? 409 : 400;
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: result?.error || 'Failed to reschedule booking' },
+        { status }
       );
     }
 
     return NextResponse.json<RescheduleBookingResponse>(
       {
         success: true,
-        booking_id,
-        slot_start: new_slot_start,
-        slot_end: new_slot_end,
-        status: 'CONFIRMED',
+        booking_id: result.booking_id || booking_id,
+        slot_start: result.slot_start || new_slot_start,
+        slot_end: result.slot_end || new_slot_end,
+        status: result.status || 'CONFIRMED',
       },
       { status: 200 }
     );

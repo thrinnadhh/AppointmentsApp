@@ -1,14 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { MerchantPortalPage } from './pages/merchant-portal.page';
 
 test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2E', () => {
+  let merchantPortal: MerchantPortalPage;
   const uniqueTimestamp = Date.now();
   const testClinicName = `Tirupati Care Hospital ${uniqueTimestamp.toString().slice(-4)}`;
   const testTurfName = `Apex Box Cricket Arena ${uniqueTimestamp.toString().slice(-4)}`;
   const testDoctorName = `Dr. S. K. Naidu, MD (Cardiology)`;
 
   test.beforeEach(async ({ page }) => {
-    // Navigate with stable load
-    await page.goto('/venues');
+    merchantPortal = new MerchantPortalPage(page);
+    await merchantPortal.gotoVenues('admin@appointments-tirupati.com', 'AdminSecure2026!');
     await expect(page).toHaveTitle(/Merchant Dashboard/);
   });
 
@@ -108,7 +110,7 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
 
     // Verify redirected to /resources with provider query
     await expect(page).toHaveURL(/.*\/resources\?providerId=.*/);
-    await expect(page.getByRole('heading', { name: /Doctors, Departments & Services/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Doctors.*Departments & Services/i })).toBeVisible();
 
     // Verify active venue banner displays the selected clinic
     await expect(page.getByRole('heading', { name: testClinicName, level: 2 })).toBeVisible({ timeout: 10000 });
@@ -139,7 +141,7 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
   });
 
   test('5. Should reflect newly added businesses and doctors on the Overview Dashboard', async ({ page }) => {
-    await page.goto('/');
+    await merchantPortal.goto('admin@appointments-tirupati.com', 'AdminSecure2026!');
 
     // Check Overview Heading
     await expect(page.getByRole('heading', { name: /City-Wide Vertical Summary/i })).toBeVisible();

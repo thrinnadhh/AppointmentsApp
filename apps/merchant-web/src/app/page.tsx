@@ -35,16 +35,52 @@ import {
   Provider,
   Resource
 } from '@/lib/supabase';
-import { INITIAL_MERCHANT_PROVIDER, INITIAL_BOOKINGS, INITIAL_RESOURCES } from '@/lib/mock-data';
+import { INITIAL_MERCHANT_PROVIDER, INITIAL_BOOKINGS, INITIAL_RESOURCES, SALON_MERCHANT_PROVIDER, SALON_BOOKINGS, SALON_RESOURCES } from '@/lib/mock-data';
+import { normCategory } from '@appointments/shared';
+import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 export default function MerchantOverviewPage() {
-  const [providers, setProviders] = useState<(Provider & { resources?: Resource[] })[]>([INITIAL_MERCHANT_PROVIDER]);
-  const [selectedProviderId, setSelectedProviderId] = useState<string>(INITIAL_MERCHANT_PROVIDER.id);
-  const [bookings, setBookings] = useState<MerchantBookingWithDetails[]>(INITIAL_BOOKINGS as unknown as MerchantBookingWithDetails[]);
+  const { 
+    activeProvider: tenantProvider, 
+    verticalConfig, 
+    isSuperAdmin, 
+    isLocked, 
+    memberships, 
+    switchActiveProvider,
+    isLoading: isTenantLoading,
+    isAuthenticated,
+  } = useMerchantTenant();
+
+  // Enforce unauthenticated redirect to /login
+  useEffect(() => {
+    if (!isTenantLoading && !isAuthenticated) {
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      if (params?.get('demo') !== '1') {
+        window.location.href = '/login';
+      }
+    }
+  }, [isTenantLoading, isAuthenticated]);
+
+  const [providers, setProviders] = useState<(Provider & { resources?: Resource[] })[]>([
+    tenantProvider || INITIAL_MERCHANT_PROVIDER,
+  ]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(
+    tenantProvider?.id || INITIAL_MERCHANT_PROVIDER.id
+  );
+  const [bookings, setBookings] = useState<MerchantBookingWithDetails[]>(
+    (tenantProvider?.category_id === 'salons' ? SALON_BOOKINGS : INITIAL_BOOKINGS) as unknown as MerchantBookingWithDetails[]
+  );
   const [allProfilesCount, setAllProfilesCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [recentNotification, setRecentNotification] = useState<string | null>(null);
+
+  // Sync selected provider when tenant context changes
+  useEffect(() => {
+    if (tenantProvider?.id && tenantProvider.id !== selectedProviderId) {
+      setSelectedProviderId(tenantProvider.id);
+    }
+  }, [tenantProvider?.id]);
 
   // Bug Monitor / Diagnostic State
   const [isDiagnosticRunning, setIsDiagnosticRunning] = useState(false);
@@ -57,23 +93,40 @@ export default function MerchantOverviewPage() {
     timestamp: string;
   } | null>(null);
 
-  const activeProvider = providers.find((p) => p.id === selectedProviderId) || providers[0] || INITIAL_MERCHANT_PROVIDER;
-  const activeResources: Resource[] = (activeProvider.resources as Resource[]) || INITIAL_RESOURCES;
+  const activeProvider = providers.find((p) => p.id === selectedProviderId) || tenantProvider || providers[0] || INITIAL_MERCHANT_PROVIDER;
+  const activeResources: Resource[] = (activeProvider.resources as Resource[]) || (activeProvider.category_id === 'salons' ? SALON_RESOURCES : INITIAL_RESOURCES);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [fetchedProviders, fetchedBookings, fetchedProfiles] = await Promise.all([
-        fetchAllProviders(),
+      const [fetchedProviders, fetchedBookings, fetchedProfiles, ownProviderRes] = await Promise.all([
+        isSuperAdmin ? fetchAllProviders() : Promise.resolve([activeProvider]),
         fetchMerchantBookings(selectedProviderId),
         fetchAllProfiles(),
+        fetch(`/api/merchant/provider?id=${selectedProviderId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       ]);
 
       if (fetchedProviders && fetchedProviders.length > 0) {
-        setProviders(fetchedProviders);
+        if (ownProviderRes?.provider) {
+          const merged = fetchedProviders.map((p) =>
+            p.id === ownProviderRes.provider.id ? { ...p, ...ownProviderRes.provider } : p
+          );
+          const exists = fetchedProviders.some((p) => p.id === ownProviderRes.provider.id);
+          setProviders(exists ? merged : [ownProviderRes.provider, ...merged]);
+        } else {
+          setProviders(fetchedProviders);
+        }
+      } else if (ownProviderRes?.provider) {
+        setProviders((prev) => {
+          const others = prev.filter((p) => p.id !== ownProviderRes.provider.id);
+          return [ownProviderRes.provider, ...others];
+        });
       }
+
       if (fetchedBookings && fetchedBookings.length > 0) {
         setBookings(fetchedBookings);
+      } else if (selectedProviderId === SALON_MERCHANT_PROVIDER.id) {
+        setBookings(SALON_BOOKINGS as unknown as MerchantBookingWithDetails[]);
       }
       if (fetchedProfiles) {
         setAllProfilesCount(fetchedProfiles.length);
@@ -81,10 +134,13 @@ export default function MerchantOverviewPage() {
       setIsLiveConnected(true);
     } catch (err) {
       console.warn('Fallback to local state due to connectivity:', err);
+      if (selectedProviderId === SALON_MERCHANT_PROVIDER.id) {
+        setBookings(SALON_BOOKINGS as unknown as MerchantBookingWithDetails[]);
+      }
     } finally {
       setLoading(false);
     }
-  }, [selectedProviderId]);
+  }, [selectedProviderId, isSuperAdmin, activeProvider]);
 
   useEffect(() => {
     loadData();
@@ -137,7 +193,6 @@ export default function MerchantOverviewPage() {
   };
 
   // Platform Vertical Summation Metrics
-  const normCategory = (c: string) => (c || '').toLowerCase().replace(/s$/, '');
   const clinicsCount = providers.filter((p) => normCategory(p.category_id) === 'clinic').length;
   const salonsCount = providers.filter((p) => normCategory(p.category_id) === 'salon').length;
   const gamingCount = providers.filter((p) => normCategory(p.category_id) === 'gaming').length;
@@ -197,6 +252,37 @@ export default function MerchantOverviewPage() {
         </div>
       )}
 
+      {/* Suspended Alert Banner */}
+      {activeProvider.status === 'SUSPENDED' && (
+        <div
+          data-testid="merchant-suspended-banner"
+          className="bg-rose-50 border-2 border-rose-300 text-rose-950 p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm"
+        >
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-rose-100 text-rose-700 shrink-0">
+              <AlertTriangle className="w-6 h-6 text-rose-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-rose-900 flex items-center gap-2">
+                Account Suspended & Blocked by Platform Administration
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 uppercase tracking-wider">
+                  Blocked by Admin
+                </span>
+              </h3>
+              <p className="text-xs sm:text-sm text-rose-700 mt-1">
+                This business ({activeProvider.name}) has been suspended by Platform Administration.
+                New customer bookings, calendar appointments, and search visibility are paused.
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0">
+            <span className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white shadow-xs">
+              Bookings Paused
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* 1. PLATFORM VERTICAL SUMMATION & HIGH-LEVEL OVERVIEW                      */}
       {/* ========================================================================= */}
@@ -223,15 +309,15 @@ export default function MerchantOverviewPage() {
               href="/venues"
               className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors shadow-xs"
             >
-              <Plus className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-              Add Business
+              <Building2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+              {isLocked ? 'My Venue Profile' : 'Add Business'}
             </Link>
             <Link
               href="/resources"
               className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors shadow-xs"
             >
               <Plus className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-              Add Doctor
+              Add {verticalConfig.resourceLabelSingular}
             </Link>
             <Link
               href="/team"
@@ -392,22 +478,35 @@ export default function MerchantOverviewPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Provider Switcher Dropdown */}
-          <div className="relative">
-            <label htmlFor="provider-select" className="sr-only">Switch Business</label>
-            <select
-              id="provider-select"
-              value={selectedProviderId}
-              onChange={(e) => setSelectedProviderId(e.target.value)}
-              className="bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 pr-8 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+          {/* Provider Switcher or Locked Space Badge */}
+          {isLocked ? (
+            <div 
+              data-testid="locked-tenant-badge"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800"
             >
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.category_id})
-                </option>
-              ))}
-            </select>
-          </div>
+              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Dedicated Space</span>
+            </div>
+          ) : (
+            <div className="relative">
+              <label htmlFor="provider-select" className="sr-only">Switch Business</label>
+              <select
+                id="provider-select"
+                value={selectedProviderId}
+                onChange={(e) => {
+                  setSelectedProviderId(e.target.value);
+                  switchActiveProvider(e.target.value);
+                }}
+                className="bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 pr-8 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+              >
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.category_id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <button
             onClick={() => loadData()}

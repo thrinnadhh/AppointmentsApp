@@ -9,7 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Resource, Slot } from '@appointments/shared';
-import { MOCK_PROVIDERS, generateAvailableSlots, fetchProviderById } from '../services/api';
+import { MOCK_PROVIDERS, generateAvailableSlots, fetchProviderById, ProviderWithDetails } from '../services/api';
 
 interface ProviderDetailScreenProps {
   providerId: string;
@@ -23,7 +23,7 @@ export default function ProviderDetailScreen({
   onProceedToHold,
 }: ProviderDetailScreenProps) {
   const initialProvider = MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
-  const [provider, setProvider] = useState(initialProvider);
+  const [provider, setProvider] = useState<ProviderWithDetails>(initialProvider);
   const [selectedResource, setSelectedResource] = useState<Resource>(
     initialProvider.resources?.[0] || MOCK_PROVIDERS[0].resources[0]
   );
@@ -35,7 +35,7 @@ export default function ProviderDetailScreen({
     async function load() {
       const p = await fetchProviderById(providerId);
       if (isMounted && p) {
-        setProvider(p as any);
+        setProvider(p);
         if (p.resources && p.resources.length > 0) {
           setSelectedResource(p.resources[0]);
         }
@@ -60,12 +60,19 @@ export default function ProviderDetailScreen({
     <SafeAreaView style={styles.safeArea}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+        >
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.topBarTitle} numberOfLines={1}>
-          {provider.name}
-        </Text>
+        <View style={styles.topBarCenter}>
+          <Text style={styles.topBarTitle} numberOfLines={1}>
+            {provider.name}
+          </Text>
+        </View>
         <View style={{ width: 60 }} />
       </View>
 
@@ -84,6 +91,16 @@ export default function ProviderDetailScreen({
           </Text>
           <Text style={styles.description}>{provider.description}</Text>
         </View>
+
+        {/* Suspended Venue Warning */}
+        {provider.status === 'SUSPENDED' && (
+          <View style={styles.suspendedBanner} testID="customer-provider-suspended-banner">
+            <Text style={styles.suspendedBannerTitle}>⚠️ Business Temporarily Suspended</Text>
+            <Text style={styles.suspendedBannerText}>
+              This venue has been blocked by platform administration and is not accepting new appointments at this time.
+            </Text>
+          </View>
+        )}
 
         {/* 1. Select Resource / Staff */}
         <View style={styles.section}>
@@ -192,12 +209,24 @@ export default function ProviderDetailScreen({
         </View>
 
         <TouchableOpacity
-          style={[styles.holdButton, !selectedSlot && styles.holdButtonDisabled]}
-          disabled={!selectedSlot}
-          onPress={() => selectedSlot && onProceedToHold(selectedResource, selectedSlot)}
+          style={[
+            styles.holdButton,
+            (!selectedSlot || provider.status === 'SUSPENDED') && styles.holdButtonDisabled,
+          ]}
+          disabled={!selectedSlot || provider.status === 'SUSPENDED'}
+          onPress={() => {
+            if (selectedSlot && provider.status !== 'SUSPENDED') {
+              const currentSlot = selectedSlot;
+              onProceedToHold(selectedResource, currentSlot);
+            }
+          }}
         >
           <Text style={styles.holdButtonText}>
-            {selectedSlot ? 'Hold Slot & Pay Deposit →' : 'Select a Time Slot'}
+            {provider.status === 'SUSPENDED'
+              ? 'Bookings Suspended'
+              : selectedSlot
+              ? 'Hold Slot & Pay Deposit →'
+              : 'Select a Time Slot'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -230,11 +259,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
+  topBarCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    marginHorizontal: 8,
+  },
   topBarTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0f172a',
-    maxWidth: 200,
+    textAlign: 'center',
+    maxWidth: 220,
+  },
+  brandSubtitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+    letterSpacing: 0.5,
+    marginTop: 1,
   },
   container: {
     flex: 1,
@@ -440,5 +483,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  suspendedBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#fff1f2',
+    borderWidth: 1.5,
+    borderColor: '#fca5a5',
+  },
+  suspendedBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#9f1239',
+    marginBottom: 4,
+  },
+  suspendedBannerText: {
+    fontSize: 12,
+    color: '#be123c',
+    lineHeight: 17,
   },
 });

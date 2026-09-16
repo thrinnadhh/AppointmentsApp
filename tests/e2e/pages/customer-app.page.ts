@@ -14,13 +14,21 @@ export class CustomerAppPage {
   readonly myBookingsBtn: Locator;
   readonly trustBanner: Locator;
 
-  // Category Filter Locators
+  // Category Filter Locators (The 5 core service mini-logos)
   readonly allCategoriesChip: Locator;
   readonly clinicsChip: Locator;
   readonly restaurantsChip: Locator;
   readonly gamingChip: Locator;
   readonly salonsChip: Locator;
   readonly petsChip: Locator;
+
+  // Search Bar Locators
+  readonly searchInput: Locator;
+  readonly clearSearchBtn: Locator;
+  readonly searchResultsHeading: Locator;
+  readonly emptySearchResults: Locator;
+  readonly resetSearchBtn: Locator;
+  readonly providerCards: Locator;
 
   // Detail Screen Locators
   readonly backButton: Locator;
@@ -53,15 +61,23 @@ export class CustomerAppPage {
     this.locationBadge = page.getByText('Tirupati, AP');
     this.appTitle = page.getByText('Instant Appointments');
     this.myBookingsBtn = page.getByText('Bookings');
-    this.trustBanner = page.getByText(/guarantees your slot with zero waiting/i);
+    this.trustBanner = page.getByText(/guarantees your slot with zero waiting/i).first();
 
-    // Categories (matching VERTICALS constant names)
-    this.allCategoriesChip = page.getByText('All Categories');
-    this.clinicsChip = page.getByText('Hospitals & Clinics', { exact: true });
-    this.restaurantsChip = page.getByText('Restaurants & Dining', { exact: true });
-    this.gamingChip = page.getByText('Gaming & Turf', { exact: true });
-    this.salonsChip = page.getByText('Salons & Spas', { exact: true });
-    this.petsChip = page.getByText('Pet Care & Clinic', { exact: true });
+    // The 5 Category Mini-Logos
+    this.allCategoriesChip = page.getByText('← All Categories');
+    this.clinicsChip = page.getByText('Hospitals & Clinics', { exact: true }).first();
+    this.restaurantsChip = page.getByText('Restaurants & Dining', { exact: true }).first();
+    this.gamingChip = page.getByText('Gaming & Turf', { exact: true }).first();
+    this.salonsChip = page.getByText('Salons & Spas', { exact: true }).first();
+    this.petsChip = page.getByText('Pet Care & Clinic', { exact: true }).first();
+
+    // Search Bar & Filters
+    this.searchInput = page.getByTestId('customer-search-input');
+    this.clearSearchBtn = page.getByTestId('clear-search-button');
+    this.searchResultsHeading = page.locator('text=/Search Results \\([0-9]+\\)/');
+    this.emptySearchResults = page.getByText(/No venues found in/i);
+    this.resetSearchBtn = page.getByTestId('reset-search-button');
+    this.providerCards = page.getByTestId('provider-card');
 
     // Detail Screen
     this.backButton = page.getByText('← Back');
@@ -94,18 +110,47 @@ export class CustomerAppPage {
   }
 
   async selectCategory(categoryName: string) {
-    const chip = this.page.getByText(categoryName, { exact: true });
+    const chip = this.page.getByText(categoryName, { exact: true }).first();
     await chip.scrollIntoViewIfNeeded();
     await expect(chip).toBeVisible();
     await chip.click();
-    await this.page.waitForTimeout(300);
+    await expect(this.searchInput).toBeVisible();
+  }
+
+  async search(query: string) {
+    await expect(this.searchInput).toBeVisible();
+    await this.searchInput.fill(query);
+  }
+
+  async clearSearch() {
+    await expect(this.clearSearchBtn).toBeVisible();
+    await this.clearSearchBtn.click();
+    await expect(this.clearSearchBtn).not.toBeVisible();
+  }
+
+  async resetSearchFromEmptyState() {
+    await expect(this.resetSearchBtn).toBeVisible();
+    await this.resetSearchBtn.click();
+    await expect(this.emptySearchResults).not.toBeVisible();
   }
 
   async selectProviderByName(name: string) {
     const card = this.page.getByText(name).first();
+    if (!(await card.isVisible().catch(() => false))) {
+      await this.selectCategory('Hospitals & Clinics');
+    }
     await expect(card).toBeVisible();
     await card.click();
     await expect(this.staffSectionHeading).toBeVisible();
+  }
+
+  async expectProviderVisible(name: string, shouldBeVisible: boolean = true) {
+    const card = this.page.getByText(name).first();
+    if (shouldBeVisible) {
+      await expect(card).toBeVisible({ timeout: 10000 });
+    } else {
+      await expect(card).not.toBeVisible({ timeout: 10000 });
+    }
   }
 
   async selectDateOffset(label: 'Today' | 'Tomorrow') {
@@ -115,10 +160,20 @@ export class CustomerAppPage {
   }
 
   async selectFirstSlot() {
-    const slotChips = this.page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ });
-    const firstSlot = slotChips.first();
-    await expect(firstSlot).toBeVisible();
-    await firstSlot.click();
+    // Look for slot chips that are not disabled
+    const slotChips = this.page.locator('div[role="button"], [role="button"]').filter({ hasText: /^[0-9]{2}:[0-9]{2} (AM|PM)$/ });
+    const count = await slotChips.count();
+    for (let i = 0; i < count; i++) {
+      const chip = slotChips.nth(i);
+      const isDisabled = await chip.getAttribute('aria-disabled');
+      if (isDisabled !== 'true') {
+        await chip.click();
+        return;
+      }
+    }
+
+    const fallbackChips = this.page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ });
+    await fallbackChips.first().click();
   }
 
   async openCheckout() {
@@ -131,4 +186,85 @@ export class CustomerAppPage {
     await expect(this.payDepositBtn).toBeVisible();
     await this.payDepositBtn.click();
   }
+
+  async navigateToMyBookings() {
+    await expect(this.myBookingsBtn).toBeVisible();
+    await this.myBookingsBtn.click();
+    await expect(this.myBookingsTitle).toBeVisible({ timeout: 10000 });
+  }
+
+  async backToBrowse() {
+    await expect(this.backToBrowseBtn).toBeVisible();
+    await this.backToBrowseBtn.click();
+    await expect(this.appTitle).toBeVisible({ timeout: 10000 });
+  }
+
+  getBookingCard(identifier: string): Locator {
+    return this.page
+      .locator(`[data-testid="booking-card-${identifier}"]`)
+      .or(this.page.locator('[data-testid^="booking-card-"]').filter({ hasText: identifier }).first())
+      .first();
+  }
+
+  async expectBookingInList(identifier: string, expectedStatus: string = 'CONFIRMED') {
+    const card = this.getBookingCard(identifier);
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toBeVisible({ timeout: 10000 });
+    await expect(card.getByText(expectedStatus).first()).toBeVisible();
+  }
+
+  async openBookingPass(identifier?: string) {
+    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const passBtn = card.getByTestId(/^view-pass-/).or(card.getByText(/Pass/i)).first();
+    await passBtn.scrollIntoViewIfNeeded();
+    await expect(passBtn).toBeVisible({ timeout: 10000 });
+    await passBtn.click();
+    await expect(this.page.getByText('Digital Booking Pass')).toBeVisible({ timeout: 10000 });
+  }
+
+  async closeBookingPass() {
+    const closeBtn = this.page.getByText('✕').first();
+    await expect(closeBtn).toBeVisible();
+    await closeBtn.click();
+    await expect(this.page.getByText('Digital Booking Pass')).not.toBeVisible({ timeout: 10000 });
+  }
+
+  async cancelBookingFromList(identifier?: string) {
+    // Intercept browser window.confirm
+    this.page.once('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+
+    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const cancelBtn = card.getByTestId(/^cancel-/).or(card.getByText('Cancel', { exact: true })).first();
+    await cancelBtn.scrollIntoViewIfNeeded();
+    await expect(cancelBtn).toBeVisible({ timeout: 10000 });
+    await cancelBtn.click();
+  }
+
+  async rescheduleBookingFromList(identifier?: string, timeSlot: string = '11:30 AM') {
+    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const rescheduleBtn = card.getByTestId(/^reschedule-/).or(card.getByText(/Reschedule/i)).first();
+    await rescheduleBtn.scrollIntoViewIfNeeded();
+    await expect(rescheduleBtn).toBeVisible({ timeout: 10000 });
+    await rescheduleBtn.click();
+
+    // Select time slot chip
+    const slotChip = this.page.getByText(timeSlot, { exact: true }).first();
+    await slotChip.scrollIntoViewIfNeeded();
+    await expect(slotChip).toBeVisible({ timeout: 10000 });
+    await slotChip.click();
+
+    // Intercept alert if fired
+    this.page.once('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+
+    // Confirm Reschedule
+    const confirmBtn = this.page.getByTestId('confirm-reschedule-btn').or(this.page.getByText('Confirm Reschedule', { exact: true })).first();
+    await confirmBtn.scrollIntoViewIfNeeded();
+    await expect(confirmBtn).toBeVisible();
+    await confirmBtn.click();
+  }
 }
+

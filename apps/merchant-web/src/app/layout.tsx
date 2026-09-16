@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import './globals.css';
 import Navigation from '@/components/Navigation';
+import { MerchantTenantProvider } from '@/contexts/MerchantTenantContext';
 
 export const metadata: Metadata = {
   title: 'Merchant Dashboard | Tirupati Hyperlocal Appointments',
@@ -22,10 +23,12 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <Navigation />
-        <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 outline-none">
-          {children}
-        </main>
+        <MerchantTenantProvider>
+          <Navigation />
+          <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 outline-none">
+            {children}
+          </main>
+        </MerchantTenantProvider>
         <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
           <p>© 2026 Hyperlocal Appointments Platform (Tirupati Hub) • Merchant Operations</p>
         </footer>

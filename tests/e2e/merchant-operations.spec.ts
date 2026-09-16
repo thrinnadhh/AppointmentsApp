@@ -1,8 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { MerchantPortalPage } from './pages/merchant-portal.page';
 
 test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () => {
+  let merchantPortal: MerchantPortalPage;
+
+  test.beforeEach(async ({ page }) => {
+    merchantPortal = new MerchantPortalPage(page);
+  });
+
   test('1. Should display team members and filter by role', async ({ page }) => {
-    await page.goto('/team');
+    await merchantPortal.gotoTeam();
     await expect(page).toHaveTitle(/Merchant Dashboard/);
 
     // Verify main header
@@ -24,7 +31,7 @@ test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () 
     const uniqueStaffEmail = `staff.${runId}@tirupati.care`;
     const uniquePhone = `+91 9${runId.toString().slice(-9)}`;
 
-    await page.goto('/team');
+    await merchantPortal.gotoTeam();
 
     // Click Add Staff Member button
     const addMemberBtn = page.getByRole('button', { name: /Add Staff Member/i });
@@ -56,7 +63,7 @@ test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () 
   });
 
   test('3. Should display Bookings Queue and filter by status tabs and search', async ({ page }) => {
-    await page.goto('/bookings');
+    await merchantPortal.gotoBookings();
     await expect(page).toHaveTitle(/Merchant Dashboard/);
 
     // Check header

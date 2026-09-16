@@ -24,13 +24,18 @@ export type Database = {
           id: string
           payment_status: Database["public"]["Enums"]["payment_status"]
           provider_id: string
+          reference_code: string | null
           resource_id: string
           slot_end: string
           slot_start: string
           status: Database["public"]["Enums"]["booking_status"]
           updated_at: string
+          attachment_url: string | null
+          reminder_1h_sent_at: string | null
+          reminder_30m_sent_at: string | null
         }
         Insert: {
+          attachment_url?: string | null
           created_at?: string
           customer_id: string
           deposit_amount: number
@@ -39,6 +44,9 @@ export type Database = {
           id?: string
           payment_status?: Database["public"]["Enums"]["payment_status"]
           provider_id: string
+          reference_code?: string | null
+          reminder_1h_sent_at?: string | null
+          reminder_30m_sent_at?: string | null
           resource_id: string
           slot_end: string
           slot_start: string
@@ -46,6 +54,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachment_url?: string | null
           created_at?: string
           customer_id?: string
           deposit_amount?: number
@@ -54,6 +63,9 @@ export type Database = {
           id?: string
           payment_status?: Database["public"]["Enums"]["payment_status"]
           provider_id?: string
+          reference_code?: string | null
+          reminder_1h_sent_at?: string | null
+          reminder_30m_sent_at?: string | null
           resource_id?: string
           slot_end?: string
           slot_start?: string
@@ -105,6 +117,139 @@ export type Database = {
         }
         Relationships: []
       }
+      cities: {
+        Row: {
+          created_at: string
+          country: string
+          id: string
+          latitude: number
+          longitude: number
+          merchant_target: number
+          metadata: Json
+          name: string
+          radius_km: number
+          state: string
+          status: "ACTIVE" | "EXPANDING" | "PLANNED" | "PAUSED"
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          country?: string
+          id: string
+          latitude: number
+          longitude: number
+          merchant_target?: number
+          metadata?: Json
+          name: string
+          radius_km?: number
+          state?: string
+          status?: "ACTIVE" | "EXPANDING" | "PLANNED" | "PAUSED"
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          country?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          merchant_target?: number
+          metadata?: Json
+          name?: string
+          radius_km?: number
+          state?: string
+          status?: "ACTIVE" | "EXPANDING" | "PLANNED" | "PAUSED"
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      city_waitlist: {
+        Row: {
+          city_id: string
+          contact_info: string
+          created_at: string
+          id: string
+          notes: string | null
+          role_interest: string
+          user_id: string | null
+        }
+        Insert: {
+          city_id: string
+          contact_info: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          role_interest?: string
+          user_id?: string | null
+        }
+        Update: {
+          city_id?: string
+          contact_info?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          role_interest?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_waitlist_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_logs: {
+        Row: {
+          booking_id: string
+          channel: string
+          created_at: string
+          event_type: string
+          id: string
+          message_content: string
+          provider_response: Json | null
+          recipient_name: string | null
+          recipient_phone: string
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          booking_id: string
+          channel: string
+          created_at?: string
+          event_type: string
+          id?: string
+          message_content: string
+          provider_response?: Json | null
+          recipient_name?: string | null
+          recipient_phone: string
+          sent_at?: string
+          status?: string
+        }
+        Update: {
+          booking_id?: string
+          channel?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          message_content?: string
+          provider_response?: Json | null
+          recipient_name?: string | null
+          recipient_phone?: string
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -149,9 +294,45 @@ export type Database = {
           },
         ]
       }
+      merchant_memberships: {
+        Row: {
+          created_at: string
+          id: string
+          provider_id: string
+          role: 'owner' | 'manager' | 'staff'
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          provider_id: string
+          role?: 'owner' | 'manager' | 'staff'
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          provider_id?: string
+          role?: 'owner' | 'manager' | 'staff'
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_memberships_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
+          default_provider_id: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -163,6 +344,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_provider_id?: string | null
           email?: string | null
           full_name?: string | null
           id: string
@@ -174,6 +356,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_provider_id?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -190,6 +373,7 @@ export type Database = {
           address: string
           category_id: string
           city: string
+          city_id: string | null
           closing_time: string
           created_at: string
           description: string | null
@@ -210,6 +394,7 @@ export type Database = {
           address: string
           category_id: string
           city?: string
+          city_id?: string | null
           closing_time?: string
           created_at?: string
           description?: string | null
@@ -230,6 +415,7 @@ export type Database = {
           address?: string
           category_id?: string
           city?: string
+          city_id?: string | null
           closing_time?: string
           created_at?: string
           description?: string | null
@@ -252,6 +438,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "providers_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
             referencedColumns: ["id"]
           },
           {
@@ -428,6 +621,33 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_booking: {
+        Args: {
+          p_booking_id: string
+          p_initiated_by?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      check_and_send_booking_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      confirm_booking_payment: {
+        Args: {
+          p_booking_id: string
+          p_deposit_amount?: number
+          p_gateway_payment_id: string
+        }
+        Returns: Json
+      }
+      dispatch_booking_notification: {
+        Args: {
+          p_booking_id: string
+          p_event_type: string
+        }
+        Returns: Json
+      }
       create_booking_hold: {
         Args: {
           p_customer_id: string
@@ -437,8 +657,72 @@ export type Database = {
         }
         Returns: Json
       }
+      get_nearby_providers: {
+        Args: {
+          p_lat: number
+          p_lng: number
+          p_category?: string | null
+          p_radius_meters?: number
+        }
+        Returns: Json
+      }
+      get_active_cities: {
+        Args: {
+          p_include_expanding?: boolean
+        }
+        Returns: Json
+      }
+      get_admin_city_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_admin_velocity_analytics: {
+        Args: {
+          p_city_id?: string | null
+          p_time_window?: string
+        }
+        Returns: Json
+      }
+      update_city_status: {
+        Args: {
+          p_city_id: string
+          p_status: string
+          p_target?: number | null
+        }
+        Returns: Json
+      }
+      is_admin: { Args: never; Returns: boolean }
       record_no_show: { Args: { p_booking_id: string }; Returns: Json }
       release_expired_holds: { Args: never; Returns: Json }
+      reschedule_booking_slot: {
+        Args: {
+          p_booking_id: string
+          p_new_slot_end: string
+          p_new_slot_start: string
+        }
+        Returns: Json
+      }
+      search_directory: {
+        Args: {
+          p_query?: string
+        }
+        Returns: Json
+      }
+      set_booking_slot_for_reminder: {
+        Args: {
+          p_booking_id: string
+          p_minutes_from_now?: number
+        }
+        Returns: Json
+      }
+      sync_customer_profile: {
+        Args: {
+          p_email?: string | null
+          p_full_name?: string | null
+          p_phone?: string | null
+        }
+        Returns: Json
+      }
     }
     Enums: {
       booking_status:

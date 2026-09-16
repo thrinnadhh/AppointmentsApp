@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    const { data, error } = await supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false });
@@ -31,7 +32,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await supabase.rpc('admin_create_user', {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin.rpc('admin_create_user', {
       p_email: email,
       p_password: password,
       p_full_name: fullName,

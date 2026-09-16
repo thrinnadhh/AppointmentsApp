@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   try {
@@ -49,13 +49,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await supabase.rpc('admin_create_resource', {
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Check for duplicate resource name under this provider
+    const { data: existing } = await supabaseAdmin
+      .from('resources')
+      .select('id')
+      .eq('provider_id', providerId)
+      .ilike('name', name.trim())
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      return NextResponse.json(
+        { error: `Duplicate: Resource with name "${name}" already exists for this provider` },
+        { status: 409 }
+      );
+    }
+
+    const { data, error } = await supabaseAdmin.rpc('admin_create_resource', {
       p_provider_id: providerId,
       p_name: name,
       p_type: type,
       p_department: department || 'General',
       p_price: Number(price) || 500,
-      p_deposit_amount: Number(depositAmount) || 50,
+      p_deposit_amount: (depositAmount !== undefined && depositAmount !== null && !isNaN(Number(depositAmount))) ? Number(depositAmount) : 50,
       p_duration_minutes: Number(durationMinutes) || 30,
       p_capacity: Number(capacity) || 1,
     });

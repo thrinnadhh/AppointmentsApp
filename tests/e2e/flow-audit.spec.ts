@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { MerchantPortalPage } from './pages/merchant-portal.page';
 
 test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
@@ -6,6 +7,11 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
   // 1. MERCHANT WEB FLOW & SCREEN AUDIT (http://localhost:3000)
   // =========================================================================
   test.describe('Merchant Web Screen Navigation & Flow Audit', () => {
+    test.beforeEach(async ({ page }, testInfo) => {
+      if (testInfo.title.includes('1.8')) return;
+      const merchantPortal = new MerchantPortalPage(page);
+      await merchantPortal.goto('admin@appointments-tirupati.com', 'AdminSecure2026!');
+    });
 
     test('1.1 Should navigate to Overview Dashboard and verify all dashboard cards and navigation links', async ({ page }) => {
       await page.goto('http://localhost:3000/');
@@ -43,7 +49,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('1.3 Should navigate to Resources/Doctors directory and inspect provider dropdown & modal', async ({ page }) => {
       await page.goto('http://localhost:3000/resources');
-      await expect(page.getByRole('heading', { name: /Doctors, Departments & Services/i, level: 1 })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Doctors.*Departments & Services/i, level: 1 })).toBeVisible();
 
       // Verify Venue selector dropdown exists
       const venueSelect = page.locator('select');
@@ -123,11 +129,11 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
     });
 
     test('1.8 Should navigate to Login screen and verify authentication form controls', async ({ page }) => {
-      await page.goto('http://localhost:3000/login');
+      await page.goto('http://localhost:3000/login?mode=signin');
       await expect(page.getByText('Merchant & Admin Access')).toBeVisible();
       await expect(page.locator('#login-email')).toBeVisible();
       await expect(page.locator('#login-password')).toBeVisible();
-      await expect(page.getByRole('button', { name: /Sign In to Dashboard/i })).toBeVisible();
+      await expect(page.getByTestId('login-submit')).toBeVisible();
     });
 
     test('1.9 Should render custom 404 Not Found screen on broken route', async ({ page }) => {
@@ -288,14 +294,22 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
   // =========================================================================
   test.describe('Customer Mobile Screen Navigation & Flow Audit', () => {
 
-    test('3.1 Should verify Customer HomeScreen navigation items, search bar, and trust banner', async ({ page }) => {
+    test('3.1 Should verify Customer HomeScreen navigation items, 5 category mini logos, and category search', async ({ page }) => {
       await page.goto('http://localhost:8081');
       await expect(page.getByText('Tirupati, AP')).toBeVisible();
       await expect(page.getByText('Instant Appointments')).toBeVisible();
       await expect(page.getByText('Bookings')).toBeVisible();
       await expect(page.getByText(/guarantees your slot with zero waiting/i)).toBeVisible();
 
-      // Test real-time search input
+      // Verify the 5 category mini logos on first page
+      await expect(page.getByText('Hospitals & Clinics', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Salons & Spas', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Restaurants & Dining', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Gaming & Turf', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Pet Care & Clinic', { exact: true }).first()).toBeVisible();
+
+      // Tap category to view related data & search
+      await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
       const searchInput = page.getByPlaceholder(/Search doctors, salons, restaurants/i);
       await expect(searchInput).toBeVisible();
       await searchInput.fill('Dental');
@@ -323,6 +337,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('3.3 Should verify complete Provider Detail view and doctor selection', async ({ page }) => {
       await page.goto('http://localhost:8081');
+      await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
       const providerCard = page.getByText('Sri Venkateswara Dental & Implant Care');
       await providerCard.click();
 

@@ -37,6 +37,7 @@ export interface Provider {
   description?: string | null;
   address: string;
   city: string;
+  city_id?: string | null;
   latitude: number;
   longitude: number;
   phone: string;
@@ -85,6 +86,7 @@ export interface Slot {
 
 export interface Booking {
   id: string;
+  reference_code?: string | null;
   customer_id: string;
   provider_id: string;
   resource_id: string;
@@ -97,6 +99,9 @@ export interface Booking {
   gateway_payment_id?: string | null;
   created_at: string;
   updated_at: string;
+  attachment_url?: string | null;
+  reminder_1h_sent_at?: string | null;
+  reminder_30m_sent_at?: string | null;
   provider?: Provider;
   resource?: Resource;
 }
@@ -128,7 +133,151 @@ export interface UserProfile {
 export interface CreateHoldResult {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
   deposit_amount?: number;
   hold_expires_at?: string;
   error?: string;
+}
+
+export type NotificationEventType =
+  | 'BOOKING_CONFIRMED'
+  | 'BOOKING_REMINDER_1H'
+  | 'BOOKING_REMINDER_30M'
+  | 'BOOKING_CANCELLED';
+
+export type NotificationChannel = 'whatsapp' | 'sms';
+
+export interface NotificationLog {
+  id: string;
+  booking_id: string;
+  recipient_phone: string;
+  recipient_name?: string | null;
+  event_type: NotificationEventType | string;
+  channel: NotificationChannel | string;
+  status: 'QUEUED' | 'SENT' | 'FAILED' | string;
+  message_content: string;
+  provider_response?: Record<string, unknown> | null;
+  sent_at: string;
+  created_at: string;
+}
+
+export type CityStatus = 'ACTIVE' | 'EXPANDING' | 'PLANNED' | 'PAUSED';
+
+export interface City {
+  id: string;
+  name: string;
+  state: string;
+  country: string;
+  status: CityStatus;
+  latitude: number;
+  longitude: number;
+  radius_km: number;
+  merchant_target: number;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CityWaitlistEntry {
+  id: string;
+  city_id: string;
+  user_id?: string | null;
+  contact_info: string;
+  role_interest: 'merchant' | 'customer' | string;
+  notes?: string | null;
+  created_at: string;
+}
+
+export type TimeWindowFilter = 'today' | '3days' | '7days' | '30days' | 'all';
+
+export interface CityAdminStats {
+  city_id: string;
+  city_name: string;
+  status: CityStatus;
+  merchant_target: number;
+  onboarded_merchants: number;
+  in_progress_merchants: number;
+  total_bookings: number;
+  completed_bookings: number;
+  deposit_volume: number;
+  waitlist_count: number;
+}
+
+export interface AdminVelocityMetrics {
+  time_window: TimeWindowFilter;
+  since: string | null;
+  total_bookings: number;
+  completed_bookings: number;
+  held_bookings: number;
+  confirmed_bookings: number;
+  no_show_bookings: number;
+  cancelled_bookings: number;
+  gross_deposit_amount: number;
+  city_density: Array<{
+    city_id: string;
+    city_name: string;
+    booking_count: number;
+    deposit_sum: number;
+  }>;
+  merchant_funnel: {
+    onboarded_count: number;
+    in_progress_count: number;
+    suspended_count: number;
+    total_merchants: number;
+  };
+  cities_overview: {
+    active_cities: number;
+    expanding_cities: number;
+    planned_cities: number;
+    total_cities: number;
+  };
+}
+
+export interface AdminAuditLogEntry {
+  id: string;
+  admin_id: string | null;
+  admin_name: string | null;
+  admin_email: string | null;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  details: Record<string, any>;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export type TenantRole = 'owner' | 'manager' | 'staff';
+
+export interface MerchantMembership {
+  id: string;
+  user_id: string;
+  provider_id: string;
+  role: TenantRole;
+  created_at: string;
+  updated_at?: string;
+  provider?: Provider;
+}
+
+export type BusinessVertical = 'clinics' | 'salons' | 'gaming' | 'restaurants' | 'pets';
+
+export interface VerticalConfig {
+  id: BusinessVertical;
+  name: string;
+  badgeLabel: string;
+  resourceLabelSingular: string;
+  resourceLabelPlural: string;
+  unitLabelSingular: string;
+  unitLabelPlural: string;
+  customerLabel: string;
+  actionVerb: string;
+  departments: string[];
+  defaultDurationMinutes: number;
+  defaultPrice: number;
+  defaultDeposit: number;
+  features: {
+    hasPrescriptions: boolean;
+    hasTokenNumbers: boolean;
+    hasCustomDurations: boolean;
+    hasTeamCovers: boolean;
+  };
 }

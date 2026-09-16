@@ -46,6 +46,9 @@ export default function SettingsPage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    // NOTE: Settings persistence is not yet connected to Supabase.
+    // This shows a preview toast only. Wire up to a platform_settings
+    // table when ready for production.
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
