@@ -22,6 +22,32 @@ export async function POST(req: NextRequest) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    // Guard: check booking status and start time
+    const { data: booking } = await supabaseAdmin
+      .from('bookings')
+      .select('status, slot_start')
+      .eq('id', booking_id)
+      .single();
+
+    if (booking?.status === 'COMPLETED') {
+      return NextResponse.json<RecordNoShowResponse>(
+        { success: false, error: 'Cannot report no-show on an already completed booking' },
+        { status: 409 }
+      );
+    }
+
+    if (booking?.slot_start) {
+      const slotTime = new Date(booking.slot_start).getTime();
+      // If appointment is more than 30 minutes in the future, it cannot be a no-show yet
+      if (slotTime > Date.now() + 30 * 60 * 1000) {
+        return NextResponse.json<RecordNoShowResponse>(
+          { success: false, error: 'Premature no-show: Cannot report no-show for a future appointment that has not started' },
+          { status: 400 }
+        );
+      }
+    }
+
     const { data, error } = await supabaseAdmin.rpc('record_no_show', {
       p_booking_id: booking_id,
     });

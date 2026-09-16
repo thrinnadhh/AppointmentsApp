@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
 
 interface RpcHoldResult {
@@ -23,6 +23,44 @@ export async function POST(req: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // Past slot validation
+    if (new Date(slot_start).getTime() < Date.now()) {
+      return NextResponse.json<CreateHoldResponse>(
+        {
+          success: false,
+          error: 'Invalid slot: Cannot book a slot in the past',
+        },
+        { status: 422 }
+      );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Check if provider is suspended
+    const { data: resData } = await supabaseAdmin
+      .from('resources')
+      .select('provider_id')
+      .eq('id', resource_id)
+      .single();
+
+    if (resData?.provider_id) {
+      const { data: prov } = await supabaseAdmin
+        .from('providers')
+        .select('status')
+        .eq('id', resData.provider_id)
+        .single();
+
+      if (prov?.status === 'SUSPENDED') {
+        return NextResponse.json<CreateHoldResponse>(
+          {
+            success: false,
+            error: 'Merchant provider is suspended. Bookings unavailable.',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const { data, error } = await supabase.rpc('create_booking_hold', {
@@ -58,12 +96,13 @@ export async function POST(req: NextRequest) {
 
     if (!result?.success) {
       const isConflict = result?.error?.includes('already held') || result?.error?.includes('conflict');
+      const isSuspended = result?.error?.toLowerCase().includes('suspended') || result?.error?.toLowerCase().includes('blocked');
       return NextResponse.json<CreateHoldResponse>(
         {
           success: false,
           error: result?.error || 'Unable to reserve slot',
         },
-        { status: isConflict ? 409 : 400 }
+        { status: isConflict ? 409 : (isSuspended ? 403 : 400) }
       );
     }
 

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import { MerchantPortalPage } from './pages/merchant-portal.page';
 
 // Initialize Supabase Client mirroring Customer Mobile App configuration
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
@@ -457,8 +458,8 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(cancelRes.status()).toBe(200);
 
     // 6. UI Verification in Merchant Web Bookings Queue
-    await page.goto('http://localhost:3000/bookings');
-    await page.waitForLoadState('networkidle');
+    const merchantPortal = new MerchantPortalPage(page);
+    await merchantPortal.gotoBookings();
 
     // Find and click the WA/SMS Logs button
     const logsBtn = page.getByRole('button', { name: /WA\/SMS Logs/i }).first();

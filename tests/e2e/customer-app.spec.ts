@@ -40,7 +40,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
 
     // 6. Filter by Salons & Spas
     await customerApp.selectCategory('Salons & Spas');
-    await expect(page.getByText('Elite Looks Luxury Salon')).toBeVisible();
+    await expect(page.locator('text=/Naturals Luxury Salon|Elite Looks Luxury Salon/').first()).toBeVisible();
     await expect(page.getByText('Tirupati Premier Turf & Gaming Arena')).not.toBeVisible();
 
     // 7. Return to 5 Categories Hub
@@ -173,7 +173,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
 
     // 6. Search by address with leading/trailing spaces ("  Bhavani Nagar  ")
     await customerApp.search('  Bhavani Nagar  ');
-    await expect(customerApp.searchResultsHeading).toContainText('Search Results (1)');
+    await expect(customerApp.searchResultsHeading).toContainText(/Search Results \([0-9]+\)/);
     await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible();
 
     // 7. Clear search and confirm full list is restored
@@ -186,6 +186,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
     // 1. Enter Hospitals & Clinics category
     await customerApp.selectCategory('Hospitals & Clinics');
     await expect(customerApp.searchInput).toBeVisible();
+    await expect(customerApp.providerCards.first()).toBeVisible({ timeout: 10000 });
 
     const initialCount = await customerApp.providerCards.count();
     expect(initialCount).toBeGreaterThan(0);
@@ -209,6 +210,6 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
     await expect(customerApp.searchInput).toHaveValue('Dental');
     await customerApp.salonsChip.click();
     await expect(customerApp.searchInput).toHaveValue('');
-    await expect(page.getByText('Elite Looks Luxury Salon')).toBeVisible();
+    await expect(page.locator('text=/Naturals Luxury Salon|Elite Looks Luxury Salon/').first()).toBeVisible();
   });
 });

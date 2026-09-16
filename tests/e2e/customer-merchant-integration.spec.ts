@@ -96,8 +96,9 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await expect(completeBtn).toBeVisible();
     await completeBtn.click();
 
-    // Merchant UI reflects COMPLETED
-    await expect(card.getByText('COMPLETED')).toBeVisible({ timeout: 10000 });
+    // Merchant UI reflects COMPLETED under COMPLETED queue
+    await merchantPortal.filterByStatus('COMPLETED');
+    await merchantPortal.expectBookingInQueue(refCode, 'COMPLETED');
 
     // 3. Customer views My Appointments on Mobile App and verifies COMPLETED status
     const customerContext = await browser.newContext();

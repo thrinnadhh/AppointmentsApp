@@ -39,12 +39,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Must be set to the deployed backend URL in any non-local build — localhost
 // only resolves on the same machine the app is running on, never on a real device.
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ||
-  (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost'
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
     ? `http://${window.location.hostname}:3000`
-    : (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? 'http://localhost:3000'
-        : 'http://192.168.0.150:3000'));
+    : (process.env.EXPO_PUBLIC_API_BASE_URL ||
+      (typeof window !== 'undefined' && window.location.hostname
+        ? `http://${window.location.hostname}:3000`
+        : 'http://localhost:3000'));
 
 // Seed data for immediate local preview/offline operation
 export const MOCK_PROVIDERS: ProviderWithDetails[] = [
@@ -238,12 +238,21 @@ export const MOCK_PROVIDERS: ProviderWithDetails[] = [
   },
 ];
 
-// In-memory cache for fast instant restoration without network flicker
-const categoryProvidersCache = new Map<string, ProviderWithDetails[]>();
+// In-memory cache with TTL for fast instant restoration without network flicker
+interface CacheEntry {
+  data: ProviderWithDetails[];
+  timestamp: number;
+}
+const categoryProvidersCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 1500;
 
 export function getCachedProvidersByCategory(categoryId?: string): ProviderWithDetails[] | null {
   const key = categoryId || 'all';
-  return categoryProvidersCache.get(key) || null;
+  const entry = categoryProvidersCache.get(key);
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL_MS) {
+    return entry.data;
+  }
+  return null;
 }
 
 export function clearProvidersCache(): void {
@@ -253,11 +262,9 @@ export function clearProvidersCache(): void {
 // Enhanced Supabase Service for Customer Mobile Application
 export async function fetchProvidersByCategory(categoryId?: string): Promise<ProviderWithDetails[]> {
   const cacheKey = categoryId || 'all';
-  if (categoryProvidersCache.has(cacheKey)) {
-    const cached = categoryProvidersCache.get(cacheKey)!;
-    if (cached.length > 0) {
-      return cached;
-    }
+  const cached = categoryProvidersCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS && cached.data.length > 0) {
+    return cached.data;
   }
 
   try {
@@ -284,10 +291,7 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
     }
 
     if (!data || data.length === 0) {
-      if (isDev) {
-        if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
-        return MOCK_PROVIDERS.filter((p) => normCategory(p.category_id) === normCategory(categoryId));
-      }
+      categoryProvidersCache.set(cacheKey, { data: [], timestamp: Date.now() });
       return [];
     }
 
@@ -334,7 +338,7 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
       };
     });
 
-    categoryProvidersCache.set(cacheKey, result);
+    categoryProvidersCache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
   } catch (err) {
     console.warn('Network error in fetchProvidersByCategory:', err);
@@ -367,7 +371,7 @@ export async function fetchNearbyProviders(
 
     const rawList = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
     if (rawList.length === 0) {
-      return fetchProvidersByCategory(categoryId);
+      return [];
     }
 
     return rawList.map((prov): ProviderWithDetails => {
@@ -1082,26 +1086,27 @@ export async function joinCityWaitlist(
   notes?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await getCurrentCustomerSession();
+    const cityName = cityId.charAt(0).toUpperCase() + cityId.slice(1).toLowerCase();
     const { error } = await supabase.from('city_waitlist').insert({
       city_id: cityId,
       contact_info: contactInfo.trim(),
       role_interest: roleInterest,
       notes: notes || null,
-      user_id: session?.user?.id || null,
     });
 
     if (error) {
       console.warn('Supabase waitlist insert error:', error.message);
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/waitlist`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
-        });
-        if (res.ok) return { success: true };
-      } catch (fErr) {
-        console.warn('Waitlist fallback fetch failed:', fErr);
+      if (API_BASE_URL) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/admin/waitlist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
+          });
+          if (res.ok) return { success: true };
+        } catch (fErr) {
+          console.warn('Waitlist fallback fetch failed:', fErr);
+        }
       }
       return { success: true };
     }

@@ -130,13 +130,8 @@ export default function HomeScreen({
   const [fuzzyResults, setFuzzyResults] = useState<ProviderWithDetails[] | null>(null);
   const [providers, setProviders] = useState<ProviderWithDetails[]>(() => {
     const cached = getCachedProvidersByCategory(selectedCategory || undefined);
-    if (cached && cached.length > 0) return cached;
-    if (selectedCategory) {
-      const norm = selectedCategory.toLowerCase().replace(/s$/, '');
-      const filtered = MOCK_PROVIDERS.filter((p) => p.category_id.toLowerCase().replace(/s$/, '') === norm);
-      if (filtered.length > 0) return filtered;
-    }
-    return MOCK_PROVIDERS;
+    if (cached !== null) return cached;
+    return [];
   });
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({
     clinics: 29,

@@ -14,6 +14,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!gateway_payment_id || typeof gateway_payment_id !== 'string' || !gateway_payment_id.trim()) {
+      return NextResponse.json<ConfirmPaymentResponse>(
+        { success: false, error: 'Missing required parameter: gateway_payment_id' },
+        { status: 400 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
     const resolvedGatewayId = gateway_payment_id || `sim_${Date.now()}`;
 
@@ -33,9 +40,10 @@ export async function POST(req: NextRequest) {
     const result = rpcData as { success: boolean; error?: string };
     if (!result?.success) {
       const isNotFound = result?.error === 'Booking not found';
+      const isExpired = result?.error?.toLowerCase().includes('expired');
       return NextResponse.json<ConfirmPaymentResponse>(
         { success: false, error: result?.error || 'Failed to confirm booking' },
-        { status: isNotFound ? 404 : 400 }
+        { status: isNotFound ? 404 : (isExpired ? 410 : 400) }
       );
     }
 

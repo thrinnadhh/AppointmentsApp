@@ -434,6 +434,17 @@ export async function fetchTenantContextData(): Promise<{
       .single();
     if (!error && prov) {
       activeProvider = prov as unknown as (Provider & { resources?: Resource[] });
+    } else {
+      try {
+        const { data: rpcProv } = await (supabase.rpc as any)('get_provider_details', {
+          p_provider_id: defaultProviderId,
+        });
+        if (rpcProv) {
+          activeProvider = rpcProv as unknown as (Provider & { resources?: Resource[] });
+        }
+      } catch {
+        // ignore fallback errors
+      }
     }
   }
 

@@ -102,6 +102,20 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: currentCity } = await supabaseAdmin
+      .from('cities')
+      .select('status')
+      .eq('id', cityId)
+      .single();
+
+    if (currentCity?.status === 'ACTIVE' && (status === 'PLANNED' || status === 'EXPANDING')) {
+      return NextResponse.json(
+        { error: 'Invalid transition: Cannot regress an ACTIVE city back to PLANNED or EXPANDING' },
+        { status: 400 }
+      );
+    }
+
     const result = await updateAdminCityStatus(
       cityId,
       status,

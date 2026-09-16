@@ -14,6 +14,19 @@ import { test, expect } from './fixtures/test-fixtures';
 test.describe('Admin Merchant Governance & Cross-App Integration', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(async ({ request }) => {
+    await request.patch('http://localhost:3000/api/admin/merchants', {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+      },
+      data: {
+        providerId: '11111111-1111-1111-1111-111111111111',
+        status: 'ACTIVE',
+      },
+    }).catch(() => null);
+  });
+
   test('TC-ADMIN-MERCHANT-01: Admin can search merchant shop and filter by type, city, and status tabs', async ({
     adminDashboard,
   }) => {

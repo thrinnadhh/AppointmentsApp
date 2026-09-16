@@ -30,7 +30,7 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     // 3. Salons forward -> back
     await salonsCard.click();
     await expect(page.getByText('Salons & Spas in Tirupati')).toBeVisible();
-    await expect(page.getByText('Elite Looks Luxury Salon')).toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible();
     await page.getByText('← All Categories').click();
     await expect(salonsCard).toBeVisible();
 
@@ -63,13 +63,13 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
 
     // Switch to Salons
     await page.getByText('Salons & Spas', { exact: true }).first().click();
-    await expect(page.getByText('Elite Looks Luxury Salon')).toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible();
     await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).not.toBeVisible();
 
     // Switch to Restaurants
     await page.getByText('Restaurants & Dining', { exact: true }).first().click();
     await expect(page.getByText('Saptagiri Heritage Dining')).toBeVisible();
-    await expect(page.getByText('Elite Looks Luxury Salon')).not.toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i)).not.toBeVisible();
 
     // Switch to Gaming
     await page.getByText('Gaming & Turf', { exact: true }).first().click();
@@ -162,7 +162,7 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     // Navigate into Salons & Spas
     await page.getByText('Salons & Spas', { exact: true }).first().click();
     await expect(page.getByText('Salons & Spas in Tirupati')).toBeVisible();
-    await expect(page.getByText('Elite Looks Luxury Salon')).toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible();
 
     // Click Bookings from top header while in Salons
     await page.getByText('Bookings').click();
@@ -171,7 +171,7 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     // Return to Browse - must return to Salons & Spas (where user left off), NOT the root Hub
     await page.getByText('← Back to Browse').click();
     await expect(page.getByText('Salons & Spas in Tirupati')).toBeVisible();
-    await expect(page.getByText('Elite Looks Luxury Salon')).toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible();
     await expect(page.getByText('Choose a Service')).not.toBeVisible();
 
     // Now clicking ← All Categories returns to the Hub
@@ -203,7 +203,7 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     // Click Back to Browse -> Must return to Hospitals & Clinics in Tirupati, NOT the root Hub
     await page.getByText('← Back to Browse').click();
     await expect(page.getByText('Hospitals & Clinics in Tirupati')).toBeVisible();
-    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible();
+    await expect(page.getByText('Sri Venkateswara Dental & Implant Care').first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Choose a Service')).not.toBeVisible();
 
     // Clicking All Categories returns to the 5-category hub

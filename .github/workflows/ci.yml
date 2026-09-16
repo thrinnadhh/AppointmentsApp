@@ -1,92 +1,435 @@
-name: CI
+name: CI — Tirupati Appointments Platform
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      run_stress:
+        description: 'Run concurrency/stress tests (slow)'
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# ─── Environment defaults shared across jobs ───────────────────────────────────
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8.15.0'
+  # Supabase — populated from repo secrets; fall back to stubs for build-only jobs
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+  EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1 — Dependency Audit & Security Scan
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  quality:
-    name: Lint, Typecheck & Build
+  security-audit:
+    name: 🔒 Security & Dependency Audit
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v3
         with:
-          version: 8.15.0
+          version: ${{ env.PNPM_VERSION }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'pnpm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run lint
+      - name: Audit for high/critical vulnerabilities
+        # Allow the step to fail with a report but not block CI immediately
+        # Change `--audit-level` to `high` to hard-fail on high+ vulns
+        run: pnpm audit --audit-level=critical
+        continue-on-error: true
+
+      - name: Check for secrets in source tree
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2 — Lint, Typecheck
+# ─────────────────────────────────────────────────────────────────────────────
+  lint-typecheck:
+    name: 🧹 Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (all workspaces)
         run: pnpm lint
 
-      - name: Run typecheck
+      - name: Typecheck (all workspaces)
         run: pnpm typecheck
 
-      - name: Run build
-        run: pnpm build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-
-  e2e:
-    name: Playwright E2E Tests
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3 — Build (merchant-web + customer-mobile export)
+# ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: 🏗️ Build
     runs-on: ubuntu-latest
-    needs: quality
+    needs: lint-typecheck
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v3
         with:
-          version: 8.15.0
+          version: ${{ env.PNPM_VERSION }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'pnpm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers & OS dependencies
+      - name: Build all workspaces
+        run: pnpm build
+
+      - name: Upload merchant-web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: merchant-web-build
+          path: apps/merchant-web/.next/
+          retention-days: 3
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 4 — Admin E2E Tests (auth, RBAC, MFA, audit, city control)
+# ─────────────────────────────────────────────────────────────────────────────
+  e2e-admin:
+    name: 🛡️ Admin E2E Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run Playwright E2E tests
-        run: pnpm test:e2e
+      - name: Run Admin E2E — Core auth & RBAC
+        run: pnpm exec playwright test tests/e2e/admin-auth-guard.spec.ts --reporter=github,list,html
         env:
           CI: true
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
 
-      - name: Upload Playwright Test Report & Artifacts
+      - name: Run Admin E2E — City control & merchant funnel
+        run: pnpm exec playwright test tests/e2e/admin-city-control.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Admin E2E — Security phases
+        run: pnpm exec playwright test tests/e2e/admin-security-phases.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Admin Edge Cases
+        run: pnpm exec playwright test tests/e2e/edge-admin.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Upload Admin test report
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
+          name: playwright-report-admin
           path: |
             playwright-report/
             test-results/
           retention-days: 14
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 5 — Merchant E2E Tests (tenancy isolation, onboarding, operations)
+# ─────────────────────────────────────────────────────────────────────────────
+  e2e-merchant:
+    name: 🏪 Merchant E2E Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Merchant E2E — Tenancy isolation
+        run: pnpm exec playwright test tests/e2e/merchant-tenancy-isolation.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Merchant E2E — Self onboarding
+        run: pnpm exec playwright test tests/e2e/merchant-self-onboarding.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Merchant E2E — Operations
+        run: pnpm exec playwright test tests/e2e/merchant-operations.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Merchant Edge Cases
+        run: pnpm exec playwright test tests/e2e/edge-merchant.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Upload Merchant test report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-merchant
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 6 — Customer E2E Tests (mobile app, booking flow, reflections)
+# ─────────────────────────────────────────────────────────────────────────────
+  e2e-customer:
+    name: 📱 Customer E2E Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Customer E2E — App flows
+        run: pnpm exec playwright test tests/e2e/customer-app.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Customer E2E — Reflections
+        run: pnpm exec playwright test tests/e2e/customer-reflection.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Customer Edge Cases
+        run: pnpm exec playwright test tests/e2e/edge-customer.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Upload Customer test report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-customer
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 7 — Integration E2E Tests (cross-actor, lifecycle, Admin↔Merchant↔Customer)
+# ─────────────────────────────────────────────────────────────────────────────
+  e2e-integration:
+    name: 🔗 Integration E2E Tests
+    runs-on: ubuntu-latest
+    needs: [e2e-admin, e2e-merchant, e2e-customer]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Customer ↔ Merchant Integration
+        run: pnpm exec playwright test tests/e2e/customer-merchant-integration.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Admin ↔ Merchant Integration
+        run: pnpm exec playwright test tests/e2e/admin-merchant-integration.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Full Flow Audit
+        run: pnpm exec playwright test tests/e2e/flow-audit.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Run Cross-System Edge Cases
+        run: pnpm exec playwright test tests/e2e/edge-integrations.spec.ts --reporter=github,list,html
+        env:
+          CI: true
+
+      - name: Upload Integration test report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-integration
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 8 — Concurrency / Stress Tests (manual trigger only)
+# ─────────────────────────────────────────────────────────────────────────────
+  e2e-stress:
+    name: ⚡ Concurrency & Stress Tests
+    runs-on: ubuntu-latest
+    needs: e2e-integration
+    # Only runs when manually triggered with run_stress=true
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_stress == true }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run stress: 50-concurrent-hold (EC-INT-05) in isolation
+        run: >
+          pnpm exec playwright test
+          tests/e2e/edge-integrations.spec.ts
+          --grep "EC-INT-05"
+          --reporter=github,list,html
+          --timeout=120000
+        env:
+          CI: true
+
+      - name: Run stress: reference code uniqueness (EC-INT-09) in isolation
+        run: >
+          pnpm exec playwright test
+          tests/e2e/edge-integrations.spec.ts
+          --grep "EC-INT-09"
+          --reporter=github,list,html
+          --timeout=120000
+        env:
+          CI: true
+
+      - name: Upload Stress test report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-stress
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 9 — Gate: All domain jobs must pass before merge is permitted
+# ─────────────────────────────────────────────────────────────────────────────
+  all-checks-pass:
+    name: ✅ All CI Gates Passed
+    runs-on: ubuntu-latest
+    needs:
+      - security-audit
+      - lint-typecheck
+      - build
+      - e2e-admin
+      - e2e-merchant
+      - e2e-customer
+      - e2e-integration
+    # Run even if optional jobs are skipped so the gate always evaluates
+    if: ${{ always() }}
+    steps:
+      - name: Verify all required jobs succeeded
+        run: |
+          echo "Security audit : ${{ needs.security-audit.result }}"
+          echo "Lint/Typecheck : ${{ needs.lint-typecheck.result }}"
+          echo "Build          : ${{ needs.build.result }}"
+          echo "Admin E2E      : ${{ needs.e2e-admin.result }}"
+          echo "Merchant E2E   : ${{ needs.e2e-merchant.result }}"
+          echo "Customer E2E   : ${{ needs.e2e-customer.result }}"
+          echo "Integration E2E: ${{ needs.e2e-integration.result }}"
+
+          # Fail if any required job failed or was cancelled
+          if [[ "${{ needs.lint-typecheck.result }}"  != "success" ]] ||
+             [[ "${{ needs.build.result }}"           != "success" ]] ||
+             [[ "${{ needs.e2e-admin.result }}"       != "success" ]] ||
+             [[ "${{ needs.e2e-merchant.result }}"    != "success" ]] ||
+             [[ "${{ needs.e2e-customer.result }}"    != "success" ]] ||
+             [[ "${{ needs.e2e-integration.result }}" != "success" ]]; then
+            echo "❌ One or more required CI gates failed."
+            exit 1
+          fi
+
+          echo "✅ All CI gates passed — safe to merge."
