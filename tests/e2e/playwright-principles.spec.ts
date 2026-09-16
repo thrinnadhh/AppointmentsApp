@@ -11,6 +11,19 @@ import { test, expect } from './fixtures/test-fixtures';
  */
 test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () => {
 
+  test.beforeEach(async ({ request }) => {
+    await request.patch('http://localhost:3000/api/admin/merchants', {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+      },
+      data: {
+        providerId: '11111111-1111-1111-1111-111111111111',
+        status: 'ACTIVE',
+      },
+    }).catch(() => null);
+  });
+
   test('Flow 1 (Full Cross-App Golden Lifecycle): Customer books appointment, reflects in Merchant queue, Merchant completes, reflects in Super Admin Analytics', async ({
     triRole,
   }) => {
@@ -87,6 +100,7 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
     await test.step('2. Super Admin suspends merchant via Section 2 Merchant Pipeline', async () => {
       await adminDashboard.filterMerchantTab('all');
       await adminDashboard.searchMerchantShop('Sri Venkateswara Dental');
+      await adminDashboard.expectMerchantVisible(targetMerchant, true);
       await adminDashboard.blockMerchant(targetMerchant);
 
       // Immutable security audit log captures the event
@@ -107,6 +121,7 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
     await test.step('5. Super Admin reactivates merchant to restore platform operations', async () => {
       await adminDashboard.filterMerchantTab('suspended');
       await adminDashboard.searchMerchantShop('Sri Venkateswara Dental');
+      await adminDashboard.expectMerchantVisible(targetMerchant, true);
       await adminDashboard.unblockMerchant(targetMerchant);
 
       // Audit log captures restoration

@@ -106,13 +106,21 @@ export default function MerchantOverviewPage() {
         fetch(`/api/merchant/provider?id=${selectedProviderId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       ]);
 
-      if (ownProviderRes?.provider) {
+      if (fetchedProviders && fetchedProviders.length > 0) {
+        if (ownProviderRes?.provider) {
+          const merged = fetchedProviders.map((p) =>
+            p.id === ownProviderRes.provider.id ? { ...p, ...ownProviderRes.provider } : p
+          );
+          const exists = fetchedProviders.some((p) => p.id === ownProviderRes.provider.id);
+          setProviders(exists ? merged : [ownProviderRes.provider, ...merged]);
+        } else {
+          setProviders(fetchedProviders);
+        }
+      } else if (ownProviderRes?.provider) {
         setProviders((prev) => {
           const others = prev.filter((p) => p.id !== ownProviderRes.provider.id);
           return [ownProviderRes.provider, ...others];
         });
-      } else if (fetchedProviders && fetchedProviders.length > 0) {
-        setProviders(fetchedProviders);
       }
 
       if (fetchedBookings && fetchedBookings.length > 0) {

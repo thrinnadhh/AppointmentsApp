@@ -134,7 +134,7 @@ export class MerchantPortalPage {
   async loginAsMerchant(email = 'svims.clinic@tirupati-appointments.com', password = 'SvimsClinic2026!') {
     await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
     const demoBtn = this.page.getByTestId('demo-login-clinic');
-    if (await demoBtn.isVisible().catch(() => false)) {
+    if (email === 'svims.clinic@tirupati-appointments.com' && (await demoBtn.isVisible().catch(() => false))) {
       await demoBtn.click();
     } else {
       const emailInput = this.page.getByTestId('login-email');
@@ -146,27 +146,28 @@ export class MerchantPortalPage {
       await this.page.getByTestId('login-password').fill(password);
       await this.page.getByTestId('login-submit').click();
     }
+    await this.page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 }).catch(() => null);
   }
 
-  async ensureAuthenticated() {
+  async ensureAuthenticated(email?: string, password?: string) {
     const isLogin = await Promise.race([
       this.page.waitForURL(/\/login/, { timeout: 3000 }).then(() => true).catch(() => false),
       this.platformTitle.waitFor({ state: 'visible', timeout: 3000 }).then(() => false).catch(() => false),
     ]);
 
     if (isLogin || this.page.url().includes('/login')) {
-      await this.loginAsMerchant();
+      await this.loginAsMerchant(email, password);
     }
   }
 
-  async goto() {
+  async goto(email?: string, password?: string) {
     try {
       await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
     } catch {
       await this.page.waitForLoadState('domcontentloaded').catch(() => null);
       await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
     }
-    await this.ensureAuthenticated();
+    await this.ensureAuthenticated(email, password);
     await expect(this.platformTitle).toBeVisible({ timeout: 15000 });
   }
 
@@ -212,10 +213,10 @@ export class MerchantPortalPage {
     await expect(this.teamHeading).toBeVisible({ timeout: 15000 });
   }
 
-  async gotoVenues() {
+  async gotoVenues(email?: string, password?: string) {
     await this.page.goto('http://localhost:3000/venues', { waitUntil: 'domcontentloaded' });
-    await this.ensureAuthenticated();
-    await expect(this.page.getByRole('heading', { name: /Venues & Businesses|My Business & Venue Controls/i })).toBeVisible({ timeout: 15000 });
+    await this.ensureAuthenticated(email, password);
+    await expect(this.page.getByRole('heading', { name: /Venues, Clinics & Centers|Venues & Businesses|My Business & Venue Controls/i })).toBeVisible({ timeout: 15000 });
   }
 
   async gotoResources() {
