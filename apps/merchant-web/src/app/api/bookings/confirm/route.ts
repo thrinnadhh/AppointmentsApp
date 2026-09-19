@@ -47,6 +47,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const { data: bkg } = await supabaseAdmin.from('bookings').select('resource_id, slot_start').eq('id', booking_id).single();
+    if (bkg?.resource_id && bkg?.slot_start) {
+      const { releaseSlotLock } = await import('@/lib/redis');
+      await releaseSlotLock(`${bkg.resource_id}:${bkg.slot_start}`);
+    }
+
     return NextResponse.json<ConfirmPaymentResponse>(
       {
         success: true,

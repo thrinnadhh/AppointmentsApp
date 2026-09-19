@@ -35,6 +35,16 @@ export default function LoginPage() {
   const [regPassword, setRegPassword] = useState('');
   const [regShopName, setRegShopName] = useState('');
   const [regCategory, setRegCategory] = useState('salons');
+
+  // Derive a user-friendly venue label from selected category (for form labels)
+  const CATEGORY_VENUE_LABELS: Record<string, string> = {
+    salons: 'Salon',
+    clinics: 'Hospital',
+    gaming: 'Turf / Arena',
+    restaurants: 'Restaurant',
+    pets: 'Pet Clinic',
+  };
+  const regVenueLabel = CATEGORY_VENUE_LABELS[regCategory] || 'Venue';
   const [regPhone, setRegPhone] = useState('');
   const [regAddress, setRegAddress] = useState('');
 
@@ -60,12 +70,27 @@ export default function LoginPage() {
       const checkSession = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          setSuccessMsg('Session detected! Redirecting to Merchant Workspace...');
-          const params = new URLSearchParams(window.location.search);
-          const redirectPath = params.get('redirect') || '/';
-          setTimeout(() => {
-            window.location.href = redirectPath;
-          }, 800);
+          const userEmail = session.user.email ? session.user.email.toLowerCase().trim() : '';
+          const { data: provs } = await supabase
+            .from('providers')
+            .select('id')
+            .or(`owner_id.eq.${session.user.id},email.ilike.${userEmail}`)
+            .limit(1);
+
+          const hasShop = Boolean(provs && provs.length > 0);
+          if (!hasShop) {
+            setSuccessMsg('Email verified with Google! Please register your venue details...');
+            setTimeout(() => {
+              window.location.href = '/register';
+            }, 600);
+          } else {
+            setSuccessMsg('Session detected! Redirecting to Merchant Workspace...');
+            const params = new URLSearchParams(window.location.search);
+            const redirectPath = params.get('redirect') || '/';
+            setTimeout(() => {
+              window.location.href = redirectPath;
+            }, 600);
+          }
         }
       };
       checkSession();
@@ -94,10 +119,23 @@ export default function LoginPage() {
       }
 
       if (data.session) {
-        setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
-        const params = new URLSearchParams(window.location.search);
-        const redirectPath = params.get('redirect') || '/';
-        window.location.href = redirectPath;
+        const userEmail = data.session.user.email ? data.session.user.email.toLowerCase().trim() : '';
+        const { data: provs } = await supabase
+          .from('providers')
+          .select('id')
+          .or(`owner_id.eq.${data.session.user.id},email.ilike.${userEmail}`)
+          .limit(1);
+
+        const hasShop = Boolean(provs && provs.length > 0);
+        if (!hasShop) {
+          setSuccessMsg('Authentication successful! Please register your venue details...');
+          window.location.href = '/register';
+        } else {
+          setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
+          const params = new URLSearchParams(window.location.search);
+          const redirectPath = params.get('redirect') || '/';
+          window.location.href = redirectPath;
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid login credentials.';
@@ -110,7 +148,7 @@ export default function LoginPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regFullName || !regEmail || !regPassword || !regShopName || !regPhone) {
-      setErrorMsg('Please complete all required fields (Name, Email, Password, Shop Name, Phone).');
+      setErrorMsg(`Please complete all required fields (Name, Email, Password, ${regVenueLabel} Name, Phone).`);
       return;
     }
 
@@ -140,7 +178,7 @@ export default function LoginPage() {
 
       const result = await res.json();
       if (!res.ok || result.error) {
-        throw new Error(result.error || 'Shop registration failed.');
+        throw new Error(result.error || `${regVenueLabel} registration failed.`);
       }
 
       setSuccessMsg(`"${regShopName}" registered successfully! Logging you in...`);
@@ -166,7 +204,7 @@ export default function LoginPage() {
         window.location.href = redirectPath;
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to register shop and merchant.';
+      const msg = err instanceof Error ? err.message : `Failed to register ${regVenueLabel} and merchant.`;
       setErrorMsg(msg);
     } finally {
       setLoading(false);
@@ -178,17 +216,28 @@ export default function LoginPage() {
     setErrorMsg(null);
     try {
       const redirectOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${redirectOrigin}/`,
+          redirectTo: `${redirectOrigin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 
       if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google OAuth authentication failed.';
-      setErrorMsg(msg);
+      if (msg.toLowerCase().includes('provider is not enabled') || msg.toLowerCase().includes('validation_failed')) {
+        setErrorMsg('Google OAuth is not enabled yet in your Supabase project (Authentication → Providers → Google). You can sign in immediately below using your registered email and password.');
+      } else {
+        setErrorMsg(msg);
+      }
       setLoading(false);
     }
   };
@@ -199,10 +248,34 @@ export default function LoginPage() {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      let { data, error } = await supabase.auth.signInWithPassword({
         email: presetEmail,
         password: presetPw,
       });
+
+      if (error && (presetEmail.includes('svims.clinic') || presetEmail.includes('naturals.salon'))) {
+        const signUpRes = await supabase.auth.signUp({
+          email: presetEmail,
+          password: presetPw,
+          options: {
+            data: {
+              full_name: presetEmail.includes('svims') ? 'Dr. Sundararajan (SVIMS Clinic)' : 'Naturals Salon Staff',
+              role: 'merchant',
+            },
+          },
+        });
+        if (signUpRes.data?.session) {
+          data = signUpRes.data as any;
+          error = null;
+        } else {
+          const retrySignIn = await supabase.auth.signInWithPassword({
+            email: presetEmail,
+            password: presetPw,
+          });
+          data = retrySignIn.data as any;
+          error = retrySignIn.error;
+        }
+      }
 
       if (error) {
         throw error;
@@ -235,7 +308,7 @@ export default function LoginPage() {
             Merchant & Admin Access Portal
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Self-service merchant onboarding & isolated shop workspace
+            Self-service merchant onboarding & isolated venue workspace
           </p>
         </div>
 
@@ -269,7 +342,7 @@ export default function LoginPage() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Register Shop & Account
+            Register Venue & Account
           </button>
         </div>
 
@@ -293,14 +366,21 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Google Authentication Option (Self-Service) */}
-        <div>
+        {/* Primary Entry Point: Google Verified Authentication */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center space-y-3">
+          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Google Verified Authentication</span>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
+            Log in through Google to register and verify your business email address. First-time users will set up their shop next; returning merchants enter directly into their workspace.
+          </p>
           <button
             type="button"
             data-testid="google-auth-btn"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full flex justify-center items-center gap-3 py-2.5 px-4 border border-slate-300 rounded-xl shadow-xs text-xs sm:text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors cursor-pointer"
+            className="w-full flex justify-center items-center gap-3 py-3 px-4 border border-slate-300 rounded-xl shadow-xs text-xs sm:text-sm font-semibold text-slate-800 bg-white hover:bg-slate-100 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all cursor-pointer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -322,14 +402,19 @@ export default function LoginPage() {
             </svg>
             <span>Continue with Google</span>
           </button>
+          <div className="flex items-center justify-center gap-3 text-[11px] text-slate-500 pt-0.5">
+            <span>✓ Verified Email</span>
+            <span>•</span>
+            <span>✓ Direct Workspace Access</span>
+          </div>
 
-          <div className="relative my-4">
+          <div className="relative pt-2">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200"></div>
             </div>
-            <div className="relative flex justify-center text-[11px] uppercase tracking-wider font-semibold">
-              <span className="bg-white px-2 text-slate-400">
-                {authMode === 'signin' ? 'Or sign in with email' : 'Or register with custom credentials'}
+            <div className="relative flex justify-center text-[10px] uppercase tracking-wider font-semibold">
+              <span className="bg-slate-50 px-2 text-slate-400">
+                {authMode === 'signin' ? 'Or sign in with password' : 'Or register with password'}
               </span>
             </div>
           </div>
@@ -505,14 +590,14 @@ export default function LoginPage() {
               <div className="flex items-center gap-1.5 mb-2">
                 <Store className="w-3.5 h-3.5 text-emerald-600" />
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                  Shop & Workspace Details
+                  {regVenueLabel} & Workspace Details
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Shop / Venue Name *
+                    {regVenueLabel} Name *
                   </label>
                   <input
                     id="reg-shop-name"
@@ -550,7 +635,7 @@ export default function LoginPage() {
 
               <div className="mt-2.5">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Shop Address (Tirupati)
+                  {regVenueLabel} Address (Tirupati)
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -583,7 +668,7 @@ export default function LoginPage() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  Register & Launch Shop Workspace
+                  Register & Launch {regVenueLabel} Workspace
                   <ArrowRight className="w-4 h-4" />
                 </span>
               )}
@@ -649,9 +734,9 @@ export default function LoginPage() {
               >
                 <div>
                   <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    Naturals Salon & Spa
+                    Naturals Beauty Salon
                     <span className="px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 rounded font-semibold">
-                      Salon Manager
+                      Salon Staff
                     </span>
                   </p>
                   <p className="text-[10px] text-slate-500">naturals.salon@tirupati-appointments.com</p>

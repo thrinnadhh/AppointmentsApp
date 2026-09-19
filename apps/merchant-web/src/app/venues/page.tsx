@@ -29,11 +29,11 @@ type ProviderWithResources = Provider & { resources: Resource[] };
 
 const CATEGORIES = [
   { id: 'all', label: 'All Businesses', icon: Building2 },
-  { id: 'clinic', label: 'Clinics & Hospitals', icon: Stethoscope },
-  { id: 'salon', label: 'Salons & Spas', icon: Scissors },
+  { id: 'clinics', label: 'Clinics & Hospitals', icon: Stethoscope },
+  { id: 'salons', label: 'Salons & Spas', icon: Scissors },
   { id: 'gaming', label: 'Gaming & Turfs', icon: Gamepad2 },
-  { id: 'restaurant', label: 'Restaurants', icon: Utensils },
-  { id: 'pet', label: 'Pet Care', icon: HeartHandshake },
+  { id: 'restaurants', label: 'Restaurants', icon: Utensils },
+  { id: 'pets', label: 'Pet Care', icon: HeartHandshake },
 ];
 
 export default function VenuesPage() {
@@ -47,7 +47,7 @@ export default function VenuesPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
-  const [categoryId, setCategoryId] = useState('clinic');
+  const [categoryId, setCategoryId] = useState('clinics');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -82,16 +82,20 @@ export default function VenuesPage() {
   const loadVenues = async () => {
     setLoading(true);
     try {
-      const data = await fetchAllProviders();
-      if (data && data.length > 0) {
-        setVenues(data);
+      if (isSuperAdmin) {
+        const data = await fetchAllProviders();
+        setVenues(data || []);
       } else if (activeProvider) {
         setVenues([{ ...activeProvider, resources: [] } as ProviderWithResources]);
+      } else {
+        setVenues([]);
       }
     } catch (err) {
       console.error('Failed to load venues:', err);
       if (activeProvider) {
         setVenues([{ ...activeProvider, resources: [] } as ProviderWithResources]);
+      } else {
+        setVenues([]);
       }
     } finally {
       setLoading(false);
@@ -100,7 +104,7 @@ export default function VenuesPage() {
 
   useEffect(() => {
     loadVenues();
-  }, [activeProvider]);
+  }, [activeProvider, isSuperAdmin]);
 
   const handleCreateVenue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -396,11 +400,17 @@ export default function VenuesPage() {
                     <Users className="w-3.5 h-3.5 text-emerald-600" />
                     <span>
                       {resourceCount}{' '}
-                      {venue.category_id === 'clinic'
+                      {normCategory(venue.category_id) === 'clinic'
                         ? 'Doctors'
-                        : venue.category_id === 'salons' || venue.category_id === 'salon'
+                        : normCategory(venue.category_id) === 'salon'
                         ? 'Stylists'
-                        : 'Resources / Units'}
+                        : normCategory(venue.category_id) === 'gaming'
+                        ? 'Courts & Pitches'
+                        : normCategory(venue.category_id) === 'restaurant'
+                        ? 'Tables'
+                        : normCategory(venue.category_id) === 'pet'
+                        ? 'Vets & Groomers'
+                        : 'Units'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -420,14 +430,20 @@ export default function VenuesPage() {
                     </label>
                     <Link
                       href={`/resources?providerId=${venue.id}`}
-                      aria-label={`Manage Staff for ${venue.name}`}
+                      aria-label={`Manage resources for ${venue.name}`}
                       className="inline-flex items-center text-xs font-bold text-emerald-700 hover:text-emerald-900 group"
                     >
-                      {venue.category_id === 'salons' || venue.category_id === 'salon'
-                        ? 'Manage Stylists'
-                        : venue.category_id === 'clinic'
+                      {normCategory(venue.category_id) === 'clinic'
                         ? 'Manage Doctors'
-                        : 'Manage Staff'}
+                        : normCategory(venue.category_id) === 'salon'
+                        ? 'Manage Stylists'
+                        : normCategory(venue.category_id) === 'gaming'
+                        ? 'Manage Courts'
+                        : normCategory(venue.category_id) === 'restaurant'
+                        ? 'Manage Tables'
+                        : normCategory(venue.category_id) === 'pet'
+                        ? 'Manage Vets & Groomers'
+                        : 'Manage Resources'}
                       <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
                     </Link>
                   </div>
@@ -497,11 +513,11 @@ export default function VenuesPage() {
                   onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
                 >
-                  <option value="clinic">Clinic & Hospital (Doctors & Appointments)</option>
-                  <option value="salon">Salon & Spa (Hair, Skin & Beauty)</option>
+                  <option value="clinics">Clinic & Hospital (Doctors & Appointments)</option>
+                  <option value="salons">Salon & Spa (Hair, Skin & Beauty)</option>
                   <option value="gaming">Gaming Arena & Sports Turf (Box Cricket, Badminton)</option>
-                  <option value="restaurant">Restaurant & Dining (Table Reservations)</option>
-                  <option value="pet">Pet Care & Clinic (Grooming & Veterinary)</option>
+                  <option value="restaurants">Restaurant & Dining (Table Reservations)</option>
+                  <option value="pets">Pet Care & Clinic (Grooming & Veterinary)</option>
                 </select>
               </div>
 

@@ -5,6 +5,9 @@ import {
   BookingStatus,
   PaymentStatus,
   Provider,
+  DaySchedule,
+  DayOfWeek,
+  WeeklyHours,
   Resource,
   ResourceType,
   NotificationLog,
@@ -20,6 +23,9 @@ import {
 
 export type {
   Provider,
+  DaySchedule,
+  DayOfWeek,
+  WeeklyHours,
   Resource,
   ResourceType,
   NotificationLog,
@@ -91,6 +97,8 @@ export interface MerchantBookingWithDetails {
   attachment_url?: string | null;
   reminder_1h_sent_at?: string | null;
   reminder_30m_sent_at?: string | null;
+  is_present?: boolean;
+  customer_arrived_at?: string | null;
   customer_name?: string;
   customer_phone?: string;
   no_show_count?: number;
@@ -110,6 +118,7 @@ export async function fetchAllProviders(): Promise<(Provider & { resources: Reso
   }
   return (data || []).map((p) => ({
     ...p,
+    weekly_hours: p.weekly_hours as unknown as WeeklyHours | null | undefined,
     resources: (p.resources || []).map((r) => ({
       ...r,
       type: r.type as ResourceType,
@@ -117,7 +126,7 @@ export async function fetchAllProviders(): Promise<(Provider & { resources: Reso
       price: r.price !== null ? Number(r.price) : null,
       attributes: (r.attributes || {}) as Record<string, unknown>,
     })),
-  }));
+  })) as (Provider & { resources: Resource[] })[];
 }
 
 type RawBookingRow = Database['public']['Tables']['bookings']['Row'] & {
@@ -235,6 +244,24 @@ export async function rescheduleBookingSlot(bookingId: string, newStartIso: stri
   const result = data as { success?: boolean; error?: string };
   if (result && !result.success) {
     throw new Error(result.error || 'Failed to reschedule booking');
+  }
+  return data;
+}
+
+export async function reassignBookingResource(bookingId: string, newResourceId: string, reason?: string) {
+  const { data, error } = await supabase.rpc('reassign_booking_resource', {
+    p_booking_id: bookingId,
+    p_new_resource_id: newResourceId,
+    p_reason: reason || 'Emergency staff reassignment',
+  });
+
+  if (error) {
+    console.error('Error reassigning resource:', error);
+    throw error;
+  }
+  const result = data as { success?: boolean; error?: string };
+  if (result && !result.success) {
+    throw new Error(result.error || 'Failed to reassign resource');
   }
   return data;
 }
@@ -457,6 +484,28 @@ export async function fetchTenantContextData(): Promise<{
       .limit(1);
     if (ownedProviders && ownedProviders.length > 0) {
       activeProvider = ownedProviders[0] as unknown as (Provider & { resources?: Resource[] });
+    }
+  }
+
+  // 3. If user signed in with Google (or email) matching a registered shop's email
+  if (!activeProvider && !isSuperAdmin && userProfile.user.email) {
+    const userEmail = userProfile.user.email.toLowerCase().trim();
+    const { data: matchedProviders } = await supabase
+      .from('providers')
+      .select('*, resources(*)')
+      .ilike('email', userEmail)
+      .limit(1);
+
+    if (matchedProviders && matchedProviders.length > 0) {
+      activeProvider = matchedProviders[0] as unknown as (Provider & { resources?: Resource[] });
+      try {
+        await (supabase.rpc as any)('auto_link_merchant_by_email', {
+          p_user_id: userProfile.user.id,
+          p_email: userEmail,
+        });
+      } catch (err) {
+        console.warn('Auto-link provider note:', err);
+      }
     }
   }
 

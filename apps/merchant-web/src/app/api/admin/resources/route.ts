@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       p_type: type,
       p_department: department || 'General',
       p_price: Number(price) || 500,
-      p_deposit_amount: (depositAmount !== undefined && depositAmount !== null && !isNaN(Number(depositAmount))) ? Number(depositAmount) : 50,
+      p_deposit_amount: (depositAmount !== undefined && depositAmount !== null && !isNaN(Number(depositAmount))) ? Number(depositAmount) : (Number(price) || 500),
       p_duration_minutes: Number(durationMinutes) || 30,
       p_capacity: Number(capacity) || 1,
     });
@@ -82,6 +82,33 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, resource: data }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Resource ID is required' }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Call PostgreSQL SECURITY DEFINER RPC to safely delete the resource while enforcing constraints
+    const { data, error } = await (supabaseAdmin.rpc as any)('admin_delete_resource', {
+      p_resource_id: id,
+    });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, result: data }, { status: 200 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });

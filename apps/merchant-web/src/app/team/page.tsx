@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { 
   UserCheck, 
   UserPlus, 
@@ -18,7 +19,8 @@ import {
   Copy,
   Check
 } from 'lucide-react';
-import { fetchAllProfiles } from '@/lib/supabase';
+import { fetchAllProfiles, supabase } from '@/lib/supabase';
+import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 interface TeamMember {
   id: string;
@@ -31,6 +33,7 @@ interface TeamMember {
 }
 
 export default function TeamManagementPage() {
+  const { activeProvider, isSuperAdmin, verticalConfig } = useMerchantTenant();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,10 +55,26 @@ export default function TeamManagementPage() {
   const loadTeam = async () => {
     setLoading(true);
     try {
-      const data = await fetchAllProfiles();
-      setMembers(data as TeamMember[]);
+      if (isSuperAdmin) {
+        const data = await fetchAllProfiles();
+        setMembers(data as TeamMember[]);
+      } else if (activeProvider?.id) {
+        const { data, error } = await supabase
+          .from('merchant_memberships' as any)
+          .select('user_id, role, profile:profiles(*)')
+          .eq('provider_id', activeProvider.id);
+        if (!error && data) {
+          const mapped = data.map((m: any) => m.profile).filter(Boolean);
+          setMembers(mapped as TeamMember[]);
+        } else {
+          setMembers([]);
+        }
+      } else {
+        setMembers([]);
+      }
     } catch (err) {
       console.error('Failed to load team:', err);
+      setMembers([]);
     } finally {
       setLoading(false);
     }
@@ -63,7 +82,7 @@ export default function TeamManagementPage() {
 
   useEffect(() => {
     loadTeam();
-  }, []);
+  }, [activeProvider?.id, isSuperAdmin]);
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +150,26 @@ export default function TeamManagementPage() {
 
   const adminCount = members.filter((m) => m.role === 'admin').length;
   const merchantCount = members.filter((m) => m.role === 'merchant').length;
+
+  if (!activeProvider && !isSuperAdmin) {
+    return (
+      <div className="max-w-xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-2xl text-center shadow-sm">
+        <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Building2 className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Register Your Shop First</h2>
+        <p className="text-slate-600 mb-6">
+          To manage team members and staff credentials, please register or sign in to your shop first.
+        </p>
+        <Link
+          href="/login?mode=register"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition shadow-sm"
+        >
+          Register Your Shop
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -370,8 +409,12 @@ export default function TeamManagementPage() {
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Add Staff / Merchant User</h3>
-                  <p className="text-xs text-slate-500">Provision email and password credentials for new personnel</p>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Add {verticalConfig.resourceLabelSingular} / Staff Account
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Provision email and password credentials for new {verticalConfig.resourceLabelPlural.toLowerCase()}
+                  </p>
                 </div>
               </div>
               <button
@@ -402,7 +445,17 @@ export default function TeamManagementPage() {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g., Dr. Ramesh Naidu (Cardiology Head)"
+                  placeholder={
+                    verticalConfig.id === 'clinics'
+                      ? 'e.g., Dr. Ramesh Naidu (Cardiology Head)'
+                      : verticalConfig.id === 'salons'
+                      ? 'e.g., Priya Sharma (Senior Stylist)'
+                      : verticalConfig.id === 'gaming'
+                      ? 'e.g., Suresh Reddy (Turf Coordinator)'
+                      : verticalConfig.id === 'restaurants'
+                      ? 'e.g., Rajesh Kumar (Floor Manager)'
+                      : 'e.g., Staff Member Name'
+                  }
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
@@ -421,7 +474,11 @@ export default function TeamManagementPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="doctor.ramesh@tirupati-appointments.com"
+                    placeholder={
+                      activeProvider?.name
+                        ? `staff@${activeProvider.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
+                        : 'staff@tirupati-appointments.com'
+                    }
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
@@ -441,7 +498,7 @@ export default function TeamManagementPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min 6 characters (e.g. RameshClinic2026!)"
+                    placeholder="Min 6 characters (e.g. StaffPass2026!)"
                     className="w-full pl-9 pr-10 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                   <button

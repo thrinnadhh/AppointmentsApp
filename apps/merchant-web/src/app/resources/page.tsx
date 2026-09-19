@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { 
   Users, 
@@ -12,11 +13,15 @@ import {
   RefreshCw, 
   Building2, 
   Stethoscope, 
+  Scissors,
+  Gamepad2,
+  Utensils,
   Layers, 
   IndianRupee, 
-  BadgePercent,
   Search,
-  Filter
+  Filter,
+  Trash2,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   supabase, 
@@ -24,7 +29,6 @@ import {
   fetchProviderResources,
   Provider 
 } from '@/lib/supabase';
-import { INITIAL_RESOURCES, INITIAL_MERCHANT_PROVIDER, SALON_RESOURCES, SALON_MERCHANT_PROVIDER } from '@/lib/mock-data';
 import { Resource, ResourceType } from '@appointments/shared';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
@@ -34,29 +38,42 @@ function ResourcesManagementContent() {
 
   const { activeProvider: tenantProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
 
-  const [providers, setProviders] = useState<Provider[]>([tenantProvider || INITIAL_MERCHANT_PROVIDER]);
+  const [providers, setProviders] = useState<Provider[]>(tenantProvider ? [tenantProvider] : []);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    tenantProvider?.id || providerParam || INITIAL_MERCHANT_PROVIDER.id
+    tenantProvider?.id || (isSuperAdmin ? providerParam || '' : '')
   );
-  const [resources, setResources] = useState<Resource[]>(
-    (tenantProvider?.category_id === 'salons' ? SALON_RESOURCES : INITIAL_RESOURCES)
-  );
+  const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
 
-  const departmentSuggestions = verticalConfig.departments;
+  const defaultResourceType: ResourceType = (
+    verticalConfig.id === 'salons' ? 'stylist' :
+    verticalConfig.id === 'gaming' ? 'court' :
+    verticalConfig.id === 'restaurants' ? 'table' :
+    verticalConfig.id === 'pets' ? 'vet' :
+    'doctor'
+  );
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    type: ResourceType;
+    department: string;
+    price: number;
+    deposit_amount: number;
+    duration_minutes: number;
+    capacity: number;
+    specialization: string;
+  }>({
     name: '',
-    type: (verticalConfig.id === 'salons' ? 'stylist' : 'doctor') as ResourceType,
-    department: departmentSuggestions[0] || 'General',
+    type: defaultResourceType,
+    department: '',
     price: verticalConfig.defaultPrice,
-    deposit_amount: verticalConfig.defaultDeposit,
+    deposit_amount: verticalConfig.defaultPrice,
     duration_minutes: verticalConfig.defaultDurationMinutes,
-    capacity: 1,
+    capacity: verticalConfig.id === 'gaming' ? 14 : (verticalConfig.id === 'restaurants' ? 4 : 1),
     specialization: '',
   });
 
@@ -64,15 +81,29 @@ function ResourcesManagementContent() {
   useEffect(() => {
     if (tenantProvider?.id && !isSuperAdmin) {
       setSelectedProviderId(tenantProvider.id);
+      setProviders([tenantProvider]);
+      setFormData((prev) => ({
+        ...prev,
+        type: defaultResourceType,
+        department: '',
+        price: verticalConfig.defaultPrice,
+        deposit_amount: verticalConfig.defaultPrice,
+        duration_minutes: verticalConfig.defaultDurationMinutes,
+      }));
     }
-  }, [tenantProvider?.id, isSuperAdmin]);
+  }, [tenantProvider?.id, isSuperAdmin, verticalConfig, defaultResourceType]);
 
   const loadData = useCallback(async () => {
+    if (!selectedProviderId && !isSuperAdmin) {
+      setLoading(false);
+      setResources([]);
+      return;
+    }
     setLoading(true);
     try {
       const [fetchedProviders, fetchedResources] = await Promise.all([
-        isSuperAdmin ? fetchAllProviders() : Promise.resolve([tenantProvider || INITIAL_MERCHANT_PROVIDER]),
-        fetchProviderResources(selectedProviderId),
+        isSuperAdmin ? fetchAllProviders() : Promise.resolve(tenantProvider ? [tenantProvider] : []),
+        selectedProviderId ? fetchProviderResources(selectedProviderId) : Promise.resolve([]),
       ]);
 
       if (fetchedProviders && fetchedProviders.length > 0) {
@@ -81,16 +112,10 @@ function ResourcesManagementContent() {
           setSelectedProviderId(providerParam);
         }
       }
-      if (fetchedResources && fetchedResources.length > 0) {
-        setResources(fetchedResources as Resource[]);
-      } else if (selectedProviderId === SALON_MERCHANT_PROVIDER.id) {
-        setResources(SALON_RESOURCES);
-      }
+      setResources((fetchedResources || []) as Resource[]);
     } catch (err) {
-      console.warn('Fallback to local resources:', err);
-      if (selectedProviderId === SALON_MERCHANT_PROVIDER.id) {
-        setResources(SALON_RESOURCES);
-      }
+      console.warn('Error fetching resources:', err);
+      setResources([]);
     } finally {
       setLoading(false);
     }
@@ -114,7 +139,7 @@ function ResourcesManagementContent() {
           type: formData.type,
           department: formData.department.trim() || 'General',
           price: Number(formData.price),
-          depositAmount: Number(formData.deposit_amount),
+          depositAmount: Number(formData.price),
           durationMinutes: Number(formData.duration_minutes),
           capacity: Number(formData.capacity),
         }),
@@ -125,7 +150,7 @@ function ResourcesManagementContent() {
         throw new Error(json.error || 'Failed to create resource');
       }
 
-      setFeedbackToast(`Added "${formData.name}" in Department "${formData.department}" (Fee: ₹${formData.price})!`);
+      setFeedbackToast(`${verticalConfig.resourceLabelSingular} "${formData.name}" added successfully.`);
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error adding resource';
@@ -134,12 +159,12 @@ function ResourcesManagementContent() {
       setIsAdding(false);
       setFormData({
         name: '',
-        type: 'doctor',
-        department: 'General Medicine',
-        price: 500,
-        deposit_amount: 50,
-        duration_minutes: 30,
-        capacity: 1,
+        type: defaultResourceType,
+        department: '',
+        price: verticalConfig.defaultPrice,
+        deposit_amount: verticalConfig.defaultPrice,
+        duration_minutes: verticalConfig.defaultDurationMinutes,
+        capacity: verticalConfig.id === 'gaming' ? 14 : (verticalConfig.id === 'restaurants' ? 4 : 1),
         specialization: '',
       });
       setTimeout(() => setFeedbackToast(null), 5000);
@@ -152,7 +177,7 @@ function ResourcesManagementContent() {
         .from('resources')
         .update({ is_active: !currentActive, updated_at: new Date().toISOString() })
         .eq('id', id);
-      setFeedbackToast(`Doctor / Unit status updated.`);
+      setFeedbackToast(`${verticalConfig.resourceLabelSingular} status updated.`);
       await loadData();
     } catch (err) {
       console.warn('Toggling locally:', err);
@@ -161,6 +186,30 @@ function ResourcesManagementContent() {
       );
     } finally {
       setTimeout(() => setFeedbackToast(null), 3000);
+    }
+  };
+
+  const handleDeleteResource = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/resources?id=${id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.error || 'Failed to delete resource');
+      }
+      // Optimistically remove from state immediately
+      setResources((prev) => prev.filter((r) => r.id !== id));
+      setFeedbackToast(`Deleted "${name}" successfully.`);
+      await loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error deleting resource';
+      setFeedbackToast(`Error: ${msg}`);
+    } finally {
+      setTimeout(() => setFeedbackToast(null), 4000);
     }
   };
 
@@ -180,18 +229,42 @@ function ResourcesManagementContent() {
 
   const selectedVenue = providers.find((p) => p.id === selectedProviderId);
 
+  if (!tenantProvider && !isSuperAdmin) {
+    return (
+      <div className="max-w-xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-2xl text-center shadow-sm">
+        <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Building2 className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Register Your Shop First</h2>
+        <p className="text-slate-600 mb-6">
+          To manage staff, chairs, or consultation units, please register or sign in to your shop first.
+        </p>
+        <Link
+          href="/login?mode=register"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition shadow-sm"
+        >
+          Register Your Shop
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Toast */}
       {feedbackToast && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-3 rounded-xl flex items-center justify-between text-sm shadow-sm animate-fade-in">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="font-semibold">{feedbackToast}</span>
           </div>
-          <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono">
-            Database Live
-          </span>
+          <button
+            onClick={() => setFeedbackToast(null)}
+            className="text-emerald-600 hover:text-emerald-900 px-2 py-0.5 text-xs font-bold rounded transition"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -202,15 +275,21 @@ function ResourcesManagementContent() {
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
               Department & Resource Builder
             </span>
-            <span className="text-xs text-slate-500">• Individual Pricing & Booking Deposits</span>
+            <span className="text-xs text-slate-500">• Total Consultation & Service Fees (Total Cash Payable)</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             {verticalConfig.resourceLabelPlural}, Departments & Services
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             {verticalConfig.id === 'salons'
-              ? 'Manage senior hair stylists, aesthetic specialists, chairs/stations, and custom salon service pricing.'
-              : 'Assign doctors to departments (Cardiology, Ortho, Dental) and set custom appointment fees and slot deposits.'}
+              ? 'Manage senior hair stylists, aesthetic specialists, chairs/stations, and salon service pricing.'
+              : verticalConfig.id === 'gaming'
+              ? 'Manage box cricket pitches, turf arenas, badminton courts, and booking rates.'
+              : verticalConfig.id === 'restaurants'
+              ? 'Configure dining tables, rooftop cabanas, and table reservation rates.'
+              : verticalConfig.id === 'pets'
+              ? 'Manage veterinary doctors, pet groomers, wellness consultation bays, and care pricing.'
+              : 'Add doctors/staff to any department of your choice (e.g. Cardiology, Ortho, General Medicine) with total cash consultation fees.'}
           </p>
         </div>
 
@@ -300,9 +379,9 @@ function ResourcesManagementContent() {
           <input
             id="resource-search"
             name="resourceSearch"
-            aria-label="Search doctor name or department"
+            aria-label={`Search ${verticalConfig.resourceLabelSingular.toLowerCase()} or department`}
             type="text"
-            placeholder="Search doctor name or department..."
+            placeholder={`Search ${verticalConfig.resourceLabelSingular.toLowerCase()} name or department...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50/50"
@@ -347,11 +426,19 @@ function ResourcesManagementContent() {
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <Stethoscope className="w-5 h-5" />
+                  {verticalConfig.id === 'salons' ? (
+                    <Scissors className="w-5 h-5" />
+                  ) : verticalConfig.id === 'gaming' ? (
+                    <Gamepad2 className="w-5 h-5" />
+                  ) : verticalConfig.id === 'restaurants' ? (
+                    <Utensils className="w-5 h-5" />
+                  ) : (
+                    <Stethoscope className="w-5 h-5" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Add Doctor / Service Unit</h3>
-                  <p className="text-xs text-slate-500">Configure department, consultation fee, and booking deposit</p>
+                  <h3 className="text-lg font-bold text-slate-900">Add {verticalConfig.resourceLabelSingular} / Service Unit</h3>
+                  <p className="text-xs text-slate-500">Configure department, {verticalConfig.actionVerb.toLowerCase()} fee, and booking deposit</p>
                 </div>
               </div>
               <button
@@ -366,24 +453,30 @@ function ResourcesManagementContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label htmlFor="doctor-name" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Doctor / Specialist Name *
+                    {verticalConfig.resourceLabelSingular} Name *
                   </label>
                   <input
                     id="doctor-name"
                     name="doctorName"
-                    aria-label="Doctor or Specialist Name"
+                    aria-label={`${verticalConfig.resourceLabelSingular} Name`}
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Dr. A. V. Ramana Rao, MD (Cardiology)"
+                    placeholder={
+                      verticalConfig.id === 'salons' ? 'e.g. Priya Sharma (Senior Stylist)' :
+                      verticalConfig.id === 'gaming' ? 'e.g. Box Cricket Pitch 1 (Floodlit)' :
+                      verticalConfig.id === 'restaurants' ? 'e.g. Family Dining Table 4 (AC Hall)' :
+                      verticalConfig.id === 'pets' ? 'e.g. Dr. K. Suresh (Veterinary Surgeon)' :
+                      'e.g. Dr. A. V. Ramana Rao, MD (Cardiology)'
+                    }
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
                   <label htmlFor="doctor-department" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Department *
+                    Department / Specialty *
                   </label>
                   <input
                     id="doctor-department"
@@ -391,17 +484,12 @@ function ResourcesManagementContent() {
                     aria-label="Department"
                     type="text"
                     required
-                    list="dept-list"
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    placeholder="e.g. Cardiology, Orthopedics, Dental"
+                    placeholder="Enter any department (e.g. Cardiology, Pediatrics, General Medicine, Skin Care...)"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
-                  <datalist id="dept-list">
-                    {departmentSuggestions.map((d) => (
-                      <option key={d} value={d} />
-                    ))}
-                  </datalist>
+                  <p className="text-[11px] text-slate-500 mt-1">Add any custom department or category you want</p>
                 </div>
 
                 <div>
@@ -427,46 +515,27 @@ function ResourcesManagementContent() {
 
                 <div>
                   <label htmlFor="doctor-price" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Appointment Price (₹) *
+                    Total Fee (₹) *
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-slate-400 font-bold text-sm">₹</span>
                     <input
                       id="doctor-price"
                       name="doctorPrice"
-                      aria-label="Appointment Price in Rupees"
+                      aria-label="Total Fee in Rupees"
                       type="number"
                       required
                       min="0"
                       step="50"
                       value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setFormData({ ...formData, price: val, deposit_amount: val });
+                      }}
                       className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold"
                     />
                   </div>
-                  <span className="text-[11px] text-slate-500">Total consultation / service charge</span>
-                </div>
-
-                <div>
-                  <label htmlFor="doctor-deposit" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Slot Advance Deposit (₹) *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-slate-400 font-bold text-sm">₹</span>
-                    <input
-                      id="doctor-deposit"
-                      name="doctorDeposit"
-                      aria-label="Slot Advance Deposit in Rupees"
-                      type="number"
-                      required
-                      min="0"
-                      step="10"
-                      value={formData.deposit_amount}
-                      onChange={(e) => setFormData({ ...formData, deposit_amount: Number(e.target.value) })}
-                      className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold"
-                    />
-                  </div>
-                  <span className="text-[11px] text-slate-500">Advance token to lock appointment</span>
+                  <span className="text-[11px] text-slate-500">Total cash amount to be paid by customer (No advance deposit)</span>
                 </div>
 
                 <div>
@@ -516,7 +585,7 @@ function ResourcesManagementContent() {
                   className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Save Doctor / Unit
+                  Save {verticalConfig.resourceLabelSingular}
                 </button>
               </div>
             </form>
@@ -528,14 +597,14 @@ function ResourcesManagementContent() {
       {loading ? (
         <div className="py-16 text-center text-slate-500">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
-          Loading doctors and departments...
+          Loading {verticalConfig.resourceLabelPlural.toLowerCase()} and departments...
         </div>
       ) : filteredResources.length === 0 ? (
         <div className="py-16 text-center bg-white rounded-2xl border border-slate-200 p-8">
           <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-base font-bold text-slate-800">No doctors or units found</p>
+          <p className="text-base font-bold text-slate-800">No {verticalConfig.resourceLabelPlural.toLowerCase()} found</p>
           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-            Click &quot;Add Doctor / Service&quot; to assign the first doctor, department, and consultation price.
+            Click &quot;Add {verticalConfig.resourceLabelSingular}&quot; to assign your first {verticalConfig.resourceLabelSingular.toLowerCase()}, department, and pricing.
           </p>
         </div>
       ) : (
@@ -573,7 +642,7 @@ function ResourcesManagementContent() {
                     </button>
                   </div>
 
-                  {/* Doctor Info */}
+                  {/* Resource Info */}
                   <div>
                     <h3 className="text-lg font-bold text-slate-900 leading-snug">
                       {res.name}
@@ -584,27 +653,20 @@ function ResourcesManagementContent() {
                     </p>
                   </div>
 
-                  {/* Pricing Box */}
-                  <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 grid grid-cols-2 gap-3">
+                  {/* Pricing Box - Total Cash Fee */}
+                  <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 flex items-center justify-between">
                     <div>
                       <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider flex items-center gap-1">
-                        <IndianRupee className="w-3 h-3 text-slate-400" />
-                        Fee / Price
+                        <IndianRupee className="w-3 h-3 text-emerald-600" />
+                        Total Fee
                       </p>
-                      <p className="text-lg font-bold text-slate-900 mt-0.5">
+                      <p className="text-xl font-bold text-slate-900 mt-0.5">
                         ₹{Number(price).toFixed(0)}
                       </p>
                     </div>
-
-                    <div>
-                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider flex items-center gap-1">
-                        <BadgePercent className="w-3 h-3 text-emerald-600" />
-                        Advance Deposit
-                      </p>
-                      <p className="text-lg font-bold text-emerald-700 mt-0.5">
-                        ₹{Number(deposit).toFixed(0)}
-                      </p>
-                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Pay Total Cash
+                    </span>
                   </div>
 
                   {/* Slot Details */}
@@ -617,17 +679,27 @@ function ResourcesManagementContent() {
                   </div>
                 </div>
 
-                {/* Footer Toggle */}
+                {/* Footer Toggle & Delete */}
                 <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-[11px] text-slate-400 font-mono">
                     ID: {res.id.substring(0, 8)}
                   </span>
-                  <button
-                    onClick={() => toggleActive(res.id, res.is_active)}
-                    className="text-xs font-bold text-slate-600 hover:text-emerald-700 transition-colors"
-                  >
-                    {res.is_active ? 'Pause Bookings' : 'Reactivate Unit'}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => toggleActive(res.id, res.is_active)}
+                      className="text-xs font-bold text-slate-600 hover:text-emerald-700 transition-colors"
+                    >
+                      {res.is_active ? 'Pause Bookings' : 'Reactivate Unit'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteResource(res.id, res.name)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      title={`Delete ${res.name}`}
+                      aria-label={`Delete ${res.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

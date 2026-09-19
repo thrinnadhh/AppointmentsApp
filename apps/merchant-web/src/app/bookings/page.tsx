@@ -17,7 +17,8 @@ import {
   Send,
   Bell,
   Calendar,
-  History
+  History,
+  UserCheck
 } from 'lucide-react';
 import { 
   supabase, 
@@ -26,25 +27,25 @@ import {
   updateBookingStatus, 
   rescheduleBookingSlot, 
   recordMerchantNoShow,
+  reassignBookingResource,
+  fetchProviderResources,
   getPrescriptionSignedUrl,
   fetchBookingNotifications,
   MerchantBookingWithDetails,
   NotificationLog
 } from '@/lib/supabase';
-import { INITIAL_BOOKINGS, INITIAL_MERCHANT_PROVIDER, SALON_BOOKINGS, SALON_MERCHANT_PROVIDER } from '@/lib/mock-data';
+import Link from 'next/link';
 import { BookingStatus, Provider, PaymentStatus } from '@appointments/shared';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 export default function BookingsManagementPage() {
   const { activeProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
 
-  const [providers, setProviders] = useState<Provider[]>([activeProvider || INITIAL_MERCHANT_PROVIDER]);
+  const [providers, setProviders] = useState<Provider[]>(activeProvider ? [activeProvider] : []);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    isSuperAdmin ? 'ALL' : (activeProvider?.id || INITIAL_MERCHANT_PROVIDER.id)
+    isSuperAdmin ? 'ALL' : (activeProvider?.id || '')
   );
-  const [bookings, setBookings] = useState<MerchantBookingWithDetails[]>(
-    (activeProvider?.category_id === 'salons' ? SALON_BOOKINGS : INITIAL_BOOKINGS) as unknown as MerchantBookingWithDetails[]
-  );
+  const [bookings, setBookings] = useState<MerchantBookingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | BookingStatus>('ALL');
   const [selectedDateFilter, setSelectedDateFilter] = useState<'ALL' | 'TODAY' | 'YESTERDAY' | 'WEEK'>('ALL');
@@ -52,6 +53,11 @@ export default function BookingsManagementPage() {
   const [rescheduleModalId, setRescheduleModalId] = useState<string | null>(null);
   const [newSlotTime, setNewSlotTime] = useState('');
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+  const [reassignModalBooking, setReassignModalBooking] = useState<MerchantBookingWithDetails | null>(null);
+  const [availableResources, setAvailableResources] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [selectedResourceId, setSelectedResourceId] = useState('');
+  const [reassignReason, setReassignReason] = useState('Emergency specialist change');
+  const [isReassigning, setIsReassigning] = useState(false);
   const [notificationModalBooking, setNotificationModalBooking] = useState<MerchantBookingWithDetails | null>(null);
   const [bookingNotificationLogs, setBookingNotificationLogs] = useState<NotificationLog[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -60,6 +66,7 @@ export default function BookingsManagementPage() {
   useEffect(() => {
     if (activeProvider?.id && !isSuperAdmin) {
       setSelectedProviderId(activeProvider.id);
+      setProviders([activeProvider]);
     }
   }, [activeProvider?.id, isSuperAdmin]);
 
@@ -71,23 +78,17 @@ export default function BookingsManagementPage() {
         : (selectedProviderId === 'ALL' ? undefined : selectedProviderId);
 
       const [fetchedProviders, fetchedBookings] = await Promise.all([
-        isSuperAdmin ? fetchAllProviders() : Promise.resolve([activeProvider || INITIAL_MERCHANT_PROVIDER]),
-        fetchMerchantBookings(targetProviderId)
+        isSuperAdmin ? fetchAllProviders() : Promise.resolve(activeProvider ? [activeProvider] : []),
+        targetProviderId ? fetchMerchantBookings(targetProviderId) : Promise.resolve([])
       ]);
 
-      if (fetchedProviders && fetchedProviders.length > 0) {
+      if (fetchedProviders) {
         setProviders(fetchedProviders);
       }
-      if (fetchedBookings && fetchedBookings.length > 0) {
-        setBookings(fetchedBookings);
-      } else if (targetProviderId === SALON_MERCHANT_PROVIDER.id) {
-        setBookings(SALON_BOOKINGS as unknown as MerchantBookingWithDetails[]);
-      }
+      setBookings(fetchedBookings || []);
     } catch (err) {
-      console.warn('Fallback to local state due to error:', err);
-      if (selectedProviderId === SALON_MERCHANT_PROVIDER.id || activeProvider?.category_id === 'salons') {
-        setBookings(SALON_BOOKINGS as unknown as MerchantBookingWithDetails[]);
-      }
+      console.warn('Error loading bookings:', err);
+      setBookings([]);
     } finally {
       setLoading(false);
     }
@@ -137,6 +138,8 @@ export default function BookingsManagementPage() {
     return t >= startOfWeek && t <= (now.getTime() + 48 * 60 * 60 * 1000);
   }).length;
 
+  const todayPresentCount = bookings.filter((b) => Boolean(b.is_present) && b.status === 'CONFIRMED').length;
+
   const filteredBookings = bookings.filter((b) => {
     const matchesFilter = selectedFilter === 'ALL' || b.status === selectedFilter;
     const matchesSearch = 
@@ -165,8 +168,27 @@ export default function BookingsManagementPage() {
   ) => {
     try {
       if (newStatus === 'NO_SHOW') {
-        await recordMerchantNoShow(bookingId);
-        setFeedbackToast('No-show recorded in Supabase: deposit forfeited & strike incremented.');
+        const res = (await recordMerchantNoShow(bookingId)) as { payment_status?: string; penalty_applied?: boolean } | null;
+        if (res?.payment_status === 'REFUNDED') {
+          setFeedbackToast('No-show recorded: Courtesy refund granted to customer (Grace Period).');
+        } else {
+          setFeedbackToast('No-show recorded: Strike 3 penalty applied, deposit forfeited to shop.');
+        }
+      } else if (newStatus === 'CANCELLED') {
+        const res = (await updateBookingStatus(bookingId, newStatus, paymentStatus)) as {
+          merchant_strikes?: number;
+          penalty_applied?: boolean;
+          penalty_amount?: number;
+          is_booking_frozen?: boolean;
+        } | null;
+
+        if (res?.penalty_applied) {
+          setFeedbackToast(`Booking cancelled. Merchant Strike ${res.merchant_strikes}! ₹${res.penalty_amount} penalty charged.`);
+        } else if (res?.merchant_strikes !== undefined && res.merchant_strikes > 0) {
+          setFeedbackToast(`Cancelled & 100% refunded: Merchant Strike ${res.merchant_strikes}/2 (Grace Period).`);
+        } else {
+          setFeedbackToast('Booking cancelled & full refund issued to customer.');
+        }
       } else {
         await updateBookingStatus(bookingId, newStatus, paymentStatus);
         setFeedbackToast(`Booking updated to ${newStatus} on Supabase`);
@@ -229,6 +251,39 @@ export default function BookingsManagementPage() {
     }
   };
 
+  const handleOpenReassignModal = async (booking: MerchantBookingWithDetails) => {
+    setReassignModalBooking(booking);
+    setReassignReason('Emergency specialist change');
+    setSelectedResourceId('');
+    try {
+      const res = await fetchProviderResources(booking.provider_id);
+      const filtered = (res || []).filter((r: { id: string }) => r.id !== booking.resource_id);
+      setAvailableResources(filtered as { id: string; name: string; type: string }[]);
+      if (filtered.length > 0) {
+        setSelectedResourceId(filtered[0].id);
+      }
+    } catch (err) {
+      console.error('Error fetching resources for reassignment:', err);
+    }
+  };
+
+  const handleReassignSubmit = async () => {
+    if (!reassignModalBooking || !selectedResourceId) return;
+    setIsReassigning(true);
+    try {
+      await reassignBookingResource(reassignModalBooking.id, selectedResourceId, reassignReason);
+      setFeedbackToast('Staff substituted! Reassignment alert sent to customer.');
+      setReassignModalBooking(null);
+      await loadData();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to substitute staff';
+      alert(msg);
+    } finally {
+      setIsReassigning(false);
+      setTimeout(() => setFeedbackToast(null), 4000);
+    }
+  };
+
   const handleViewPrescription = async (storagePath: string) => {
     try {
       const signedUrl = await getPrescriptionSignedUrl(storagePath, 3600);
@@ -276,6 +331,26 @@ export default function BookingsManagementPage() {
     }
   };
 
+  if (!activeProvider && !isSuperAdmin) {
+    return (
+      <div className="max-w-xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-2xl text-center shadow-sm">
+        <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Building2 className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Register Your Shop First</h2>
+        <p className="text-slate-600 mb-6">
+          To view your private appointments queue and manage bookings, please register or sign in to your shop.
+        </p>
+        <Link
+          href="/login?mode=register"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition shadow-sm"
+        >
+          Register Your Shop
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Toast Feedback */}
@@ -290,6 +365,29 @@ export default function BookingsManagementPage() {
       )}
 
       {/* Header */}
+      {(activeProvider?.cancellation_strikes ?? 0) > 0 && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between text-xs ${
+          (activeProvider?.cancellation_strikes ?? 0) >= 3
+            ? 'bg-rose-50 border-rose-200 text-rose-900'
+            : 'bg-amber-50 border-amber-200 text-amber-900'
+        }`}>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className={`w-4 h-4 ${(activeProvider?.cancellation_strikes ?? 0) >= 3 ? 'text-rose-600' : 'text-amber-600'}`} />
+            <span>
+              <strong>Venue Reliability Notice:</strong> {activeProvider?.cancellation_strikes} cancellation strike(s) recorded this period.
+              {(activeProvider?.cancellation_strikes ?? 0) >= 3
+                ? ' 3rd Strike reached: ₹100 penalty debited to payout. Please prioritize customer appointments.'
+                : ' Strikes 1 & 2 are courtesy grace period (100% customer refund). Strike 3 incurs a ₹100 penalty.'}
+            </span>
+          </div>
+          {activeProvider?.penalty_balance && activeProvider.penalty_balance > 0 ? (
+            <span className="font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded">
+              Penalty Balance: ₹{activeProvider.penalty_balance}
+            </span>
+          ) : null}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Bookings & Queue</h1>
@@ -359,6 +457,15 @@ export default function BookingsManagementPage() {
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {todayPresentCount > 0 && (
+              <span 
+                data-testid="lobby-present-pill"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
+                <span>{todayPresentCount} In Lobby Now</span>
+              </span>
+            )}
             <button
               type="button"
               data-testid="date-horizon-all"
@@ -460,24 +567,50 @@ export default function BookingsManagementPage() {
             const formattedDate = slotDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', weekday: 'short' });
 
             return (
-              <div key={booking.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/50 transition">
+              <div 
+                key={booking.id} 
+                data-testid={`queue-booking-card-${booking.id}`}
+                data-present={booking.is_present ? 'true' : 'false'}
+                className={`p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition ${
+                  booking.is_present
+                    ? 'bg-emerald-50/80 border-l-4 border-l-emerald-600 shadow-xs'
+                    : 'hover:bg-slate-50/50'
+                }`}
+              >
                 <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex flex-col items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">{slotDate.toLocaleDateString('en-IN', { weekday: 'short' })}</span>
-                    <span className="text-sm font-bold text-slate-900">{slotDate.getDate()}</span>
+                  <div className={`w-12 h-12 rounded-xl border flex flex-col items-center justify-center flex-shrink-0 transition-colors ${
+                    booking.is_present 
+                      ? 'bg-emerald-100 border-emerald-300' 
+                      : 'bg-slate-100 border-slate-200'
+                  }`}>
+                    <span className={`text-[10px] font-bold uppercase ${
+                      booking.is_present ? 'text-emerald-700' : 'text-slate-500'
+                    }`}>{slotDate.toLocaleDateString('en-IN', { weekday: 'short' })}</span>
+                    <span className={`text-sm font-bold ${
+                      booking.is_present ? 'text-emerald-950' : 'text-slate-900'
+                    }`}>{slotDate.getDate()}</span>
                   </div>
 
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h2 className="font-bold text-slate-900 text-sm">{booking.customer_name || 'Customer'}</h2>
                       {booking.reference_code && (
                         <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                           {booking.reference_code}
                         </span>
                       )}
+                      {booking.is_present && (
+                        <span 
+                          data-testid={`queue-present-badge-${booking.id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                          <span>📍 PRESENT</span>
+                        </span>
+                      )}
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         booking.status === 'CONFIRMED'
-                          ? 'bg-emerald-100 text-emerald-800'
+                          ? (booking.is_present ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800')
                           : booking.status === 'HELD'
                           ? 'bg-amber-100 text-amber-800'
                           : booking.status === 'COMPLETED'
@@ -513,6 +646,11 @@ export default function BookingsManagementPage() {
                       <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
                         Deposit: ₹{booking.deposit_amount} ({booking.payment_status})
                       </span>
+                      {booking.customer_arrived_at && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
+                          ✓ Arrived {new Date(booking.customer_arrived_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
                       {verticalConfig.features.hasPrescriptions && booking.attachment_url && (
                         <button
                           onClick={() => handleViewPrescription(booking.attachment_url!)}
@@ -556,10 +694,14 @@ export default function BookingsManagementPage() {
                     <>
                       <button
                         onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
-                        className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                        className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs transition ${
+                          booking.is_present
+                            ? 'font-bold bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400/40 shadow-xs'
+                            : 'font-semibold bg-emerald-600 text-white hover:bg-emerald-700'
+                        }`}
                       >
                         <Check className="w-3.5 h-3.5 mr-1" />
-                        Complete
+                        {booking.is_present ? 'Admit & Complete' : 'Complete'}
                       </button>
 
                       <button
@@ -571,9 +713,18 @@ export default function BookingsManagementPage() {
                       </button>
 
                       <button
+                        onClick={() => handleOpenReassignModal(booking)}
+                        className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition"
+                        title="Emergency staff substitution: Reassign slot to another available specialist"
+                      >
+                        <UserCheck className="w-3.5 h-3.5 mr-1 text-sky-600" />
+                        Substitute
+                      </button>
+
+                      <button
                         onClick={() => handleStatusChange(booking.id, 'NO_SHOW', 'FORFEITED')}
                         className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
-                        title="Customer didn't arrive. Forfeits deposit to merchant and counts toward no-show record"
+                        title="Customer didn't arrive. First 2 misses receive courtesy refund; 3rd miss forfeits deposit to your shop."
                       >
                         <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-500" />
                         No-Show
@@ -582,7 +733,7 @@ export default function BookingsManagementPage() {
                       <button
                         onClick={() => handleStatusChange(booking.id, 'CANCELLED', 'REFUNDED')}
                         className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition"
-                        title="Business cancellation: Always triggers full refund to customer"
+                        title="Merchant cancellation: Customer is refunded 100%. Strikes 1-2 courtesy grace; Strike 3 incurs ₹100 penalty."
                       >
                         Cancel & Refund
                       </button>
@@ -649,6 +800,90 @@ export default function BookingsManagementPage() {
                 className="px-4 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition"
               >
                 Confirm Reschedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Staff Substitution Modal */}
+      {reassignModalBooking && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-sky-600" />
+                  Substitute Staff Member
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Reassign slot to another available specialist at this venue.
+                </p>
+              </div>
+              <button
+                onClick={() => setReassignModalBooking(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-1">
+                <div>Customer: <strong className="text-slate-800">{reassignModalBooking.customer_name}</strong></div>
+                <div>Current Specialist: <strong className="text-slate-800">{reassignModalBooking.resource_name}</strong></div>
+                <div>Slot: <strong className="text-slate-800">{new Date(reassignModalBooking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({new Date(reassignModalBooking.slot_start).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })})</strong></div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Select Replacement Staff:
+                </label>
+                {availableResources.length === 0 ? (
+                  <p className="text-xs text-rose-600 font-medium">No other active staff found for this venue.</p>
+                ) : (
+                  <select
+                    value={selectedResourceId}
+                    onChange={(e) => setSelectedResourceId(e.target.value)}
+                    className="w-full text-xs font-medium text-slate-800 border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                  >
+                    {availableResources.map((res) => (
+                      <option key={res.id} value={res.id}>
+                        {res.name} ({res.type})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Reason for Emergency Substitution:
+                </label>
+                <input
+                  type="text"
+                  value={reassignReason}
+                  onChange={(e) => setReassignReason(e.target.value)}
+                  placeholder="e.g. Doctor medical emergency, stylist unwell"
+                  className="w-full text-xs font-medium text-slate-800 border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setReassignModalBooking(null)}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReassignSubmit}
+                disabled={!selectedResourceId || isReassigning}
+                className="px-4 py-1.5 text-xs font-semibold bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 transition"
+              >
+                {isReassigning ? 'Reassigning...' : 'Confirm Substitution'}
               </button>
             </div>
           </div>
