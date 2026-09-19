@@ -41,8 +41,9 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined' && window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:3000';
   }
-  return process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+  return process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.31.112:3000';
 }
+
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -528,6 +529,9 @@ export interface CreateRazorpayOrderResult {
   amount?: number;
   currency?: string;
   is_mock?: boolean;
+  deposit_amount?: number;
+  platform_fee?: number;
+  total_amount?: number;
   error?: string;
 }
 
@@ -552,6 +556,9 @@ export async function createRazorpayOrder(bookingId: string): Promise<CreateRazo
       amount: json.amount,
       currency: json.currency,
       is_mock: json.is_mock,
+      deposit_amount: json.deposit_amount,
+      platform_fee: json.platform_fee,
+      total_amount: json.total_amount,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Network error initiating payment';
@@ -559,6 +566,7 @@ export async function createRazorpayOrder(bookingId: string): Promise<CreateRazo
     return { success: false, error: msg };
   }
 }
+
 
 export interface VerifyPaymentResult {
   success: boolean;

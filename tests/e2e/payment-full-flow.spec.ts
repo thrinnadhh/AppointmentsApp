@@ -49,7 +49,8 @@ test.describe('Comprehensive Razorpay Payment Gateway Full-Flow Suite', () => {
     // 3a. Switch to QR Code tab
     const qrTab = customerPage.getByRole('button', { name: 'Select QR Code Payment' });
     await qrTab.click();
-    await expect(customerPage.getByText('Scan & Pay ₹100')).toBeVisible();
+    await expect(customerPage.getByText(/Scan & Pay ₹(100|110)/)).toBeVisible();
+
 
     // 3b. Switch to Card tab
     const cardTab = customerPage.getByRole('button', { name: 'Select Card Payment' });

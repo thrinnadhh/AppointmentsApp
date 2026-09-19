@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createRazorpayOrder, getRazorpayKeyId } from '@/lib/razorpay';
-import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse } from '@appointments/shared';
+import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     // Verify booking exists and is in an active lock / held state
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, status, hold_expires_at')
+      .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, status, hold_expires_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -55,8 +55,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Fetch provider category to determine vertical platform fee
+    let categoryId: string | null = null;
+    if (booking.provider_id) {
+      const { data: prov } = await supabaseAdmin
+        .from('providers')
+        .select('category_id')
+        .eq('id', booking.provider_id)
+        .maybeSingle();
+      categoryId = prov?.category_id || null;
+    }
+
+    // Merchant sets deposit fee; platform adds ₹10 (or ₹50 for gaming/turf)
     const depositInInr = Number(booking.deposit_amount) || 100;
-    const amountInPaise = Math.round(depositInInr * 100);
+    const platformFeeInInr = getPlatformFee(categoryId);
+    const totalInInr = depositInInr + platformFeeInInr;
+    const amountInPaise = Math.round(totalInInr * 100);
+
+    // Defensively sync platform fee & total amount onto booking record
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        platform_fee: platformFeeInInr,
+        total_amount: totalInInr,
+      })
+      .eq('id', booking.id);
 
     const order = await createRazorpayOrder({
       amount: amountInPaise,
@@ -66,6 +89,10 @@ export async function POST(req: NextRequest) {
         booking_id: booking.id,
         customer_id: booking.customer_id,
         provider_id: booking.provider_id,
+        deposit_amount: String(depositInInr),
+        platform_fee: String(platformFeeInInr),
+        total_amount: String(totalInInr),
+        category: categoryId || 'general',
       },
     });
 
@@ -77,6 +104,9 @@ export async function POST(req: NextRequest) {
         amount: order.amount,
         currency: order.currency,
         is_mock: order.is_mock,
+        deposit_amount: depositInInr,
+        platform_fee: platformFeeInInr,
+        total_amount: totalInInr,
       },
       { status: 200 }
     );

@@ -13,7 +13,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Resource, Slot, Booking } from '@appointments/shared';
+
+import { Resource, Slot, Booking, getPlatformFee } from '@appointments/shared';
+
+
 import HomeScreen from './src/screens/HomeScreen';
 import ProviderDetailScreen from './src/screens/ProviderDetailScreen';
 import CheckoutModal from './src/screens/CheckoutModal';
@@ -314,13 +317,17 @@ export default function App() {
 
   const handlePaymentSuccess = async (bookingId: string) => {
     setCheckoutVisible(false);
-    setConfirmationToast(`Booking Confirmed on Supabase! Deposit ₹${activeResource?.deposit_amount} captured.`);
+    const fee = getPlatformFee(activeCategoryId);
+    const deposit = Number(activeResource?.deposit_amount) || 100;
+    const total = deposit + fee;
+    setConfirmationToast(`Booking Confirmed! Paid ₹${total} (Deposit ₹${deposit} + Platform Fee ₹${fee}).`);
     // Push MY_BOOKINGS onto history so clicking back returns to where the user left off (Provider Detail)
     setHistory((prev) => [
       ...prev,
       { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
     ]);
     await loadBookings();
+
 
     setTimeout(() => {
       setConfirmationToast(null);
@@ -433,10 +440,12 @@ export default function App() {
         visible={checkoutVisible}
         resource={activeResource}
         slot={activeSlot}
+        categoryId={activeCategoryId}
         customerId={activeCustomerId}
         onClose={() => setCheckoutVisible(false)}
         onPaymentSuccess={handlePaymentSuccess}
       />
+
 
       {/* Customer Profile & Authentication Modal */}
       <Modal

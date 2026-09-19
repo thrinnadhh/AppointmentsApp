@@ -113,7 +113,10 @@ export interface Booking {
   status: BookingStatus;
   payment_status: PaymentStatus;
   deposit_amount: number;
+  platform_fee?: number | null;
+  total_amount?: number | null;
   hold_expires_at?: string | null;
+
   gateway_payment_id?: string | null;
   created_at: string;
   updated_at: string;
@@ -314,9 +317,12 @@ export interface CreateRazorpayOrderResponse {
   success: boolean;
   order_id?: string;
   key_id?: string;
-  amount?: number;
+  amount?: number; // in paise
   currency?: string;
   is_mock?: boolean;
+  deposit_amount?: number; // merchant deposit in INR
+  platform_fee?: number;   // platform fee in INR (₹10 or ₹50)
+  total_amount?: number;   // total payable in INR (deposit_amount + platform_fee)
   error?: string;
 }
 

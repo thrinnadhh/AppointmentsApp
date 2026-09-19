@@ -19,6 +19,8 @@ export type Database = {
           created_at: string
           customer_id: string
           deposit_amount: number
+          platform_fee: number | null
+          total_amount: number | null
           gateway_payment_id: string | null
           hold_expires_at: string | null
           id: string
@@ -41,6 +43,8 @@ export type Database = {
           created_at?: string
           customer_id: string
           deposit_amount: number
+          platform_fee?: number | null
+          total_amount?: number | null
           gateway_payment_id?: string | null
           hold_expires_at?: string | null
           id?: string
@@ -62,6 +66,8 @@ export type Database = {
           created_at?: string
           customer_id?: string
           deposit_amount?: number
+          platform_fee?: number | null
+          total_amount?: number | null
           gateway_payment_id?: string | null
           hold_expires_at?: string | null
           id?: string
@@ -78,6 +84,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["booking_status"]
           updated_at?: string
         }
+
         Relationships: [
           {
             foreignKeyName: "bookings_customer_id_fkey"

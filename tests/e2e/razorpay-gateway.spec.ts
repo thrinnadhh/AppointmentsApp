@@ -57,11 +57,49 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
       expect(orderData.success).toBe(true);
       expect(orderData.order_id).toBeDefined();
       expect(orderData.order_id.length).toBeGreaterThan(5);
-      expect(orderData.amount).toBe(10000); // 100 INR in paise
+      expect(orderData.amount).toBe(11000); // 100 INR deposit + 10 INR platform fee = 110 INR (11000 paise)
+      expect(orderData.deposit_amount).toBe(100);
+      expect(orderData.platform_fee).toBe(10);
+      expect(orderData.total_amount).toBe(110);
       expect(orderData.currency).toBe('INR');
       expect(orderData.key_id).toBeDefined();
     });
+
+    test('1.4 should create Razorpay order with ₹50 platform fee for Gaming & Turf', async ({ request }) => {
+      const GAMING_RESOURCE_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+      const slotStart = new Date(Date.now() + 86400000 * 4).toISOString();
+      const slotEnd = new Date(Date.now() + 86400000 * 4 + 1800000).toISOString();
+
+      const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
+        data: {
+          resource_id: GAMING_RESOURCE_ID,
+          customer_id: DUMMY_CUSTOMER_ID,
+          slot_start: slotStart,
+          slot_end: slotEnd,
+        },
+      });
+
+      expect(holdRes.status()).toBe(201);
+      const holdData = await holdRes.json();
+      expect(holdData.success).toBe(true);
+      const bookingId = holdData.booking_id;
+      expect(bookingId).toBeDefined();
+
+      const orderRes = await request.post(`${BASE_URL}/api/payments/create-order`, {
+        data: { booking_id: bookingId },
+      });
+
+      expect(orderRes.status()).toBe(200);
+      const orderData = await orderRes.json();
+      expect(orderData.success).toBe(true);
+      expect(orderData.order_id).toBeDefined();
+      expect(orderData.amount).toBe(25000); // 200 INR deposit + 50 INR platform fee = 250 INR (25000 paise)
+      expect(orderData.deposit_amount).toBe(200);
+      expect(orderData.platform_fee).toBe(50);
+      expect(orderData.total_amount).toBe(250);
+    });
   });
+
 
   test.describe('2. POST /api/payments/verify', () => {
     test('2.1 should reject requests with missing parameters with 400', async ({ request }) => {
@@ -136,7 +174,9 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
   });
 
   test.describe('3. POST /api/webhooks/razorpay', () => {
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || 'dev_razorpay_webhook_secret';
+    const webhookSecret =
+      process.env.RAZORPAY_WEBHOOK_SECRET || '30772a35dc5bf0a5889b1af5dfd0409c364749e83c6e0e1d';
+
 
     test('3.1 should reject requests missing x-razorpay-signature header with 401', async ({ request }) => {
       const res = await request.post(`${BASE_URL}/api/webhooks/razorpay`, {
