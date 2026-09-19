@@ -61,7 +61,7 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     expect(page.url()).not.toContain('/register');
   });
 
-  test('TC-GOOGLE-06: /register presents shop details form with locked verified email design', async ({ page }) => {
+  test('TC-GOOGLE-06: /register presents shop details form with owner name, phone, address, and shop storefront photo upload', async ({ page }) => {
     await page.setExtraHTTPHeaders({
       'x-merchant-bypass-key': 'tirupati-superadmin-e2e-2026',
     });
@@ -79,11 +79,39 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     await expect(page.getByText('Verified Business Email')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Verified', { exact: true })).toBeVisible();
 
-    // Required shop registration inputs
+    // Required shop registration inputs moved from front page to /register
+    await expect(page.locator('#owner-full-name')).toBeVisible();
     await expect(page.locator('#shopName')).toBeVisible();
     await expect(page.locator('#categoryId')).toBeVisible();
     await expect(page.locator('#phone')).toBeVisible();
     await expect(page.locator('#address')).toBeVisible();
+
+    // Shop Storefront Image Upload input & Customer App badge
+    await expect(page.getByText('Shows in Customer Mobile App')).toBeVisible();
+    await expect(page.locator('#shop-photo-input')).toBeAttached();
     await expect(page.getByRole('button', { name: /Complete Registration & Open Workspace/i })).toBeVisible();
+  });
+
+  test('TC-GOOGLE-07: Image upload API and shop registration persists photoUrl to providers.photos', async ({ request }) => {
+    const uniqueSuffix = Date.now();
+    const testPhotoUrl = `https://ynkdnwhubfknnnzjtpeg.supabase.co/storage/v1/object/public/venue-assets/test-shop-${uniqueSuffix}.webp`;
+
+    // 1. Register a shop with the photo URL using a valid user ID
+    const regRes = await request.post('http://localhost:3000/api/merchant/register-shop', {
+      data: {
+        userId: '88888888-8888-8888-8888-888888888883',
+        fullName: `Dr. Tester ${uniqueSuffix}`,
+        shopName: `Storefront Photo Test Clinic ${uniqueSuffix}`,
+        categoryId: 'clinics',
+        phone: '+919848011223',
+        address: 'Alipiri Road, Tirupati',
+        photoUrl: testPhotoUrl,
+      },
+    });
+
+    expect(regRes.status()).toBe(200);
+    const regData = await regRes.json();
+    expect(regData.success).toBe(true);
+    expect(regData.data.photos).toContain(testPhotoUrl);
   });
 });

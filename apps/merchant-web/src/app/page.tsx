@@ -90,15 +90,20 @@ export default function MerchantOverviewPage() {
 
   const venueLabel = verticalConfig?.venueLabel || 'Shop';
 
-  // Enforce unauthenticated redirect to /login?mode=register
+  // Enforce unauthenticated redirect to /login or /register for new users
   useEffect(() => {
     if (!isTenantLoading && !isAuthenticated) {
       const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       if (params?.get('demo') !== '1') {
-        window.location.href = '/login?mode=register';
+        window.location.href = '/login';
+      }
+    } else if (!isTenantLoading && isAuthenticated && !tenantProvider && !isSuperAdmin) {
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      if (params?.get('demo') !== '1') {
+        window.location.href = '/register';
       }
     }
-  }, [isTenantLoading, isAuthenticated]);
+  }, [isTenantLoading, isAuthenticated, tenantProvider, isSuperAdmin]);
 
   const [providers, setProviders] = useState<(Provider & { resources?: Resource[] })[]>(
     tenantProvider ? [tenantProvider] : []

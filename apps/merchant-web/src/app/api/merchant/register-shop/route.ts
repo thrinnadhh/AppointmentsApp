@@ -8,12 +8,13 @@ interface RegisterShopRequestBody {
   address?: string;
   fullName?: string;
   userId?: string;
+  photoUrl?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: RegisterShopRequestBody = await request.json();
-    const { shopName, categoryId, phone, address, fullName, userId } = body;
+    const { shopName, categoryId, phone, address, fullName, userId, photoUrl } = body;
 
     if (!shopName?.trim() || !categoryId?.trim() || !phone?.trim()) {
       return NextResponse.json(
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
       p_phone: phone.trim(),
       p_address: address?.trim() || 'AIR Bypass Road, Tirupati',
       p_full_name: fullName?.trim() || 'Merchant Owner',
+      p_photo_url: photoUrl?.trim() || null,
     });
 
     if (error) {
@@ -64,9 +66,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Explicitly ensure photos array is populated on the newly created provider
+    if (photoUrl?.trim() && data?.provider_id) {
+      await supabaseAdmin
+        .from('providers')
+        .update({ photos: [photoUrl.trim()] })
+        .eq('id', data.provider_id);
+    }
+
     return NextResponse.json({
       success: true,
-      data,
+      data: {
+        ...data,
+        photos: photoUrl?.trim() ? [photoUrl.trim()] : null,
+      },
     });
   } catch (err: unknown) {
     console.error('[Register Shop Exception]:', err);

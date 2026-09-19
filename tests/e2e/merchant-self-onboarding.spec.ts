@@ -35,29 +35,43 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
     await page.goto('http://localhost:3000/login');
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
 
-    // 3. Verify Google OAuth button is present
+    // 3. Verify Google OAuth button is present as primary action
     const googleBtn = page.getByTestId('google-auth-btn');
     await expect(googleBtn).toBeVisible();
     await expect(googleBtn).toContainText('Continue with Google');
 
-    // 4. Switch to "Register Shop & Account" tab
+    // 4. Switch to "Register Business" tab
     await page.getByTestId('auth-tab-register').click();
 
-    // 5. Fill in Self-Service Registration Details
-    await page.getByTestId('register-name').fill('Trinadh Founder');
-    await page.getByTestId('register-phone').fill(testPhone);
-    await page.getByTestId('register-email').fill(testEmail);
-    await page.getByTestId('register-password').fill(testPassword);
+    // 5. Verify Owner name, phone, password and shop details are REMOVED from the front page
+    await expect(page.locator('#reg-name, [data-testid="register-name"]')).toHaveCount(0);
+    await expect(page.locator('#reg-phone, [data-testid="register-phone"]')).toHaveCount(0);
+    await expect(page.locator('#reg-shop-name, [data-testid="register-shop-name"]')).toHaveCount(0);
 
-    // Shop Details
-    await page.getByTestId('register-shop-name').fill(shopName);
-    await page.getByTestId('register-category').selectOption('salons');
-    await page.getByTestId('register-address').fill('AIR Bypass Road, Tirupati');
+    // Verify 2-step onboarding explanation is shown instead
+    await expect(page.getByText(/Two-Step Business Registration/i)).toBeVisible();
 
-    // 6. Submit Registration
-    await page.getByTestId('register-submit').click();
+    // 6. Complete self-registration via the onboarding API
+    const onboardRes = await page.request.post('http://localhost:3000/api/merchant/onboard', {
+      data: {
+        fullName: 'Trinadh Founder',
+        phone: testPhone,
+        email: testEmail,
+        password: testPassword,
+        shopName: shopName,
+        categoryId: 'salons',
+        address: 'AIR Bypass Road, Tirupati',
+      },
+    });
+    expect(onboardRes.ok()).toBeTruthy();
 
-    // 7. Verify Redirection to Merchant Dashboard
+    // 7. Log in on the front page using the newly created credentials
+    await page.getByTestId('auth-tab-signin').click();
+    await page.getByTestId('login-email').fill(testEmail);
+    await page.getByTestId('login-password').fill(testPassword);
+    await page.getByTestId('login-submit').click();
+
+    // 8. Verify Redirection to Merchant Dashboard
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 20000 });
 
     // 8. Verify Isolated Workspace displays the new shop name or vertical badge

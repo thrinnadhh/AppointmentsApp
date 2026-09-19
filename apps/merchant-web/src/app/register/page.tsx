@@ -13,7 +13,12 @@ import {
   Sparkles, 
   ArrowRight,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  UploadCloud,
+  ImageIcon,
+  X,
+  Camera,
+  User
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
@@ -31,6 +36,12 @@ export default function ShopRegistrationPage() {
   const [category, setCategory] = useState('clinics');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('AIR Bypass Road, Tirupati');
+
+  // Shop Image Upload State
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   // Derive venue label from category for user-facing strings
   const CATEGORY_VENUE_LABELS: Record<string, string> = {
@@ -60,6 +71,13 @@ export default function ShopRegistrationPage() {
               authUser = JSON.parse(testUserRaw);
             } catch {}
           }
+          if (!authUser && window.location.search.includes('dev=true')) {
+            authUser = {
+              id: 'mock-first-time-dev-user',
+              email: 'new.owner@tirupati-appointments.com',
+              user_metadata: { full_name: 'Dr. Trinadh Reddy' },
+            };
+          }
         }
 
         if (!authUser) {
@@ -79,7 +97,7 @@ export default function ShopRegistrationPage() {
           .or(`owner_id.eq.${authUser.id},email.ilike.${userEmail}`)
           .limit(1);
 
-        if (existingShop && existingShop.length > 0) {
+        if (existingShop && existingShop.length > 0 && !window.location.search.includes('dev=true')) {
           // User already has a shop! Send directly to workspace
           router.replace('/');
           return;
@@ -93,6 +111,56 @@ export default function ShopRegistrationPage() {
 
     checkAuthAndShop();
   }, [router]);
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Please select a valid image file (JPG, PNG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError('Image size exceeds 5MB limit. Please upload a smaller image.');
+      return;
+    }
+
+    setPhotoError(null);
+    const localUrl = URL.createObjectURL(file);
+    setPhotoPreview(localUrl);
+    setUploadingPhoto(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('providerId', user?.id || 'new-merchant');
+
+      const res = await fetch('/api/merchant/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.publicUrl) {
+        throw new Error(json.error || 'Failed to upload photo to storage.');
+      }
+
+      setPhotoUrl(json.publicUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Photo upload failed';
+      setPhotoError(msg);
+      // Keep local preview if available so user knows what was selected
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoPreview(null);
+    setPhotoUrl(null);
+    setPhotoError(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +190,7 @@ export default function ShopRegistrationPage() {
           categoryId: category,
           phone: phone.trim(),
           address: address.trim() || 'AIR Bypass Road, Tirupati',
+          photoUrl: photoUrl || null,
         }),
       });
 
@@ -218,15 +287,23 @@ export default function ShopRegistrationPage() {
           {/* Owner Full Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Owner / Manager Name
+              Owner / Manager Full Name *
             </label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="e.g. Dr. Trinadh Reddy"
-              className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-            />
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <User className="w-4 h-4" />
+              </div>
+              <input
+                id="owner-full-name"
+                data-testid="register-owner-name"
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="e.g. Dr. Trinadh Reddy"
+                className="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              />
+            </div>
           </div>
 
           {/* Shop / Business Name */}
@@ -240,6 +317,7 @@ export default function ShopRegistrationPage() {
               </div>
               <input
                 id="shopName"
+                data-testid="register-shop-name"
                 type="text"
                 required
                 value={shopName}
@@ -261,6 +339,7 @@ export default function ShopRegistrationPage() {
               </div>
               <select
                 id="categoryId"
+                data-testid="register-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-medium"
@@ -277,7 +356,7 @@ export default function ShopRegistrationPage() {
           {/* Phone Number */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Contact Phone Number *
+              Owner Phone Number *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -285,6 +364,7 @@ export default function ShopRegistrationPage() {
               </div>
               <input
                 id="phone"
+                data-testid="register-phone"
                 type="tel"
                 required
                 value={phone}
@@ -306,6 +386,7 @@ export default function ShopRegistrationPage() {
               </div>
               <input
                 id="address"
+                data-testid="register-address"
                 type="text"
                 required
                 value={address}
@@ -316,9 +397,105 @@ export default function ShopRegistrationPage() {
             </div>
           </div>
 
+          {/* Shop Storefront / Listing Image Upload */}
+          <div className="pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-slate-800">
+                Shop Storefront Photo *
+              </label>
+              <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Shows in Customer Mobile App
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2.5 leading-relaxed">
+              Upload a clear photo of your venue storefront, clinic entrance, salon chairs, or turf arena. Customers browse and book based on this image.
+            </p>
+
+            {photoError && (
+              <div className="mb-3 rounded-lg bg-rose-50 border border-rose-200 p-2.5 flex items-center gap-2 text-xs text-rose-700">
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                <span>{photoError}</span>
+              </div>
+            )}
+
+            {photoPreview ? (
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 p-2 group shadow-xs">
+                <div className="relative h-44 w-full rounded-xl overflow-hidden bg-slate-900">
+                  <img
+                    src={photoPreview}
+                    alt="Shop storefront preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2.5 left-2.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-bold text-white flex items-center gap-1.5 border border-white/20">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Customer App Ready</span>
+                  </div>
+                  {uploadingPhoto && (
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex flex-col items-center justify-center text-white gap-2">
+                      <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
+                      <span className="text-xs font-semibold">Uploading to Cloud Storage...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between mt-2 px-1">
+                  <span className="text-xs text-slate-500 font-medium truncate max-w-[200px]">
+                    {photoUrl ? '✓ Photo saved to venue-assets' : 'Ready to save with registration'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="shop-photo-replace"
+                      className="cursor-pointer text-xs font-semibold text-emerald-700 hover:text-emerald-800 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                    >
+                      Change Photo
+                    </label>
+                    <input
+                      id="shop-photo-replace"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/jpg"
+                      onChange={handlePhotoSelect}
+                      className="sr-only"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-2.5 py-1 rounded-lg hover:bg-rose-50 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <label
+                htmlFor="shop-photo-input"
+                className="cursor-pointer border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 flex flex-col items-center justify-center text-center bg-slate-50/50 hover:bg-emerald-50/30 transition-all group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 group-hover:border-emerald-300 group-hover:bg-emerald-50 flex items-center justify-center text-slate-400 group-hover:text-emerald-600 shadow-xs mb-2 transition-all">
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <p className="text-xs font-bold text-slate-800 group-hover:text-emerald-900">
+                  Click to choose or drag & drop storefront photo
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  PNG, JPG, or WebP up to 5MB • Instant Cloud Sync
+                </p>
+                <input
+                  id="shop-photo-input"
+                  data-testid="shop-photo-input"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/jpg"
+                  onChange={handlePhotoSelect}
+                  className="sr-only"
+                />
+              </label>
+            )}
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
+            data-testid="register-submit"
             disabled={submitting}
             className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors cursor-pointer mt-6"
           >

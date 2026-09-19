@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { 
   Building2, 
   ShieldCheck, 
@@ -11,42 +10,17 @@ import {
   AlertCircle, 
   KeyRound, 
   CheckCircle2,
-  Sparkles,
-  User,
-  Phone,
-  MapPin,
-  Store,
-  Layers
+  Sparkles
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
-
-  // Mode: 'register' by default (Onboarding-first self-service entry), or 'signin'
-  const [authMode, setAuthMode] = useState<'signin' | 'register'>('register');
+  // Mode: 'signin' by default, or 'register'
+  const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
 
   // Sign In Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  // Self-Service Registration Form State
-  const [regFullName, setRegFullName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regShopName, setRegShopName] = useState('');
-  const [regCategory, setRegCategory] = useState('salons');
-
-  // Derive a user-friendly venue label from selected category (for form labels)
-  const CATEGORY_VENUE_LABELS: Record<string, string> = {
-    salons: 'Salon',
-    clinics: 'Hospital',
-    gaming: 'Turf / Arena',
-    restaurants: 'Restaurant',
-    pets: 'Pet Clinic',
-  };
-  const regVenueLabel = CATEGORY_VENUE_LABELS[regCategory] || 'Venue';
-  const [regPhone, setRegPhone] = useState('');
-  const [regAddress, setRegAddress] = useState('');
 
   // UI State
   const [loading, setLoading] = useState(false);
@@ -139,72 +113,6 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid login credentials.';
-      setErrorMsg(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!regFullName || !regEmail || !regPassword || !regShopName || !regPhone) {
-      setErrorMsg(`Please complete all required fields (Name, Email, Password, ${regVenueLabel} Name, Phone).`);
-      return;
-    }
-
-    if (regPassword.length < 6) {
-      setErrorMsg('Password must be at least 6 characters long.');
-      return;
-    }
-
-    setLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    try {
-      const res = await fetch('/api/merchant/onboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: regFullName,
-          email: regEmail,
-          password: regPassword,
-          shopName: regShopName,
-          categoryId: regCategory,
-          phone: regPhone,
-          address: regAddress,
-        }),
-      });
-
-      const result = await res.json();
-      if (!res.ok || result.error) {
-        throw new Error(result.error || `${regVenueLabel} registration failed.`);
-      }
-
-      setSuccessMsg(`"${regShopName}" registered successfully! Logging you in...`);
-
-      // Automatically sign in with the new credentials
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: regEmail.trim(),
-        password: regPassword,
-      });
-
-      if (signInErr) {
-        // Fallback: switch to sign in tab
-        setAuthMode('signin');
-        setEmail(regEmail);
-        setPassword(regPassword);
-        setErrorMsg('Registration succeeded. Please click Sign In to continue.');
-        return;
-      }
-
-      if (signInData.session) {
-        const params = new URLSearchParams(window.location.search);
-        const redirectPath = params.get('redirect') || '/';
-        window.location.href = redirectPath;
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : `Failed to register ${regVenueLabel} and merchant.`;
       setErrorMsg(msg);
     } finally {
       setLoading(false);
@@ -308,7 +216,7 @@ export default function LoginPage() {
             Merchant & Admin Access Portal
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Self-service merchant onboarding & isolated venue workspace
+            Unified workspace & business registration for Tirupati providers
           </p>
         </div>
 
@@ -342,7 +250,7 @@ export default function LoginPage() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Register Venue & Account
+            Register Business
           </button>
         </div>
 
@@ -373,7 +281,9 @@ export default function LoginPage() {
             <span>Google Verified Authentication</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
-            Log in through Google to register and verify your business email address. First-time users will set up their shop next; returning merchants enter directly into their workspace.
+            {authMode === 'register'
+              ? 'Authenticate with Google to verify your business email. After signing in, you will configure your shop profile, address, and upload your storefront photo in Step 2.'
+              : 'Sign in with your Google account. First-time merchants will be prompted to set up their venue profile and storefront photo; returning merchants enter directly into their workspace.'}
           </p>
           <button
             type="button"
@@ -400,12 +310,14 @@ export default function LoginPage() {
                 d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
               />
             </svg>
-            <span>Continue with Google</span>
+            <span>{authMode === 'register' ? 'Register with Google' : 'Continue with Google'}</span>
           </button>
           <div className="flex items-center justify-center gap-3 text-[11px] text-slate-500 pt-0.5">
             <span>✓ Verified Email</span>
             <span>•</span>
-            <span>✓ Direct Workspace Access</span>
+            <span>✓ Storefront Photo Sync</span>
+            <span>•</span>
+            <span>✓ Direct Workspace</span>
           </div>
 
           <div className="relative pt-2">
@@ -414,13 +326,13 @@ export default function LoginPage() {
             </div>
             <div className="relative flex justify-center text-[10px] uppercase tracking-wider font-semibold">
               <span className="bg-slate-50 px-2 text-slate-400">
-                {authMode === 'signin' ? 'Or sign in with password' : 'Or register with password'}
+                {authMode === 'signin' ? 'Or sign in with password' : 'How registration works'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* TAB 1: Sign In Mode */}
+        {/* TAB 1: Sign In Mode (Password Login) */}
         {authMode === 'signin' && (
           <form className="space-y-4" onSubmit={handleLogin}>
             <div>
@@ -493,187 +405,40 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* TAB 2: Self-Service Registration Mode */}
+        {/* TAB 2: Register Explanation (2-Step Flow) */}
         {authMode === 'register' && (
-          <form className="space-y-3.5" onSubmit={handleRegister}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Owner Full Name *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <User className="h-3.5 w-3.5" />
-                  </div>
-                  <input
-                    id="reg-name"
-                    name="regName"
-                    data-testid="register-name"
-                    type="text"
-                    required
-                    value={regFullName}
-                    onChange={(e) => setRegFullName(e.target.value)}
-                    placeholder="Trinadh S."
-                    className="block w-full pl-8 pr-2.5 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Owner Phone *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Phone className="h-3.5 w-3.5" />
-                  </div>
-                  <input
-                    id="reg-phone"
-                    name="regPhone"
-                    data-testid="register-phone"
-                    type="tel"
-                    required
-                    value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
-                    placeholder="+91 98480 12345"
-                    className="block w-full pl-8 pr-2.5 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                  />
-                </div>
-              </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+              <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                Two-Step Business Registration
+              </h4>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Owner Email (Google Mail or Business Email) *
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Mail className="h-3.5 w-3.5" />
-                </div>
-                <input
-                  id="reg-email"
-                  name="regEmail"
-                  data-testid="register-email"
-                  type="email"
-                  required
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="trinadh.salon@gmail.com"
-                  className="block w-full pl-8 pr-2.5 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Custom Password * <span className="text-[10px] text-slate-400 font-normal">(Min 6 characters)</span>
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Lock className="h-3.5 w-3.5" />
-                </div>
-                <input
-                  id="reg-password"
-                  name="regPassword"
-                  data-testid="register-password"
-                  type="password"
-                  required
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  placeholder="Set your secure password"
-                  className="block w-full pl-8 pr-2.5 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Store className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                  {regVenueLabel} & Workspace Details
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <ol className="space-y-2.5 text-xs text-slate-700">
+              <li className="flex items-start gap-2.5">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px]">1</span>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {regVenueLabel} Name *
-                  </label>
-                  <input
-                    id="reg-shop-name"
-                    name="regShopName"
-                    data-testid="register-shop-name"
-                    type="text"
-                    required
-                    value={regShopName}
-                    onChange={(e) => setRegShopName(e.target.value)}
-                    placeholder="e.g. Trinadh Salon"
-                    className="block w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                  />
+                  <span className="font-semibold text-slate-900">Verify Email with Google:</span> Click &ldquo;Register with Google&rdquo; above to link your official business email address.
                 </div>
-
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-200 text-emerald-900 font-bold flex items-center justify-center text-[10px]">2</span>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Category *
-                  </label>
-                  <select
-                    id="reg-category"
-                    name="regCategory"
-                    data-testid="register-category"
-                    value={regCategory}
-                    onChange={(e) => setRegCategory(e.target.value)}
-                    className="block w-full px-2.5 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white cursor-pointer font-medium"
-                  >
-                    <option value="salons">Salons & Spas</option>
-                    <option value="clinics">Hospitals & Clinics</option>
-                    <option value="gaming">Gaming & Turf</option>
-                    <option value="restaurants">Dining & Cafes</option>
-                    <option value="pets">Pet Care & Vet</option>
-                  </select>
+                  <span className="font-semibold text-slate-900">Shop Profile & Photo Setup:</span> On the next screen, enter your venue name, owner contact, address, and upload your storefront photo.
                 </div>
-              </div>
-
-              <div className="mt-2.5">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  {regVenueLabel} Address (Tirupati)
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <MapPin className="h-3.5 w-3.5" />
-                  </div>
-                  <input
-                    id="reg-address"
-                    name="regAddress"
-                    data-testid="register-address"
-                    type="text"
-                    value={regAddress}
-                    onChange={(e) => setRegAddress(e.target.value)}
-                    placeholder="e.g. AIR Bypass Road, Tirupati"
-                    className="block w-full pl-8 pr-2.5 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                  />
-                </div>
-              </div>
+              </li>
+            </ol>
+            <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between text-xs">
+              <span className="text-slate-500">Already have an account?</span>
+              <button
+                type="button"
+                onClick={() => setAuthMode('signin')}
+                className="font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+              >
+                Sign In with Password →
+              </button>
             </div>
-
-            <button
-              type="submit"
-              data-testid="register-submit"
-              disabled={loading}
-              className="w-full mt-2 flex justify-center items-center py-2.5 px-4 border border-transparent rounded-xl shadow-xs text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  Setting Up Workspace...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  Register & Launch {regVenueLabel} Workspace
-                  <ArrowRight className="w-4 h-4" />
-                </span>
-              )}
-            </button>
-          </form>
+          </div>
         )}
 
         {/* Quick Demo Credentials Switcher — DEV ONLY */}
