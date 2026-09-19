@@ -11,7 +11,9 @@ import {
   Database,
   resolveCategoryId,
   normCategory,
-  City
+  City,
+  WeeklyHours,
+  DayOfWeek
 } from '@appointments/shared';
 
 declare const process: { env: Record<string, string | undefined> };
@@ -35,208 +37,17 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Base URL for the merchant-web backend API (e.g. the reschedule route).
-// Must be set to the deployed backend URL in any non-local build — localhost
-// only resolves on the same machine the app is running on, never on a real device.
-const API_BASE_URL =
-  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-    ? `http://${window.location.hostname}:3000`
-    : (process.env.EXPO_PUBLIC_API_BASE_URL ||
-      (typeof window !== 'undefined' && window.location.hostname
-        ? `http://${window.location.hostname}:3000`
-        : 'http://localhost:3000'));
+export function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:3000';
+  }
+  return process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+}
 
-// Seed data for immediate local preview/offline operation
-export const MOCK_PROVIDERS: ProviderWithDetails[] = [
-  {
-    id: '11111111-1111-1111-1111-111111111111',
-    category_id: 'clinics',
-    sub_category_id: 'dental',
-    name: 'Sri Venkateswara Dental & Implant Care',
-    description: 'Specialized painless root canals, smile makeovers, and dental implants.',
-    address: 'Shop 12, Bhavani Nagar, Near RTC Bus Stand',
-    city: 'Tirupati',
-    latitude: 13.6328,
-    longitude: 79.4197,
-    phone: '+91 98765 43210',
-    opening_time: '09:00:00',
-    closing_time: '20:00:00',
-    photos: ['https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800'],
-    status: 'ACTIVE',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    distance_km: 1.2,
-    next_slot: 'Today, 11:30 AM',
-    resources: [
-      {
-        id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        provider_id: '11111111-1111-1111-1111-111111111111',
-        name: 'Dr. S. K. Murthy, MDS (Implantologist)',
-        type: 'doctor',
-        duration_minutes: 30,
-        capacity: 1,
-        deposit_amount: 100,
-        attributes: { specialization: 'Dental Implants', experience: '14 yrs' },
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: 'aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        provider_id: '11111111-1111-1111-1111-111111111111',
-        name: 'Dr. Ananya Reddy (Orthodontist)',
-        type: 'doctor',
-        duration_minutes: 30,
-        capacity: 1,
-        deposit_amount: 100,
-        attributes: { specialization: 'Braces & Aligners', experience: '8 yrs' },
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ],
-  },
-  {
-    id: '22222222-2222-2222-2222-222222222222',
-    category_id: 'restaurants',
-    sub_category_id: 'fine_dining',
-    name: 'Saptagiri Heritage Dining',
-    description: 'Authentic royal Andhra thalis and reserved AC table seating.',
-    address: 'Renigunta Road, Opp. Reliance Trends',
-    city: 'Tirupati',
-    latitude: 13.6288,
-    longitude: 79.4285,
-    phone: '+91 98765 43211',
-    opening_time: '11:30:00',
-    closing_time: '22:30:00',
-    photos: ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800'],
-    status: 'ACTIVE',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    distance_km: 2.1,
-    next_slot: 'Today, 1:00 PM',
-    resources: [
-      {
-        id: 'bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        provider_id: '22222222-2222-2222-2222-222222222222',
-        name: 'Family AC Booth (4 Seater)',
-        type: 'table',
-        duration_minutes: 60,
-        capacity: 4,
-        deposit_amount: 150,
-        attributes: { section: 'AC Hall', seats: 4 },
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ],
-  },
-  {
-    id: '33333333-3333-3333-3333-333333333333',
-    category_id: 'gaming',
-    sub_category_id: 'box_cricket',
-    name: 'Tirupati Premier Turf & Gaming Arena',
-    description: 'FIFA-grade Astroturf with floodlights for box cricket and football.',
-    address: 'Korlagunta Main Road, Near Reliance Mart',
-    city: 'Tirupati',
-    latitude: 13.6412,
-    longitude: 79.4310,
-    phone: '+91 98765 43212',
-    opening_time: '06:00:00',
-    closing_time: '23:00:00',
-    photos: ['https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800'],
-    status: 'ACTIVE',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    distance_km: 3.4,
-    next_slot: 'Today, 5:00 PM',
-    resources: [
-      {
-        id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        provider_id: '33333333-3333-3333-3333-333333333333',
-        name: 'Pitch 1 (Box Cricket Arena)',
-        type: 'court',
-        duration_minutes: 60,
-        capacity: 14,
-        deposit_amount: 200,
-        attributes: { lights: '1000W LED', surface: 'Astroturf' },
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ],
-  },
-  {
-    id: '44444444-4444-4444-4444-444444444444',
-    category_id: 'salons',
-    sub_category_id: 'hair_styling',
-    name: 'Elite Looks Luxury Salon',
-    description: 'Expert hair styling, beard grooming, and spa facials.',
-    address: 'Air Bypass Road, Beside Domino’s Pizza',
-    city: 'Tirupati',
-    latitude: 13.6355,
-    longitude: 79.4123,
-    phone: '+91 98765 43213',
-    opening_time: '09:30:00',
-    closing_time: '21:00:00',
-    photos: ['https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'],
-    status: 'ACTIVE',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    distance_km: 0.8,
-    next_slot: 'Today, 2:30 PM',
-    resources: [
-      {
-        id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
-        provider_id: '44444444-4444-4444-4444-444444444444',
-        name: 'Stylist Chair 1 (Master Stylist Vikram)',
-        type: 'stylist',
-        duration_minutes: 45,
-        capacity: 1,
-        deposit_amount: 75,
-        attributes: { specialty: 'Hair Sculpting & Fade' },
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ],
-  },
-  {
-    id: '55555555-5555-5555-5555-555555555555',
-    category_id: 'pets',
-    sub_category_id: 'pet_hospital',
-    name: 'Tirumala Pet Clinic & Grooming Spa',
-    description: 'Experienced vets, vaccination schedules, and dog grooming suites.',
-    address: 'Alipiri Bypass Road, Near Balaji Colony',
-    city: 'Tirupati',
-    latitude: 13.6450,
-    longitude: 79.4080,
-    phone: '+91 98765 43214',
-    opening_time: '09:00:00',
-    closing_time: '20:00:00',
-    photos: ['https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=800'],
-    status: 'ACTIVE',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    distance_km: 2.8,
-    next_slot: 'Today, 4:00 PM',
-    resources: [
-      {
-        id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        provider_id: '55555555-5555-5555-5555-555555555555',
-        name: 'Dr. K. Srinivas (Veterinary Surgeon)',
-        type: 'vet',
-        duration_minutes: 30,
-        capacity: 1,
-        deposit_amount: 100,
-        attributes: { qualification: 'BVSc & AH' },
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ],
-  },
-];
+const API_BASE_URL = getApiBaseUrl();
+
+// Seed data array kept empty to ensure only real database providers are shown
+export const MOCK_PROVIDERS: ProviderWithDetails[] = [];
 
 // In-memory cache with TTL for fast instant restoration without network flicker
 interface CacheEntry {
@@ -283,10 +94,6 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
 
     if (error) {
       console.warn('Supabase fetch failed:', error);
-      if (isDev) {
-        if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
-        return MOCK_PROVIDERS.filter((p) => normCategory(p.category_id) === normCategory(categoryId));
-      }
       return [];
     }
 
@@ -330,6 +137,7 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
         closing_time: prov.closing_time,
         photos: prov.photos,
         status: prov.status,
+        weekly_hours: (prov.weekly_hours as unknown as WeeklyHours) || null,
         created_at: prov.created_at,
         updated_at: prov.updated_at,
         distance_km: Number((1.2 + idx * 0.7).toFixed(1)),
@@ -342,10 +150,6 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
     return result;
   } catch (err) {
     console.warn('Network error in fetchProvidersByCategory:', err);
-    if (isDev) {
-      if (!categoryId || categoryId === 'all') return MOCK_PROVIDERS;
-      return MOCK_PROVIDERS.filter((p) => normCategory(p.category_id) === normCategory(categoryId));
-    }
     return [];
   }
 }
@@ -371,10 +175,13 @@ export async function fetchNearbyProviders(
 
     const rawList = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
     if (rawList.length === 0) {
+      if (isDev) {
+        return fetchProvidersByCategory(categoryId);
+      }
       return [];
     }
 
-    return rawList.map((prov): ProviderWithDetails => {
+    const mapped = rawList.map((prov): ProviderWithDetails => {
       const rawResources = Array.isArray(prov.resources) ? prov.resources : [];
       const resources: Resource[] = rawResources.map((r: Record<string, unknown>) => ({
         id: String(r.id),
@@ -409,6 +216,7 @@ export async function fetchNearbyProviders(
         closing_time: String(prov.closing_time || '21:00:00'),
         photos: Array.isArray(prov.photos) ? (prov.photos as string[]) : null,
         status: (prov.status as Provider['status']) || 'ACTIVE',
+        weekly_hours: (prov.weekly_hours as unknown as WeeklyHours) || null,
         created_at: String(prov.created_at || new Date().toISOString()),
         updated_at: String(prov.updated_at || new Date().toISOString()),
         distance_km: Number(prov.distance_km) || 1.2,
@@ -416,6 +224,8 @@ export async function fetchNearbyProviders(
         resources,
       };
     });
+
+    return mapped;
   } catch (err) {
     console.warn('Network error in fetchNearbyProviders:', err);
     return fetchProvidersByCategory(categoryId);
@@ -431,9 +241,6 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
       .single();
 
     if (error || !data) {
-      if (isDev) {
-        return MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
-      }
       return null;
     }
 
@@ -470,6 +277,7 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
       closing_time: data.closing_time,
       photos: data.photos,
       status: data.status,
+      weekly_hours: (data.weekly_hours as unknown as WeeklyHours) || null,
       created_at: data.created_at,
       updated_at: data.updated_at,
       distance_km: 1.5,
@@ -477,9 +285,6 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
       resources,
     };
   } catch {
-    if (isDev) {
-      return MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
-    }
     return null;
   }
 }
@@ -565,6 +370,7 @@ export async function searchDirectoryOnSupabase(query: string): Promise<Provider
         closing_time: String(prov.closing_time || '21:00:00'),
         photos: Array.isArray(prov.photos) ? (prov.photos as string[]) : null,
         status: (prov.status as Provider['status']) || 'ACTIVE',
+        weekly_hours: (prov.weekly_hours as unknown as WeeklyHours) || null,
         created_at: String(prov.created_at || new Date().toISOString()),
         updated_at: String(prov.updated_at || new Date().toISOString()),
         distance_km: Number((1.2 + idx * 0.7).toFixed(1)),
@@ -584,6 +390,43 @@ export async function createHoldOnSupabase(
   slotStart: string,
   slotEnd: string
 ): Promise<{ success: boolean; booking_id?: string; reference_code?: string; deposit_amount?: number; error?: string }> {
+  // --- Step 1: Try the backend API (has rate-limit, provider-active, daily-cap checks) ---
+  try {
+    const resp = await fetch(`${API_BASE_URL}/api/bookings/hold`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer_id: customerId,
+        resource_id: resourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      }),
+    });
+
+    const json = await resp.json();
+
+    if (resp.ok && json.success) {
+      return {
+        success: true,
+        booking_id: json.booking_id,
+        reference_code: json.reference_code,
+        deposit_amount: json.deposit_amount,
+      };
+    }
+
+    // Backend returned an error — surface it to the user (slot conflict, paused, cap, etc.)
+    if (!resp.ok) {
+      return {
+        success: false,
+        error: json.error || `Booking failed (${resp.status})`,
+      };
+    }
+  } catch (networkErr) {
+    // Backend unreachable (no internet / backend not running) — fall through to direct RPC
+    if (isDev) console.warn('Backend /api/bookings/hold unreachable, falling back to direct RPC:', networkErr);
+  }
+
+  // --- Step 2: Direct Supabase RPC fallback (dev / offline mode) ---
   try {
     const { data, error } = await supabase.rpc('create_booking_hold', {
       p_customer_id: customerId,
@@ -678,9 +521,89 @@ export async function confirmBookingPaymentOnSupabase(
   }
 }
 
+export interface CreateRazorpayOrderResult {
+  success: boolean;
+  order_id?: string;
+  key_id?: string;
+  amount?: number;
+  currency?: string;
+  is_mock?: boolean;
+  error?: string;
+}
+
+export async function createRazorpayOrder(bookingId: string): Promise<CreateRazorpayOrderResult> {
+  const baseUrl = getApiBaseUrl();
+  try {
+    const resp = await fetch(`${baseUrl}/api/payments/create-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
+
+    const json = await resp.json();
+    if (!resp.ok || !json.success) {
+      return { success: false, error: json.error || `Failed to create payment order (${resp.status})` };
+    }
+
+    return {
+      success: true,
+      order_id: json.order_id,
+      key_id: json.key_id,
+      amount: json.amount,
+      currency: json.currency,
+      is_mock: json.is_mock,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error initiating payment';
+    console.warn('createRazorpayOrder network error:', msg);
+    return { success: false, error: msg };
+  }
+}
+
+export interface VerifyPaymentResult {
+  success: boolean;
+  booking_id?: string;
+  status?: string;
+  payment_status?: string;
+  error?: string;
+}
+
+export async function verifyRazorpayPayment(params: {
+  booking_id: string;
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+  attachment_url?: string | null;
+}): Promise<VerifyPaymentResult> {
+  const baseUrl = getApiBaseUrl();
+  try {
+    const resp = await fetch(`${baseUrl}/api/payments/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    const json = await resp.json();
+    if (!resp.ok || !json.success) {
+      return { success: false, error: json.error || 'Payment verification failed' };
+    }
+
+    return {
+      success: true,
+      booking_id: json.booking_id,
+      status: json.status,
+      payment_status: json.payment_status,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error verifying payment';
+    console.warn('verifyRazorpayPayment network error:', msg);
+    return { success: false, error: msg };
+  }
+}
+
 export async function cancelBookingOnSupabase(bookingId: string, slotStart: string) {
-  const diffHours = (new Date(slotStart).getTime() - Date.now()) / (1000 * 60 * 60);
-  const isLate = diffHours <= 1;
+  const diffMinutes = Math.round((new Date(slotStart).getTime() - Date.now()) / (1000 * 60));
+  const isLate = diffMinutes <= 30;
 
   try {
     if (API_BASE_URL) {
@@ -690,7 +613,7 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             booking_id: bookingId,
-            reason: isLate ? 'Customer cancelled (<1 hr)' : 'Customer cancelled (>1 hr)',
+            reason: isLate ? 'Customer cancelled (<30 min)' : 'Customer cancelled (>30 min)',
           }),
         });
         if (resp.ok) {
@@ -704,7 +627,7 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
 
     const { data: rpcData, error: rpcError } = await supabase.rpc('cancel_booking', {
       p_booking_id: bookingId,
-      p_reason: isLate ? 'Customer cancelled (<1 hr)' : 'Customer cancelled (>1 hr)',
+      p_reason: isLate ? 'Customer cancelled (<30 min)' : 'Customer cancelled (>30 min)',
     });
     if (!rpcError) {
       return { data: rpcData, isLate };
@@ -728,8 +651,83 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
   }
 }
 
-export function generateAvailableSlots(resource: Resource, selectedDate: Date): Slot[] {
+export async function fetchBookedSlots(resourceId: string, date: Date): Promise<string[]> {
+  try {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('slot_start')
+      .eq('resource_id', resourceId)
+      .in('status', ['HELD', 'CONFIRMED', 'PENDING_PAYMENT'])
+      .gte('slot_start', startOfDay.toISOString())
+      .lte('slot_start', endOfDay.toISOString());
+
+    if (error || !data) return [];
+    return data.map((b) => new Date(b.slot_start).toISOString());
+  } catch (err) {
+    console.warn('fetchBookedSlots error:', err);
+    return [];
+  }
+}
+
+export function generateAvailableSlots(
+  resource: Resource,
+  selectedDate: Date,
+  provider?: ProviderWithDetails | null,
+  bookedSlotStarts: string[] = []
+): Slot[] {
   const slots: Slot[] = [];
+  const now = new Date();
+  const isSelectedDateToday =
+    selectedDate.getFullYear() === now.getFullYear() &&
+    selectedDate.getMonth() === now.getMonth() &&
+    selectedDate.getDate() === now.getDate();
+
+  // Check if provider has weekly_hours configured for this day
+  if (provider?.weekly_hours) {
+    const dayNames: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[selectedDate.getDay()];
+    const daySched = provider.weekly_hours[dayName];
+    if (daySched) {
+      if (daySched.is_closed) {
+        return []; // Closed on this day (e.g. weekly off / holiday)
+      }
+      let startHour = 10;
+      let endHour = 18;
+      if (daySched.open && daySched.close) {
+        const [oh] = daySched.open.split(':').map(Number);
+        const [ch] = daySched.close.split(':').map(Number);
+        if (!isNaN(oh)) startHour = oh;
+        if (!isNaN(ch) && ch > startHour) endHour = ch;
+      }
+      for (let hour = startHour; hour < endHour; hour++) {
+        for (let min = 0; min < 60; min += resource.duration_minutes) {
+          const start = new Date(selectedDate);
+          start.setHours(hour, min, 0, 0);
+          const end = new Date(start.getTime() + resource.duration_minutes * 60000);
+          const isBusy = (hour === 13 && min === 0);
+          const isPast = isSelectedDateToday && start.getTime() <= (now.getTime() + 5 * 60 * 1000);
+          const isBooked = bookedSlotStarts.some(
+            (bs) => Math.abs(new Date(bs).getTime() - start.getTime()) < 60000
+          );
+
+          slots.push({
+            resource_id: resource.id,
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+            is_available: !isBusy && !isPast && !isBooked,
+            capacity_remaining: isBusy || isPast || isBooked ? 0 : resource.capacity,
+          });
+        }
+      }
+      return slots;
+    }
+  }
+
   const startHour = 10;
   const endHour = 18;
 
@@ -741,13 +739,17 @@ export function generateAvailableSlots(resource: Resource, selectedDate: Date): 
       
       // Mark one slot as busy for demonstration
       const isBusy = (hour === 12 && min === 0) || (hour === 15 && min === 30);
+      const isPast = isSelectedDateToday && start.getTime() <= (now.getTime() + 5 * 60 * 1000);
+      const isBooked = bookedSlotStarts.some(
+        (bs) => Math.abs(new Date(bs).getTime() - start.getTime()) < 60000
+      );
 
       slots.push({
         resource_id: resource.id,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
-        is_available: !isBusy,
-        capacity_remaining: isBusy ? 0 : resource.capacity,
+        is_available: !isBusy && !isPast && !isBooked,
+        capacity_remaining: isBusy || isPast || isBooked ? 0 : resource.capacity,
       });
     }
   }
@@ -805,6 +807,51 @@ export async function rescheduleBookingOnSupabase(
     return { success: true, data };
   } catch (err) {
     console.error('Error rescheduling booking:', err);
+    throw err;
+  }
+}
+
+/**
+ * Signal that customer has reached the clinic/venue lobby in person.
+ */
+export async function markBookingReached(bookingId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (API_BASE_URL) {
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/bookings/reach`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: bookingId }),
+        });
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.success) return json;
+        }
+      } catch {
+        // Fallback directly to RPC or Supabase update
+      }
+    }
+
+    const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('mark_customer_reached', {
+      p_booking_id: bookingId,
+    });
+    if (!rpcError && rpcData) {
+      return { success: true };
+    }
+
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({
+        is_present: true,
+        customer_arrived_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId);
+
+    if (updateError) throw updateError;
+    return { success: true };
+  } catch (err) {
+    console.error('Error marking booking as reached:', err);
     throw err;
   }
 }
@@ -1117,4 +1164,53 @@ export async function joinCityWaitlist(
   }
 }
 
+/**
+ * Fetch customer no-show strikes count and flagged status from public.profiles
+ */
+export async function fetchCustomerStrikes(
+  customerId: string
+): Promise<{ strikes: number; isFlagged: boolean }> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('no_show_count, is_flagged')
+      .eq('id', customerId)
+      .maybeSingle();
 
+    if (error || !data) {
+      return { strikes: 0, isFlagged: false };
+    }
+
+    return {
+      strikes: Number(data.no_show_count) || 0,
+      isFlagged: Boolean(data.is_flagged),
+    };
+  } catch {
+    return { strikes: 0, isFlagged: false };
+  }
+}
+
+/**
+ * Emergency staff substitution API
+ */
+export async function reassignBookingResourceApi(
+  bookingId: string,
+  newResourceId: string,
+  reason?: string
+) {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/api/bookings/reassign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        booking_id: bookingId,
+        new_resource_id: newResourceId,
+        reason: reason || 'Emergency staff substitution',
+      }),
+    });
+    return await resp.json();
+  } catch (err) {
+    console.warn('Reassign resource error:', err);
+    return { success: false, error: 'Reassignment failed' };
+  }
+}

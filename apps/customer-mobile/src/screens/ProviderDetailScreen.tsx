@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,9 +7,10 @@ import {
   TouchableOpacity,
   Image,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
-import { Resource, Slot } from '@appointments/shared';
-import { MOCK_PROVIDERS, generateAvailableSlots, fetchProviderById, ProviderWithDetails } from '../services/api';
+import { Resource, Slot, DayOfWeek } from '@appointments/shared';
+import { generateAvailableSlots, fetchProviderById, fetchBookedSlots, ProviderWithDetails } from '../services/api';
 
 interface ProviderDetailScreenProps {
   providerId: string;
@@ -22,30 +23,14 @@ export default function ProviderDetailScreen({
   onBack,
   onProceedToHold,
 }: ProviderDetailScreenProps) {
-  const initialProvider = MOCK_PROVIDERS.find((p) => p.id === providerId) || MOCK_PROVIDERS[0];
-  const [provider, setProvider] = useState<ProviderWithDetails>(initialProvider);
-  const [selectedResource, setSelectedResource] = useState<Resource>(
-    initialProvider.resources?.[0] || MOCK_PROVIDERS[0].resources[0]
-  );
-  const [selectedDateIndex, setSelectedDateIndex] = useState<number>(0);
+  const [provider, setProvider] = useState<ProviderWithDetails | null>(null);
+  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [selectedDateIndex, setSelectedDateIndex] = useState(0); // 0 = today, 1 = tomorrow, 2 = day after
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function load() {
-      const p = await fetchProviderById(providerId);
-      if (isMounted && p) {
-        setProvider(p);
-        if (p.resources && p.resources.length > 0) {
-          setSelectedResource(p.resources[0]);
-        }
-      }
-    }
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [providerId]);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const lastBookedQueryId = useRef(0);
 
   // Generate 3 date options (Today, Tomorrow, Day after)
   const dates = [0, 1, 2].map((offset) => {
@@ -54,7 +39,99 @@ export default function ProviderDetailScreen({
     return d;
   });
 
-  const availableSlots = selectedResource ? generateAvailableSlots(selectedResource, dates[selectedDateIndex]) : [];
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      setLoading(true);
+      // Always fetch real data first — real resource IDs + deposit_amount from DB
+      const p = await fetchProviderById(providerId);
+      if (!isMounted) return;
+      if (p) {
+        setProvider(p);
+        if (p.resources && p.resources.length > 0) {
+          setSelectedResource(p.resources[0]);
+        }
+      } else {
+        setProvider(null);
+        setSelectedResource(null);
+      }
+      setLoading(false);
+    }
+    load();
+    return () => { isMounted = false; };
+  }, [providerId]);
+
+  const dayNames: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const todayDay = dayNames[new Date().getDay()];
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowDay = dayNames[tomorrowDate.getDay()];
+
+  const formatTimeStr = (t?: string) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const period = (h || 0) >= 12 ? 'PM' : 'AM';
+    const hour12 = (h || 0) % 12 || 12;
+    return `${hour12}:${String(m || 0).padStart(2, '0')} ${period}`;
+  };
+
+  const todaySched = provider?.weekly_hours?.[todayDay];
+  const tomorrowSched = provider?.weekly_hours?.[tomorrowDay];
+
+  const todayHoursStr = todaySched
+    ? (todaySched.is_closed ? 'Closed today' : `${formatTimeStr(todaySched.open)} - ${formatTimeStr(todaySched.close)}`)
+    : provider ? `${provider.opening_time.slice(0, 5)} - ${provider.closing_time.slice(0, 5)}` : '—';
+
+  const tomorrowHoursStr = tomorrowSched
+    ? (tomorrowSched.is_closed ? 'Closed' : `${formatTimeStr(tomorrowSched.open)} - ${formatTimeStr(tomorrowSched.close)}`)
+    : null;
+
+  const selectedDate = dates[selectedDateIndex];
+  const selectedDayName = selectedDate ? dayNames[selectedDate.getDay()] : null;
+  const isSelectedDateClosed = Boolean(provider?.weekly_hours && selectedDayName && provider.weekly_hours[selectedDayName]?.is_closed);
+
+  useEffect(() => {
+    if (selectedResource && dates[selectedDateIndex]) {
+      const qId = ++lastBookedQueryId.current;
+      setSlotsLoading(true);
+      fetchBookedSlots(selectedResource.id, dates[selectedDateIndex])
+        .then((res) => {
+          if (qId === lastBookedQueryId.current) {
+            setBookedSlots(res);
+            setSlotsLoading(false);
+          }
+        })
+        .catch(() => {
+          if (qId === lastBookedQueryId.current) {
+            setSlotsLoading(false);
+          }
+        });
+    } else {
+      setBookedSlots([]);
+      setSlotsLoading(false);
+    }
+  }, [selectedResource?.id, selectedDateIndex]);
+
+  const availableSlots = selectedResource && provider
+    ? generateAvailableSlots(selectedResource, dates[selectedDateIndex], provider, bookedSlots)
+    : [];
+
+  // Loading state — show spinner while fetching real data
+  if (loading || !provider) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <ActivityIndicator size="large" color="#059669" />
+          <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '600' }}>Loading venue details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -86,8 +163,8 @@ export default function ProviderDetailScreen({
         <View style={styles.headerInfo}>
           <Text style={styles.name}>{provider.name}</Text>
           <Text style={styles.address}>📍 {provider.address}</Text>
-          <Text style={styles.hours}>
-            🕒 Hours: {provider.opening_time.slice(0, 5)} - {provider.closing_time.slice(0, 5)}
+          <Text style={styles.hours} testID="customer-provider-hours">
+            🕒 Today: {todayHoursStr} {tomorrowHoursStr ? `• Tomorrow: ${tomorrowHoursStr}` : ''}
           </Text>
           <Text style={styles.description}>{provider.description}</Text>
         </View>
@@ -107,7 +184,7 @@ export default function ProviderDetailScreen({
           <Text style={styles.sectionTitle}>1. Select Staff / Unit</Text>
           <View style={styles.resourceList}>
             {provider.resources.map((res) => {
-              const isSelected = selectedResource.id === res.id;
+              const isSelected = selectedResource?.id === res.id;
               return (
                 <TouchableOpacity
                   key={res.id}
@@ -145,8 +222,10 @@ export default function ProviderDetailScreen({
               return (
                 <TouchableOpacity
                   key={index}
+                  testID={`customer-date-card-${index}`}
                   style={[styles.dateCard, isSelected && styles.dateCardSelected]}
                   onPress={() => {
+                    setSlotsLoading(true);
                     setSelectedDateIndex(index);
                     setSelectedSlot(null);
                   }}
@@ -166,38 +245,65 @@ export default function ProviderDetailScreen({
         {/* 3. Slot Grid */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>3. Available Slots</Text>
-          <View style={styles.slotGrid}>
-            {availableSlots.map((slot, index) => {
-              const timeString = new Date(slot.start_time).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
-              const isSelected = selectedSlot?.start_time === slot.start_time;
+          {slotsLoading ? (
+            <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }} testID="customer-slots-loading">
+              <ActivityIndicator size="small" color="#059669" />
+              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 8, fontWeight: '500' }}>
+                Checking live slot availability...
+              </Text>
+            </View>
+          ) : isSelectedDateClosed ? (
+            <View style={styles.closedDayBanner} testID="customer-day-closed-notice">
+              <Text style={styles.closedDayTitle}>🚫 Venue Closed on This Day</Text>
+              <Text style={styles.closedDaySub}>
+                {provider.name} is marked closed on {selectedDateIndex === 0 ? 'today' : selectedDateIndex === 1 ? 'tomorrow' : selectedDate?.toLocaleDateString('en-IN', { weekday: 'long' })} (weekly off or holiday). Please select another date for your visit.
+              </Text>
+            </View>
+          ) : availableSlots.length > 0 && availableSlots.every((s) => !s.is_available) ? (
+            <View style={styles.closedDayBanner} testID="customer-all-slots-past-notice">
+              <Text style={styles.closedDayTitle}>🌙 All Slots for Today Concluded</Text>
+              <Text style={styles.closedDaySub}>
+                All booking slots for today have already passed. Please tap &quot;Tomorrow&quot; above to view available appointments.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.slotGrid}>
+              {availableSlots.map((slot, index) => {
+                const timeString = new Date(slot.start_time).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+                const isSelected = selectedSlot?.start_time === slot.start_time;
+                const isAvailable = Boolean(slot.is_available);
 
-              return (
-                <TouchableOpacity
-                  key={index}
-                  disabled={!slot.is_available}
-                  style={[
-                    styles.slotChip,
-                    isSelected && styles.slotChipSelected,
-                    !slot.is_available && styles.slotChipDisabled,
-                  ]}
-                  onPress={() => setSelectedSlot(slot)}
-                >
-                  <Text
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    disabled={!isAvailable}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !isAvailable }}
+                    aria-disabled={!isAvailable}
                     style={[
-                      styles.slotTimeText,
-                      isSelected && styles.slotTimeTextSelected,
-                      !slot.is_available && styles.slotTimeTextDisabled,
+                      styles.slotChip,
+                      isSelected && styles.slotChipSelected,
+                      !isAvailable && styles.slotChipDisabled,
                     ]}
+                    onPress={() => isAvailable && setSelectedSlot(slot)}
                   >
-                    {timeString}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                    <Text
+                      style={[
+                        styles.slotTimeText,
+                        isSelected && styles.slotTimeTextSelected,
+                        !isAvailable && styles.slotTimeTextDisabled,
+                      ]}
+                    >
+                      {timeString}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -213,11 +319,10 @@ export default function ProviderDetailScreen({
             styles.holdButton,
             (!selectedSlot || provider.status === 'SUSPENDED') && styles.holdButtonDisabled,
           ]}
-          disabled={!selectedSlot || provider.status === 'SUSPENDED'}
+          disabled={!selectedSlot || !selectedResource || provider.status === 'SUSPENDED'}
           onPress={() => {
-            if (selectedSlot && provider.status !== 'SUSPENDED') {
-              const currentSlot = selectedSlot;
-              onProceedToHold(selectedResource, currentSlot);
+            if (selectedSlot && selectedResource && provider.status !== 'SUSPENDED') {
+              onProceedToHold(selectedResource, selectedSlot);
             }
           }}
         >
@@ -503,5 +608,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#be123c',
     lineHeight: 17,
+  },
+  closedDayBanner: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1.5,
+    borderColor: '#fde68a',
+    marginVertical: 6,
+  },
+  closedDayTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#92400e',
+    marginBottom: 4,
+  },
+  closedDaySub: {
+    fontSize: 12,
+    color: '#b45309',
+    lineHeight: 18,
   },
 });

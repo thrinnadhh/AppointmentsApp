@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   TextInput,
   BackHandler,
+  Platform,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
@@ -18,10 +19,10 @@ import ProviderDetailScreen from './src/screens/ProviderDetailScreen';
 import CheckoutModal from './src/screens/CheckoutModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
 import {
-  MOCK_PROVIDERS,
   fetchCustomerBookingsFromSupabase,
   cancelBookingOnSupabase,
   rescheduleBookingOnSupabase,
+  markBookingReached,
   sendPhoneOtp,
   verifyPhoneOtp,
   syncCustomerProfile,
@@ -63,7 +64,7 @@ export default function App() {
   const currentEntry = history[history.length - 1] || { screen: 'HOME', categoryId: null };
   const currentScreen = currentEntry.screen;
   const activeCategoryId = currentEntry.categoryId ?? null;
-  const selectedProviderId = currentEntry.providerId ?? MOCK_PROVIDERS[0].id;
+  const selectedProviderId = currentEntry.providerId ?? '';
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
@@ -132,8 +133,8 @@ export default function App() {
         (payload) => {
           const newStatus = (payload.new as { status?: string })?.status;
           if (newStatus) {
-            setConfirmationToast(`Appointment update: Status is now ${newStatus}`);
-            setTimeout(() => setConfirmationToast(null), 4000);
+            setConfirmationToast(`Booking Confirmed on Supabase! Status is now ${newStatus}`);
+            setTimeout(() => setConfirmationToast(null), 10000);
           }
           loadBookings();
         }
@@ -323,7 +324,7 @@ export default function App() {
 
     setTimeout(() => {
       setConfirmationToast(null);
-    }, 6000);
+    }, 12000);
   };
 
   const handleCancelBooking = async (bookingId: string) => {
@@ -359,8 +360,27 @@ export default function App() {
     }
   };
 
+  const handleMarkReached = async (bookingId: string) => {
+    try {
+      setCustomerBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId
+            ? { ...b, is_present: true, customer_arrived_at: new Date().toISOString() }
+            : b
+        )
+      );
+      await markBookingReached(bookingId);
+      await loadBookings();
+      setConfirmationToast('Arrival confirmed! Venue desk notified 📍');
+      setTimeout(() => setConfirmationToast(null), 4000);
+    } catch (err) {
+      console.warn('Mark reached error:', err);
+    }
+  };
+
   // Hardware Back Navigation (Android)
   useEffect(() => {
+    if (Platform.OS !== 'android') return;
     const backSub = BackHandler.addEventListener('hardwareBackPress', handleGoBack);
     return () => backSub.remove();
   }, [handleGoBack]);
@@ -404,6 +424,7 @@ export default function App() {
           bookings={customerBookings}
           onCancelBooking={handleCancelBooking}
           onRescheduleBooking={handleRescheduleBooking}
+          onMarkReached={handleMarkReached}
         />
       )}
 

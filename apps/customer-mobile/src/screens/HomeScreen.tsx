@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { VERTICALS, normCategory, City } from '@appointments/shared';
 import {
-  MOCK_PROVIDERS,
   fetchProvidersByCategory,
   fetchNearbyProviders,
   ProviderWithDetails,
