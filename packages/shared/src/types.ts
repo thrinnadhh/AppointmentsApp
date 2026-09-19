@@ -14,6 +14,16 @@ export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'FORFEITED';
 
 export type ResourceType = 'doctor' | 'table' | 'court' | 'stylist' | 'groomer' | 'vet';
 
+export interface DaySchedule {
+  open: string;
+  close: string;
+  is_closed: boolean;
+}
+
+export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+export type WeeklyHours = Record<DayOfWeek, DaySchedule>;
+
 export interface Category {
   id: string;
   name: string;
@@ -44,8 +54,16 @@ export interface Provider {
   email?: string | null;
   opening_time: string; // '09:00:00'
   closing_time: string; // '21:00:00'
+  weekly_hours?: WeeklyHours | null;
   photos?: string[] | null;
   status: ProviderStatus;
+  is_active?: boolean;
+  auto_accept_bookings?: boolean;
+  daily_booking_limit?: number;
+  cancellation_strikes?: number;
+  strike_reset_date?: string;
+  penalty_balance?: number;
+  is_booking_frozen?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -102,6 +120,8 @@ export interface Booking {
   attachment_url?: string | null;
   reminder_1h_sent_at?: string | null;
   reminder_30m_sent_at?: string | null;
+  is_present?: boolean;
+  customer_arrived_at?: string | null;
   provider?: Provider;
   resource?: Resource;
 }
@@ -264,6 +284,8 @@ export interface VerticalConfig {
   id: BusinessVertical;
   name: string;
   badgeLabel: string;
+  venueLabel: string; // e.g. 'Hospital', 'Salon', 'Turf', 'Restaurant', 'Pet Clinic'
+  venueLabelPlural: string;
   resourceLabelSingular: string;
   resourceLabelPlural: string;
   unitLabelSingular: string;
@@ -280,4 +302,36 @@ export interface VerticalConfig {
     hasCustomDurations: boolean;
     hasTeamCovers: boolean;
   };
+}
+
+export interface CreateRazorpayOrderRequest {
+  booking_id: string;
+  amount?: number;
+  currency?: string;
+}
+
+export interface CreateRazorpayOrderResponse {
+  success: boolean;
+  order_id?: string;
+  key_id?: string;
+  amount?: number;
+  currency?: string;
+  is_mock?: boolean;
+  error?: string;
+}
+
+export interface VerifyRazorpayPaymentRequest {
+  booking_id: string;
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+  attachment_url?: string | null;
+}
+
+export interface VerifyRazorpayPaymentResponse {
+  success: boolean;
+  booking_id?: string;
+  status?: string;
+  payment_status?: string;
+  error?: string;
 }

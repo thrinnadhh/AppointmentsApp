@@ -44,6 +44,29 @@ export interface CancelBookingResponse {
   payment_status?: string;
   refund_eligible?: boolean;
   refund_amount?: number;
+  merchant_strikes?: number;
+  penalty_applied?: boolean;
+  penalty_amount?: number;
+  is_booking_frozen?: boolean;
+  error?: string;
+}
+
+export interface ReassignResourceRequest {
+  booking_id: string;
+  new_resource_id: string;
+  reason?: string;
+}
+
+export interface ReassignResourceResponse {
+  success: boolean;
+  booking_id?: string;
+  old_resource_id?: string;
+  old_resource_name?: string;
+  new_resource_id?: string;
+  new_resource_name?: string;
+  slot_start?: string;
+  slot_end?: string;
+  status?: string;
   error?: string;
 }
 
@@ -71,6 +94,9 @@ export interface RecordNoShowResponse {
   success: boolean;
   booking_id?: string;
   no_show_count?: number;
+  penalty_applied?: boolean;
+  payment_status?: 'REFUNDED' | 'FORFEITED';
+  refund_amount?: number;
   is_flagged?: boolean;
   error?: string;
 }
@@ -94,10 +120,10 @@ export interface RazorpayWebhookPayload {
 }
 
 /**
- * 1-Hour Cancellation Cutoff Policy Helper
+ * 30-Minute Cancellation Cutoff Policy Helper
  * - Merchant-initiated cancellation: ALWAYS 100% full refund (Customer protected)
- * - Customer-initiated cancellation: 100% full refund IF requested > 1 hour before slot_start
- * - Customer-initiated cancellation: Deposit FORFEITED IF requested <= 1 hour before slot_start
+ * - Customer-initiated cancellation: 100% full refund IF requested > 30 minutes before slot_start
+ * - Customer-initiated cancellation: Deposit FORFEITED IF requested <= 30 minutes before slot_start
  */
 export function isEligibleForFullRefund(
   slotStartIso: string,
@@ -115,17 +141,17 @@ export function isEligibleForFullRefund(
   const now = Date.now();
   const diffMinutes = Math.round((slotTime - now) / (1000 * 60));
 
-  if (diffMinutes > 60) {
+  if (diffMinutes > 30) {
     return {
       eligible: true,
       minutesUntilSlot: diffMinutes,
-      rule: `Cancelled with ${diffMinutes}m remaining (> 60m required for full refund).`,
+      rule: `Cancelled with ${diffMinutes}m remaining (> 30m required for full refund).`,
     };
   }
 
   return {
     eligible: false,
     minutesUntilSlot: diffMinutes,
-    rule: `Late cancellation (${diffMinutes}m before slot). Deposits are forfeited within 60 minutes of slot start.`,
+    rule: `Late cancellation (${diffMinutes}m before slot). Deposits are forfeited within 30 minutes of slot start.`,
   };
 }

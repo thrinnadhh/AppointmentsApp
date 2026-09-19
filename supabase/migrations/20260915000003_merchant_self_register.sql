@@ -108,33 +108,7 @@ BEGIN
   SET default_provider_id = v_provider_id
   WHERE id = v_user_id;
 
-  -- 6. Seed Operational Resources based on category
-  IF v_category = 'salons' THEN
-    INSERT INTO public.resources (provider_id, name, type, department, price, deposit_amount, duration_minutes, capacity, is_active)
-    VALUES
-      (v_provider_id, 'Master Stylist Chair 1', 'chair', 'Hair & Styling', 500, 100, 45, 1, true),
-      (v_provider_id, 'Senior Spa & Colour Station', 'chair', 'Skin & Spa', 750, 150, 60, 1, true);
-  ELSIF v_category = 'clinics' THEN
-    INSERT INTO public.resources (provider_id, name, type, department, price, deposit_amount, duration_minutes, capacity, is_active)
-    VALUES
-      (v_provider_id, 'Consultation Unit 1', 'doctor', 'General Medicine', 400, 100, 30, 1, true),
-      (v_provider_id, 'Specialist Exam Chamber', 'doctor', 'Diagnostics', 600, 150, 30, 1, true);
-  ELSIF v_category = 'gaming' THEN
-    INSERT INTO public.resources (provider_id, name, type, department, price, deposit_amount, duration_minutes, capacity, is_active)
-    VALUES
-      (v_provider_id, 'PS5 Pro Station Alpha', 'station', 'Console Gaming', 200, 50, 60, 1, true),
-      (v_provider_id, 'VR Simulator Pod 1', 'station', 'Virtual Reality', 350, 100, 30, 1, true);
-  ELSIF v_category = 'restaurants' THEN
-    INSERT INTO public.resources (provider_id, name, type, department, price, deposit_amount, duration_minutes, capacity, is_active)
-    VALUES
-      (v_provider_id, 'Family Dining Booth 1', 'table', 'Main Dining', 0, 200, 90, 4, true),
-      (v_provider_id, 'Terrace View Table 2', 'table', 'Outdoor Rooftop', 0, 200, 60, 2, true);
-  ELSE
-    INSERT INTO public.resources (provider_id, name, type, department, price, deposit_amount, duration_minutes, capacity, is_active)
-    VALUES
-      (v_provider_id, 'Pet Grooming & Spa Bay 1', 'service', 'Pet Grooming', 450, 100, 45, 1, true),
-      (v_provider_id, 'Veterinary Wellness Unit', 'doctor', 'Pet Care', 500, 100, 30, 1, true);
-  END IF;
+  -- Note: Newly registered merchants start with a clean shop with zero dummy resources.
 
   RETURN jsonb_build_object(
     'success', true,
