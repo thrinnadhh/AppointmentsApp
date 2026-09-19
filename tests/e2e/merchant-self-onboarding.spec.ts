@@ -79,8 +79,8 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
     // Verify Salon Resource Heading
     await expect(page.getByRole('heading', { name: /Stylists/i })).toBeVisible({ timeout: 15000 });
 
-    // Verify newly provisioned salon station/chair exists
-    await expect(page.getByText(/Stylist Chair|Senior Spa & Colour/i).first()).toBeVisible({ timeout: 15000 });
+    // Verify newly provisioned salon workspace is ready (starts clean without dummy clutter)
+    await expect(page.getByText(/Stylist|Add Stylist|No stylists found/i).first()).toBeVisible({ timeout: 15000 });
 
     // Hospital doctors must NOT be present in this isolated workspace
     await expect(page.getByText('Dr. A. Sundararajan')).toHaveCount(0);

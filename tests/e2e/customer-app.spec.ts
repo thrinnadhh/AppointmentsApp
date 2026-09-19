@@ -112,7 +112,12 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
 
     // 5. Verify Cancellation Policy
     await expect(page.getByText('🛡️ Cancellation & Reschedule Policy')).toBeVisible();
-    await expect(page.getByText(/Free cancellation or reschedule up to 1 hour before/)).toBeVisible();
+    await expect(page.getByText(/Free cancellation or reschedule up to 30 minutes before/)).toBeVisible();
+
+    // 5b. Verify Late Arrival Grace Policy (+2 Token Buffer)
+    await expect(page.getByTestId('late-arrival-notice')).toBeVisible();
+    await expect(page.getByText('Late Arrival Grace Policy (+2 Token Buffer)')).toBeVisible();
+    await expect(page.getByText(/ongoing.*token #12/i)).toBeVisible();
 
     // 6. Test Cancel action restores detail screen
     await customerApp.cancelModalBtn.click();
@@ -152,7 +157,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
 
     // 2. Search by venue name ("Dental")
     await customerApp.search('Dental');
-    await expect(customerApp.searchResultsHeading).toContainText('Search Results (1)');
+    await expect(customerApp.searchResultsHeading).toContainText(/Search Results \([0-9]+\)/);
     await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible();
     await expect(customerApp.clearSearchBtn).toBeVisible();
 

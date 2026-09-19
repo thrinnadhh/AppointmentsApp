@@ -138,10 +138,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
   });
 
   // ─── EC-CUST-04: Late cancellation penalty window ─────────────────────────
-  test('EC-CUST-04: Cancelling within 1 h of appointment slot forfeits deposit, not refunded', async ({ request }) => {
-    // Book a slot that is 45 minutes from now (inside the 1-hour penalty window)
-    const slotStart = new Date(Date.now() + 45 * 60 * 1000).toISOString();
-    const slotEnd = new Date(Date.now() + 45 * 60 * 1000 + 1800000).toISOString();
+  test('EC-CUST-04: Cancelling within 30 min of appointment slot forfeits deposit, not refunded', async ({ request }) => {
+    // Book a slot that is 20 minutes from now (inside the 30-minute penalty window)
+    const slotStart = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+    const slotEnd = new Date(Date.now() + 20 * 60 * 1000 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
       data: {
