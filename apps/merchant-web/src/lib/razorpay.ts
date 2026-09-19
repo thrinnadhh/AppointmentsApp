@@ -121,25 +121,29 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
   const { orderId, paymentId, signature } = params;
   if (!orderId || !paymentId || !signature) return false;
 
-  // In live mode, verify cryptographic HMAC
-  if (isRazorpayConfigured() && KEY_SECRET) {
+  // 1. Cryptographic HMAC verification if key is present
+  if (KEY_SECRET) {
     try {
       const expectedSignature = crypto
         .createHmac('sha256', KEY_SECRET)
         .update(`${orderId}|${paymentId}`)
         .digest('hex');
 
-      if (signature.length !== expectedSignature.length) return false;
-      return crypto.timingSafeEqual(
-        Buffer.from(signature, 'utf-8'),
-        Buffer.from(expectedSignature, 'utf-8')
-      );
+      if (
+        signature.length === expectedSignature.length &&
+        crypto.timingSafeEqual(
+          Buffer.from(signature, 'utf-8'),
+          Buffer.from(expectedSignature, 'utf-8')
+        )
+      ) {
+        return true;
+      }
     } catch {
-      return false;
+      // Fall through
     }
   }
 
-  // Sandbox mode verification
+  // Explicitly reject tamper / invalid markers
   if (
     signature.toLowerCase().includes('invalid') ||
     signature.toLowerCase().includes('forged') ||
@@ -148,13 +152,13 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
     return false;
   }
 
+  // In non-production or for mock test tokens, allow test signatures
   if (
-    signature.startsWith('mock_sig_') ||
-    signature === 'mock_verified' ||
-    signature === 'sim_signature' ||
-    orderId.startsWith('order_mock_') ||
-    paymentId.startsWith('pay_') ||
-    paymentId.startsWith('sim_')
+    process.env.NODE_ENV !== 'production' &&
+    (signature.startsWith('mock_sig_') ||
+      signature === 'mock_verified' ||
+      signature === 'sim_signature' ||
+      orderId.startsWith('order_mock_'))
   ) {
     return true;
   }

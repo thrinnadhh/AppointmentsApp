@@ -49,3 +49,5 @@ supabase/.temp/
 .opencode.json
 opencode*.json
 .mcp.json
+.vercel
+.env*
