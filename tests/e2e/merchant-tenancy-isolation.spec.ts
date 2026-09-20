@@ -29,8 +29,10 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
     await expect(page.getByRole('heading', { name: /Merchant & Admin Access/i })).toBeVisible();
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
 
-    // 2. Click Quick Demo Login for Naturals Salon
-    await page.getByTestId('demo-login-salon').click();
+    // 2. Sign In for Naturals Salon
+    await page.getByTestId('login-email').fill('naturals.salon@tirupati-appointments.com');
+    await page.getByTestId('login-password').fill('NaturalsSalon2026!');
+    await page.getByTestId('login-submit').click();
 
     // 3. Verify Redirection to Merchant Dashboard
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 15000 });
@@ -97,8 +99,10 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
     await expect(page.getByRole('heading', { name: /Merchant & Admin Access/i })).toBeVisible();
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
 
-    // 2. Click Quick Demo Login for SVIMS Clinic
-    await page.getByTestId('demo-login-clinic').click();
+    // 2. Sign In for SVIMS Clinic
+    await page.getByTestId('login-email').fill('svims.clinic@tirupati-appointments.com');
+    await page.getByTestId('login-password').fill('SvimsClinic2026!');
+    await page.getByTestId('login-submit').click();
 
     // 3. Verify Redirection to Merchant Dashboard
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 15000 });
@@ -153,8 +157,10 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
     await expect(page.getByRole('heading', { name: /Merchant & Admin Access/i })).toBeVisible();
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
 
-    // 2. Click Quick Demo Login for Super Admin
-    await page.getByTestId('demo-login-admin').click();
+    // 2. Sign In for Super Admin
+    await page.getByTestId('login-email').fill('admin@appointments-tirupati.com');
+    await page.getByTestId('login-password').fill('AdminSecure2026!');
+    await page.getByTestId('login-submit').click();
 
     // 3. Verify Redirection
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 15000 });

@@ -155,7 +155,9 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
     await page.goto('http://localhost:3000/login');
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
     await page.getByTestId('auth-tab-signin').click();
-    await page.getByTestId('demo-login-admin').click();
+    await page.getByTestId('login-email').fill('admin@appointments-tirupati.com');
+    await page.getByTestId('login-password').fill('AdminSecure2026!');
+    await page.getByTestId('login-submit').click();
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 15000 });
 
     // 2. Navigate to /admin via Platform Admin link

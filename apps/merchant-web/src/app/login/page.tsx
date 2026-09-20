@@ -8,7 +8,6 @@ import {
   Mail, 
   ArrowRight, 
   AlertCircle, 
-  KeyRound, 
   CheckCircle2,
   Sparkles
 } from 'lucide-react';
@@ -45,6 +44,19 @@ export default function LoginPage() {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           const userEmail = session.user.email ? session.user.email.toLowerCase().trim() : '';
+          const userRole = session.user.user_metadata?.role;
+          const isAdmin = userRole === 'admin' || userEmail.includes('admin');
+
+          if (isAdmin) {
+            setSuccessMsg('Session detected! Redirecting to Merchant Workspace...');
+            const params = new URLSearchParams(window.location.search);
+            const redirectPath = params.get('redirect') || '/';
+            setTimeout(() => {
+              window.location.href = redirectPath;
+            }, 600);
+            return;
+          }
+
           const { data: provs } = await supabase
             .from('providers')
             .select('id')
@@ -94,6 +106,17 @@ export default function LoginPage() {
 
       if (data.session) {
         const userEmail = data.session.user.email ? data.session.user.email.toLowerCase().trim() : '';
+        const userRole = data.session.user.user_metadata?.role;
+        const isAdmin = userRole === 'admin' || userEmail.includes('admin');
+
+        if (isAdmin) {
+          setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
+          const params = new URLSearchParams(window.location.search);
+          const redirectPath = params.get('redirect') || '/';
+          window.location.href = redirectPath;
+          return;
+        }
+
         const { data: provs } = await supabase
           .from('providers')
           .select('id')
@@ -146,59 +169,6 @@ export default function LoginPage() {
       } else {
         setErrorMsg(msg);
       }
-      setLoading(false);
-    }
-  };
-
-  const handleQuickLogin = async (presetEmail: string, presetPw: string) => {
-    setEmail(presetEmail);
-    setPassword(presetPw);
-    setErrorMsg(null);
-    setLoading(true);
-    try {
-      let { data, error } = await supabase.auth.signInWithPassword({
-        email: presetEmail,
-        password: presetPw,
-      });
-
-      if (error && (presetEmail.includes('svims.clinic') || presetEmail.includes('naturals.salon'))) {
-        const signUpRes = await supabase.auth.signUp({
-          email: presetEmail,
-          password: presetPw,
-          options: {
-            data: {
-              full_name: presetEmail.includes('svims') ? 'Dr. Sundararajan (SVIMS Clinic)' : 'Naturals Salon Staff',
-              role: 'merchant',
-            },
-          },
-        });
-        if (signUpRes.data?.session) {
-          data = signUpRes.data as any;
-          error = null;
-        } else {
-          const retrySignIn = await supabase.auth.signInWithPassword({
-            email: presetEmail,
-            password: presetPw,
-          });
-          data = retrySignIn.data as any;
-          error = retrySignIn.error;
-        }
-      }
-
-      if (error) {
-        throw error;
-      }
-
-      if (data.session) {
-        setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
-        const params = new URLSearchParams(window.location.search);
-        const redirectPath = params.get('redirect') || '/';
-        window.location.href = redirectPath;
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Invalid login credentials.';
-      setErrorMsg(msg);
-    } finally {
       setLoading(false);
     }
   };
@@ -436,79 +406,6 @@ export default function LoginPage() {
                 className="font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer"
               >
                 Sign In with Password →
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Demo Credentials Switcher — DEV ONLY */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="pt-4 border-t border-slate-200">
-            <div className="flex items-center gap-1.5 mb-2.5">
-              <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                Preset Demo Credentials (Dev Only)
-              </h3>
-            </div>
-            <div className="space-y-1.5">
-              <button
-                type="button"
-                data-testid="demo-login-admin"
-                onClick={() => handleQuickLogin('admin@appointments-tirupati.com', 'AdminSecure2026!')}
-                className="w-full text-left p-2 rounded-lg border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors flex items-center justify-between group cursor-pointer"
-              >
-                <div>
-                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    Super Admin (Platform Owner)
-                    <span className="px-1.5 py-0.5 text-[9px] bg-emerald-100 text-emerald-800 rounded font-semibold">
-                      Full Governance
-                    </span>
-                  </p>
-                  <p className="text-[10px] text-slate-500">admin@appointments-tirupati.com</p>
-                </div>
-                <span className="text-[10px] font-semibold text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Select →
-                </span>
-              </button>
-
-              <button
-                type="button"
-                data-testid="demo-login-clinic"
-                onClick={() => handleQuickLogin('svims.clinic@tirupati-appointments.com', 'SvimsClinic2026!')}
-                className="w-full text-left p-2 rounded-lg border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors flex items-center justify-between group cursor-pointer"
-              >
-                <div>
-                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    SVIMS Specialty Clinic
-                    <span className="px-1.5 py-0.5 text-[9px] bg-sky-100 text-sky-800 rounded font-semibold">
-                      Hospital Staff
-                    </span>
-                  </p>
-                  <p className="text-[10px] text-slate-500">svims.clinic@tirupati-appointments.com</p>
-                </div>
-                <span className="text-[10px] font-semibold text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Select →
-                </span>
-              </button>
-
-              <button
-                type="button"
-                data-testid="demo-login-salon"
-                onClick={() => handleQuickLogin('naturals.salon@tirupati-appointments.com', 'NaturalsSalon2026!')}
-                className="w-full text-left p-2 rounded-lg border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors flex items-center justify-between group cursor-pointer"
-              >
-                <div>
-                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    Naturals Beauty Salon
-                    <span className="px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 rounded font-semibold">
-                      Salon Staff
-                    </span>
-                  </p>
-                  <p className="text-[10px] text-slate-500">naturals.salon@tirupati-appointments.com</p>
-                </div>
-                <span className="text-[10px] font-semibold text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Select →
-                </span>
               </button>
             </div>
           </div>

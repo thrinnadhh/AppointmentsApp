@@ -133,19 +133,14 @@ export class MerchantPortalPage {
   // Navigation Methods
   async loginAsMerchant(email = 'svims.clinic@tirupati-appointments.com', password = 'SvimsClinic2026!') {
     await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
-    const demoBtn = this.page.getByTestId('demo-login-clinic');
-    if (email === 'svims.clinic@tirupati-appointments.com' && (await demoBtn.isVisible().catch(() => false))) {
-      await demoBtn.click();
-    } else {
-      const emailInput = this.page.getByTestId('login-email');
-      if (!(await emailInput.isVisible().catch(() => false))) {
-        await this.page.getByTestId('auth-tab-signin').click();
-      }
-      await expect(emailInput).toBeVisible({ timeout: 10000 });
-      await emailInput.fill(email);
-      await this.page.getByTestId('login-password').fill(password);
-      await this.page.getByTestId('login-submit').click();
+    const emailInput = this.page.getByTestId('login-email');
+    if (!(await emailInput.isVisible().catch(() => false))) {
+      await this.page.getByTestId('auth-tab-signin').click();
     }
+    await expect(emailInput).toBeVisible({ timeout: 10000 });
+    await emailInput.fill(email);
+    await this.page.getByTestId('login-password').fill(password);
+    await this.page.getByTestId('login-submit').click();
     await this.page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 }).catch(() => null);
   }
 
