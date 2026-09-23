@@ -111,8 +111,9 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
     await expect(page.getByText('Total Payable Now')).toBeVisible();
 
     // 5. Verify Cancellation Policy
-    await expect(page.getByText('🛡️ Cancellation & Reschedule Policy')).toBeVisible();
-    await expect(page.getByText(/Free cancellation or reschedule up to 30 minutes before/)).toBeVisible();
+    await expect(page.getByText('🛡️ Cancellation & Refund Policy')).toBeVisible();
+    await expect(page.getByText(/Free cancellation up to 1 hour before/)).toBeVisible();
+    await expect(page.getByText(/4 no-shows/i)).toBeVisible();
 
     // 5b. Verify Late Arrival Grace Policy (+2 Token Buffer)
     await expect(page.getByTestId('late-arrival-notice')).toBeVisible();

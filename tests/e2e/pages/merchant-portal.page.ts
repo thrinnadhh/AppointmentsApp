@@ -205,7 +205,10 @@ export class MerchantPortalPage {
   async gotoTeam() {
     await this.page.goto('http://localhost:3000/team', { waitUntil: 'domcontentloaded' });
     await this.ensureAuthenticated();
-    await expect(this.teamHeading).toBeVisible({ timeout: 15000 });
+    if (!this.page.url().includes('/team')) {
+      await this.page.goto('http://localhost:3000/team', { waitUntil: 'domcontentloaded' });
+    }
+    await expect(this.teamHeading).toBeVisible({ timeout: 20000 });
   }
 
   async gotoVenues(email?: string, password?: string) {

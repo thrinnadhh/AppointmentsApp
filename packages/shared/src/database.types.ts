@@ -613,6 +613,69 @@ export type Database = {
           },
         ]
       }
+      user_consents: {
+        Row: {
+          created_at: string
+          granted: boolean
+          id: string
+          ip_address: string | null
+          purpose: string
+          user_agent: string | null
+          user_id: string
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          granted: boolean
+          id?: string
+          ip_address?: string | null
+          purpose: string
+          user_agent?: string | null
+          user_id: string
+          version?: string
+        }
+        Update: {
+          created_at?: string
+          granted?: boolean
+          id?: string
+          ip_address?: string | null
+          purpose?: string
+          user_agent?: string | null
+          user_id?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      account_deletion_requests: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          id: string
+          reason: string | null
+          requested_at: string
+          scheduled_for: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          id?: string
+          reason?: string | null
+          requested_at?: string
+          scheduled_for?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          id?: string
+          reason?: string | null
+          requested_at?: string
+          scheduled_for?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

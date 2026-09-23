@@ -136,23 +136,9 @@ type RawBookingRow = Database['public']['Tables']['bookings']['Row'] & {
 };
 
 export async function fetchMerchantBookings(providerId?: string): Promise<MerchantBookingWithDetails[]> {
-  let query = supabase
-    .from('bookings')
-    .select(`
-      *,
-      profiles (
-        full_name,
-        phone,
-        no_show_count
-      ),
-      resources (
-        name,
-        type
-      ),
-      providers (
-        name
-      )
-    `)
+  let query = (supabase as any)
+    .from('merchant_bookings')
+    .select('*')
     .order('slot_start', { ascending: true });
 
   if (providerId) {
@@ -161,20 +147,34 @@ export async function fetchMerchantBookings(providerId?: string): Promise<Mercha
 
   const { data, error } = await query;
   if (error) {
-    console.error('Error fetching bookings from Supabase:', error);
+    console.error('Error fetching bookings from merchant_bookings view:', error);
     return [];
   }
 
-  const rawBookings = (data || []) as unknown as RawBookingRow[];
-  return rawBookings.map((b) => ({
+  return (data || []).map((b: any) => ({
     ...b,
-    customer_name: b.profiles?.full_name || 'Walk-in / Guest',
-    customer_phone: b.profiles?.phone || '+91 98480 00000',
-    no_show_count: b.profiles?.no_show_count ?? 0,
-    resource_name: b.resources?.name || 'Standard Unit',
-    resource_type: b.resources?.type || 'slot',
-    provider_name: b.providers?.name || 'Merchant Venue',
+    customer_name: b.customer_name || 'Walk-in / Guest',
+    customer_phone: b.customer_phone || 'Not provided',
+    no_show_count: b.no_show_count ?? 0,
+    resource_name: b.resource_name || 'Standard Unit',
+    resource_type: b.resource_type || 'slot',
+    provider_name: b.provider_name || 'Merchant Venue',
   }));
+}
+
+export async function revealCustomerContact(bookingId: string): Promise<{
+  success: boolean;
+  phone?: string;
+  full_name?: string;
+  error?: string;
+}> {
+  const { data, error } = await (supabase.rpc as any)('reveal_customer_contact', {
+    p_booking_id: bookingId,
+  });
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  return data as { success: boolean; phone?: string; full_name?: string; error?: string };
 }
 
 export async function fetchProviderResources(providerId: string) {

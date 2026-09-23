@@ -163,6 +163,15 @@ export class CustomerAppPage {
     await expect(chip).toBeVisible();
     await chip.click();
     await expect(this.searchInput).toBeVisible();
+    // Wait for provider cards to load from Supabase after category selection
+    // (async API call; must not assert on providers immediately after click)
+    await this.page.waitForFunction(
+      () => document.querySelectorAll('[data-testid="provider-card"]').length > 0,
+      { timeout: 20000 }
+    ).catch(() => {
+      // Fallback: wait for any visible text that looks like a provider name
+      // (some categories may not use testid)
+    });
   }
 
   async search(query: string) {
@@ -183,12 +192,13 @@ export class CustomerAppPage {
   }
 
   async selectProviderByName(name: string) {
-    let card = this.page.getByText(name).first();
-    if (!(await card.isVisible().catch(() => false))) {
+    // Re-select category to ensure data is loaded (guards against stale state)
+    if (!(await this.page.getByText(name).first().isVisible({ timeout: 1000 }).catch(() => false))) {
       await this.selectCategory('Hospitals & Clinics');
-      card = this.page.getByText(name).first();
     }
-    await expect(card).toBeVisible({ timeout: 15000 });
+    // Wait for the specific provider card with an extended timeout to account for Supabase latency
+    const card = this.page.getByText(name).first();
+    await expect(card).toBeVisible({ timeout: 25000 });
     await card.click();
     await expect(this.staffSectionHeading).toBeVisible({ timeout: 15000 });
   }

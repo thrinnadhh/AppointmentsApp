@@ -10,12 +10,14 @@ interface OnboardRequestBody {
   phone: string;
   address?: string;
   userId?: string;
+  /** REQUIRED: merchant must affirmatively tick the ToS checkbox */
+  tosAccepted: boolean;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: OnboardRequestBody = await request.json();
-    const { fullName, email, password, shopName, categoryId, phone, address } = body;
+    const { fullName, email, password, shopName, categoryId, phone, address, tosAccepted } = body;
 
     if (!fullName?.trim() || !email?.trim() || !shopName?.trim() || !categoryId?.trim() || !phone?.trim()) {
       return NextResponse.json(
@@ -31,15 +33,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // IT Act Section 79 safe-harbour requires affirmative ToS acceptance
+    if (!tosAccepted) {
+      return NextResponse.json(
+        { error: 'You must accept the Merchant Partner Terms of Service to register.' },
+        { status: 400 }
+      );
+    }
+
     // Call atomic PostgreSQL RPC
     const { data, error } = await (supabase.rpc as any)('merchant_self_register', {
-      p_full_name: fullName.trim(),
-      p_email: email.trim().toLowerCase(),
-      p_password: password,
-      p_phone: phone.trim(),
-      p_shop_name: shopName.trim(),
-      p_category_id: categoryId.trim().toLowerCase(),
-      p_address: address?.trim() || 'AIR Bypass Road, Tirupati',
+      p_full_name:       fullName.trim(),
+      p_email:           email.trim().toLowerCase(),
+      p_password:        password,
+      p_phone:           phone.trim(),
+      p_shop_name:       shopName.trim(),
+      p_category_id:     categoryId.trim().toLowerCase(),
+      p_address:         address?.trim() || 'AIR Bypass Road, Tirupati',
+      p_tos_version:     '1.0',
+      p_tos_accepted_at: new Date().toISOString(),
     });
 
     if (error) {
@@ -50,13 +62,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      data,
-    });
+    return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
     console.error('[Onboard Exception]:', err);
     const message = err instanceof Error ? err.message : 'Internal onboarding error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

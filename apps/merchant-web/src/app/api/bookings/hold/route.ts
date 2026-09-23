@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Rate Limit Protection (free-for.dev Upstash / Memory)
-    const rateLimit = await checkRateLimit(customer_id, 100, 60);
+    // Rate Limit: max 10 reservation attempts per customer per minute
+    const rateLimit = await checkRateLimit(`hold:${customer_id}`, 10, 60);
     if (!rateLimit.allowed) {
       return NextResponse.json<CreateHoldResponse>(
         {

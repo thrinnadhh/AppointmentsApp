@@ -35,8 +35,9 @@ import {
   NotificationLog
 } from '@/lib/supabase';
 import Link from 'next/link';
-import { BookingStatus, Provider, PaymentStatus } from '@appointments/shared';
+import { BookingStatus, Provider, PaymentStatus, maskPhoneNumber } from '@appointments/shared';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { CustomerContactBadge } from '@/components/CustomerContactBadge';
 
 export default function BookingsManagementPage() {
   const { activeProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
@@ -144,9 +145,9 @@ export default function BookingsManagementPage() {
     const matchesFilter = selectedFilter === 'ALL' || b.status === selectedFilter;
     const matchesSearch = 
       (b.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (b.customer_phone || '').includes(searchQuery) ||
       (b.reference_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (b.resource_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (b.resource_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.id.toLowerCase().includes(searchQuery.toLowerCase());
 
     let matchesDate = true;
     const slotTime = new Date(b.slot_start).getTime();
@@ -638,10 +639,12 @@ export default function BookingsManagementPage() {
                         {formattedTime} ({formattedDate})
                       </span>
                       {booking.customer_phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          {booking.customer_phone}
-                        </span>
+                        <CustomerContactBadge
+                          phone={booking.customer_phone}
+                          bookingId={booking.id}
+                          bookingStatus={booking.status}
+                          isArrived={Boolean(booking.customer_arrived_at)}
+                        />
                       )}
                       <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
                         Deposit: ₹{booking.deposit_amount} ({booking.payment_status})
@@ -900,9 +903,16 @@ export default function BookingsManagementPage() {
                   <MessageSquare className="w-5 h-5 text-emerald-600" />
                   WhatsApp & SMS Communications
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5 font-mono">
-                  Ref: {notificationModalBooking.reference_code || notificationModalBooking.id.slice(0, 8)} • {notificationModalBooking.customer_phone}
-                </p>
+                <div className="text-xs text-slate-500 mt-1 font-mono flex items-center gap-1.5 flex-wrap">
+                  <span>Ref: {notificationModalBooking.reference_code || notificationModalBooking.id.slice(0, 8)}</span>
+                  <span>•</span>
+                  <CustomerContactBadge
+                    phone={notificationModalBooking.customer_phone}
+                    bookingId={notificationModalBooking.id}
+                    bookingStatus={notificationModalBooking.status}
+                    isArrived={Boolean(notificationModalBooking.customer_arrived_at)}
+                  />
+                </div>
               </div>
               <button
                 onClick={() => setNotificationModalBooking(null)}

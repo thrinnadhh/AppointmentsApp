@@ -29,8 +29,16 @@ export default function RootLayout({
             {children}
           </main>
         </MerchantTenantProvider>
-        <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-          <p>© 2026 Hyperlocal Appointments Platform (Tirupati Hub) • Merchant Operations</p>
+        <footer className="bg-white border-t border-slate-200 py-5 text-xs text-slate-500">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p>© 2026 Appointments4u · Tirupati Hyperlocal Appointments Platform</p>
+            <nav aria-label="Legal" className="flex items-center gap-4 flex-wrap justify-center">
+              <a href="/privacy" className="hover:text-emerald-700 transition-colors">Privacy Policy</a>
+              <a href="/terms" className="hover:text-emerald-700 transition-colors">Terms of Service</a>
+              <a href="/refund-policy" className="hover:text-emerald-700 transition-colors">Refund Policy</a>
+              <a href="mailto:grievance@appointments4u.in" className="hover:text-emerald-700 transition-colors">Grievance Officer</a>
+            </nav>
+          </div>
         </footer>
       </body>
     </html>
