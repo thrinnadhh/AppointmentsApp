@@ -1,0 +1,11 @@
+.agents
+.code-review-graph
+.cursor
+.claude
+apps/customer-mobile
+playwright-report
+test-results
+tests
+supabase
+*.log
+*.md

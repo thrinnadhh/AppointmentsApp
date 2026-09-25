@@ -19,6 +19,8 @@ export type Database = {
           created_at: string
           customer_id: string
           deposit_amount: number
+          platform_fee: number | null
+          total_amount: number | null
           gateway_payment_id: string | null
           hold_expires_at: string | null
           id: string
@@ -33,12 +35,16 @@ export type Database = {
           attachment_url: string | null
           reminder_1h_sent_at: string | null
           reminder_30m_sent_at: string | null
+          is_present: boolean
+          customer_arrived_at: string | null
         }
         Insert: {
           attachment_url?: string | null
           created_at?: string
           customer_id: string
           deposit_amount: number
+          platform_fee?: number | null
+          total_amount?: number | null
           gateway_payment_id?: string | null
           hold_expires_at?: string | null
           id?: string
@@ -47,6 +53,8 @@ export type Database = {
           reference_code?: string | null
           reminder_1h_sent_at?: string | null
           reminder_30m_sent_at?: string | null
+          is_present?: boolean
+          customer_arrived_at?: string | null
           resource_id: string
           slot_end: string
           slot_start: string
@@ -58,6 +66,8 @@ export type Database = {
           created_at?: string
           customer_id?: string
           deposit_amount?: number
+          platform_fee?: number | null
+          total_amount?: number | null
           gateway_payment_id?: string | null
           hold_expires_at?: string | null
           id?: string
@@ -66,12 +76,15 @@ export type Database = {
           reference_code?: string | null
           reminder_1h_sent_at?: string | null
           reminder_30m_sent_at?: string | null
+          is_present?: boolean
+          customer_arrived_at?: string | null
           resource_id?: string
           slot_end?: string
           slot_start?: string
           status?: Database["public"]["Enums"]["booking_status"]
           updated_at?: string
         }
+
         Relationships: [
           {
             foreignKeyName: "bookings_customer_id_fkey"
@@ -388,6 +401,14 @@ export type Database = {
           photos: string[] | null
           status: Database["public"]["Enums"]["provider_status"]
           sub_category_id: string | null
+          cancellation_strikes: number
+          strike_reset_date: string
+          penalty_balance: number
+          is_booking_frozen: boolean
+          is_active: boolean
+          auto_accept_bookings: boolean
+          daily_booking_limit: number
+          weekly_hours: Json
           updated_at: string
         }
         Insert: {
@@ -409,6 +430,14 @@ export type Database = {
           photos?: string[] | null
           status?: Database["public"]["Enums"]["provider_status"]
           sub_category_id?: string | null
+          cancellation_strikes?: number
+          strike_reset_date?: string
+          penalty_balance?: number
+          is_booking_frozen?: boolean
+          is_active?: boolean
+          auto_accept_bookings?: boolean
+          daily_booking_limit?: number
+          weekly_hours?: Json
           updated_at?: string
         }
         Update: {
@@ -430,6 +459,14 @@ export type Database = {
           photos?: string[] | null
           status?: Database["public"]["Enums"]["provider_status"]
           sub_category_id?: string | null
+          cancellation_strikes?: number
+          strike_reset_date?: string
+          penalty_balance?: number
+          is_booking_frozen?: boolean
+          is_active?: boolean
+          auto_accept_bookings?: boolean
+          daily_booking_limit?: number
+          weekly_hours?: Json
           updated_at?: string
         }
         Relationships: [
@@ -693,6 +730,21 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       record_no_show: { Args: { p_booking_id: string }; Returns: Json }
+      reassign_booking_resource: {
+        Args: {
+          p_booking_id: string
+          p_new_resource_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      reset_test_provider_strikes: {
+        Args: {
+          p_provider_id: string
+          p_count?: number
+        }
+        Returns: Json
+      }
       release_expired_holds: { Args: never; Returns: Json }
       reschedule_booking_slot: {
         Args: {

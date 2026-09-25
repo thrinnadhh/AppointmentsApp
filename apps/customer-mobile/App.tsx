@@ -8,20 +8,24 @@ import {
   SafeAreaView,
   TextInput,
   BackHandler,
+  Platform,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Resource, Slot, Booking } from '@appointments/shared';
+
+import { Resource, Slot, Booking, getPlatformFee } from '@appointments/shared';
+
+
 import HomeScreen from './src/screens/HomeScreen';
 import ProviderDetailScreen from './src/screens/ProviderDetailScreen';
 import CheckoutModal from './src/screens/CheckoutModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
 import {
-  MOCK_PROVIDERS,
   fetchCustomerBookingsFromSupabase,
   cancelBookingOnSupabase,
   rescheduleBookingOnSupabase,
+  markBookingReached,
   sendPhoneOtp,
   verifyPhoneOtp,
   syncCustomerProfile,
@@ -63,7 +67,7 @@ export default function App() {
   const currentEntry = history[history.length - 1] || { screen: 'HOME', categoryId: null };
   const currentScreen = currentEntry.screen;
   const activeCategoryId = currentEntry.categoryId ?? null;
-  const selectedProviderId = currentEntry.providerId ?? MOCK_PROVIDERS[0].id;
+  const selectedProviderId = currentEntry.providerId ?? '';
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
@@ -132,8 +136,8 @@ export default function App() {
         (payload) => {
           const newStatus = (payload.new as { status?: string })?.status;
           if (newStatus) {
-            setConfirmationToast(`Appointment update: Status is now ${newStatus}`);
-            setTimeout(() => setConfirmationToast(null), 4000);
+            setConfirmationToast(`Booking Confirmed on Supabase! Status is now ${newStatus}`);
+            setTimeout(() => setConfirmationToast(null), 10000);
           }
           loadBookings();
         }
@@ -313,7 +317,10 @@ export default function App() {
 
   const handlePaymentSuccess = async (bookingId: string) => {
     setCheckoutVisible(false);
-    setConfirmationToast(`Booking Confirmed on Supabase! Deposit ₹${activeResource?.deposit_amount} captured.`);
+    const fee = getPlatformFee(activeCategoryId);
+    const deposit = Number(activeResource?.deposit_amount) || 100;
+    const total = deposit + fee;
+    setConfirmationToast(`Booking Confirmed! Paid ₹${total} (Deposit ₹${deposit} + Platform Fee ₹${fee}).`);
     // Push MY_BOOKINGS onto history so clicking back returns to where the user left off (Provider Detail)
     setHistory((prev) => [
       ...prev,
@@ -321,9 +328,10 @@ export default function App() {
     ]);
     await loadBookings();
 
+
     setTimeout(() => {
       setConfirmationToast(null);
-    }, 6000);
+    }, 12000);
   };
 
   const handleCancelBooking = async (bookingId: string) => {
@@ -359,8 +367,27 @@ export default function App() {
     }
   };
 
+  const handleMarkReached = async (bookingId: string) => {
+    try {
+      setCustomerBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId
+            ? { ...b, is_present: true, customer_arrived_at: new Date().toISOString() }
+            : b
+        )
+      );
+      await markBookingReached(bookingId);
+      await loadBookings();
+      setConfirmationToast('Arrival confirmed! Venue desk notified 📍');
+      setTimeout(() => setConfirmationToast(null), 4000);
+    } catch (err) {
+      console.warn('Mark reached error:', err);
+    }
+  };
+
   // Hardware Back Navigation (Android)
   useEffect(() => {
+    if (Platform.OS !== 'android') return;
     const backSub = BackHandler.addEventListener('hardwareBackPress', handleGoBack);
     return () => backSub.remove();
   }, [handleGoBack]);
@@ -404,6 +431,7 @@ export default function App() {
           bookings={customerBookings}
           onCancelBooking={handleCancelBooking}
           onRescheduleBooking={handleRescheduleBooking}
+          onMarkReached={handleMarkReached}
         />
       )}
 
@@ -412,10 +440,12 @@ export default function App() {
         visible={checkoutVisible}
         resource={activeResource}
         slot={activeSlot}
+        categoryId={activeCategoryId}
         customerId={activeCustomerId}
         onClose={() => setCheckoutVisible(false)}
         onPaymentSuccess={handlePaymentSuccess}
       />
+
 
       {/* Customer Profile & Authentication Modal */}
       <Modal

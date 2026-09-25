@@ -11,7 +11,7 @@ import { test, expect } from './fixtures/test-fixtures';
  */
 test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () => {
 
-  test.beforeEach(async ({ request }) => {
+  test.beforeEach(async ({ request, supabaseClient }) => {
     await request.patch('http://localhost:3000/api/admin/merchants', {
       headers: {
         'Content-Type': 'application/json',
@@ -22,6 +22,27 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
         status: 'ACTIVE',
       },
     }).catch(() => null);
+
+    try {
+      await supabaseClient.rpc('reset_test_provider_strikes', {
+        p_provider_id: '11111111-1111-1111-1111-111111111111',
+        p_count: 0,
+      });
+    } catch {}
+
+    try {
+      await supabaseClient.rpc('reset_test_customer_strikes', {
+        p_customer_id: '99999999-9999-9999-9999-999999999991',
+        p_count: 0,
+      });
+    } catch {}
+
+    try {
+      await supabaseClient.rpc('reset_test_bookings', {
+        p_provider_id: '11111111-1111-1111-1111-111111111111',
+        p_customer_id: '99999999-9999-9999-9999-999999999991',
+      });
+    } catch {}
   });
 
   test('Flow 1 (Full Cross-App Golden Lifecycle): Customer books appointment, reflects in Merchant queue, Merchant completes, reflects in Super Admin Analytics', async ({
@@ -51,7 +72,7 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       await customerApp.submitPayment();
 
       // Web-first auto-wait on confirmation toast and My Appointments screen
-      await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await expect(customerApp.confirmationToast.first()).toBeVisible({ timeout: 15000 });
       await expect(customerApp.myBookingsTitle).toBeVisible({ timeout: 15000 });
       await customerApp.expectBookingInList('CONFIRMED');
     });
@@ -174,6 +195,324 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
 
       // Verify inbound demand signal row in Section 3 Table
       await expect(adminDashboard.waitlistTable.getByText(testContact)).toBeVisible({ timeout: 10000 });
+    });
+  });
+
+  test('Flow 4 (Complete Multi-Vertical Discovery & Dynamic Selection): Customer explores 5 core service verticals and inspects staff specialists', async ({
+    customerApp,
+  }) => {
+    await test.step('1. Verify 5 core service mini-logos are visible on Home Hub', async () => {
+      await expect(customerApp.clinicsChip).toBeVisible();
+      await expect(customerApp.salonsChip).toBeVisible();
+      await expect(customerApp.restaurantsChip).toBeVisible();
+      await expect(customerApp.gamingChip).toBeVisible();
+      await expect(customerApp.petsChip).toBeVisible();
+    });
+
+    await test.step('2. Explore Hospitals & Clinics and inspect doctor specialization hierarchy', async () => {
+      await customerApp.selectCategory('Hospitals & Clinics');
+      await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+      await expect(customerApp.staffSectionHeading).toBeVisible();
+
+      // Switch staff member to Orthodontist
+      await customerApp.selectStaffMember('Dr. Ananya Reddy (Orthodontist)');
+      await expect(customerApp.dateSectionHeading).toBeVisible();
+
+      // Toggle dates to verify dynamic slot availability generation
+      await customerApp.selectDateOffset('Tomorrow');
+      await customerApp.selectFirstSlot();
+      await expect(customerApp.holdDepositBtn).toBeVisible();
+      await expect(customerApp.stickyFooterPrice).toContainText('₹100');
+
+      // Return to Browse hub
+      await customerApp.backButton.click();
+      await customerApp.allCategoriesChip.click();
+      await expect(customerApp.clinicsChip).toBeVisible();
+    });
+
+    await test.step('3. Explore Salons & Spas and verify venue listing', async () => {
+      await customerApp.selectCategory('Salons & Spas');
+      await expect(customerApp.page.locator('text=/Naturals Luxury Salon|Elite Looks Luxury Salon/').first()).toBeVisible();
+      await customerApp.allCategoriesChip.click();
+      await expect(customerApp.salonsChip).toBeVisible();
+    });
+
+    await test.step('4. Explore Gaming & Turf and verify arena listing', async () => {
+      await customerApp.selectCategory('Gaming & Turf');
+      await expect(customerApp.page.getByText('Tirupati Premier Turf & Gaming Arena')).toBeVisible();
+      await customerApp.allCategoriesChip.click();
+      await expect(customerApp.gamingChip).toBeVisible();
+    });
+  });
+
+  test('Flow 5 (Customer Self-Service Lifecycle): Reschedule & Cancellation reflect in Merchant Private Space', async ({
+    multiRole,
+    supabaseClient,
+  }) => {
+    const { customerApp, customerPage, merchantPortal } = multiRole;
+    let createdRefCode = '';
+
+    await test.step('1. Customer books an appointment via high-level POM actions', async () => {
+      await customerApp.selectCategory('Hospitals & Clinics');
+      await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+      await customerApp.selectDateOffset('Tomorrow');
+      await customerApp.selectFirstSlot();
+      await customerApp.openCheckout();
+      await customerApp.submitPayment();
+
+      await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await expect(customerApp.myBookingsTitle).toBeVisible({ timeout: 15000 });
+      await customerApp.expectBookingInList('CONFIRMED');
+    });
+
+    await test.step('2. Customer verifies Digital Booking Pass details (QR Code & Reference Code)', async () => {
+      await customerApp.openBookingPass('Sri Venkateswara Dental');
+      await customerApp.verifyPassDetails();
+
+      createdRefCode = await customerApp.getPassReferenceCode();
+      expect(createdRefCode).toMatch(/^TPT-[A-Z0-9]+/);
+
+      await customerApp.closeBookingPass();
+    });
+
+    await test.step('3. Customer reschedules appointment from My Appointments to a new time slot', async () => {
+      await customerApp.rescheduleBookingFromList(createdRefCode, '02:00 PM');
+      await customerApp.expectBookingInList(createdRefCode, 'CONFIRMED');
+    });
+
+    await test.step('4. Merchant Private Space (/bookings) reflects updated rescheduled time', async () => {
+      await merchantPortal.gotoBookings();
+      await merchantPortal.filterByStatus('CONFIRMED');
+      await merchantPortal.expectBookingInQueue(createdRefCode, 'CONFIRMED');
+    });
+
+    await test.step('5. Customer cancels appointment within advance window; receives policy refund', async () => {
+      await customerApp.cancelBookingFromList(createdRefCode);
+      await customerApp.expectBookingInList(createdRefCode, 'CANCELLED');
+    });
+
+    await test.step('6. Merchant Private Space reflects cancelled appointment under CANCELLED filter', async () => {
+      await merchantPortal.gotoBookings();
+      await merchantPortal.filterByStatus('CANCELLED');
+      await merchantPortal.expectBookingInQueue(createdRefCode, 'CANCELLED');
+    });
+  });
+
+  test('Flow 6 (Merchant Private Space Controls): Weekly Schedule & Resource roster reflect across platform', async ({
+    multiRole,
+  }) => {
+    const { customerApp, merchantPortal } = multiRole;
+
+    await test.step('1. Merchant accesses Private Space Schedule (/schedule) and saves operating hours', async () => {
+      await merchantPortal.gotoSchedule();
+      await merchantPortal.saveSchedule();
+    });
+
+    await test.step('2. Merchant navigates to Private Space Resources (/resources) and inspects service units', async () => {
+      await merchantPortal.gotoResources();
+      await expect(merchantPortal.page.getByText('Dr. S. K. Murthy')).toBeVisible();
+    });
+
+    await test.step('3. Customer places booking; Merchant in Private Space Queue completes service', async () => {
+      // Customer books
+      await customerApp.selectCategory('Hospitals & Clinics');
+      await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+      await customerApp.selectDateOffset('Tomorrow');
+      await customerApp.selectFirstSlot();
+      await customerApp.openCheckout();
+      await customerApp.submitPayment();
+
+      await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await customerApp.expectBookingInList('CONFIRMED');
+
+      // Merchant marks completed in private space
+      await merchantPortal.gotoBookings();
+      await merchantPortal.filterByStatus('CONFIRMED');
+      await merchantPortal.markBookingCompleted('Sri Venkateswara Dental');
+
+      // Merchant verifies completed filter
+      await merchantPortal.filterByStatus('COMPLETED');
+      await merchantPortal.expectBookingInQueue('Sri Venkateswara Dental', 'COMPLETED');
+    });
+
+    await test.step('4. Customer Mobile App reflects COMPLETED status in real-time', async () => {
+      await customerApp.navigateToMyBookings();
+      await customerApp.expectBookingInList('COMPLETED');
+    });
+  });
+
+  test('Flow 7 (Customer Mobile Profile & Auth): Phone OTP authentication and session management', async ({
+    customerApp,
+  }) => {
+    await test.step('1. Customer opens Profile modal from Mobile header', async () => {
+      await customerApp.openProfile();
+    });
+
+    await test.step('2. Customer logs in via OTP with fixed test credentials', async () => {
+      await customerApp.loginWithPhoneOtp('+919999999991', '123456');
+    });
+
+    await test.step('3. Customer verifies active session, Supabase user ID, and booking metrics', async () => {
+      await expect(customerApp.page.getByText('ACTIVE MOBILE')).toBeVisible();
+      await expect(customerApp.page.getByText('ACTIVE USER ID (SUPABASE)')).toBeVisible();
+      await expect(customerApp.page.getByText('Total Bookings')).toBeVisible();
+      await expect(customerApp.page.getByText('Active Slots')).toBeVisible();
+    });
+
+    await test.step('4. Customer closes profile and verifies persistent state on browse feed', async () => {
+      await customerApp.closeProfile();
+      await expect(customerApp.appTitle).toBeVisible();
+    });
+  });
+
+  test('Flow 8 (Customer Inbound Expansion Waitlist): Inbound signal from Mobile Home propagates to Admin/Merchant radar', async ({
+    customerApp,
+    adminDashboard,
+  }) => {
+    const testPhone = `+91 98765 ${Math.floor(10000 + Math.random() * 90000)}`;
+
+    await test.step('1. Customer submits expansion waitlist request on Home Screen', async () => {
+      await customerApp.submitExpansionWaitlist(testPhone);
+    });
+
+    await test.step('2. Super Admin & Merchant Analytics radar records the customer expansion demand', async () => {
+      await adminDashboard.refreshDashboard();
+      await expect(adminDashboard.waitlistTable.getByText(testPhone).or(adminDashboard.page.getByText(testPhone))).toBeVisible({ timeout: 10000 });
+    });
+  });
+
+  test('Flow 9 (Emergency Staff Substitution Lifecycle): Merchant reassigns staff due to emergency, reflects live in Customer app', async ({
+    multiRole,
+  }) => {
+    const { customerApp, merchantPortal } = multiRole;
+    let createdRefCode = '';
+
+    await test.step('1. Customer books an appointment with default specialist (Dr. Murthy)', async () => {
+      await customerApp.selectCategory('Hospitals & Clinics');
+      await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+      await customerApp.selectDateOffset('Tomorrow');
+      await customerApp.selectFirstSlot();
+      await customerApp.openCheckout();
+      await customerApp.submitPayment();
+
+      await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await expect(customerApp.myBookingsTitle).toBeVisible({ timeout: 15000 });
+      await customerApp.expectBookingInList('CONFIRMED');
+
+      await customerApp.openBookingPass('Sri Venkateswara Dental');
+      createdRefCode = await customerApp.getPassReferenceCode();
+      expect(createdRefCode).toMatch(/^TPT-[A-Z0-9]+/);
+      await customerApp.closeBookingPass();
+    });
+
+    await test.step('2. Merchant views Queue, clicks Substitute Staff, and reassigns slot to Dr. Ananya Reddy', async () => {
+      await merchantPortal.gotoBookings();
+      await merchantPortal.filterByStatus('CONFIRMED');
+      await merchantPortal.expectBookingInQueue(createdRefCode, 'CONFIRMED');
+
+      await merchantPortal.substituteStaffMember(createdRefCode, undefined, 'Emergency doctor surgical delay');
+    });
+
+    await test.step('3. Customer Mobile App immediately reflects substituted specialist', async () => {
+      await customerApp.navigateToMyBookings();
+      const card = customerApp.getBookingCard(createdRefCode);
+      await expect(card.getByText('Dr. Ananya Reddy').or(card.getByText('Orthodontist'))).toBeVisible({ timeout: 10000 });
+    });
+
+    await test.step('4. Merchant Notification audit logs confirm RESOURCE_REASSIGNED event', async () => {
+      await merchantPortal.openNotificationModal(createdRefCode);
+      await expect(merchantPortal.page.getByText(/RESOURCE REASSIGNED/i).first()).toBeVisible({ timeout: 10000 });
+      await merchantPortal.closeNotificationModal();
+    });
+  });
+
+  test('Flow 10 (Merchant 3-Strike Courtesy & Reliability Policy): Emergency merchant cancellation triggers 100% refund notice', async ({
+    multiRole,
+  }) => {
+    const { customerApp, merchantPortal } = multiRole;
+    let createdRefCode = '';
+
+    await test.step('1. Customer books appointment via mobile app', async () => {
+      await customerApp.selectCategory('Hospitals & Clinics');
+      await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+      await customerApp.selectDateOffset('Tomorrow');
+      await customerApp.selectFirstSlot();
+      await customerApp.openCheckout();
+      await customerApp.submitPayment();
+
+      await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await customerApp.openBookingPass('Sri Venkateswara Dental');
+      createdRefCode = await customerApp.getPassReferenceCode();
+      await customerApp.closeBookingPass();
+    });
+
+    await test.step('2. Merchant cancels booking; triggers 100% customer refund and merchant strike tracking', async () => {
+      await merchantPortal.gotoBookings();
+      await merchantPortal.filterByStatus('CONFIRMED');
+      await merchantPortal.cancelAndRefundBooking(createdRefCode);
+      await merchantPortal.filterByStatus('CANCELLED');
+      await merchantPortal.expectBookingInQueue(createdRefCode, 'CANCELLED');
+    });
+
+    await test.step('3. Customer Mobile App reflects CANCELLED status and 100% Refund badge', async () => {
+      await customerApp.navigateToMyBookings();
+      await customerApp.expectBookingInList(createdRefCode, 'CANCELLED');
+      const card = customerApp.getBookingCard(createdRefCode);
+      await expect(card.getByText(/100% Refund Issued/i)).toBeVisible({ timeout: 10000 });
+    });
+  });
+
+  test('Flow 11 (Customer Courtesy No-Show & 30-Minute Policy): First missed appointment receives courtesy refund', async ({
+    multiRole,
+    supabaseClient,
+  }) => {
+    const { customerApp, merchantPortal } = multiRole;
+    let createdRefCode = '';
+
+    await test.step('1. Customer books appointment via mobile app', async () => {
+      await supabaseClient.rpc('reset_test_customer_strikes', {
+        p_customer_id: '99999999-9999-9999-9999-999999999991',
+        p_count: 0,
+      });
+
+      await customerApp.selectCategory('Hospitals & Clinics');
+      await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+      await customerApp.selectDateOffset('Tomorrow');
+      await customerApp.selectFirstSlot();
+      await customerApp.openCheckout();
+      await customerApp.submitPayment();
+
+      await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await customerApp.openBookingPass('Sri Venkateswara Dental');
+      createdRefCode = await customerApp.getPassReferenceCode();
+      await customerApp.closeBookingPass();
+    });
+
+    await test.step('2. Merchant marks No-Show in Queue; Courtesy Grace Period grants 100% refund without penalty', async () => {
+      // Backdate slot_start to past so it passes the premature no-show guard
+      const { data: bkg } = await supabaseClient
+        .from('bookings')
+        .select('id')
+        .eq('reference_code', createdRefCode)
+        .single();
+      if (bkg?.id) {
+        await supabaseClient
+          .from('bookings')
+          .update({ slot_start: new Date(Date.now() - 3600000).toISOString() })
+          .eq('id', bkg.id);
+      }
+
+      await merchantPortal.gotoBookings();
+      await merchantPortal.filterByStatus('CONFIRMED');
+      await merchantPortal.markBookingNoShow(createdRefCode);
+      await expect(merchantPortal.page.getByText(/Courtesy refund granted to customer/i).first()).toBeVisible({ timeout: 10000 });
+    });
+
+    await test.step('3. Customer Mobile reflects NO_SHOW status and 100% Refund badge', async () => {
+      await customerApp.navigateToMyBookings();
+      await customerApp.expectBookingInList(createdRefCode, 'NO_SHOW');
+      const card = customerApp.getBookingCard(createdRefCode);
+      await expect(card.getByText(/100% Refund Issued/i)).toBeVisible({ timeout: 10000 });
     });
   });
 

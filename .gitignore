@@ -38,3 +38,16 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# Temporary & Local Editor Files
+.temp/
+supabase/.temp/
+.claude/
+.cursor/
+.cursorrules
+.windsurfrules
+.opencode.json
+opencode*.json
+.mcp.json
+.vercel
+.env*

@@ -75,6 +75,43 @@ serve(async (req: Request) => {
       throw new Error(`Dispatch failed: ${dispatchError.message}`);
     }
 
+    // Check if customer has an active Expo Push Token (free-for.dev 100% free channel)
+    let pushResult = { sent: false, channel: 'expo-push' };
+    try {
+      const { data: bookingData } = await supabase
+        .from('bookings')
+        .select('id, reference_code, customer_id')
+        .eq('id', booking_id)
+        .single();
+
+      if (bookingData?.customer_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('expo_push_token')
+          .eq('id', bookingData.customer_id)
+          .single();
+
+        if (profile?.expo_push_token?.startsWith('ExponentPushToken')) {
+          const pushRes = await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              to: profile.expo_push_token,
+              sound: 'default',
+              title: `Appointment Update (${bookingData.reference_code || 'Tirupati'})`,
+              body: `Your appointment status has updated: ${event_type}`,
+              data: { booking_id, event_type },
+            }),
+          });
+          if (pushRes.ok) {
+            pushResult = { sent: true, channel: 'expo-push' };
+          }
+        }
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+
     // If external SMS/WhatsApp API keys are configured, outbound requests can be dispatched here
     const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const gupshupApiKey = Deno.env.get('GUPSHUP_API_KEY');
@@ -85,7 +122,9 @@ serve(async (req: Request) => {
         booking_id,
         event_type,
         dispatch: dispatchResult,
+        push_notification: pushResult,
         gateways: {
+          expo_push_free: pushResult.sent,
           twilio_configured: Boolean(twilioAccountSid),
           gupshup_configured: Boolean(gupshupApiKey),
         },

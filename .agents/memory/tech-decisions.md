@@ -12,4 +12,5 @@ updated: 2026-07-18
 - Customer Platform: Native Mobile Application built with React Native (Expo) for iOS and Android.
 - Merchant Platform: Web Application built with Next.js 15 App Router and Tailwind CSS.
 - Monorepo: Managed via pnpm workspaces (`apps/customer-mobile`, `apps/merchant-web`, `packages/shared`, `supabase/`).
+- Payment Gateway: Standardized on Razorpay (Orders API, HMAC-SHA256 signature verification, and UPI Intent checkout) for Indian domestic collections and deposit holds.
 

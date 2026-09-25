@@ -171,9 +171,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     try {
       // 2. Load merchant portal
       await page.goto(`${MERCHANT_BASE}/`);
-      // Demo-login as clinic merchant (Merchant A)
       await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
-      await page.getByTestId('demo-login-clinic').click().catch(() => null);
+      const emailInput = page.getByTestId('login-email');
+      if (await emailInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await emailInput.fill('svims.clinic@tirupati-appointments.com');
+        await page.getByTestId('login-password').fill('SvimsClinic2026!');
+        await page.getByTestId('login-submit').click();
+      }
       await page.waitForURL(/localhost:3000/, { timeout: 15000 }).catch(() => null);
 
       // 3. Verify suspension banner is visible
@@ -295,9 +299,11 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     // Log in as salon merchant
     await page.goto(`${MERCHANT_BASE}/login`);
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
-    const salonBtn = page.getByTestId('demo-login-salon');
-    if (!await salonBtn.isVisible({ timeout: 5000 }).catch(() => false)) { test.skip(); return; }
-    await salonBtn.click();
+    const emailInput = page.getByTestId('login-email');
+    if (!await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) { test.skip(); return; }
+    await emailInput.fill('naturals.salon@tirupati-appointments.com');
+    await page.getByTestId('login-password').fill('NaturalsSalon2026!');
+    await page.getByTestId('login-submit').click();
     await expect(page.getByText('Tirupati Merchant Hub')).toBeVisible({ timeout: 15000 });
 
     // Attempt to navigate to admin

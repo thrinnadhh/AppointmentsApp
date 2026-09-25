@@ -54,11 +54,35 @@ export class CustomerAppPage {
   // Confirmation Toast
   readonly confirmationToast: Locator;
 
+  // Profile & Auth Locators
+  readonly profileBtn: Locator;
+  readonly profileModalTitle: Locator;
+  readonly authPhoneInput: Locator;
+  readonly sendOtpBtn: Locator;
+  readonly otpCodeInput: Locator;
+  readonly verifyOtpBtn: Locator;
+  readonly signOutBtn: Locator;
+  readonly closeProfileBtn: Locator;
+
+  // Waitlist Locators
+  readonly waitlistSectionTitle: Locator;
+  readonly waitlistPhoneInput: Locator;
+  readonly waitlistSubmitBtn: Locator;
+  readonly waitlistSuccessBadge: Locator;
+
+  // Digital Pass Locators
+  readonly passModalTitle: Locator;
+  readonly passQrVerification: Locator;
+  readonly passRefCode: Locator;
+  readonly passDirectionsBtn: Locator;
+  readonly passSaveBtn: Locator;
+  readonly passCloseBtn: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
     // Header & Navigation
-    this.locationBadge = page.getByText('Tirupati, AP');
+    this.locationBadge = page.getByRole('button', { name: 'Select Territory' }).or(page.getByLabel('Select Territory')).or(page.getByText('Tirupati, AP')).first();
     this.appTitle = page.getByText('Instant Appointments');
     this.myBookingsBtn = page.getByText('Bookings');
     this.trustBanner = page.getByText(/guarantees your slot with zero waiting/i).first();
@@ -84,9 +108,9 @@ export class CustomerAppPage {
     this.staffSectionHeading = page.getByText('1. Select Staff / Unit');
     this.dateSectionHeading = page.getByText('2. Choose Date');
     this.slotSectionHeading = page.getByText('3. Available Slots');
-    this.holdDepositBtn = page.getByText('Hold Slot & Pay Deposit →');
+    this.holdDepositBtn = page.getByText('Hold Slot & Pay Deposit →').or(page.getByText('Confirm & Pay Total Cash →'));
     this.selectTimeSlotBtn = page.getByText('Select a Time Slot');
-    this.stickyFooterPrice = page.locator('text=Deposit to hold:').locator('..');
+    this.stickyFooterPrice = page.locator('text=Deposit to hold:').or(page.locator('text=Total fee:')).locator('..');
 
     // Checkout Modal
     this.checkoutTitle = page.getByText('Confirm Reservation');
@@ -101,7 +125,31 @@ export class CustomerAppPage {
     this.emptyBookingsState = page.getByText('No Appointments Yet');
 
     // Toast
-    this.confirmationToast = page.locator('text=/Booking Confirmed/i');
+    this.confirmationToast = page.locator('text=/Booking Confirmed/i').first();
+
+    // Profile & Auth
+    this.profileBtn = page.getByRole('button', { name: 'Customer Profile' }).or(page.getByLabel('Customer Profile')).or(page.getByText('👤')).first();
+    this.profileModalTitle = page.getByText(/Customer Profile & Sign In/i);
+    this.authPhoneInput = page.getByTestId('input-phone-auth').or(page.locator('input[type="tel"]')).or(page.getByPlaceholder('+919999999991')).first();
+    this.sendOtpBtn = page.getByTestId('btn-send-otp');
+    this.otpCodeInput = page.getByTestId('input-otp-code');
+    this.verifyOtpBtn = page.getByTestId('btn-verify-otp');
+    this.signOutBtn = page.getByTestId('btn-sign-out');
+    this.closeProfileBtn = page.getByLabel('Close profile modal').or(page.getByText('✕')).first();
+
+    // Waitlist
+    this.waitlistSectionTitle = page.getByText('Want appointments in another city?');
+    this.waitlistPhoneInput = page.getByPlaceholder('e.g. 9876543210 or user@domain.com').or(page.locator('input[placeholder*="9876543210"]')).first();
+    this.waitlistSubmitBtn = page.getByTestId('waitlist-submit-btn').or(page.getByText('Notify Me')).first();
+    this.waitlistSuccessBadge = page.getByText('✓ Noted! You will receive early priority booking.');
+
+    // Digital Pass
+    this.passModalTitle = page.getByText('Digital Booking Pass');
+    this.passQrVerification = page.getByText('Scan at reception desk for check-in');
+    this.passRefCode = page.getByTestId('pass-reference-code');
+    this.passDirectionsBtn = page.getByText('Directions');
+    this.passSaveBtn = page.getByText('Save Pass');
+    this.passCloseBtn = page.getByText('✕').first();
   }
 
   async goto() {
@@ -135,13 +183,14 @@ export class CustomerAppPage {
   }
 
   async selectProviderByName(name: string) {
-    const card = this.page.getByText(name).first();
+    let card = this.page.getByText(name).first();
     if (!(await card.isVisible().catch(() => false))) {
       await this.selectCategory('Hospitals & Clinics');
+      card = this.page.getByText(name).first();
     }
-    await expect(card).toBeVisible();
+    await expect(card).toBeVisible({ timeout: 15000 });
     await card.click();
-    await expect(this.staffSectionHeading).toBeVisible();
+    await expect(this.staffSectionHeading).toBeVisible({ timeout: 15000 });
   }
 
   async expectProviderVisible(name: string, shouldBeVisible: boolean = true) {
@@ -160,20 +209,40 @@ export class CustomerAppPage {
   }
 
   async selectFirstSlot() {
-    // Look for slot chips that are not disabled
-    const slotChips = this.page.locator('div[role="button"], [role="button"]').filter({ hasText: /^[0-9]{2}:[0-9]{2} (AM|PM)$/ });
-    const count = await slotChips.count();
-    for (let i = 0; i < count; i++) {
-      const chip = slotChips.nth(i);
-      const isDisabled = await chip.getAttribute('aria-disabled');
-      if (isDisabled !== 'true') {
-        await chip.click();
-        return;
+    await expect(this.slotSectionHeading).toBeVisible({ timeout: 15000 });
+
+    const slotsLoading = this.page.getByTestId('customer-slots-loading');
+    await expect(slotsLoading).toBeHidden({ timeout: 10000 }).catch(() => {});
+
+    // Check if Today is closed or all slots have passed
+    const closedNotice = this.page.getByTestId('customer-day-closed-notice');
+    const pastNotice = this.page.getByTestId('customer-all-slots-past-notice');
+    const isTodayUnavailable =
+      (await closedNotice.isVisible().catch(() => false)) ||
+      (await pastNotice.isVisible().catch(() => false));
+
+    if (isTodayUnavailable) {
+      // Switch to Tomorrow date card
+      const tomorrowCard = this.page.getByTestId('customer-date-card-1');
+      if (await tomorrowCard.isVisible().catch(() => false)) {
+        await tomorrowCard.click();
+      } else {
+        await this.page.getByText('Tomorrow', { exact: true }).click();
       }
+      await expect(slotsLoading).toBeHidden({ timeout: 10000 }).catch(() => {});
+      await this.page.waitForTimeout(400);
     }
 
-    const fallbackChips = this.page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ });
-    await fallbackChips.first().click();
+    // Find the first slot button that is truly enabled (not disabled)
+    const enabledSlot = this.page
+      .locator('[role="button"]:not([aria-disabled="true"]):not([disabled])')
+      .filter({ hasText: /^[0-9]{2}:[0-9]{2} (am|pm)$/i })
+      .first();
+
+    await expect(enabledSlot).toBeVisible({ timeout: 10000 });
+    await enabledSlot.click();
+
+    await expect(this.holdDepositBtn).toBeEnabled({ timeout: 5000 });
   }
 
   async openCheckout() {
@@ -188,6 +257,9 @@ export class CustomerAppPage {
   }
 
   async navigateToMyBookings() {
+    if (await this.myBookingsTitle.isVisible().catch(() => false)) {
+      return;
+    }
     await expect(this.myBookingsBtn).toBeVisible();
     await this.myBookingsBtn.click();
     await expect(this.myBookingsTitle).toBeVisible({ timeout: 10000 });
@@ -199,22 +271,30 @@ export class CustomerAppPage {
     await expect(this.appTitle).toBeVisible({ timeout: 10000 });
   }
 
-  getBookingCard(identifier: string): Locator {
-    return this.page
-      .locator(`[data-testid="booking-card-${identifier}"]`)
-      .or(this.page.locator('[data-testid^="booking-card-"]').filter({ hasText: identifier }).first())
-      .first();
+  getBookingCard(identifier?: string, status?: string): Locator {
+    let loc = this.page.locator('[data-testid^="booking-card-"]');
+    if (identifier) {
+      loc = loc.filter({ hasText: identifier });
+    }
+    if (status) {
+      loc = loc.filter({ hasText: status });
+    }
+    return loc.first();
   }
 
-  async expectBookingInList(identifier: string, expectedStatus: string = 'CONFIRMED') {
-    const card = this.getBookingCard(identifier);
+  async expectBookingInList(identifier?: string, expectedStatus: string = 'CONFIRMED') {
+    if (['CONFIRMED', 'COMPLETED', 'CANCELLED', 'HELD', 'NO_SHOW'].includes(identifier || '')) {
+      expectedStatus = identifier!;
+      identifier = undefined;
+    }
+    const card = this.getBookingCard(identifier, expectedStatus);
     await card.scrollIntoViewIfNeeded();
     await expect(card).toBeVisible({ timeout: 10000 });
     await expect(card.getByText(expectedStatus).first()).toBeVisible();
   }
 
   async openBookingPass(identifier?: string) {
-    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const card = this.getBookingCard(identifier, 'CONFIRMED');
     const passBtn = card.getByTestId(/^view-pass-/).or(card.getByText(/Pass/i)).first();
     await passBtn.scrollIntoViewIfNeeded();
     await expect(passBtn).toBeVisible({ timeout: 10000 });
@@ -230,20 +310,19 @@ export class CustomerAppPage {
   }
 
   async cancelBookingFromList(identifier?: string) {
-    // Intercept browser window.confirm
-    this.page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-
-    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const card = this.getBookingCard(identifier, 'CONFIRMED');
     const cancelBtn = card.getByTestId(/^cancel-/).or(card.getByText('Cancel', { exact: true })).first();
     await cancelBtn.scrollIntoViewIfNeeded();
     await expect(cancelBtn).toBeVisible({ timeout: 10000 });
+
+    this.page.once('dialog', (dialog) => {
+      dialog.accept().catch(() => {});
+    });
     await cancelBtn.click();
   }
 
   async rescheduleBookingFromList(identifier?: string, timeSlot: string = '11:30 AM') {
-    const card = identifier ? this.getBookingCard(identifier) : this.page.locator('[data-testid^="booking-card-"]').first();
+    const card = this.getBookingCard(identifier, 'CONFIRMED');
     const rescheduleBtn = card.getByTestId(/^reschedule-/).or(card.getByText(/Reschedule/i)).first();
     await rescheduleBtn.scrollIntoViewIfNeeded();
     await expect(rescheduleBtn).toBeVisible({ timeout: 10000 });
@@ -256,8 +335,8 @@ export class CustomerAppPage {
     await slotChip.click();
 
     // Intercept alert if fired
-    this.page.once('dialog', async (dialog) => {
-      await dialog.accept();
+    this.page.once('dialog', (dialog) => {
+      dialog.accept().catch(() => {});
     });
 
     // Confirm Reschedule
@@ -266,5 +345,80 @@ export class CustomerAppPage {
     await expect(confirmBtn).toBeVisible();
     await confirmBtn.click();
   }
+
+  async selectStaffMember(name: string) {
+    const staffCard = this.page.getByText(name).first();
+    await staffCard.scrollIntoViewIfNeeded();
+    await expect(staffCard).toBeVisible({ timeout: 10000 });
+    await staffCard.click();
+  }
+
+  async verifyPassDetails(expectedRefCode?: string) {
+    await expect(this.passModalTitle).toBeVisible({ timeout: 10000 });
+    await expect(this.passQrVerification).toBeVisible({ timeout: 10000 });
+    if (expectedRefCode) {
+      await expect(this.passRefCode).toHaveText(expectedRefCode, { timeout: 10000 });
+    }
+    await expect(this.passDirectionsBtn).toBeVisible();
+    await expect(this.passSaveBtn).toBeVisible();
+  }
+
+  async getPassReferenceCode(): Promise<string> {
+    await expect(this.passRefCode).toBeVisible({ timeout: 10000 });
+    const text = await this.passRefCode.textContent();
+    return text?.trim() || '';
+  }
+
+  async submitExpansionWaitlist(phone: string) {
+    if (!(await this.page.getByText('Choose Territory').isVisible().catch(() => false))) {
+      await this.locationBadge.click();
+      await expect(this.page.getByText('Choose Territory')).toBeVisible({ timeout: 10000 });
+    }
+    await this.waitlistPhoneInput.scrollIntoViewIfNeeded();
+    await expect(this.waitlistPhoneInput).toBeVisible({ timeout: 10000 });
+    await this.waitlistPhoneInput.fill(phone);
+    await expect(this.waitlistSubmitBtn).toBeVisible();
+    await this.waitlistSubmitBtn.click();
+    await expect(this.waitlistSuccessBadge).toBeVisible({ timeout: 10000 });
+  }
+
+  async openProfile() {
+    await this.profileBtn.scrollIntoViewIfNeeded();
+    await expect(this.profileBtn).toBeVisible({ timeout: 10000 });
+    await this.profileBtn.click();
+    await expect(this.profileModalTitle).toBeVisible({ timeout: 10000 });
+  }
+
+  async closeProfile() {
+    await expect(this.closeProfileBtn).toBeVisible();
+    await this.closeProfileBtn.click();
+    await expect(this.profileModalTitle).not.toBeVisible({ timeout: 10000 });
+  }
+
+  async loginWithPhoneOtp(phone: string = '+919999999991', otp: string = '123456') {
+    // If already signed in, check if sign out is visible
+    if (await this.signOutBtn.isVisible().catch(() => false)) {
+      await this.signOutBtn.click();
+    }
+    await expect(this.authPhoneInput).toBeVisible({ timeout: 10000 });
+    await this.authPhoneInput.fill(phone);
+    await expect(this.sendOtpBtn).toBeVisible();
+    await this.sendOtpBtn.click();
+
+    await expect(this.otpCodeInput).toBeVisible({ timeout: 10000 });
+    await this.otpCodeInput.fill(otp);
+    await expect(this.verifyOtpBtn).toBeVisible();
+    await this.verifyOtpBtn.click();
+
+    await expect(this.signOutBtn).toBeVisible({ timeout: 10000 });
+  }
+
+  async signOutCustomer() {
+    if (await this.signOutBtn.isVisible().catch(() => false)) {
+      await this.signOutBtn.click();
+      await expect(this.authPhoneInput).toBeVisible({ timeout: 10000 });
+    }
+  }
 }
+
 

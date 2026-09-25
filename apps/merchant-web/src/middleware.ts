@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PUBLIC_ROUTES = ['/login', '/admin/login', '/api/', '/_next/', '/favicon.ico'];
+const PUBLIC_ROUTES = ['/login', '/register', '/admin/login', '/auth/', '/api/', '/_next/', '/favicon.ico'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // If an OAuth code arrives on any route (e.g. /?code=...), route to /auth/callback to exchange for session
+  if (req.nextUrl.searchParams.has('code') && !pathname.startsWith('/auth/')) {
+    const callbackUrl = new URL('/auth/callback', req.url);
+    req.nextUrl.searchParams.forEach((value, key) => {
+      callbackUrl.searchParams.set(key, value);
+    });
+    return NextResponse.redirect(callbackUrl);
+  }
 
   // Handle CORS for /api/ routes to allow customer-mobile (port 8081) communication
   if (pathname.startsWith('/api/')) {

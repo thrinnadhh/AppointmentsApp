@@ -84,3 +84,28 @@ export function normCategory(category: string): string {
 export function resolveCategoryId(input: string): string {
   return CATEGORY_MAP[input.toLowerCase()] || input;
 }
+
+/**
+ * Category-based platform convenience fee structure (in INR):
+ * - ₹10 for Clinics & Hospitals, Salons & Spas, Pet Care & Clinics, Restaurants
+ * - ₹50 for Gaming & Turf bookings
+ * - Default: ₹10
+ */
+export const PLATFORM_FEES: Record<string, number> = {
+  clinics: 10,
+  salons: 10,
+  pets: 10,
+  restaurants: 10,
+  gaming: 50,
+  default: 10,
+};
+
+/**
+ * Resolves the platform fee in INR for a given provider category.
+ */
+export function getPlatformFee(category?: string | null): number {
+  if (!category) return PLATFORM_FEES.default;
+  const resolved = resolveCategoryId(category.trim());
+  return PLATFORM_FEES[resolved] ?? PLATFORM_FEES.default;
+}
+

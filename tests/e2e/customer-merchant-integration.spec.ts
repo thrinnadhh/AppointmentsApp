@@ -379,6 +379,12 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
       },
     });
 
+    // Backdate slot_start to past so premature no-show check passes
+    await supabase
+      .from('bookings')
+      .update({ slot_start: new Date(Date.now() - 3600000).toISOString() })
+      .eq('id', booking_id);
+
     // 3. Merchant reports No-Show via endpoint
     const noShowRes = await request.post('http://localhost:3000/api/bookings/no-show', {
       data: {
@@ -396,8 +402,9 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
       .eq('id', booking_id)
       .single();
 
+    const expectedPaymentStatus = (initialStrikes + 1) <= 2 ? 'REFUNDED' : 'FORFEITED';
     expect(verifiedBooking.status).toBe('NO_SHOW');
-    expect(verifiedBooking.payment_status).toBe('FORFEITED');
+    expect(verifiedBooking.payment_status).toBe(expectedPaymentStatus);
 
     // 5. Verify Customer Profile strike count incremented by 1
     const { data: updatedProfile } = await supabase
@@ -468,8 +475,9 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
   test('9. [Digital Pass QR & Reference Code Verification] Customer views Digital Booking Pass; Merchant verifies customer via Reference Code search', async ({ browser, request }) => {
     // 1. Create and confirm a booking
-    const slotStart = new Date(Date.now() + 345600000).toISOString(); // +4 days
-    const slotEnd = new Date(Date.now() + 345600000 + 1800000).toISOString();
+    const offset = 345600000 + Math.floor(Math.random() * 5000) * 60000;
+    const slotStart = new Date(Date.now() + offset).toISOString();
+    const slotEnd = new Date(Date.now() + offset + 1800000).toISOString();
 
     const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
       data: {
@@ -526,8 +534,9 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
   });
 
   test('10. [Concurrency Collision Protection] Simultaneous slot hold attempts result in 1 confirmation and 1 conflict rejection', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 432000000).toISOString(); // +5 days
-    const slotEnd = new Date(Date.now() + 432000000 + 1800000).toISOString();
+    const offset = 432000000 + Math.floor(Math.random() * 5000) * 60000;
+    const slotStart = new Date(Date.now() + offset).toISOString();
+    const slotEnd = new Date(Date.now() + offset + 1800000).toISOString();
 
     // Launch two simultaneous slot hold requests for the exact same resource & time window
     const [holdResponseA, holdResponseB] = await Promise.all([
@@ -557,6 +566,78 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     const conflictResponse = holdResponseA.status() === 409 ? holdResponseA : holdResponseB;
     const conflictJson = await conflictResponse.json();
-    expect(conflictJson.error).toMatch(/already held or booked|conflict/i);
+    expect(conflictJson.error).toMatch(/already held or booked|conflict|currently being reserved/i);
+  });
+
+  test('11. [Customer Arrival "Say Reached" -> Merchant Realtime "Present" Card Styling] Customer marks reached; Merchant dashboard displays emerald Present card with arrival badge', async ({ browser, request }) => {
+    // 1. Create a confirmed booking for today so it appears in Live Appointments
+    const now = new Date();
+    // Schedule for today in IST
+    const slotStart = new Date(Date.now() + 3600000).toISOString();
+    const slotEnd = new Date(Date.now() + 3600000 + 1800000).toISOString();
+
+    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    expect(holdRes.status()).toBe(201);
+    const holdJson = await holdRes.json();
+    const bookingId = holdJson.booking_id;
+    expect(bookingId).toBeTruthy();
+
+    const confirmRes = await request.post('http://localhost:3000/api/bookings/confirm', {
+      data: {
+        booking_id: bookingId,
+        gateway_payment_id: `pay_test_${Date.now()}`,
+      },
+    });
+    expect(confirmRes.ok()).toBeTruthy();
+
+    // 2. Customer reaches hospital/venue and says reached via API
+    const reachRes = await request.post('http://localhost:3000/api/bookings/reach', {
+      data: { booking_id: bookingId },
+    });
+    expect(reachRes.ok()).toBeTruthy();
+    const reachJson = await reachRes.json();
+    expect(reachJson.success).toBe(true);
+    expect(reachJson.is_present).toBe(true);
+    expect(reachJson.customer_arrived_at).toBeTruthy();
+
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('reference_code')
+      .eq('id', bookingId)
+      .single();
+    const refCode = booking?.reference_code || `TPT-${bookingId.slice(0, 6).toUpperCase()}`;
+
+    // 3. Merchant Portal verifies arrival in Bookings Queue
+    const merchantContext = await browser.newContext();
+    const merchantPage = await merchantContext.newPage();
+    const merchantPortal = new MerchantPortalPage(merchantPage);
+
+    await merchantPortal.gotoBookings();
+    await merchantPortal.filterByStatus('CONFIRMED');
+    await merchantPortal.searchBookings(refCode);
+
+    const queueCard = merchantPage.locator(`[data-testid="queue-booking-card-${bookingId}"]`);
+    await expect(queueCard).toBeVisible({ timeout: 15000 });
+    await expect(queueCard).toHaveAttribute('data-present', 'true');
+    await expect(merchantPage.locator(`[data-testid="queue-present-badge-${bookingId}"]`)).toBeVisible();
+    await expect(queueCard.getByText('Admit & Complete')).toBeVisible();
+
+    // 4. Verify arrival on Merchant Dashboard (Today's Live Appointments)
+    await merchantPortal.navOverview.click();
+    const bookingCard = merchantPage.locator(`[data-testid="live-booking-card-${bookingId}"]`);
+    await expect(bookingCard).toBeVisible({ timeout: 15000 });
+    await expect(bookingCard).toHaveAttribute('data-present', 'true');
+    await expect(merchantPage.locator(`[data-testid="present-badge-${bookingId}"]`)).toBeVisible();
+    await expect(bookingCard.getByText('PATIENT PRESENT')).toBeVisible();
+    await expect(bookingCard.getByText('Admit / Check-In')).toBeVisible();
+
+    await merchantContext.close();
   });
 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { initiateRazorpayRefund } from '@/lib/razorpay';
 import { CancelBookingRequest, CancelBookingResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
@@ -37,6 +38,10 @@ export async function POST(req: NextRequest) {
       payment_status?: 'REFUNDED' | 'FORFEITED';
       refund_eligible?: boolean;
       refund_amount?: number;
+      merchant_strikes?: number;
+      penalty_applied?: boolean;
+      penalty_amount?: number;
+      is_booking_frozen?: boolean;
     };
 
     if (!result?.success) {
@@ -47,6 +52,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // If eligible for refund, trigger refund via Razorpay
+    if (result.refund_eligible && (result.refund_amount ?? 0) > 0) {
+      const { data: bkg } = await supabaseAdmin
+        .from('bookings')
+        .select('gateway_payment_id')
+        .eq('id', booking_id)
+        .maybeSingle();
+
+      if (bkg?.gateway_payment_id) {
+        try {
+          await initiateRazorpayRefund({
+            paymentId: bkg.gateway_payment_id,
+            amount: Math.round(Number(result.refund_amount) * 100),
+            notes: {
+              booking_id,
+              reason: reason || 'Policy-eligible cancellation refund',
+            },
+          });
+        } catch (refundErr) {
+          console.error('Razorpay refund trigger warning:', refundErr);
+        }
+      }
+    }
+
     return NextResponse.json<CancelBookingResponse>(
       {
         success: true,
@@ -55,6 +84,10 @@ export async function POST(req: NextRequest) {
         payment_status: result.payment_status || 'FORFEITED',
         refund_eligible: result.refund_eligible ?? false,
         refund_amount: result.refund_amount !== undefined ? Number(result.refund_amount) : 0,
+        merchant_strikes: result.merchant_strikes,
+        penalty_applied: result.penalty_applied,
+        penalty_amount: result.penalty_amount,
+        is_booking_frozen: result.is_booking_frozen,
         error: undefined,
       },
       { status: 200 }

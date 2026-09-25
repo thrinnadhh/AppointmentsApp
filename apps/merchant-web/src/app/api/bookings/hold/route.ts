@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { acquireSlotLock, releaseSlotLock, checkRateLimit } from '@/lib/redis';
+import { captureException } from '@/lib/sentry';
 import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
 
 interface RpcHoldResult {
@@ -11,6 +13,7 @@ interface RpcHoldResult {
 }
 
 export async function POST(req: NextRequest) {
+  let slotKey = '';
   try {
     const body = (await req.json()) as Partial<CreateHoldRequest>;
     const { resource_id, slot_start, slot_end, customer_id } = body;
@@ -25,6 +28,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Rate Limit Protection (free-for.dev Upstash / Memory)
+    const rateLimit = await checkRateLimit(customer_id, 100, 60);
+    if (!rateLimit.allowed) {
+      return NextResponse.json<CreateHoldResponse>(
+        {
+          success: false,
+          error: 'Too many reservation attempts. Please wait a minute.',
+        },
+        { status: 429 }
+      );
+    }
+
     // Past slot validation
     if (new Date(slot_start).getTime() < Date.now()) {
       return NextResponse.json<CreateHoldResponse>(
@@ -33,6 +48,19 @@ export async function POST(req: NextRequest) {
           error: 'Invalid slot: Cannot book a slot in the past',
         },
         { status: 422 }
+      );
+    }
+
+    // Distributed Slot Mutex (Upstash Redis / Memory)
+    slotKey = `${resource_id}:${slot_start}`;
+    const acquired = await acquireSlotLock(slotKey, 10);
+    if (!acquired) {
+      return NextResponse.json<CreateHoldResponse>(
+        {
+          success: false,
+          error: 'Slot is already held or currently being reserved by another customer (conflict)',
+        },
+        { status: 409 }
       );
     }
 
@@ -48,18 +76,58 @@ export async function POST(req: NextRequest) {
     if (resData?.provider_id) {
       const { data: prov } = await supabaseAdmin
         .from('providers')
-        .select('status')
+        .select('status, is_active, daily_booking_limit')
         .eq('id', resData.provider_id)
         .single();
 
-      if (prov?.status === 'SUSPENDED') {
+      if (prov && prov.status === 'SUSPENDED') {
+        if (slotKey) await releaseSlotLock(slotKey);
         return NextResponse.json<CreateHoldResponse>(
           {
             success: false,
-            error: 'Merchant provider is suspended. Bookings unavailable.',
+            error: 'Provider is suspended and cannot accept bookings',
           },
           { status: 403 }
         );
+      }
+
+      if (prov && prov.is_active === false) {
+        if (slotKey) await releaseSlotLock(slotKey);
+        return NextResponse.json<CreateHoldResponse>(
+          {
+            success: false,
+            error: 'This venue is temporarily paused and not accepting new appointments right now.',
+          },
+          { status: 422 }
+        );
+      }
+
+      if (prov?.daily_booking_limit && prov.daily_booking_limit > 0) {
+        const dailyLimit = prov.daily_booking_limit;
+        const targetSlotDate = new Date(slot_start);
+        const slotDayStart = new Date(targetSlotDate);
+        slotDayStart.setHours(0, 0, 0, 0);
+        const slotDayEnd = new Date(targetSlotDate);
+        slotDayEnd.setHours(23, 59, 59, 999);
+
+        const { count: slotDayBookingsCount } = await supabaseAdmin
+          .from('bookings')
+          .select('id', { count: 'exact', head: true })
+          .eq('provider_id', resData.provider_id)
+          .gte('slot_start', slotDayStart.toISOString())
+          .lte('slot_start', slotDayEnd.toISOString())
+          .in('status', ['HELD', 'CONFIRMED', 'COMPLETED']);
+
+        if ((slotDayBookingsCount || 0) >= dailyLimit) {
+          if (slotKey) await releaseSlotLock(slotKey);
+          return NextResponse.json<CreateHoldResponse>(
+            {
+              success: false,
+              error: `This venue has reached its daily booking limit (${dailyLimit}) for this date. Please choose another day.`,
+            },
+            { status: 422 }
+          );
+        }
       }
     }
 
@@ -71,6 +139,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
+      if (slotKey) await releaseSlotLock(slotKey);
       console.error('Supabase RPC create_booking_hold error:', error);
       const isConflict =
         error.code === '23505' ||
@@ -95,6 +164,7 @@ export async function POST(req: NextRequest) {
     const result = data as unknown as RpcHoldResult;
 
     if (!result?.success) {
+      if (slotKey) await releaseSlotLock(slotKey);
       const isConflict = result?.error?.includes('already held') || result?.error?.includes('conflict');
       const isSuspended = result?.error?.toLowerCase().includes('suspended') || result?.error?.toLowerCase().includes('blocked');
       return NextResponse.json<CreateHoldResponse>(
@@ -116,6 +186,8 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (err: unknown) {
+    if (slotKey) await releaseSlotLock(slotKey);
+    await captureException(err, { tags: { endpoint: '/api/bookings/hold' } });
     const message = err instanceof Error ? err.message : 'Invalid request payload';
     return NextResponse.json<CreateHoldResponse>(
       {

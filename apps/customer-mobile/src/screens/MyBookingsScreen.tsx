@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,12 +12,14 @@ import {
 } from 'react-native';
 import { Booking } from '@appointments/shared';
 import BookingPassModal from './BookingPassModal';
+import { fetchCustomerStrikes } from '../services/api';
 
 interface MyBookingsScreenProps {
   onBack: () => void;
   bookings: (Booking & { provider_name?: string; resource_name?: string })[];
   onCancelBooking: (bookingId: string) => void;
   onRescheduleBooking?: (bookingId: string, newSlotStart: string, newSlotEnd: string) => Promise<void>;
+  onMarkReached?: (bookingId: string) => Promise<void>;
 }
 
 export default function MyBookingsScreen({
@@ -25,10 +27,46 @@ export default function MyBookingsScreen({
   bookings,
   onCancelBooking,
   onRescheduleBooking,
+  onMarkReached,
 }: MyBookingsScreenProps) {
   const [selectedPassBooking, setSelectedPassBooking] = useState<
     (Booking & { provider_name?: string; resource_name?: string }) | null
   >(null);
+  const [customerStrikes, setCustomerStrikes] = useState<number>(0);
+  const [markingReachedId, setMarkingReachedId] = useState<string | null>(null);
+
+  const handleReachedClick = (bookingId: string) => {
+    Alert.alert(
+      'Confirm Arrival 📍',
+      'Have you reached the hospital or venue lobby? The front desk will be notified immediately.',
+      [
+        { text: 'Not Yet', style: 'cancel' },
+        {
+          text: "Yes, I've Reached",
+          onPress: async () => {
+            setMarkingReachedId(bookingId);
+            try {
+              if (onMarkReached) {
+                await onMarkReached(bookingId);
+              }
+              Alert.alert('Arrival Confirmed! 📍', 'The reception desk has been notified that you are present in the lobby.');
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Could not update arrival status';
+              Alert.alert('Notice', msg);
+            } finally {
+              setMarkingReachedId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  useEffect(() => {
+    fetchCustomerStrikes('99999999-9999-9999-9999-999999999991').then((res) => {
+      setCustomerStrikes(res.strikes);
+    });
+  }, []);
 
   // Reschedule state
   const [rescheduleTarget, setRescheduleTarget] = useState<
@@ -39,23 +77,23 @@ export default function MyBookingsScreen({
   const [isSubmittingReschedule, setIsSubmittingReschedule] = useState(false);
 
   const handleCancelClick = (bookingId: string, slotStart: string) => {
-    const diffHours = (new Date(slotStart).getTime() - Date.now()) / (1000 * 60 * 60);
+    const diffMinutes = Math.round((new Date(slotStart).getTime() - Date.now()) / (1000 * 60));
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const confirmMessage =
-        diffHours > 1
-          ? 'Cancel Appointment: You are cancelling more than 1 hour in advance. Your deposit will be refunded in full. Confirm cancellation?'
-          : 'Late Cancellation Warning: You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
+        diffMinutes > 30
+          ? 'Cancel Appointment: You are cancelling more than 30 minutes in advance. Your deposit will be refunded in full. Confirm cancellation?'
+          : 'Late Cancellation Warning: You are cancelling inside the 30-minute window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
       if (window.confirm(confirmMessage)) {
         onCancelBooking(bookingId);
       }
       return;
     }
 
-    if (diffHours > 1) {
+    if (diffMinutes > 30) {
       Alert.alert(
         'Cancel Appointment',
-        'You are cancelling more than 1 hour in advance. Your deposit will be refunded in full.',
+        'You are cancelling more than 30 minutes in advance. Your deposit will be refunded in full.',
         [
           { text: 'Keep Booking', style: 'cancel' },
           { text: 'Confirm & Refund', style: 'destructive', onPress: () => onCancelBooking(bookingId) },
@@ -64,7 +102,7 @@ export default function MyBookingsScreen({
     } else {
       Alert.alert(
         'Late Cancellation Warning',
-        'You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited to the business.',
+        'You are cancelling inside the 30-minute window. Under the policy, your deposit will be forfeited to the business.',
         [
           { text: 'Keep Booking', style: 'cancel' },
           { text: 'Forfeit & Cancel', style: 'destructive', onPress: () => onCancelBooking(bookingId) },
@@ -114,6 +152,18 @@ export default function MyBookingsScreen({
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {customerStrikes >= 2 && (
+          <View style={styles.strikeAlertBanner} testID="my-bookings-strike-banner">
+            <Text style={styles.strikeAlertIcon}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.strikeAlertTitle}>Courtesy Policy Notice (2 Prior Misses)</Text>
+              <Text style={styles.strikeAlertSub}>
+                Under our courtesy grace policy, your first 2 misses were refunded. If you miss your next appointment, your ₹100 deposit will be forfeited to the provider.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {bookings.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📅</Text>
@@ -133,7 +183,11 @@ export default function MyBookingsScreen({
             });
 
             return (
-              <View key={booking.id} style={styles.card} testID={`booking-card-${booking.id}`}>
+              <View 
+                key={booking.id} 
+                style={[styles.card, booking.is_present && styles.cardPresent]} 
+                testID={`booking-card-${booking.id}`}
+              >
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={styles.providerName}>{booking.provider_name || 'Service Provider'}</Text>
@@ -143,28 +197,35 @@ export default function MyBookingsScreen({
                       </View>
                     )}
                   </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      booking.status === 'CONFIRMED'
-                        ? styles.statusConfirmed
-                        : booking.status === 'CANCELLED'
-                        ? styles.statusCancelled
-                        : styles.statusCompleted,
-                    ]}
-                  >
-                    <Text
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {booking.is_present && (
+                      <View style={styles.presentBadge} testID={`present-badge-${booking.id}`}>
+                        <Text style={styles.presentBadgeText}>📍 Present in Lobby</Text>
+                      </View>
+                    )}
+                    <View
                       style={[
-                        styles.statusText,
+                        styles.statusBadge,
                         booking.status === 'CONFIRMED'
-                          ? styles.statusTextConfirmed
-                          : booking.status === 'CANCELLED'
-                          ? styles.statusTextCancelled
-                          : styles.statusTextCompleted,
+                          ? styles.statusConfirmed
+                          : (booking.status === 'CANCELLED' || booking.status === 'NO_SHOW')
+                          ? styles.statusCancelled
+                          : styles.statusCompleted,
                       ]}
                     >
-                      {booking.status}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.statusText,
+                          booking.status === 'CONFIRMED'
+                            ? styles.statusTextConfirmed
+                            : (booking.status === 'CANCELLED' || booking.status === 'NO_SHOW')
+                            ? styles.statusTextCancelled
+                            : styles.statusTextCompleted,
+                        ]}
+                      >
+                        {booking.status}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
@@ -177,6 +238,22 @@ export default function MyBookingsScreen({
                   </Text>
                 </View>
 
+                {(booking.status === 'CANCELLED' || booking.status === 'NO_SHOW') && booking.payment_status === 'REFUNDED' && (
+                  <View style={{ backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', borderRadius: 8, padding: 8, marginTop: 8 }}>
+                    <Text style={{ fontSize: 11, color: '#166534', fontWeight: '600' }}>
+                      💚 100% Refund Issued: Your deposit has been credited back to your account.
+                    </Text>
+                  </View>
+                )}
+
+                {booking.status === 'CONFIRMED' && !booking.is_present && (
+                  <View style={styles.lateArrivalTipBox} testID={`late-arrival-tip-${booking.id}`}>
+                    <Text style={styles.lateArrivalTipText}>
+                      ⏱️ <Text style={{ fontWeight: '700' }}>Running late?</Text> Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"Say Reached"</Text> on arrival to enter at Ongoing Token + 2 (e.g. #10 → #12).
+                    </Text>
+                  </View>
+                )}
+
                 <View style={styles.cardFooter}>
                   <View style={styles.depositInfo}>
                     <Text style={styles.depositLabel}>Deposit Paid:</Text>
@@ -185,6 +262,24 @@ export default function MyBookingsScreen({
 
                   {booking.status === 'CONFIRMED' && (
                     <View style={styles.actionButtonsGroup}>
+                      {booking.is_present ? (
+                        <View style={styles.arrivedPill} testID={`arrived-status-${booking.id}`}>
+                          <Text style={styles.arrivedPillText}>✓ Reached Venue</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.reachedBtn}
+                          onPress={() => handleReachedClick(booking.id)}
+                          disabled={markingReachedId === booking.id}
+                          accessibilityLabel="Say Reached"
+                          testID={`say-reached-${booking.id}`}
+                        >
+                          <Text style={styles.reachedBtnText}>
+                            {markingReachedId === booking.id ? 'Updating…' : '📍 Say Reached'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+
                       <TouchableOpacity
                         style={styles.passBtn}
                         onPress={() => setSelectedPassBooking(booking)}
@@ -225,6 +320,7 @@ export default function MyBookingsScreen({
         visible={!!selectedPassBooking}
         booking={selectedPassBooking}
         onClose={() => setSelectedPassBooking(null)}
+        onMarkReached={onMarkReached}
       />
 
       {/* Reschedule Modal */}
@@ -386,6 +482,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  cardPresent: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#10b981',
+    borderWidth: 1.5,
+  },
+  presentBadge: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#10b981',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+  },
+  presentBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#065f46',
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -521,6 +635,32 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#dc2626',
+  },
+  reachedBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#047857',
+  },
+  reachedBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  arrivedPill: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  arrivedPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#15803d',
   },
   modalOverlay: {
     flex: 1,
@@ -665,5 +805,44 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '800',
+  },
+  strikeAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#fde68a',
+    gap: 10,
+  },
+  strikeAlertIcon: {
+    fontSize: 20,
+  },
+  strikeAlertTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#92400e',
+    marginBottom: 2,
+  },
+  strikeAlertSub: {
+    fontSize: 11,
+    color: '#b45309',
+    lineHeight: 16,
+  },
+  lateArrivalTipBox: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  lateArrivalTipText: {
+    fontSize: 11,
+    color: '#92400e',
+    lineHeight: 15,
   },
 });

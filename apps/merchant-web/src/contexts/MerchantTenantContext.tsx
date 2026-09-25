@@ -4,7 +4,6 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { Provider, Resource, MerchantMembership, VerticalConfig } from '@appointments/shared';
 import { supabase, fetchTenantContextData } from '@/lib/supabase';
 import { getVerticalConfig } from '@/lib/vertical-config';
-import { INITIAL_MERCHANT_PROVIDER, SALON_MERCHANT_PROVIDER } from '@/lib/mock-data';
 
 export interface MerchantTenantContextType {
   activeProvider: (Provider & { resources?: Resource[] }) | null;
@@ -22,7 +21,7 @@ export interface MerchantTenantContextType {
 const defaultVerticalConfig = getVerticalConfig('clinics');
 
 const MerchantTenantContext = createContext<MerchantTenantContextType>({
-  activeProvider: INITIAL_MERCHANT_PROVIDER,
+  activeProvider: null,
   verticalConfig: defaultVerticalConfig,
   memberships: [],
   isSuperAdmin: false,
@@ -35,9 +34,7 @@ const MerchantTenantContext = createContext<MerchantTenantContextType>({
 });
 
 export function MerchantTenantProvider({ children }: { children: React.ReactNode }) {
-  const [activeProvider, setActiveProvider] = useState<(Provider & { resources?: Resource[] }) | null>(
-    INITIAL_MERCHANT_PROVIDER
-  );
+  const [activeProvider, setActiveProvider] = useState<(Provider & { resources?: Resource[] }) | null>(null);
   const [memberships, setMemberships] = useState<MerchantMembership[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,18 +52,12 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
 
       if (data.activeProvider) {
         setActiveProvider(data.activeProvider);
-      } else if (!data.isSuperAdmin) {
-        // Fallback resolution for email-based demo credentials
-        const email = data.user?.email || '';
-        if (email.includes('naturals.salon') || email.includes('salon')) {
-          setActiveProvider(SALON_MERCHANT_PROVIDER);
-        } else {
-          setActiveProvider(INITIAL_MERCHANT_PROVIDER);
-        }
+      } else {
+        setActiveProvider(null);
       }
     } catch (err: unknown) {
       console.warn('Error loading merchant tenant:', err);
-      setError('Unable to load tenant profile, falling back to local workspace');
+      setError('Unable to load tenant profile');
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +75,7 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
         setIsAuthenticated(false);
         setIsSuperAdmin(false);
         setMemberships([]);
-        setActiveProvider(INITIAL_MERCHANT_PROVIDER);
+        setActiveProvider(null);
         setIsLoading(false);
       }
     });
@@ -111,10 +102,8 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
 
       if (!provError && data) {
         setActiveProvider(data as unknown as (Provider & { resources?: Resource[] }));
-      } else if (providerId === SALON_MERCHANT_PROVIDER.id) {
-        setActiveProvider(SALON_MERCHANT_PROVIDER);
       } else {
-        setActiveProvider(INITIAL_MERCHANT_PROVIDER);
+        console.warn('Provider not found or error loading provider:', provError);
       }
     } catch (err) {
       console.warn('Failed to switch provider:', err);

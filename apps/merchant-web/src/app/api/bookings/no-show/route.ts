@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { initiateRazorpayRefund } from '@/lib/razorpay';
 import { RecordNoShowRequest, RecordNoShowResponse } from '@appointments/shared';
 
 interface RpcNoShowResult {
   success: boolean;
   no_show_count?: number;
+  penalty_applied?: boolean;
+  payment_status?: 'REFUNDED' | 'FORFEITED';
+  refund_amount?: number;
   flagged?: boolean;
   error?: string;
 }
@@ -26,7 +30,7 @@ export async function POST(req: NextRequest) {
     // Guard: check booking status and start time
     const { data: booking } = await supabaseAdmin
       .from('bookings')
-      .select('status, slot_start')
+      .select('id, status, slot_start, gateway_payment_id, deposit_amount')
       .eq('id', booking_id)
       .single();
 
@@ -68,11 +72,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // If Strike 1 or Strike 2 (Courtesy Grace Period with refund), initiate gateway refund
+    if (result.payment_status === 'REFUNDED' && booking?.gateway_payment_id) {
+      try {
+        await initiateRazorpayRefund({
+          paymentId: booking.gateway_payment_id,
+          amount: Math.round(Number(result.refund_amount ?? booking.deposit_amount ?? 100) * 100),
+          notes: {
+            booking_id,
+            reason: `Courtesy no-show grace refund (Strike ${result.no_show_count})`,
+          },
+        });
+      } catch (refundErr) {
+        console.error('Courtesy no-show refund warning (non-fatal):', refundErr);
+      }
+    }
+
     return NextResponse.json<RecordNoShowResponse>(
       {
         success: true,
         booking_id,
         no_show_count: result.no_show_count,
+        penalty_applied: result.penalty_applied ?? false,
+        payment_status: result.payment_status || 'FORFEITED',
+        refund_amount: result.refund_amount !== undefined ? Number(result.refund_amount) : 0,
         is_flagged: result.flagged,
       },
       { status: 200 }

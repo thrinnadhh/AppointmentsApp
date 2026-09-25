@@ -15,13 +15,17 @@ interface BookingPassModalProps {
   visible: boolean;
   booking: (Booking & { provider_name?: string; resource_name?: string }) | null;
   onClose: () => void;
+  onMarkReached?: (bookingId: string) => Promise<void>;
 }
 
 export default function BookingPassModal({
   visible,
   booking,
   onClose,
+  onMarkReached,
 }: BookingPassModalProps) {
+  const [isMarkingReached, setIsMarkingReached] = React.useState(false);
+
   if (!booking) return null;
 
   const slotDate = new Date(booking.slot_start);
@@ -33,6 +37,24 @@ export default function BookingPassModal({
     year: 'numeric',
   });
   const passId = booking.reference_code || `TPT-${booking.id.slice(0, 6).toUpperCase()}`;
+
+  const handleSayReached = async () => {
+    if (!booking) return;
+    setIsMarkingReached(true);
+    try {
+      if (onMarkReached) {
+        await onMarkReached(booking.id);
+      }
+      Alert.alert(
+        'Arrival Confirmed! 📍',
+        'The venue reception has been notified that you have reached in person.'
+      );
+    } catch {
+      Alert.alert('Notice', 'Unable to mark reached right now. Please inform the receptionist.');
+    } finally {
+      setIsMarkingReached(false);
+    }
+  };
 
   const handleDirections = () => {
     Alert.alert(
@@ -67,11 +89,18 @@ export default function BookingPassModal({
             <View style={styles.passCard}>
               <View style={styles.passTop}>
                 <View style={styles.badgeRow}>
-                  <View style={styles.statusPill}>
-                    <Text style={styles.statusDot}>●</Text>
-                    <Text style={styles.statusText}>{booking.status}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={styles.statusPill}>
+                      <Text style={styles.statusDot}>●</Text>
+                      <Text style={styles.statusText}>{booking.status}</Text>
+                    </View>
+                    {booking.is_present && (
+                      <View style={styles.presentPill} testID="pass-present-pill">
+                        <Text style={styles.presentPillText}>📍 AT VENUE</Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={styles.passNumber}>{passId}</Text>
+                  <Text style={styles.passNumber} testID="pass-reference-code">{passId}</Text>
                 </View>
 
                 <Text style={styles.serviceName}>{booking.resource_name || 'Reserved Session'}</Text>
@@ -136,11 +165,44 @@ export default function BookingPassModal({
                     This deposit guarantees your slot and will be adjusted in your final bill at the counter.
                   </Text>
                 </View>
+
+                {/* Late Arrival Grace Reminder */}
+                {booking.status === 'CONFIRMED' && (
+                  <View style={styles.lateArrivalPassNote} testID="pass-late-arrival-note">
+                    <View style={styles.lateArrivalPassHeader}>
+                      <Text style={styles.lateArrivalPassIcon}>⏱️</Text>
+                      <Text style={styles.lateArrivalPassTitle}>Late Arrival Rule (+2 Token Buffer)</Text>
+                    </View>
+                    <Text style={styles.lateArrivalPassText}>
+                      Arriving late? Don't worry! Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"I've Reached"</Text> below when you arrive. You will be placed <Text style={{ fontWeight: '700', color: '#0f172a' }}>2 tokens after the ongoing token</Text> (e.g. token #10 ongoing → queued at #12).
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
             {/* Quick Actions */}
             <View style={styles.actionRow}>
+              {booking.status === 'CONFIRMED' && (
+                booking.is_present ? (
+                  <View style={styles.reachedPill} testID="pass-reached-status">
+                    <Text style={styles.btnIcon}>✓</Text>
+                    <Text style={styles.reachedPillText}>At Venue</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.reachedActionBtn}
+                    onPress={handleSayReached}
+                    disabled={isMarkingReached}
+                    testID="pass-say-reached-btn"
+                  >
+                    <Text style={styles.btnIcon}>📍</Text>
+                    <Text style={styles.reachedActionBtnText}>
+                      {isMarkingReached ? 'Notifying…' : "I've Reached"}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
               <TouchableOpacity style={styles.directionsBtn} onPress={handleDirections}>
                 <Text style={styles.btnIcon}>📍</Text>
                 <Text style={styles.btnText}>Directions</Text>
@@ -450,5 +512,77 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '700',
+  },
+  presentPill: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#10b981',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  presentPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#065f46',
+  },
+  reachedActionBtn: {
+    flex: 1.2,
+    backgroundColor: '#059669',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 6,
+  },
+  reachedActionBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reachedPill: {
+    flex: 1.1,
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 6,
+  },
+  reachedPillText: {
+    color: '#15803d',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  lateArrivalPassNote: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    marginTop: 12,
+  },
+  lateArrivalPassHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  lateArrivalPassIcon: {
+    fontSize: 14,
+  },
+  lateArrivalPassTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400e',
+  },
+  lateArrivalPassText: {
+    fontSize: 11,
+    color: '#78350f',
+    lineHeight: 15,
   },
 });

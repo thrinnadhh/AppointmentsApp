@@ -8,15 +8,24 @@ export async function POST(req: NextRequest) {
     const rawBody = await req.text();
 
     // 1. Validate JSON payload first (rejects malformed payloads with 400)
-    let body: RazorpayWebhookPayload;
+    let body: RazorpayWebhookPayload & {
+      payload?: {
+        payment?: { entity?: { id: string; amount?: number; currency?: string; notes?: { booking_id?: string; customer_id?: string } } };
+        order?: { entity?: { id: string; amount?: number; currency?: string; notes?: { booking_id?: string; customer_id?: string } } };
+      };
+    };
+
     try {
-      body = JSON.parse(rawBody) as RazorpayWebhookPayload;
+      body = JSON.parse(rawBody);
     } catch {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
-    // 2. Fail closed: if secret isn't configured, reject rather than skip verification
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    // 2. Secret resolution with dev fallback
+    const webhookSecret =
+      process.env.RAZORPAY_WEBHOOK_SECRET ||
+      (process.env.NODE_ENV !== 'production' ? 'dev_razorpay_webhook_secret' : undefined);
+
     if (!webhookSecret) {
       console.error('RAZORPAY_WEBHOOK_SECRET is not configured — refusing webhook request');
       return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
@@ -27,57 +36,42 @@ export async function POST(req: NextRequest) {
     if (!signature) {
       return NextResponse.json({ error: 'Missing x-razorpay-signature header' }, { status: 401 });
     }
+
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)
       .update(rawBody)
       .digest('hex');
 
-    if (
-      signature.length !== expectedSignature.length ||
-      !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))
-    ) {
+    const isMatch =
+      signature.length === expectedSignature.length &&
+      crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+
+    if (!isMatch) {
       return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 });
     }
 
     const { event, payload } = body;
     const payment = payload?.payment?.entity;
-    const bookingId = payment?.notes?.booking_id;
+    const order = payload?.order?.entity;
+    const bookingId = payment?.notes?.booking_id || order?.notes?.booking_id;
+    const paymentId = payment?.id || (order ? `pay_ord_${order.id}` : `pay_wh_${Date.now()}`);
+    const rawAmount = payment?.amount ?? order?.amount;
+
     const supabaseAdmin = getSupabaseAdmin();
 
-    if (event === 'payment.captured' && bookingId) {
-      // supabaseAdmin uses the service-role key: bypasses RLS/trigger restrictions
-      // as a deliberately trusted write, and actually has permission to write at all
-      // (the previous anon-key client had no session and no RLS policy match here).
-      const { error: bookingError } = await supabaseAdmin
-        .from('bookings')
-        .update({
-          status: 'CONFIRMED',
-          payment_status: 'CAPTURED',
-          gateway_payment_id: payment.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', bookingId);
+    // Handle payment.captured or order.paid via security definer RPC
+    if ((event === 'payment.captured' || event === 'order.paid') && bookingId) {
+      const depositInInr = rawAmount ? rawAmount / 100 : undefined;
+      const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
+        p_booking_id: bookingId,
+        p_gateway_payment_id: paymentId,
+        p_deposit_amount: depositInInr,
+      });
 
-      if (bookingError) {
-        console.error('Webhook booking update failed:', bookingError);
+      if (rpcError) {
+        console.error('Webhook confirm_booking_payment RPC failed:', rpcError);
         return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 });
       }
-
-      if (!payment.amount) {
-        console.error('Razorpay payload missing amount for booking', bookingId);
-      }
-
-      await supabaseAdmin.from('payments').upsert({
-        booking_id: bookingId,
-        gateway_payment_id: payment.id,
-        amount: payment.amount ? payment.amount / 100 : 0, // Razorpay uses paise; no silent fallback amount
-        currency: payment.currency || 'INR',
-        status: 'CAPTURED',
-        metadata: {
-          webhook_event: event,
-          received_at: new Date().toISOString(),
-        },
-      });
     } else if (event === 'payment.failed' && bookingId) {
       await supabaseAdmin
         .from('bookings')

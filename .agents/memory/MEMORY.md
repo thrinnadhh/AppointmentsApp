@@ -6,3 +6,4 @@
 - [project] Component metadata uses SemVer while toolkit releases use CalVer → tech-decisions.md
 - [project] Database is Supabase (PostgreSQL, RLS, Auth, Edge Functions) → tech-decisions.md
 - [project] Customer platform is React Native (Expo) mobile app, Merchant platform is Next.js 15 webapp → tech-decisions.md
+- [project] Payment Gateway is Razorpay (Orders API, HMAC-SHA256, UPI) for domestic INR deposits → tech-decisions.md

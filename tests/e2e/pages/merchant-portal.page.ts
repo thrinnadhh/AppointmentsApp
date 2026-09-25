@@ -133,19 +133,14 @@ export class MerchantPortalPage {
   // Navigation Methods
   async loginAsMerchant(email = 'svims.clinic@tirupati-appointments.com', password = 'SvimsClinic2026!') {
     await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
-    const demoBtn = this.page.getByTestId('demo-login-clinic');
-    if (email === 'svims.clinic@tirupati-appointments.com' && (await demoBtn.isVisible().catch(() => false))) {
-      await demoBtn.click();
-    } else {
-      const emailInput = this.page.getByTestId('login-email');
-      if (!(await emailInput.isVisible().catch(() => false))) {
-        await this.page.getByTestId('auth-tab-signin').click();
-      }
-      await expect(emailInput).toBeVisible({ timeout: 10000 });
-      await emailInput.fill(email);
-      await this.page.getByTestId('login-password').fill(password);
-      await this.page.getByTestId('login-submit').click();
+    const emailInput = this.page.getByTestId('login-email');
+    if (!(await emailInput.isVisible().catch(() => false))) {
+      await this.page.getByTestId('auth-tab-signin').click();
     }
+    await expect(emailInput).toBeVisible({ timeout: 10000 });
+    await emailInput.fill(email);
+    await this.page.getByTestId('login-password').fill(password);
+    await this.page.getByTestId('login-submit').click();
     await this.page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 }).catch(() => null);
   }
 
@@ -222,8 +217,36 @@ export class MerchantPortalPage {
   async gotoResources() {
     await this.page.goto('http://localhost:3000/resources', { waitUntil: 'domcontentloaded' });
     await this.ensureAuthenticated();
-    await expect(this.page.getByRole('heading', { name: /Doctors & Service Units|Stylists & Service Stations|Staff & Resources/i })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('heading', { name: /Departments & Services|Doctors|Stylists|Staff/i })).toBeVisible({ timeout: 15000 });
   }
+
+  async gotoSchedule() {
+    try {
+      await this.page.goto('http://localhost:3000/schedule', { waitUntil: 'domcontentloaded' });
+    } catch {
+      await this.page.waitForLoadState('domcontentloaded').catch(() => null);
+      await this.page.goto('http://localhost:3000/schedule', { waitUntil: 'domcontentloaded' });
+    }
+    await this.ensureAuthenticated();
+    await expect(this.page.getByRole('heading', { name: /Weekly Availability & Hours/i })).toBeVisible({ timeout: 15000 });
+  }
+
+  async saveSchedule() {
+    const saveBtn = this.page.getByRole('button', { name: /Save Schedule/i });
+    await expect(saveBtn).toBeVisible({ timeout: 10000 });
+    await expect.poll(async () => {
+      if (await this.page.getByText('Saved!').isVisible().catch(() => false)) {
+        return true;
+      }
+      await saveBtn.click().catch(() => {});
+      return await this.page.getByText('Saved!').isVisible().catch(() => false);
+    }, {
+      message: 'Schedule save button should respond with Saved! confirmation after hydration',
+      timeout: 10000,
+      intervals: [200, 500, 1000],
+    }).toBe(true);
+  }
+
 
   // Bookings Queue Actions
   async filterByStatus(status: 'ALL' | 'HELD' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED') {
@@ -282,7 +305,40 @@ export class MerchantPortalPage {
     await expect(cancelBtn).toBeVisible();
     await cancelBtn.click();
     await expect(cancelBtn).not.toBeVisible({ timeout: 10000 });
-    await expect(card.getByText('CANCELLED')).toBeVisible({ timeout: 10000 });
+
+    const cancelledTab = this.page.getByRole('button', { name: /^CANCELLED$/i });
+    if (await cancelledTab.isVisible().catch(() => false)) {
+      await cancelledTab.click();
+    }
+    const cancelledCard = this.getBookingCard(identifier);
+    await expect(cancelledCard.getByText('CANCELLED')).toBeVisible({ timeout: 10000 });
+  }
+
+  async substituteStaffMember(identifier: string, replacementStaffName?: string, reason?: string) {
+    const card = this.getBookingCard(identifier);
+    await expect(card).toBeVisible({ timeout: 10000 });
+    const substituteBtn = card.getByRole('button', { name: /Substitute/i });
+    await expect(substituteBtn).toBeVisible({ timeout: 10000 });
+    await substituteBtn.click();
+
+    const modal = this.page.locator('.fixed.inset-0').filter({ hasText: 'Substitute Staff Member' });
+    await expect(modal).toBeVisible({ timeout: 10000 });
+
+    if (replacementStaffName) {
+      const select = modal.locator('select');
+      await select.selectOption({ label: replacementStaffName });
+    }
+
+    if (reason) {
+      const input = modal.locator('input[placeholder*="emergency"]');
+      await input.fill(reason);
+    }
+
+    const confirmBtn = modal.getByRole('button', { name: /Confirm Substitution/i });
+    await expect(confirmBtn).toBeVisible();
+    await confirmBtn.click();
+
+    await expect(this.page.getByText(/Staff substituted!/i)).toBeVisible({ timeout: 10000 });
   }
 
   async openNotificationModal(identifier: string) {
