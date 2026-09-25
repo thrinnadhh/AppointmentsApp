@@ -131,7 +131,10 @@ export class MerchantPortalPage {
   }
 
   // Navigation Methods
-  async loginAsMerchant(email = 'svims.clinic@tirupati-appointments.com', password = 'SvimsClinic2026!') {
+  async loginAsMerchant(
+    email = process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com',
+    password = process.env.TEST_MERCHANT_PASSWORD || ''
+  ) {
     await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
     const emailInput = this.page.getByTestId('login-email');
     if (!(await emailInput.isVisible().catch(() => false))) {

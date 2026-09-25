@@ -51,19 +51,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Mark completed
-    const { error: updateError } = await supabaseAdmin
-      .from('bookings')
-      .update({
-        status: 'COMPLETED',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', booking_id);
+    // Mark completed via SECURITY DEFINER RPC
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('complete_booking', {
+      p_booking_id: booking_id,
+    });
 
-    if (updateError) {
+    if (rpcError) {
       return NextResponse.json(
-        { success: false, error: updateError.message },
+        { success: false, error: rpcError.message },
         { status: 500 }
+      );
+    }
+
+    const rpcResult = rpcData as { success: boolean; error?: string };
+    if (!rpcResult?.success) {
+      return NextResponse.json(
+        { success: false, error: rpcResult?.error || 'Failed to complete booking' },
+        { status: 400 }
       );
     }
 

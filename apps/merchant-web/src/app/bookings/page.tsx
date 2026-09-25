@@ -984,7 +984,7 @@ export default function BookingsManagementPage() {
                       {log.message_content}
                     </p>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
-                      <span>Recipient: {log.recipient_phone} ({log.recipient_name || 'Patient'})</span>
+                      <span>Recipient: {maskPhoneNumber(log.recipient_phone)} ({log.recipient_name || 'Patient'})</span>
                       <span className="text-emerald-700 font-bold">✓ {log.status}</span>
                     </div>
                   </div>

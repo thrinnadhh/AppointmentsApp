@@ -131,9 +131,6 @@ export default function AdminDashboardPage() {
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    if (process.env.NODE_ENV !== 'production') {
-      headers['x-admin-bypass-key'] = 'tirupati-superadmin-e2e-2026';
-    }
     return headers;
   };
 

@@ -174,7 +174,63 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
   return false;
 }
 
+export interface RazorpayPaymentDetails {
+  id: string;
+  status: string;
+  order_id: string;
+  amount: number; // in paise
+  currency: string;
+}
 
+/**
+ * Fetches payment details from the Razorpay API to verify status and order linkage.
+ */
+export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayPaymentDetails | null> {
+  if (!paymentId || !paymentId.trim()) return null;
+
+  if (isRazorpayConfigured()) {
+    try {
+      const authHeader = 'Basic ' + Buffer.from(`${KEY_ID}:${KEY_SECRET}`).toString('base64');
+      const res = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+        method: 'GET',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) {
+        return null;
+      }
+      const data = await res.json();
+      return {
+        id: data.id,
+        status: data.status,
+        order_id: data.order_id,
+        amount: data.amount,
+        currency: data.currency,
+      };
+    } catch (err) {
+      console.error('[Razorpay] fetch payment failed:', err);
+      return null;
+    }
+  }
+
+  // Sandbox / test mode fallback (strictly non-production)
+  if (isTestMode() && process.env.NODE_ENV !== 'production') {
+    if (paymentId.includes('fake') || paymentId.includes('invalid') || paymentId.includes('unverified')) {
+      return null;
+    }
+    return {
+      id: paymentId,
+      status: 'captured',
+      order_id: 'order_test_mock',
+      amount: 11000,
+      currency: 'INR',
+    };
+  }
+
+  return null;
+}
 /**
  * Initiates a refund for a payment via Razorpay.
  */

@@ -129,8 +129,10 @@ export default function PrivacyPolicyPage() {
 
         <Section title="6. Grievance Officer">
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 leading-relaxed">
-            <p><strong>Grievance Officer:</strong> Appointments4u Platform Team</p>
-            <p className="mt-1"><strong>Email:</strong> <a href="mailto:grievance@appointments4u.in" className="underline">grievance@appointments4u.in</a></p>
+            <p><strong>Grievance Officer:</strong> {'{{GRIEVANCE_OFFICER_NAME}}'}</p>
+            <p className="mt-1"><strong>Designation:</strong> {'{{GRIEVANCE_OFFICER_DESIGNATION}}'}</p>
+            <p className="mt-1"><strong>Address:</strong> {'{{GRIEVANCE_OFFICER_ADDRESS}}'}</p>
+            <p className="mt-1"><strong>Email:</strong> <a href="mailto:grievance@appointments4u.in" className="underline">{'{{GRIEVANCE_OFFICER_EMAIL}}'}</a></p>
             <p className="mt-1"><strong>Response time:</strong> Within 48 hours of receipt (DPDPA §13 compliance)</p>
             <p className="mt-2 text-amber-700 text-xs">If your grievance is not resolved within 30 days, you may approach the Data Protection Board of India.</p>
           </div>

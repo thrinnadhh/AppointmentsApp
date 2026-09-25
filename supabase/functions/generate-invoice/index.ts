@@ -2,13 +2,14 @@
  * generate-invoice/index.ts
  *
  * Supabase Edge Function — generates a booking receipt/invoice after payment confirmation.
- * Triggered by handle-payment-webhook after a booking is marked CONFIRMED.
+ * Enforces caller authentication (JWT verification via auth.getUser) and ownership check
+ * (customer, authorized venue merchant, or platform admin).
  *
- * Returns JSON invoice data and optionally dispatches receipt via the
- * send-booking-notification function.
+ * Returns JSON invoice data and masks customer PII appropriately.
  *
  * Compliance:
  *  - Consumer Protection (E-Commerce) Rules 2020: receipt must include itemised charges
+ *  - DPDP Act 2023: Strict caller authorization & PII minimization
  *  - GST: platform_fee_gst column included; GSTIN shown once registered
  */
 
@@ -23,16 +24,48 @@ interface InvoicePayload {
   booking_id: string;
 }
 
+function maskCustomerPhone(phone?: string | null): string {
+  if (!phone || typeof phone !== 'string') return 'Not provided';
+  const trimmed = phone.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'not provided') return 'Not provided';
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 6) return 'Not provided';
+  return '*'.repeat(digits.length - 3) + digits.slice(-3);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // ── 0. Require & Verify Authorization JWT ──────────────────────────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization header is required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    let isInternalServiceRole = token === supabaseServiceKey;
+    let user: any = null;
+
+    if (!isInternalServiceRole) {
+      const { data: { user: authUser }, error: authErr } = await supabase.auth.getUser(token);
+      if (authErr || !authUser) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired session token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      user = authUser;
+    }
 
     const payload: InvoicePayload = await req.json();
     const { booking_id } = payload;
@@ -44,7 +77,45 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── 1. Generate invoice number (idempotent) ───────────────────────────────
+    // ── 1. Authorization Ownership Check ──────────────────────────────────────
+    const { data: bookingCheck, error: checkErr } = await supabase
+      .from('bookings')
+      .select('id, customer_id, provider_id')
+      .eq('id', booking_id)
+      .maybeSingle();
+
+    if (checkErr || !bookingCheck) {
+      return new Response(JSON.stringify({ error: 'Booking not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify caller is customer, admin, authorized provider merchant, or service_role
+    let isAuthorized = isInternalServiceRole || (user && user.id === bookingCheck.customer_id);
+
+    if (!isAuthorized && user) {
+      const { data: isAdmin } = await supabase.rpc('is_admin', { p_user_id: user.id });
+      if (isAdmin) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized && user) {
+      const { data: allowedProviders } = await supabase.rpc('get_user_authorized_providers', { p_user_id: user.id });
+      if (Array.isArray(allowedProviders) && allowedProviders.includes(bookingCheck.provider_id)) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ error: 'Access denied: You are not authorized to view invoices for this booking' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── 2. Generate invoice number (idempotent) ───────────────────────────────
     const { data: invoiceNum, error: invErr } = await supabase
       .rpc('generate_invoice_number', { p_booking_id: booking_id });
 
@@ -56,10 +127,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── 2. Compute GST (no-op if gst_active = false) ─────────────────────────
+    // ── 3. Compute GST (no-op if gst_active = false) ─────────────────────────
     await supabase.rpc('compute_gst_for_booking', { p_booking_id: booking_id });
 
-    // ── 3. Fetch full booking details for receipt ─────────────────────────────
+    // ── 4. Fetch full booking details for receipt ─────────────────────────────
     const { data: booking, error: bErr } = await supabase
       .from('bookings')
       .select(`
@@ -86,7 +157,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── 4. Fetch platform config (GSTIN, platform name, etc.) ────────────────
+    // ── 5. Fetch platform config (GSTIN, platform name, etc.) ────────────────
     const { data: configs } = await supabase
       .from('platform_config')
       .select('key, value')
@@ -97,7 +168,7 @@ Deno.serve(async (req) => {
 
     const gstActive = config['gst_active'] === 'true';
 
-    // ── 5. Build invoice object ───────────────────────────────────────────────
+    // ── 6. Build invoice object ───────────────────────────────────────────────
     const depositAmount    = Number(booking.deposit_amount ?? 0);
     const platformFee      = Number(booking.platform_fee ?? 0);
     const platformFeeGst   = Number(booking.platform_fee_gst ?? 0);
@@ -121,7 +192,7 @@ Deno.serve(async (req) => {
       },
       customer: {
         name:  (booking.profiles as any)?.full_name ?? 'Customer',
-        phone: (booking.profiles as any)?.phone ?? '',
+        phone: maskCustomerPhone((booking.profiles as any)?.phone),
       },
       charges: {
         deposit_amount:  depositAmount,
@@ -144,7 +215,8 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     console.error('[generate-invoice] Unexpected error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

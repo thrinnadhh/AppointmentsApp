@@ -96,6 +96,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Persist server-generated Razorpay order ID to booking for safe webhook order matching
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        gateway_order_id: order.id,
+      })
+      .eq('id', booking.id);
+
     return NextResponse.json<CreateRazorpayOrderResponse>(
       {
         success: true,

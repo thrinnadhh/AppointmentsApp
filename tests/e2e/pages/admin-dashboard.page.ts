@@ -194,7 +194,10 @@ export class AdminDashboardPage {
     await expect(this.page.getByTestId('admin-login-email')).toBeVisible();
   }
 
-  async loginAsAdmin(email = 'admin@appointments-tirupati.com', password = 'AdminSecure2026!') {
+  async loginAsAdmin(
+    email = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
+    password = process.env.TEST_ADMIN_PASSWORD || ''
+  ) {
     await expect(this.page.getByTestId('admin-login-email')).toBeVisible({ timeout: 10000 });
     await this.page.getByTestId('admin-login-email').fill(email);
     await this.page.getByTestId('admin-login-password').fill(password);

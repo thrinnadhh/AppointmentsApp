@@ -1,5 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Load environment variables for E2E tests without hardcoding secrets in spec files
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile('apps/merchant-web/.env.local');
+  } catch {
+    // Fall back gracefully if file is absent in CI
+  }
+}
+
 export default defineConfig({
   testDir: './tests/e2e',
 

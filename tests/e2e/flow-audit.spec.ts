@@ -10,7 +10,10 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
     test.beforeEach(async ({ page }, testInfo) => {
       if (testInfo.title.includes('1.8')) return;
       const merchantPortal = new MerchantPortalPage(page);
-      await merchantPortal.goto('admin@appointments-tirupati.com', 'AdminSecure2026!');
+      await merchantPortal.goto(
+        process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
+        process.env.TEST_ADMIN_PASSWORD || ''
+      );
     });
 
     test('1.1 Should navigate to Overview Dashboard and verify all dashboard cards and navigation links', async ({ page }) => {

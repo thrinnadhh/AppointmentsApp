@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server';
-import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAdminRequest } from '@/lib/auth-admin';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const providerId = searchParams.get('providerId');
     const status = searchParams.get('status');

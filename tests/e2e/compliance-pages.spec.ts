@@ -338,8 +338,15 @@ test.describe('Customer Data Masking — DPIIT & DPDPA Compliance', () => {
   });
 
   test('CP-39: REST API / RPC response for merchant bookings returns server-side masked phone numbers and blocks raw profile phone access', async ({ request }) => {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlua2Rud2h1YmZrbm5uemp0cGVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzEyOTIsImV4cCI6MjEwNDQ0NzI5Mn0.Vaep3rcu8dDPkwAoiqCMPV9zovN8eWHCGaLUBC5CF-A';
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const merchantEmail = process.env.TEST_MERCHANT_EMAIL;
+    const merchantPassword = process.env.TEST_MERCHANT_PASSWORD;
+
+    if (!supabaseUrl || !anonKey || !merchantEmail || !merchantPassword) {
+      test.skip(true, 'Skipping CP-39: Required test environment variables are not configured');
+      return;
+    }
 
     // 1. Authenticate as merchant over REST
     const authRes = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
@@ -348,8 +355,8 @@ test.describe('Customer Data Masking — DPIIT & DPDPA Compliance', () => {
         'Content-Type': 'application/json',
       },
       data: {
-        email: 'svims.clinic@tirupati-appointments.com',
-        password: 'SvimsClinic2026!',
+        email: merchantEmail,
+        password: merchantPassword,
       },
     });
     expect(authRes.status()).toBe(200);

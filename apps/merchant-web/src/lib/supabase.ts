@@ -716,7 +716,7 @@ export async function updateAdminCityStatus(
   cityId: string,
   status: CityStatus,
   target?: number | null,
-  adminToken: string = 'tirupati-superadmin-e2e-2026'
+  adminToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
@@ -724,7 +724,7 @@ export async function updateAdminCityStatus(
       p_city_id: cityId,
       p_status: status,
       p_target: target !== undefined ? target : null,
-      p_admin_token: adminToken,
+      p_admin_token: adminToken || undefined,
     });
     if (error) {
       return { success: false, error: error.message };
@@ -778,7 +778,7 @@ export async function fetchAdminMerchants(cityId?: string) {
 export async function updateAdminMerchantStatus(
   providerId: string,
   status: Database['public']['Enums']['provider_status'],
-  adminToken: string = 'tirupati-superadmin-e2e-2026'
+  adminToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
@@ -786,7 +786,7 @@ export async function updateAdminMerchantStatus(
     const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('admin_update_merchant_status', {
       p_provider_id: providerId,
       p_status: status,
-      p_admin_token: adminToken,
+      p_admin_token: adminToken || undefined,
     });
 
     if (!rpcError && rpcData) {
@@ -848,13 +848,13 @@ export async function fetchAdminCityWaitlist(cityId?: string): Promise<CityWaitl
  */
 export async function fetchAdminAuditLogs(
   limit: number = 50,
-  adminToken: string = 'tirupati-superadmin-e2e-2026'
+  adminToken?: string
 ): Promise<AdminAuditLogEntry[]> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await (supabaseAdmin.rpc as any)('get_admin_audit_logs', {
       p_limit: limit,
-      p_admin_token: adminToken,
+      p_admin_token: adminToken || undefined,
     });
 
     if (error) {
