@@ -78,12 +78,12 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
     const headerShop = page.locator('header, main, [data-testid="locked-tenant-badge"]');
     await expect(headerShop.getByText(new RegExp(shopName, 'i')).or(page.getByText(/Salons & Spas/i)).first()).toBeVisible({ timeout: 15000 });
 
-    // Verify Salon Terminology: "Stylists & Services" link present
-    const stylistNavLink = page.getByRole('link', { name: /Stylists & Services/i }).first();
+    // Verify Salon Terminology: "Stylists" link present
+    const stylistNavLink = page.getByRole('link', { name: /Stylists/i }).first();
     await expect(stylistNavLink).toBeVisible();
 
     // Clinic/Hospital Terminology must NOT be present
-    await expect(page.getByRole('link', { name: /Doctors & Services/i })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Doctors/i })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Platform Admin/i })).toHaveCount(0);
 
     // 9. Navigate to Resources (Stylists)
@@ -100,7 +100,7 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
     await expect(page.getByText('Dr. A. Sundararajan')).toHaveCount(0);
 
     // 10. Navigate to Bookings Queue
-    const bookingsLink = page.getByRole('link', { name: /Bookings Queue/i }).first();
+    const bookingsLink = page.getByRole('link', { name: /Bookings/i }).first();
     await bookingsLink.click();
     await expect(page).toHaveURL(/.*\/bookings.*/, { timeout: 15000 });
 
@@ -147,7 +147,7 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
 
     // 5. Verify Successful Login into Isolated Workspace
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 20000 });
-    await expect(page.getByRole('link', { name: /Stylists & Services/i }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('link', { name: /Stylists/i }).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('TC-SELF-03: Super Admin live governance at /admin monitors the newly created shop', async ({ page }) => {

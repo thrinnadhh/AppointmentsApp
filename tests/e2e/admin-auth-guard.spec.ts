@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
 import { AdminDashboardPage } from './pages/admin-dashboard.page';
 
 const TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com';
@@ -114,15 +113,20 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     expect([401, 403]).toContain(unauthResponse.status());
 
     // 2. Authenticated Admin request must succeed and return structured logs
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-    );
-    const { data: authData } = await supabase.auth.signInWithPassword({
-      email: TEST_ADMIN_EMAIL,
-      password: TEST_ADMIN_PASSWORD,
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const authRes = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      headers: {
+        'apikey': anonKey,
+        'Content-Type': 'application/json',
+      },
+      data: {
+        email: TEST_ADMIN_EMAIL,
+        password: TEST_ADMIN_PASSWORD,
+      },
     });
-    const token = authData?.session?.access_token || '';
+    const authData = await authRes.json();
+    const token = authData?.access_token || '';
 
     const authResponse = await request.get('http://localhost:3000/api/admin/audit-logs', {
       headers: { Authorization: `Bearer ${token}` },

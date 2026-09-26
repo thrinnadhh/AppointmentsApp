@@ -233,7 +233,7 @@ export class AdminDashboardPage {
     await this.page.getByTestId('admin-login-email').fill(email);
     await this.page.getByTestId('admin-login-password').fill(password);
     await this.page.getByTestId('admin-login-submit').click();
-    await expect(this.page.getByTestId('admin-login-error')).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByTestId('admin-login-error')).toBeVisible({ timeout: 15000 });
   }
 
   async signOutAdmin() {

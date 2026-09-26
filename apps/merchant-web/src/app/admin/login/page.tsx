@@ -79,13 +79,13 @@ function AdminLoginForm() {
         .single();
 
       if (profileError || !profile) {
-        await supabase.auth.signOut();
+        void supabase.auth.signOut();
         throw new Error('Access Denied: Unable to verify platform authority record.');
       }
 
       if (profile.role !== 'admin') {
         // Immediately terminate session for non-admin accounts attempting access
-        await supabase.auth.signOut();
+        void supabase.auth.signOut();
         throw new Error('Access Denied: This account lacks Super Administrator privileges.');
       }
 
