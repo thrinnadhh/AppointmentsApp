@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (paymentStatus) {
-      query = query.eq('payment_status', paymentStatus.toUpperCase());
+      query = query.eq('payment_status', paymentStatus.toUpperCase() as 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'FORFEITED');
     } else if (needsReconciliation) {
       query = query.in('payment_status', ['REFUND_FAILED', 'REFUND_PENDING']);
     }

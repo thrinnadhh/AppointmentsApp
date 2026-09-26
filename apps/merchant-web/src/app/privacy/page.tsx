@@ -42,7 +42,7 @@ export default function PrivacyPolicyPage() {
 
         <Section title="1. Who We Are">
           <p>
-            <strong>Appointments4u</strong> (also referred to as "the Platform", "we", "us", or "our") is a technology scheduling intermediary that operates a hyperlocal booking platform for service providers (clinics, salons, restaurants, gaming zones, and pet-care providers) in Tirupati, India.
+            <strong>Appointments4u</strong> (also referred to as &ldquo;the Platform&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) is a technology scheduling intermediary that operates a hyperlocal booking platform for service providers (clinics, salons, restaurants, gaming zones, and pet-care providers) in Tirupati, India.
           </p>
           <p className="mt-3">
             We are a <strong>Data Fiduciary</strong> under the DPDPA 2023. Our Grievance Officer can be reached at <a href="mailto:grievance@appointments4u.in" className="text-emerald-700 underline font-medium">grievance@appointments4u.in</a>. We respond within 48 hours.

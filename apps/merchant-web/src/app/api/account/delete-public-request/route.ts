@@ -69,7 +69,6 @@ export async function POST(req: NextRequest) {
 
     if (userId) {
       // Check for existing pending request
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: existing } = await (supabaseAdmin as any)
         .from('account_deletion_requests')
         .select('id, scheduled_for')
@@ -79,7 +78,6 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (!existing) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabaseAdmin as any)
           .from('account_deletion_requests')
           .insert({

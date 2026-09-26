@@ -42,7 +42,6 @@ export async function DELETE(req: NextRequest) {
     const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 500) : null;
 
     const supabaseAdmin = getSupabaseAdmin();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabaseAdmin.rpc as any)('request_account_deletion', {
       p_reason: reason,
     });
@@ -75,7 +74,6 @@ export async function GET() {
 
     const supabaseAdmin = getSupabaseAdmin();
     // New table — cast to any until types are regenerated after migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabaseAdmin as any)
       .from('account_deletion_requests')
       .select('id, requested_at, scheduled_for, completed_at, cancelled_at')

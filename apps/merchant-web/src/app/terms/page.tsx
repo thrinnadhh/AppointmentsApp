@@ -108,7 +108,7 @@ export default function TermsOfServicePage() {
 
         <Section title="6. Medical Disclaimer">
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 leading-relaxed">
-            <strong>Appointments4u is a scheduling platform, not a healthcare provider.</strong> We do not verify the credentials, qualifications, or outcomes of any clinic, doctor, or healthcare professional listed on the platform. In a medical emergency, call <strong>108 (Ambulance)</strong> immediately. Do not rely on appointment slots in emergencies. Appointment times are approximate and subject to the clinic's operational schedule.
+            <strong>Appointments4u is a scheduling platform, not a healthcare provider.</strong> We do not verify the credentials, qualifications, or outcomes of any clinic, doctor, or healthcare professional listed on the platform. In a medical emergency, call <strong>108 (Ambulance)</strong> immediately. Do not rely on appointment slots in emergencies. Appointment times are approximate and subject to the clinic&apos;s operational schedule.
           </div>
         </Section>
 

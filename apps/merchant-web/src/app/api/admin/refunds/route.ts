@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       .limit(limit);
 
     if (statusFilter && (statusFilter.toUpperCase() === 'REFUND_FAILED' || statusFilter.toUpperCase() === 'REFUND_PENDING')) {
-      query = query.eq('payment_status', statusFilter.toUpperCase());
+      query = query.eq('payment_status', statusFilter.toUpperCase() as 'REFUND_FAILED' | 'REFUND_PENDING');
     } else {
       query = query.in('payment_status', ['REFUND_FAILED', 'REFUND_PENDING']);
     }
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     // Also fetch relevant audit logs for these bookings if any
     const bookingIds = (bookings || []).map((b) => b.id);
-    let auditLogs: Array<{ target_id?: string; action?: string; details?: unknown; created_at?: string }> = [];
+    let auditLogs: Array<{ target_id?: string | null; action?: string; details?: unknown; created_at?: string }> = [];
     if (bookingIds.length > 0) {
       const { data: logs } = await supabaseAdmin
         .from('admin_audit_logs')
