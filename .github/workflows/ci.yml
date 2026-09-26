@@ -364,7 +364,7 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run stress: 50-concurrent-hold (EC-INT-05) in isolation
+      - name: "Run stress: 50-concurrent-hold (EC-INT-05) in isolation"
         run: >
           pnpm exec playwright test
           tests/e2e/edge-integrations.spec.ts
@@ -374,7 +374,7 @@ jobs:
         env:
           CI: true
 
-      - name: Run stress: reference code uniqueness (EC-INT-09) in isolation
+      - name: "Run stress: reference code uniqueness (EC-INT-09) in isolation"
         run: >
           pnpm exec playwright test
           tests/e2e/edge-integrations.spec.ts
