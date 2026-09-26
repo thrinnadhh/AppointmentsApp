@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const providerId = searchParams.get('providerId');
     const status = searchParams.get('status');
+    const paymentStatus = searchParams.get('payment_status');
+    const needsReconciliation = searchParams.get('needs_reconciliation') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
@@ -45,6 +47,12 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       query = query.eq('status', status.toUpperCase() as 'HELD' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW');
+    }
+
+    if (paymentStatus) {
+      query = query.eq('payment_status', paymentStatus.toUpperCase());
+    } else if (needsReconciliation) {
+      query = query.in('payment_status', ['REFUND_FAILED', 'REFUND_PENDING']);
     }
 
     const { data, error } = await query;

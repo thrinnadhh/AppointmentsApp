@@ -27,9 +27,6 @@ async function getAuthenticatedCaller(req: NextRequest): Promise<{ id: string; e
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (token) {
-      if (process.env.SUPABASE_SERVICE_ROLE_KEY && token === process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        return { id: '00000000-0000-0000-0000-000000000000', email: 'service_role@supabase.internal' };
-      }
       try {
         const directClient = createClient(supabaseUrl, supabaseAnonKey);
         const { data, error } = await directClient.auth.getUser(token);
@@ -113,12 +110,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. AUTHORIZATION: CALLER MUST BE BOOKING'S CUSTOMER, AUTHORIZED MERCHANT, OR PLATFORM ADMIN
-    const isServiceRole = caller.email === 'service_role@supabase.internal';
     const isCustomer = caller.id === booking.customer_id;
     let isAuthorizedMerchant = false;
-    let isPlatformAdmin = isServiceRole;
+    let isPlatformAdmin = false;
 
-    if (!isCustomer && !isServiceRole) {
+    if (!isCustomer) {
       const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
         p_user_id: caller.id,
       });

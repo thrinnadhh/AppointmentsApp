@@ -188,6 +188,17 @@ export interface RazorpayPaymentDetails {
 export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayPaymentDetails | null> {
   if (!paymentId || !paymentId.trim()) return null;
 
+  // Sandbox / test mode mock payment prefix fallback (strictly non-production or test mode)
+  if (isTestMode() && (paymentId.startsWith('pay_mock_') || paymentId.startsWith('sim_'))) {
+    return {
+      id: paymentId,
+      status: 'captured',
+      order_id: 'order_test_mock',
+      amount: 11000,
+      currency: 'INR',
+    };
+  }
+
   if (isRazorpayConfigured()) {
     try {
       const authHeader = 'Basic ' + Buffer.from(`${KEY_ID}:${KEY_SECRET}`).toString('base64');
@@ -236,6 +247,11 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
  */
 export async function initiateRazorpayRefund(params: RefundParams): Promise<RazorpayRefundResult> {
   const { paymentId, amount, notes } = params;
+
+  // Simulated failure hook for test runs (strictly non-production or test mode)
+  if (isTestMode() && (paymentId.includes('fail') || paymentId.includes('error'))) {
+    throw new Error('Simulated Razorpay refund gateway failure');
+  }
 
   if (
     isRazorpayConfigured() &&

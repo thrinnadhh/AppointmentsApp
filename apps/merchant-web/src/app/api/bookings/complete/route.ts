@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark completed via SECURITY DEFINER RPC
-    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('complete_booking', {
+    const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('complete_booking', {
       p_booking_id: booking_id,
     });
 

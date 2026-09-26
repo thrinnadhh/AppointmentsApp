@@ -54,12 +54,10 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
-    // 2. Confirm booking
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_strike1_${Date.now()}`,
-      },
+    // 2. Confirm booking via direct RPC
+    await supabase.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_mock_strike1_${Date.now()}`,
     });
 
     // 3. Backdate slot_start to past so premature no-show check passes
@@ -101,11 +99,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_strike2_${Date.now()}`,
-      },
+    await supabase.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_mock_strike2_${Date.now()}`,
     });
 
     // Backdate slot_start
@@ -145,11 +141,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_strike3_${Date.now()}`,
-      },
+    await supabase.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_mock_strike3_${Date.now()}`,
     });
 
     // Backdate slot_start
@@ -175,7 +169,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(bkg?.payment_status).toBe('FORFEITED');
   });
 
-  test('4. Cancellation at 45 minutes (> 30m) yields 100% full refund', async ({ request }) => {
+  test('4. Cancellation at 45 minutes before slot yields 100% full refund', async ({ request }) => {
     // 1. Create a future slot
     const slotStart = new Date(Date.now() + 86400000 * 8).toISOString();
     const slotEnd = new Date(Date.now() + 86400000 * 8 + 1800000).toISOString();
@@ -191,14 +185,12 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_cancel45_${Date.now()}`,
-      },
+    await supabase.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_mock_cancel45_${Date.now()}`,
     });
 
-    // Set slot_start to exactly 45 minutes from now (between 30m and 60m)
+    // Set slot_start to exactly 45 minutes from now (> 30m policy cutoff)
     const slot45Min = new Date(Date.now() + 45 * 60 * 1000).toISOString();
     await supabase
       .from('bookings')
@@ -237,11 +229,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_cancel15_${Date.now()}`,
-      },
+    await supabase.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_mock_cancel15_${Date.now()}`,
     });
 
     // Set slot_start to exactly 15 minutes from now (inside 30-min cutoff)
@@ -264,5 +254,118 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(cancelData.status).toBe('CANCELLED');
     expect(cancelData.payment_status).toBe('FORFEITED');
     expect(cancelData.refund_eligible).toBe(false);
+    expect(cancelData.refund_amount).toBe(0);
+  });
+
+  test('6. Merchant cancellation refunds deposit + platform_fee + platform_fee_gst', async ({ request }) => {
+    const slotStart = new Date(Date.now() + 86400000 * 10).toISOString();
+    const slotEnd = new Date(Date.now() + 86400000 * 10 + 1800000).toISOString();
+
+    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    expect(holdRes.status()).toBe(201);
+    const { booking_id } = await holdRes.json();
+
+    await supabase.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_mock_merch_${Date.now()}`,
+    });
+
+    // Set explicit deposit and platform fees on booking
+    await supabase
+      .from('bookings')
+      .update({
+        deposit_amount: 100.00,
+        platform_fee: 10.00,
+        platform_fee_gst: 1.80,
+      })
+      .eq('id', booking_id);
+
+    // Cancel booking as MERCHANT
+    const cancelRes = await request.post(`${BASE_URL}/api/bookings/cancel`, {
+      data: {
+        booking_id,
+        reason: 'Provider emergency closure',
+        initiated_by: 'MERCHANT',
+      },
+    });
+    expect(cancelRes.status()).toBe(200);
+    const cancelData = await cancelRes.json();
+    expect(cancelData.success).toBe(true);
+    expect(cancelData.status).toBe('CANCELLED');
+    expect(cancelData.refund_eligible).toBe(true);
+    // Refund must equal deposit (100) + platform_fee (10) + platform_fee_gst (1.80) = 111.80
+    expect(cancelData.refund_amount).toBe(111.80);
+    expect(cancelData.refund_gateway_paise).toBe(11180);
+    expect(cancelData.payment_status).toBe('REFUNDED');
+
+    // Assert that the amount recorded for Razorpay settlement matches 11180 paise exactly
+    const { data: paymentRecord } = await supabase
+      .from('payments')
+      .select('metadata')
+      .eq('booking_id', booking_id)
+      .single();
+
+    expect(paymentRecord?.metadata?.refund_amount_paise).toBe(11180);
+    expect(paymentRecord?.metadata?.refund_amount).toBe(111.80);
+  });
+
+  test('7. Razorpay refund failure sets REFUND_FAILED and creates admin_audit_logs record', async ({ request }) => {
+    const slotStart = new Date(Date.now() + 86400000 * 11).toISOString();
+    const slotEnd = new Date(Date.now() + 86400000 * 11 + 1800000).toISOString();
+
+    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    expect(holdRes.status()).toBe(201);
+    const { booking_id } = await holdRes.json();
+
+    // Use a payment ID with 'fail' to simulate Razorpay failure
+    await supabase.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_mock_fail_${Date.now()}`,
+    });
+
+    // Set slot_start to 75m from now so cancellation is eligible for refund
+    await supabase
+      .from('bookings')
+      .update({ slot_start: new Date(Date.now() + 75 * 60 * 1000).toISOString() })
+      .eq('id', booking_id);
+
+    const cancelRes = await request.post(`${BASE_URL}/api/bookings/cancel`, {
+      data: {
+        booking_id,
+        initiated_by: 'CUSTOMER',
+      },
+    });
+    expect(cancelRes.status()).toBe(200);
+    const cancelData = await cancelRes.json();
+    expect(cancelData.success).toBe(true);
+    expect(cancelData.status).toBe('CANCELLED');
+    // Because gateway refund failed, status must be REFUND_FAILED, NOT REFUNDED
+    expect(cancelData.payment_status).toBe('REFUND_FAILED');
+
+    // Verify DB booking status
+    const { data: bkg } = await supabase.from('bookings').select('payment_status').eq('id', booking_id).single();
+    expect(bkg?.payment_status).toBe('REFUND_FAILED');
+
+    // Verify admin audit log entry was created
+    const { data: auditLogs } = await supabase
+      .from('admin_audit_logs')
+      .select('action, target_id')
+      .eq('target_id', booking_id)
+      .eq('action', 'REFUND_MANUAL_INTERVENTION_REQUIRED');
+    expect(auditLogs && auditLogs.length).toBeGreaterThan(0);
   });
 });

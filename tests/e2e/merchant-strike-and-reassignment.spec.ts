@@ -248,7 +248,7 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     });
     const { booking_id } = await hold.json();
     await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: `pay_lastmin_${Date.now()}` },
+      data: { booking_id, gateway_payment_id: `pay_mock_lastmin_${Date.now()}` },
     });
 
     // Backdate slot to exactly 15 minutes from now (<= 30 minutes)

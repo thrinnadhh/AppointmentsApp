@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { data, error } = await supabase.rpc('create_booking_hold', {
+    const { data, error } = await supabaseAdmin.rpc('create_booking_hold', {
       p_resource_id: resource_id,
       p_slot_start: slot_start,
       p_slot_end: slot_end,

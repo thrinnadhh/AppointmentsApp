@@ -20,8 +20,10 @@ export type Database = {
           customer_id: string
           deposit_amount: number
           platform_fee: number | null
+          platform_fee_gst: number | null
           total_amount: number | null
           gateway_payment_id: string | null
+          gateway_order_id: string | null
           hold_expires_at: string | null
           id: string
           payment_status: Database["public"]["Enums"]["payment_status"]
@@ -44,8 +46,10 @@ export type Database = {
           customer_id: string
           deposit_amount: number
           platform_fee?: number | null
+          platform_fee_gst?: number | null
           total_amount?: number | null
           gateway_payment_id?: string | null
+          gateway_order_id?: string | null
           hold_expires_at?: string | null
           id?: string
           payment_status?: Database["public"]["Enums"]["payment_status"]
@@ -67,8 +71,10 @@ export type Database = {
           customer_id?: string
           deposit_amount?: number
           platform_fee?: number | null
+          platform_fee_gst?: number | null
           total_amount?: number | null
           gateway_payment_id?: string | null
+          gateway_order_id?: string | null
           hold_expires_at?: string | null
           id?: string
           payment_status?: Database["public"]["Enums"]["payment_status"]
@@ -676,6 +682,45 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_audit_logs: {
+        Row: {
+          id: string
+          admin_id: string | null
+          admin_name: string | null
+          admin_email: string | null
+          action: string
+          target_type: string
+          target_id: string | null
+          details: Json
+          ip_address: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          admin_id?: string | null
+          admin_name?: string | null
+          admin_email?: string | null
+          action: string
+          target_type: string
+          target_id?: string | null
+          details?: Json
+          ip_address?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          admin_id?: string | null
+          admin_name?: string | null
+          admin_email?: string | null
+          action?: string
+          target_type?: string
+          target_id?: string | null
+          details?: Json
+          ip_address?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -847,7 +892,7 @@ export type Database = {
         | "COMPLETED"
         | "CANCELLED"
         | "NO_SHOW"
-      payment_status: "PENDING" | "CAPTURED" | "REFUNDED" | "FORFEITED"
+      payment_status: "PENDING" | "CAPTURED" | "REFUNDED" | "REFUND_PENDING" | "REFUND_FAILED" | "FORFEITED"
       provider_status: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED"
       user_role: "customer" | "merchant" | "admin"
     }
@@ -985,7 +1030,7 @@ export const Constants = {
         "CANCELLED",
         "NO_SHOW",
       ],
-      payment_status: ["PENDING", "CAPTURED", "REFUNDED", "FORFEITED"],
+      payment_status: ["PENDING", "CAPTURED", "REFUNDED", "REFUND_PENDING", "REFUND_FAILED", "FORFEITED"],
       provider_status: ["PENDING_APPROVAL", "ACTIVE", "SUSPENDED"],
       user_role: ["customer", "merchant", "admin"],
     },

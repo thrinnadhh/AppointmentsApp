@@ -94,9 +94,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Link staff member to merchant's venue
-    if (authResult.profile.role === 'merchant' && providerId && data?.id) {
+    const createdUser = data as { id?: string } | null;
+    if (authResult.profile.role === 'merchant' && providerId && createdUser?.id) {
       await supabaseAdmin.from('merchant_memberships').insert({
-        user_id: data.id,
+        user_id: createdUser.id,
         provider_id: providerId,
         role: 'staff',
       });

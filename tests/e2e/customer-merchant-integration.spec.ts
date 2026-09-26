@@ -249,7 +249,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await request.post('http://localhost:3000/api/bookings/confirm', {
       data: {
         booking_id,
-        gateway_payment_id: `pay_cust_cancel_${Date.now()}`,
+        gateway_payment_id: `pay_mock_cust_cancel_${Date.now()}`,
       },
     });
 
@@ -324,7 +324,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await request.post('http://localhost:3000/api/bookings/confirm', {
       data: {
         booking_id,
-        gateway_payment_id: `pay_cancel_${Date.now()}`,
+        gateway_payment_id: `pay_mock_cancel_${Date.now()}`,
       },
     });
 

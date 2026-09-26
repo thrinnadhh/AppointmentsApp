@@ -91,52 +91,26 @@ serve(async (req: Request) => {
       }
     }
 
-    // 2. 1-Hour policy calculation
-    const slotTime = new Date(booking.slot_start).getTime();
-    const diffMinutes = Math.round((slotTime - Date.now()) / (1000 * 60));
-    const isRefundEligible = initiated_by === 'MERCHANT' || diffMinutes > 60;
-    const newPaymentStatus = isRefundEligible ? 'REFUNDED' : 'FORFEITED';
+    // 2. Delegate to cancel_booking RPC for atomic strike tracking and policy compliance
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('cancel_booking', {
+      p_booking_id: booking_id,
+      p_reason: reason || 'Processed by Edge Function',
+      p_initiated_by: initiated_by,
+    });
 
-    // 3. Update booking status
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
-        status: 'CANCELLED',
-        payment_status: newPaymentStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', booking_id);
-
-    if (updateError) {
-      throw new Error(updateError.message);
+    if (rpcError) {
+      throw new Error(rpcError.message);
     }
 
-    // 4. Update payment ledger
-    if (booking.gateway_payment_id) {
-      await supabase
-        .from('payments')
-        .update({
-          status: newPaymentStatus,
-          updated_at: new Date().toISOString(),
-          metadata: {
-            cancellation_reason: reason || 'Processed by Edge Function',
-            initiated_by,
-            refund_eligible: isRefundEligible,
-            minutes_before_slot: diffMinutes,
-          },
-        })
-        .eq('booking_id', booking_id);
+    if (!rpcResult?.success) {
+      return new Response(
+        JSON.stringify({ success: false, error: rpcResult?.error || 'Cancellation failed' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        booking_id,
-        status: 'CANCELLED',
-        payment_status: newPaymentStatus,
-        refund_eligible: isRefundEligible,
-        refund_amount: isRefundEligible ? booking.deposit_amount : 0,
-      }),
+      JSON.stringify(rpcResult),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (err: unknown) {

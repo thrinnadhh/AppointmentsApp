@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     // 1. Validate JSON payload first (rejects malformed payloads with 400)
     let body: RazorpayWebhookPayload & {
       payload?: {
-        payment?: { entity?: { id: string; amount?: number; currency?: string; notes?: { booking_id?: string; customer_id?: string } } };
+        payment?: { entity?: { id: string; amount?: number; currency?: string; order_id?: string; notes?: { booking_id?: string; customer_id?: string } } };
         order?: { entity?: { id: string; amount?: number; currency?: string; notes?: { booking_id?: string; customer_id?: string } } };
       };
     };
