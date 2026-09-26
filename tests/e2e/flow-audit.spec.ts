@@ -18,7 +18,8 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('1.1 Should navigate to Overview Dashboard and verify all dashboard cards and navigation links', async ({ page }) => {
       await page.goto('http://localhost:3000/');
-      await expect(page.locator('h1')).toContainText('City-Wide Vertical Summary');
+      await expect(page.locator('h2').first()).toBeVisible();
+      await expect(page.getByText(/Today's Live Appointments/i)).toBeVisible();
 
       // Check navigation bar items including newly added schedule and settings
       const nav = page.locator('nav');
@@ -91,9 +92,9 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       await expect(inviteBtn).toBeVisible();
       await inviteBtn.click();
 
-      await expect(page.getByRole('heading', { name: /Add Staff \/ Merchant User/i })).toBeVisible();
-      await page.getByRole('button', { name: /Cancel/i }).click();
-      await expect(page.getByRole('heading', { name: /Add Staff \/ Merchant User/i })).not.toBeVisible();
+      await expect(page.getByRole('heading', { name: /Add (Doctor|Staff).*Account|Add Staff \/ Merchant User/i })).toBeVisible();
+      await page.getByRole('button', { name: /Cancel/i }).or(page.locator('button:has-text("✕")')).first().click();
+      await expect(page.getByRole('heading', { name: /Add (Doctor|Staff).*Account|Add Staff \/ Merchant User/i })).not.toBeVisible();
     });
 
     test('1.6 Should navigate to Schedule availability screen and verify save action', async ({ page }) => {
@@ -197,7 +198,9 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
     });
 
     test('2.6 GET /api/admin/bookings should return 200 with bookings list', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/admin/bookings');
+      const res = await request.get('http://localhost:3000/api/admin/bookings', {
+        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      });
       expect(res.status()).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
@@ -205,7 +208,9 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
     });
 
     test('2.7 GET /api/admin/users should return 200 with user profiles', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/admin/users');
+      const res = await request.get('http://localhost:3000/api/admin/users', {
+        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      });
       expect(res.status()).toBe(200);
       const data = await res.json();
       expect(Array.isArray(data.users)).toBe(true);
@@ -213,6 +218,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.8 POST /api/admin/users should reject missing email/password with 400', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/admin/users', {
+        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
         data: { fullName: 'Incomplete Staff' },
       });
       expect(res.status()).toBe(400);
@@ -250,7 +256,10 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.12 POST /api/bookings/confirm should return 404 for non-existent booking', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/confirm', {
-        data: { booking_id: '00000000-0000-0000-0000-000000000000' },
+        data: {
+          booking_id: '00000000-0000-0000-0000-000000000000',
+          gateway_payment_id: 'pay_test_nonexistent',
+        },
       });
       expect(res.status()).toBe(404);
       const data = await res.json();

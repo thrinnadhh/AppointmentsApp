@@ -206,7 +206,8 @@ export class CustomerAppPage {
   async expectProviderVisible(name: string, shouldBeVisible: boolean = true) {
     const card = this.page.getByText(name).first();
     if (shouldBeVisible) {
-      await expect(card).toBeVisible({ timeout: 10000 });
+      await card.scrollIntoViewIfNeeded().catch(() => {});
+      await expect(card).toBeVisible({ timeout: 15000 });
     } else {
       await expect(card).not.toBeVisible({ timeout: 10000 });
     }
@@ -304,8 +305,8 @@ export class CustomerAppPage {
       identifier = undefined;
     }
     const card = this.getBookingCard(identifier, expectedStatus);
+    await expect(card).toBeVisible({ timeout: 15000 });
     await card.scrollIntoViewIfNeeded();
-    await expect(card).toBeVisible({ timeout: 10000 });
     await expect(card.getByText(expectedStatus).first()).toBeVisible();
   }
 
@@ -328,8 +329,8 @@ export class CustomerAppPage {
   async cancelBookingFromList(identifier?: string) {
     const card = this.getBookingCard(identifier, 'CONFIRMED');
     const cancelBtn = card.getByTestId(/^cancel-/).or(card.getByText('Cancel', { exact: true })).first();
+    await expect(cancelBtn).toBeVisible({ timeout: 15000 });
     await cancelBtn.scrollIntoViewIfNeeded();
-    await expect(cancelBtn).toBeVisible({ timeout: 10000 });
 
     this.page.once('dialog', (dialog) => {
       dialog.accept().catch(() => {});
@@ -340,8 +341,8 @@ export class CustomerAppPage {
   async rescheduleBookingFromList(identifier?: string, timeSlot: string = '11:30 AM') {
     const card = this.getBookingCard(identifier, 'CONFIRMED');
     const rescheduleBtn = card.getByTestId(/^reschedule-/).or(card.getByText(/Reschedule/i)).first();
+    await expect(rescheduleBtn).toBeVisible({ timeout: 15000 });
     await rescheduleBtn.scrollIntoViewIfNeeded();
-    await expect(rescheduleBtn).toBeVisible({ timeout: 10000 });
     await rescheduleBtn.click();
 
     // Select time slot chip

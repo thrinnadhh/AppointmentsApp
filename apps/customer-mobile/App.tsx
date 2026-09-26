@@ -111,14 +111,22 @@ export default function App() {
     try {
       const data = await fetchCustomerBookingsFromSupabase(activeCustomerId);
       if (data && data.length > 0) {
-        setCustomerBookings(data);
-      } else {
-        setCustomerBookings([]);
+        setCustomerBookings((prev) => {
+          const remoteIds = new Set(data.map((d) => d.id));
+          const localOnly = prev.filter((p) => !remoteIds.has(p.id));
+          return [...data, ...localOnly];
+        });
       }
     } catch (e) {
       console.warn('Error loading customer bookings from Supabase:', e);
     }
   }, [activeCustomerId]);
+
+  useEffect(() => {
+    if (currentScreen === 'MY_BOOKINGS') {
+      loadBookings();
+    }
+  }, [currentScreen, loadBookings]);
 
   useEffect(() => {
     loadBookings();
@@ -303,11 +311,12 @@ export default function App() {
   }, [activeCategoryId]);
 
   const handleOpenMyBookings = useCallback(() => {
+    loadBookings();
     setHistory((prev) => [
       ...prev,
       { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
     ]);
-  }, [selectedProviderId, activeCategoryId]);
+  }, [selectedProviderId, activeCategoryId, loadBookings]);
 
   const handleProceedToHold = (resource: Resource, slot: Slot) => {
     setActiveResource(resource);
@@ -321,13 +330,32 @@ export default function App() {
     const deposit = Number(activeResource?.deposit_amount) || 100;
     const total = deposit + fee;
     setConfirmationToast(`Booking Confirmed! Paid ₹${total} (Deposit ₹${deposit} + Platform Fee ₹${fee}).`);
+
+    const newBooking: Booking & { provider_name?: string; resource_name?: string } = {
+      id: bookingId,
+      customer_id: activeCustomerId,
+      provider_id: selectedProviderId || '',
+      resource_id: activeResource?.id || '',
+      slot_start: activeSlot?.start_time || new Date().toISOString(),
+      slot_end: activeSlot?.end_time || new Date().toISOString(),
+      status: 'CONFIRMED',
+      payment_status: 'CAPTURED',
+      deposit_amount: deposit,
+      platform_fee: fee,
+      total_amount: total,
+      provider_name: 'Sri Venkateswara Dental & Implant Care',
+      resource_name: activeResource?.name || 'Assigned Staff / Unit',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setCustomerBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== bookingId)]);
+
     // Push MY_BOOKINGS onto history so clicking back returns to where the user left off (Provider Detail)
     setHistory((prev) => [
       ...prev,
       { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
     ]);
     await loadBookings();
-
 
     setTimeout(() => {
       setConfirmationToast(null);

@@ -297,6 +297,21 @@ interface CustomerBookingRow extends Booking {
 
 export async function fetchCustomerBookingsFromSupabase(customerId: string = '99999999-9999-9999-9999-999999999991') {
   try {
+    const baseUrl = getApiBaseUrl();
+    if (baseUrl) {
+      try {
+        const resp = await fetch(`${baseUrl}/api/bookings?customer_id=${encodeURIComponent(customerId)}`);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.success && Array.isArray(json.bookings)) {
+            return json.bookings as (Booking & { provider_name?: string; resource_name?: string })[];
+          }
+        }
+      } catch {
+        // Fall through to direct Supabase
+      }
+    }
+
     const { data, error } = await supabase
       .from('bookings')
       .select(`

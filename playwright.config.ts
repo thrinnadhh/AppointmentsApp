@@ -56,7 +56,12 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: ['**/edge-integrations.spec.ts'], // run integration suite separately
+      testIgnore: [
+        '**/customer-merchant-integration.spec.ts',
+        '**/admin-merchant-integration.spec.ts',
+        '**/edge-integrations.spec.ts',
+        '**/flow-audit.spec.ts',
+      ],
     },
 
     // ── Integration & cross-system suite (needs extra timeout) ────────────

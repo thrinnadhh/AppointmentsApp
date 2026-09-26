@@ -209,6 +209,31 @@ export async function updateBookingStatus(
     return data;
   }
 
+  if (status === 'COMPLETED') {
+    try {
+      const resp = await fetch('/api/bookings/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.success) return json;
+      }
+    } catch {
+      // Fall through to RPC if fetch fails
+    }
+
+    const { data, error } = await (supabase.rpc as any)('complete_booking', {
+      p_booking_id: bookingId,
+    });
+    if (error) {
+      console.error('Error completing booking:', error);
+      throw error;
+    }
+    return data;
+  }
+
   const updates: Partial<Database['public']['Tables']['bookings']['Update']> = {
     status,
     updated_at: new Date().toISOString(),

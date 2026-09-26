@@ -22,7 +22,8 @@ const ADMIN_BYPASS = 'tirupati-superadmin-e2e-2026';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
 
 const SEED_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
 const CLINIC_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';  // Dr. S. K. Murthy (clinic)
@@ -175,10 +176,24 @@ test.describe('Cross-System Integration — Edge Cases', () => {
     const slotStart = new Date(Date.now() + 86400000 * 14).toISOString();
     const slotEnd   = new Date(Date.now() + 86400000 * 14 + 1800000).toISOString();
 
+    const { data: customerProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'customer');
+
+    const customerIds = (customerProfiles && customerProfiles.length > 0)
+      ? customerProfiles.map(p => p.id)
+      : [SEED_CUSTOMER_ID];
+
     const CONCURRENCY = 50;
-    const attempts = Array.from({ length: CONCURRENCY }, () =>
+    const attempts = Array.from({ length: CONCURRENCY }, (_, i) =>
       request.post(`${BASE}/api/bookings/hold`, {
-        data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+        data: {
+          customer_id: customerIds[i % customerIds.length],
+          resource_id: CLINIC_RESOURCE_ID,
+          slot_start: slotStart,
+          slot_end: slotEnd,
+        },
       })
     );
 

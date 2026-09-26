@@ -366,18 +366,8 @@ export class AdminDashboardPage {
     await expect(blockBtn).toBeVisible({ timeout: 10000 });
     await blockBtn.click();
 
-    const feedbackOrStatus = this.page
-      .getByText(/Merchant Blocked & Suspended/i)
-      .or(row.getByText(/BLOCKED \/ SUSPENDED/i));
-    const succeeded = await feedbackOrStatus
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!succeeded && (await blockBtn.isVisible().catch(() => false))) {
-      await blockBtn.click();
-    }
-    await expect(feedbackOrStatus).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByText(/Merchant Blocked & Suspended/i)).toBeVisible({ timeout: 15000 });
+    await expect(row.getByText(/BLOCKED \/ SUSPENDED/i)).toBeVisible({ timeout: 10000 });
   }
 
   async unblockMerchant(merchantName: string) {
@@ -387,18 +377,8 @@ export class AdminDashboardPage {
     await expect(unblockBtn).toBeVisible({ timeout: 10000 });
     await unblockBtn.click();
 
-    const feedbackOrStatus = this.page
-      .getByText(/Merchant Activated & Visible/i)
-      .or(row.getByText(/ONBOARDED \(ACTIVE\)/i));
-    const succeeded = await feedbackOrStatus
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!succeeded && (await unblockBtn.isVisible().catch(() => false))) {
-      await unblockBtn.click();
-    }
-    await expect(feedbackOrStatus).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByText(/Merchant Activated & Visible/i)).toBeVisible({ timeout: 15000 });
+    await expect(row.getByText(/ONBOARDED \(ACTIVE\)/i)).toBeVisible({ timeout: 10000 });
   }
 
   async approveMerchant(merchantName: string) {

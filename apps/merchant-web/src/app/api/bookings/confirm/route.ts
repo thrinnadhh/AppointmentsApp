@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
     // 2. RETRIEVE BOOKING TO VERIFY OWNERSHIP & DETAILS
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, status, payment_status, gateway_order_id')
+      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, status, payment_status, gateway_order_id, hold_expires_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -115,6 +115,16 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Booking not found' },
         { status: 404 }
       );
+    }
+
+    // 2b. CHECK IF HOLD IS EXPIRED
+    if (booking.status === 'HELD' && booking.hold_expires_at) {
+      if (new Date(booking.hold_expires_at).getTime() < Date.now()) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Slot hold has expired and is no longer held' },
+          { status: 410 }
+        );
+      }
     }
 
     // 3. AUTHORIZATION: CALLER MUST BE BOOKING'S CUSTOMER, AUTHORIZED MERCHANT, OR PLATFORM ADMIN
