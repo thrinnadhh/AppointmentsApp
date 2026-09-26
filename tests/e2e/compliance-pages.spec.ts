@@ -244,11 +244,7 @@ test.describe('Customer Checkout — Fee Itemisation & Corrected Policy', () => 
   test.beforeEach(async ({ page }) => {
     const customerApp = new CustomerAppPage(page);
     await customerApp.goto();
-    await customerApp.selectCategory('Hospitals & Clinics');
-    const providerCard = customerApp.page.getByTestId('provider-card').first();
-    await expect(providerCard).toBeVisible({ timeout: 25000 });
-    await providerCard.click();
-    await expect(customerApp.staffSectionHeading).toBeVisible({ timeout: 15000 });
+    await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
     await customerApp.selectFirstSlot();
     await customerApp.openCheckout();
   });
@@ -426,10 +422,16 @@ test.describe('Customer Data Masking — DPIIT & DPDPA Compliance', () => {
       expect(confirmedData.success).toBe(true);
       expect(confirmedData.phone).toBeTruthy();
 
-      // Verify audit row exists in contact_reveal_audit table
+      // Verify audit row exists in contact_reveal_audit table (admin/service-role access per RLS)
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || anonKey;
       const auditRes = await request.get(
         `${supabaseUrl}/rest/v1/contact_reveal_audit?booking_id=eq.${confirmedBooking.id}&select=*&order=revealed_at.desc&limit=1`,
-        { headers: merchantHeaders }
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }
       );
       expect(auditRes.status()).toBe(200);
       const auditRows = await auditRes.json();

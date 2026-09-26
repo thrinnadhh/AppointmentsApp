@@ -59,21 +59,27 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+    let targetProviderId = providerId;
 
     // 2. Merchants can only manage staff for their own venue
     if (authResult.profile.role === 'merchant') {
-      if (!providerId) {
+      const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
+        p_user_id: authResult.user.id,
+      });
+      const authorizedList = Array.isArray(authProviders) ? authProviders : [];
+
+      if (!targetProviderId && authorizedList.length > 0) {
+        targetProviderId = authorizedList[0];
+      }
+
+      if (!targetProviderId) {
         return NextResponse.json(
           { error: 'providerId is required to assign staff to your venue' },
           { status: 400 }
         );
       }
 
-      const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
-        p_user_id: authResult.user.id,
-      });
-      const authorizedList = Array.isArray(authProviders) ? authProviders : [];
-      if (!authorizedList.includes(providerId)) {
+      if (!authorizedList.includes(targetProviderId)) {
         return NextResponse.json(
           { error: 'Forbidden: You can only manage staff for your own venue.' },
           { status: 403 }
@@ -95,10 +101,10 @@ export async function POST(request: NextRequest) {
 
     // Link staff member to merchant's venue
     const createdUser = data as { id?: string } | null;
-    if (authResult.profile.role === 'merchant' && providerId && createdUser?.id) {
+    if (authResult.profile.role === 'merchant' && targetProviderId && createdUser?.id) {
       await supabaseAdmin.from('merchant_memberships').insert({
         user_id: createdUser.id,
-        provider_id: providerId,
+        provider_id: targetProviderId,
         role: 'staff',
       });
     }

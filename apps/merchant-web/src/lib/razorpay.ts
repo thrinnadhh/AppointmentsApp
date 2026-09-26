@@ -189,7 +189,15 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
   if (!paymentId || !paymentId.trim()) return null;
 
   // Sandbox / test mode mock payment prefix fallback (strictly non-production or test mode)
-  if (isTestMode() && (paymentId.startsWith('pay_mock_') || paymentId.startsWith('sim_'))) {
+  if (
+    isTestMode() &&
+    (paymentId.startsWith('pay_mock_') ||
+      paymentId.startsWith('sim_') ||
+      paymentId.startsWith('pay_test_') ||
+      paymentId.startsWith('pay_complete_') ||
+      paymentId.startsWith('pay_cancel_') ||
+      paymentId.startsWith('pay_noshow_'))
+  ) {
     return {
       id: paymentId,
       status: 'captured',

@@ -224,10 +224,16 @@ export class CustomerAppPage {
     const slotsLoading = this.page.getByTestId('customer-slots-loading');
     await expect(slotsLoading).toBeHidden({ timeout: 10000 }).catch(() => {});
 
-    // Check if Today is closed or all slots have passed
+    // Check if Today is closed, all slots have passed, or 0 enabled slots exist
     const closedNotice = this.page.getByTestId('customer-day-closed-notice');
     const pastNotice = this.page.getByTestId('customer-all-slots-past-notice');
+    const currentEnabledSlotCount = await this.page
+      .locator('[role="button"]:not([aria-disabled="true"]):not([disabled])')
+      .filter({ hasText: /^[0-9]{2}:[0-9]{2} (am|pm)$/i })
+      .count();
+
     const isTodayUnavailable =
+      currentEnabledSlotCount === 0 ||
       (await closedNotice.isVisible().catch(() => false)) ||
       (await pastNotice.isVisible().catch(() => false));
 

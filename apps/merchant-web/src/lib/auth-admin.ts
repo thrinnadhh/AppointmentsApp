@@ -24,6 +24,8 @@ export interface AdminAuthFailure {
 
 export type AdminAuthResult = AdminAuthSuccess | AdminAuthFailure;
 
+export const E2E_ADMIN_BYPASS_SECRET = 'tirupati-superadmin-e2e-2026';
+
 /**
  * Verifies that an incoming NextRequest originates from an authenticated session
  * with 'admin' role in public.profiles.
@@ -31,6 +33,7 @@ export type AdminAuthResult = AdminAuthSuccess | AdminAuthFailure;
  * Supports:
  * 1. Supabase SSR session cookies
  * 2. Authorization: Bearer <jwt> header
+ * 3. x-admin-bypass-key header (non-production test harness only)
  */
 export async function verifyAdminRequest(request: NextRequest): Promise<AdminAuthResult> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -38,6 +41,25 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return { error: 'Server configuration error: Supabase credentials missing', status: 401 };
+  }
+
+  // 1. Non-production E2E test bypass header check
+  if (process.env.NODE_ENV !== 'production') {
+    const bypassHeader = request.headers.get('x-admin-bypass-key');
+    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
+      return {
+        user: {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+        },
+        profile: {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+          full_name: 'Platform Owner (Super Admin)',
+          role: 'admin',
+        },
+      };
+    }
   }
 
   let user: { id: string; email?: string } | null = null;
@@ -141,6 +163,25 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return { error: 'Server configuration error: Supabase credentials missing', status: 401 };
+  }
+
+  // 1. Non-production E2E test bypass header check
+  if (process.env.NODE_ENV !== 'production') {
+    const bypassHeader = request.headers.get('x-admin-bypass-key');
+    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
+      return {
+        user: {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+        },
+        profile: {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+          full_name: 'Platform Owner (Super Admin)',
+          role: 'admin',
+        },
+      };
+    }
   }
 
   let user: { id: string; email?: string } | null = null;
