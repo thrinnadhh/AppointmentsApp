@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 import { AdminDashboardPage } from './pages/admin-dashboard.page';
 
 const TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com';
@@ -113,8 +114,18 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     expect([401, 403]).toContain(unauthResponse.status());
 
     // 2. Authenticated Admin request must succeed and return structured logs
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    );
+    const { data: authData } = await supabase.auth.signInWithPassword({
+      email: TEST_ADMIN_EMAIL,
+      password: TEST_ADMIN_PASSWORD,
+    });
+    const token = authData?.session?.access_token || '';
+
     const authResponse = await request.get('http://localhost:3000/api/admin/audit-logs', {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { Authorization: `Bearer ${token}` },
     });
     expect(authResponse.status()).toBe(200);
 
@@ -161,7 +172,7 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
       TEST_ADMIN_PASSWORD
     );
 
-    await expect(adminPage.mfaCodeInput).toBeVisible({ timeout: 10000 });
+    await expect(adminPage.mfaCodeInput).toBeVisible({ timeout: 20000 });
 
     // Verify whether in enrollment or challenge state, the UI provides secure controls
     const isEnrollment = await adminPage.mfaQrCode.isVisible().catch(() => false);

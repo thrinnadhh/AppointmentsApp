@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     // 2. Secret resolution with dev fallback
     const webhookSecret =
       process.env.RAZORPAY_WEBHOOK_SECRET ||
-      (process.env.NODE_ENV !== 'production' ? 'dev_razorpay_webhook_secret' : undefined);
+      (process.env.NODE_ENV !== 'production' ? '30772a35dc5bf0a5889b1af5dfd0409c364749e83c6e0e1d' : undefined);
 
     if (!webhookSecret) {
       console.error('RAZORPAY_WEBHOOK_SECRET is not configured — refusing webhook request');
