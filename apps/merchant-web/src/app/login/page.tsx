@@ -216,7 +216,7 @@ export default function LoginPage() {
               <Building2 style={{ width: 24, height: 24, color: '#fff' }} />
             </div>
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-ink)', letterSpacing: '-0.02em', margin: '0 0 6px' }}>
-              Merchant &amp; Admin Portal
+              Merchant &amp; Admin Access
             </h2>
             <p style={{ fontSize: 13, color: 'var(--color-ink-tertiary)', margin: 0 }}>
               Workspace &amp; business registration for Tirupati providers
