@@ -65,13 +65,13 @@ export async function PATCH(request: NextRequest) {
     if (typeof auto_accept_bookings === 'boolean') updates.auto_accept_bookings = auto_accept_bookings;
 
     if (Object.keys(updates).length > 0) {
-      const { supabase } = await import('@/lib/supabase');
-      const { data: rpcRes, error: rpcErr } = await (supabase.rpc as any)('admin_update_provider_operational_settings', {
+      const { getSupabaseAdmin } = await import('@/lib/supabase');
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data: rpcRes, error: rpcErr } = await (supabaseAdmin.rpc as any)('admin_update_provider_operational_settings', {
         p_provider_id: providerId,
         p_is_active: typeof is_active === 'boolean' ? is_active : null,
         p_auto_accept: typeof auto_accept_bookings === 'boolean' ? auto_accept_bookings : null,
         p_daily_limit: typeof daily_booking_limit === 'number' ? daily_booking_limit : null,
-        p_admin_token: 'tirupati-superadmin-e2e-2026',
       });
 
       if (rpcErr || (rpcRes && !rpcRes.success)) {

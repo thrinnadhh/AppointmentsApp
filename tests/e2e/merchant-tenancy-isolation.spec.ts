@@ -23,6 +23,10 @@ import { test, expect } from '@playwright/test';
 test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(async ({ page }) => {
+    await page.context().clearCookies();
+  });
+
   test('TC-TENANT-01: Salon Merchant has strictly isolated salon space and controls', async ({ page }) => {
     // 1. Navigate to Merchant Login and wait for hydration
     await page.goto('http://localhost:3000/login');
@@ -30,18 +34,18 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
 
     // 2. Sign In for Naturals Salon
-    await page.getByTestId('login-email').fill('naturals.salon@tirupati-appointments.com');
-    await page.getByTestId('login-password').fill('NaturalsSalon2026!');
+    await page.getByTestId('login-email').fill(process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com');
+    await page.getByTestId('login-password').fill(process.env.TEST_SALON_PASSWORD || '');
     await page.getByTestId('login-submit').click();
 
     // 3. Verify Redirection to Merchant Dashboard
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 15000 });
 
     // 4. Verify Salon Verticalized Navigation
-    // Should display "Stylists & Services" instead of "Doctors & Services"
-    const stylistNavLink = page.getByRole('link', { name: /Stylists & Services/i }).first();
+    // Should display "Stylists" instead of "Doctors"
+    const stylistNavLink = page.getByRole('link', { name: /Stylists/i }).first();
     await expect(stylistNavLink).toBeVisible();
-    await expect(page.getByRole('link', { name: /Doctors & Services/i })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Doctors/i })).toHaveCount(0);
 
     // Should NOT display Platform Admin link
     await expect(page.getByRole('link', { name: /Platform Admin/i })).toHaveCount(0);
@@ -100,17 +104,17 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
 
     // 2. Sign In for SVIMS Clinic
-    await page.getByTestId('login-email').fill('svims.clinic@tirupati-appointments.com');
-    await page.getByTestId('login-password').fill('SvimsClinic2026!');
+    await page.getByTestId('login-email').fill(process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com');
+    await page.getByTestId('login-password').fill(process.env.TEST_MERCHANT_PASSWORD || '');
     await page.getByTestId('login-submit').click();
 
     // 3. Verify Redirection to Merchant Dashboard
     await expect(page).toHaveURL('http://localhost:3000/', { timeout: 15000 });
 
     // 4. Verify Clinic Verticalized Navigation
-    const doctorNavLink = page.getByRole('link', { name: /Doctors & Services/i }).first();
+    const doctorNavLink = page.getByRole('link', { name: /Doctors/i }).first();
     await expect(doctorNavLink).toBeVisible();
-    await expect(page.getByRole('link', { name: /Stylists & Services/i })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Stylists/i })).toHaveCount(0);
 
     // Should NOT display Platform Admin link
     await expect(page.getByRole('link', { name: /Platform Admin/i })).toHaveCount(0);
@@ -158,8 +162,8 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
 
     // 2. Sign In for Super Admin
-    await page.getByTestId('login-email').fill('admin@appointments-tirupati.com');
-    await page.getByTestId('login-password').fill('AdminSecure2026!');
+    await page.getByTestId('login-email').fill(process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com');
+    await page.getByTestId('login-password').fill(process.env.TEST_ADMIN_PASSWORD || '');
     await page.getByTestId('login-submit').click();
 
     // 3. Verify Redirection

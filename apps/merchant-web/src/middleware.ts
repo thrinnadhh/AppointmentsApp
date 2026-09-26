@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PUBLIC_ROUTES = ['/login', '/register', '/admin/login', '/auth/', '/api/', '/_next/', '/favicon.ico'];
+const PUBLIC_ROUTES = ['/login', '/register', '/admin/login', '/auth/', '/api/', '/_next/', '/favicon.ico', '/privacy', '/terms', '/refund-policy'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -23,7 +23,7 @@ export function middleware(req: NextRequest) {
         headers: {
           'Access-Control-Allow-Origin': origin,
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
           'Access-Control-Allow-Credentials': 'true',
         },
       });
@@ -31,7 +31,7 @@ export function middleware(req: NextRequest) {
     const res = NextResponse.next();
     res.headers.set('Access-Control-Allow-Origin', origin);
     res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key');
+    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.headers.set('Access-Control-Allow-Credentials', 'true');
     return res;
   }
@@ -54,22 +54,16 @@ export function middleware(req: NextRequest) {
   });
 
   const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login';
-  const hasAdminBypass = req.headers.get('x-admin-bypass-key') === 'tirupati-superadmin-e2e-2026';
 
   // Enforce strict authentication gate on /admin routes across all environments
-  if (isAdminRoute && !hasAuthToken && !hasAdminBypass) {
+  if (isAdminRoute && !hasAuthToken) {
     const adminLoginUrl = new URL('/admin/login', req.url);
     adminLoginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(adminLoginUrl);
   }
 
-  const hasMerchantBypass =
-    hasAdminBypass ||
-    req.headers.get('x-merchant-bypass-key') === 'tirupati-superadmin-e2e-2026' ||
-    req.nextUrl.searchParams.get('demo') === '1';
-
   // Enforce authentication gate for standard merchant routes
-  if (!hasAuthToken && !hasMerchantBypass) {
+  if (!hasAuthToken) {
     const loginUrl = new URL('/login', req.url);
     if (pathname !== '/') {
       loginUrl.searchParams.set('redirect', pathname);

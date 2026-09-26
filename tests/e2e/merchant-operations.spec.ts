@@ -98,8 +98,13 @@ test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () 
   test('4. Should toggle shop active/paused status and display alert banners', async ({ page }) => {
     await merchantPortal.goto();
 
+    // Wait for the venue selector or locked tenant badge to confirm activeProvider is loaded in React state
+    // (the toggle's onClick guard returns early if activeProvider is null)
+    await expect(merchantPortal.venueSelector.or(page.getByTestId('locked-tenant-badge'))).toBeVisible({ timeout: 20000 });
+
     // Verify operational control bar is present
     const shopToggle = page.getByTestId('shop-active-toggle');
+    await shopToggle.scrollIntoViewIfNeeded();
     await expect(shopToggle).toBeVisible({ timeout: 15000 });
 
     const statusText = page.getByTestId('shop-status-text');
@@ -109,19 +114,28 @@ test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () 
     await expect(page.getByTestId('shop-hours-badge')).toBeVisible();
     await expect(page.getByTestId('auto-accept-status-badge')).toBeVisible();
 
-    // Toggle shop to Paused
+    // Normalise state: ensure shop is ACTIVE before testing the pause flow
+    // (previous test runs may have left the shop paused)
+    const isCurrentlyActive = await shopToggle.getAttribute('aria-checked') === 'true';
+    if (!isCurrentlyActive) {
+      // Shop is paused — click to activate first
+      await shopToggle.click();
+      await expect(page.getByTestId('shop-status-text')).toContainText('Active (Accepting)', { timeout: 10000 });
+    }
+
+    // Now toggle from Active -> Paused
     await shopToggle.click();
     await expect(page.getByTestId('shop-paused-alert-banner')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Shop Paused (Offline)')).toBeVisible();
+    await expect(page.getByTestId('shop-status-text')).toContainText('Paused (Offline)');
 
     // Resume shop accepting via banner button
     const resumeBtn = page.getByRole('button', { name: /Resume Accepting Bookings/i });
     await expect(resumeBtn).toBeVisible();
     await resumeBtn.click();
 
-    // Verify shop is active again
-    await expect(page.getByTestId('shop-paused-alert-banner')).not.toBeVisible();
-    await expect(page.getByText('Shop Active (Accepting)')).toBeVisible();
+    // Verify shop is active again (clean up state for next run)
+    await expect(page.getByTestId('shop-paused-alert-banner')).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('shop-status-text')).toContainText('Active (Accepting)');
   });
 
   test('5. Should open and update Operating Hours and Booking Rules/Cap modals', async ({ page }) => {

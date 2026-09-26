@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "check:agents": "python3 .agents/scripts/validate_kit.py",
+    "check:legal": "node scripts/check-legal-placeholders.js",
     "check:antigravity": "python3 .agents/scripts/checklist.py .",
     "test:antigravity": "python3 -m unittest discover -s .agents/scripts/tests -v",
     "status": "python3 .agents/scripts/session_manager.py status .",

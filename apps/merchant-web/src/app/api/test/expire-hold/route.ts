@@ -3,12 +3,12 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   try {
-    const bypassKey = req.headers.get('x-admin-bypass-key');
-    if (bypassKey !== 'tirupati-superadmin-e2e-2026') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Strictly block this test helper in production
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Not available in production' }, { status: 404 });
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const { booking_id } = body;
 
     if (!booking_id) {

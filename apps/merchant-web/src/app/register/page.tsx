@@ -57,6 +57,8 @@ export default function ShopRegistrationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  // Legal: IT Act Section 79 — ToS acceptance required before registration
+  const [tosAccepted, setTosAccepted] = useState(false);
 
   useEffect(() => {
     async function checkAuthAndShop() {
@@ -168,6 +170,10 @@ export default function ShopRegistrationPage() {
       setErrorMsg(`Please enter your ${venueLabel} Name, Category, and Phone Number.`);
       return;
     }
+    if (!tosAccepted) {
+      setErrorMsg('Please read and accept the Merchant Partner Terms of Service to continue.');
+      return;
+    }
 
     if (!user) {
       setErrorMsg('Session expired. Please sign in with Google again.');
@@ -191,6 +197,7 @@ export default function ShopRegistrationPage() {
           phone: phone.trim(),
           address: address.trim() || 'AIR Bypass Road, Tirupati',
           photoUrl: photoUrl || null,
+          tosAccepted: true,
         }),
       });
 
@@ -492,12 +499,35 @@ export default function ShopRegistrationPage() {
             )}
           </div>
 
+          {/* Medical Disclaimer — shown only for clinic category */}
+          {category === 'clinics' && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800 leading-relaxed">
+              <strong>Medical Disclaimer:</strong> Appointments4u is a scheduling technology platform acting as an intermediary between patients and healthcare providers. Actual wait times may vary based on clinic operations. <strong>In a medical emergency, call 108 immediately.</strong> Do not rely on appointment slots in emergencies.
+            </div>
+          )}
+
+          {/* ToS Acceptance — IT Act Section 79 safe-harbour requirement */}
+          <label className="flex items-start gap-3 cursor-pointer select-none" htmlFor="tos-checkbox">
+            <input
+              id="tos-checkbox"
+              type="checkbox"
+              checked={tosAccepted}
+              onChange={e => setTosAccepted(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer flex-shrink-0"
+            />
+            <span className="text-xs text-slate-600 leading-relaxed">
+              I have read and agree to the{' '}
+              <a href="https://appointments4u.in/terms" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-medium">Merchant Partner Terms of Service</a>{' '}
+              and acknowledge that Appointments4u is a technology intermediary and not a party to the service transaction between merchant and customer.
+            </span>
+          </label>
+
           {/* Submit Button */}
           <button
             type="submit"
             data-testid="register-submit"
-            disabled={submitting}
-            className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors cursor-pointer mt-6"
+            disabled={submitting || !tosAccepted}
+            className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors cursor-pointer mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <RefreshCw className="w-4 h-4 animate-spin" />

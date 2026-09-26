@@ -98,7 +98,14 @@ export async function releaseSlotLock(slotKey: string): Promise<boolean> {
 }
 
 /**
- * Sliding window rate-limiter for phone OTP, checkout, or search requests
+ * Sliding window rate-limiter for phone OTP, checkout, or search requests.
+ *
+ * PRODUCTION SAFETY: When Upstash IS configured but unreachable (network blip,
+ * daily command limit exceeded), we BLOCK rather than fall through to the
+ * in-memory store. On Vercel serverless each invocation is a fresh process —
+ * the in-memory store is always empty, making it a zero-protection bypass.
+ *
+ * In-memory store is only used when Upstash is NOT configured (local dev).
  */
 export async function checkRateLimit(
   identifier: string,
@@ -113,6 +120,7 @@ export async function checkRateLimit(
     if (current === 1) {
       await upstashCommand('EXPIRE', key, windowSeconds);
     }
+
     if (current !== null) {
       const allowed = current <= limit;
       return {
@@ -121,15 +129,19 @@ export async function checkRateLimit(
         reset: Math.floor(now / 1000) + windowSeconds,
       };
     }
+
+    // ► Upstash configured but returned null (unreachable / over daily limit).
+    //   Block-by-default in production; let through in dev for DX.
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Redis] Upstash unreachable — rate limit defaulting to BLOCK');
+      return { allowed: false, remaining: 0, reset: Math.floor(now / 1000) + windowSeconds };
+    }
   }
 
-  // In-Memory Fallback
+  // ── Local dev in-memory fallback (Upstash not configured) ──────────────────
   const entry = memoryStore.get(key);
   if (!entry || entry.expiresAt <= now) {
-    memoryStore.set(key, {
-      value: '1',
-      expiresAt: now + windowSeconds * 1000,
-    });
+    memoryStore.set(key, { value: '1', expiresAt: now + windowSeconds * 1000 });
     return {
       allowed: true,
       remaining: limit - 1,
@@ -140,7 +152,6 @@ export async function checkRateLimit(
   const count = parseInt(entry.value, 10) + 1;
   entry.value = count.toString();
   const allowed = count <= limit;
-
   return {
     allowed,
     remaining: Math.max(0, limit - count),

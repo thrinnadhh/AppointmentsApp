@@ -23,35 +23,36 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     // 2. Clinics forward -> back
     await clinicsCard.click();
     await expect(page.getByText('Hospitals & Clinics in Tirupati')).toBeVisible();
-    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible();
+    // Wait for Supabase async data to load before asserting on provider names
+    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible({ timeout: 25000 });
     await page.getByText('← All Categories').click();
     await expect(clinicsCard).toBeVisible();
 
     // 3. Salons forward -> back
     await salonsCard.click();
     await expect(page.getByText('Salons & Spas in Tirupati')).toBeVisible();
-    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible({ timeout: 25000 });
     await page.getByText('← All Categories').click();
     await expect(salonsCard).toBeVisible();
 
     // 4. Restaurants forward -> back
     await restaurantsCard.click();
     await expect(page.getByText('Restaurants & Dining in Tirupati')).toBeVisible();
-    await expect(page.getByText('Saptagiri Heritage Dining')).toBeVisible();
+    await expect(page.getByText('Saptagiri Heritage Dining')).toBeVisible({ timeout: 25000 });
     await page.getByText('← All Categories').click();
     await expect(restaurantsCard).toBeVisible();
 
     // 5. Gaming forward -> back
     await gamingCard.click();
     await expect(page.getByText('Gaming & Turf in Tirupati')).toBeVisible();
-    await expect(page.getByText('Tirupati Premier Turf & Gaming Arena')).toBeVisible();
+    await expect(page.getByText('Tirupati Premier Turf & Gaming Arena')).toBeVisible({ timeout: 25000 });
     await page.getByText('← All Categories').click();
     await expect(gamingCard).toBeVisible();
 
     // 6. Pets forward -> back
     await petsCard.click();
     await expect(page.getByText('Pet Care & Clinic in Tirupati')).toBeVisible();
-    await expect(page.getByText('Tirumala Pet Clinic & Grooming Spa')).toBeVisible();
+    await expect(page.getByText('Tirumala Pet Clinic & Grooming Spa')).toBeVisible({ timeout: 25000 });
     await page.getByText('← All Categories').click();
     await expect(petsCard).toBeVisible();
   });
@@ -59,21 +60,21 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
   test('2. Should use in-category horizontal switcher to toggle categories smoothly', async ({ page }) => {
     // Open Clinics
     await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
-    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible();
+    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible({ timeout: 25000 });
 
     // Switch to Salons
     await page.getByText('Salons & Spas', { exact: true }).first().click();
-    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible({ timeout: 25000 });
     await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).not.toBeVisible();
 
     // Switch to Restaurants
     await page.getByText('Restaurants & Dining', { exact: true }).first().click();
-    await expect(page.getByText('Saptagiri Heritage Dining')).toBeVisible();
+    await expect(page.getByText('Saptagiri Heritage Dining')).toBeVisible({ timeout: 25000 });
     await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i)).not.toBeVisible();
 
     // Switch to Gaming
     await page.getByText('Gaming & Turf', { exact: true }).first().click();
-    await expect(page.getByText('Tirupati Premier Turf & Gaming Arena')).toBeVisible();
+    await expect(page.getByText('Tirupati Premier Turf & Gaming Arena')).toBeVisible({ timeout: 25000 });
 
     // Back to Hub
     await page.getByText('← All Categories').click();
@@ -81,9 +82,9 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
   });
 
   test('3. Should preserve category context when navigating into Provider Detail and pressing Back', async ({ page }) => {
-    // Open Hospitals & Clinics
+    // Open Hospitals & Clinics — wait for Supabase data
     await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
-    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible();
+    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible({ timeout: 25000 });
 
     // Navigate to Provider Detail
     await page.getByText('Sri Venkateswara Dental & Implant Care').first().click();
@@ -94,7 +95,7 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
 
     // Must return to Hospitals & Clinics list (NOT root hub)
     await expect(page.getByText('Hospitals & Clinics in Tirupati')).toBeVisible();
-    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible();
+    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible({ timeout: 15000 });
 
     // Now press All Categories to return to Hub
     await page.getByText('← All Categories').click();
@@ -102,8 +103,9 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
   });
 
   test('4. Should open Checkout Modal, cancel it, and restore Provider Detail state', async ({ page }) => {
-    // Open Clinics -> Dental
+    // Open Clinics -> Dental — wait for providers
     await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
+    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible({ timeout: 25000 });
     await page.getByText('Sri Venkateswara Dental & Implant Care').first().click();
 
     // Select time slot
@@ -159,10 +161,10 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
   });
 
   test('7. Should navigate to My Bookings from within a Category and return back to that Category (not Hub)', async ({ page }) => {
-    // Navigate into Salons & Spas
+    // Navigate into Salons & Spas — wait for Supabase data
     await page.getByText('Salons & Spas', { exact: true }).first().click();
     await expect(page.getByText('Salons & Spas in Tirupati')).toBeVisible();
-    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible({ timeout: 25000 });
 
     // Click Bookings from top header while in Salons
     await page.getByText('Bookings').click();
@@ -171,7 +173,7 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     // Return to Browse - must return to Salons & Spas (where user left off), NOT the root Hub
     await page.getByText('← Back to Browse').click();
     await expect(page.getByText('Salons & Spas in Tirupati')).toBeVisible();
-    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible();
+    await expect(page.getByText(/Naturals Luxury Salon & Spa|Elite Looks Luxury Salon/i).first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Choose a Service')).not.toBeVisible();
 
     // Now clicking ← All Categories returns to the Hub
@@ -180,9 +182,10 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
   });
 
   test('8. Should complete booking, land on My Appointments, and return to Category Browse without resetting to first Hub page', async ({ page }) => {
-    // Navigate into Hospitals & Clinics -> Sri Venkateswara Dental
+    // Navigate into Hospitals & Clinics — wait for Supabase data
     await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
     await expect(page.getByText('Hospitals & Clinics in Tirupati')).toBeVisible();
+    await expect(page.getByText('Sri Venkateswara Dental & Implant Care')).toBeVisible({ timeout: 25000 });
     await page.getByText('Sri Venkateswara Dental & Implant Care').first().click();
 
     // Select time slot

@@ -136,23 +136,9 @@ type RawBookingRow = Database['public']['Tables']['bookings']['Row'] & {
 };
 
 export async function fetchMerchantBookings(providerId?: string): Promise<MerchantBookingWithDetails[]> {
-  let query = supabase
-    .from('bookings')
-    .select(`
-      *,
-      profiles (
-        full_name,
-        phone,
-        no_show_count
-      ),
-      resources (
-        name,
-        type
-      ),
-      providers (
-        name
-      )
-    `)
+  let query = (supabase as any)
+    .from('merchant_bookings')
+    .select('*')
     .order('slot_start', { ascending: true });
 
   if (providerId) {
@@ -161,20 +147,34 @@ export async function fetchMerchantBookings(providerId?: string): Promise<Mercha
 
   const { data, error } = await query;
   if (error) {
-    console.error('Error fetching bookings from Supabase:', error);
+    console.error('Error fetching bookings from merchant_bookings view:', error);
     return [];
   }
 
-  const rawBookings = (data || []) as unknown as RawBookingRow[];
-  return rawBookings.map((b) => ({
+  return (data || []).map((b: any) => ({
     ...b,
-    customer_name: b.profiles?.full_name || 'Walk-in / Guest',
-    customer_phone: b.profiles?.phone || '+91 98480 00000',
-    no_show_count: b.profiles?.no_show_count ?? 0,
-    resource_name: b.resources?.name || 'Standard Unit',
-    resource_type: b.resources?.type || 'slot',
-    provider_name: b.providers?.name || 'Merchant Venue',
+    customer_name: b.customer_name || 'Walk-in / Guest',
+    customer_phone: b.customer_phone || 'Not provided',
+    no_show_count: b.no_show_count ?? 0,
+    resource_name: b.resource_name || 'Standard Unit',
+    resource_type: b.resource_type || 'slot',
+    provider_name: b.provider_name || 'Merchant Venue',
   }));
+}
+
+export async function revealCustomerContact(bookingId: string): Promise<{
+  success: boolean;
+  phone?: string;
+  full_name?: string;
+  error?: string;
+}> {
+  const { data, error } = await (supabase.rpc as any)('reveal_customer_contact', {
+    p_booking_id: bookingId,
+  });
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  return data as { success: boolean; phone?: string; full_name?: string; error?: string };
 }
 
 export async function fetchProviderResources(providerId: string) {
@@ -204,6 +204,31 @@ export async function updateBookingStatus(
     });
     if (error) {
       console.error('Error cancelling booking:', error);
+      throw error;
+    }
+    return data;
+  }
+
+  if (status === 'COMPLETED') {
+    try {
+      const resp = await fetch('/api/bookings/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.success) return json;
+      }
+    } catch {
+      // Fall through to RPC if fetch fails
+    }
+
+    const { data, error } = await (supabase.rpc as any)('complete_booking', {
+      p_booking_id: bookingId,
+    });
+    if (error) {
+      console.error('Error completing booking:', error);
       throw error;
     }
     return data;
@@ -716,7 +741,7 @@ export async function updateAdminCityStatus(
   cityId: string,
   status: CityStatus,
   target?: number | null,
-  adminToken: string = 'tirupati-superadmin-e2e-2026'
+  adminToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
@@ -724,7 +749,7 @@ export async function updateAdminCityStatus(
       p_city_id: cityId,
       p_status: status,
       p_target: target !== undefined ? target : null,
-      p_admin_token: adminToken,
+      p_admin_token: adminToken || undefined,
     });
     if (error) {
       return { success: false, error: error.message };
@@ -778,7 +803,7 @@ export async function fetchAdminMerchants(cityId?: string) {
 export async function updateAdminMerchantStatus(
   providerId: string,
   status: Database['public']['Enums']['provider_status'],
-  adminToken: string = 'tirupati-superadmin-e2e-2026'
+  adminToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
@@ -786,7 +811,7 @@ export async function updateAdminMerchantStatus(
     const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('admin_update_merchant_status', {
       p_provider_id: providerId,
       p_status: status,
-      p_admin_token: adminToken,
+      p_admin_token: adminToken || undefined,
     });
 
     if (!rpcError && rpcData) {
@@ -848,13 +873,13 @@ export async function fetchAdminCityWaitlist(cityId?: string): Promise<CityWaitl
  */
 export async function fetchAdminAuditLogs(
   limit: number = 50,
-  adminToken: string = 'tirupati-superadmin-e2e-2026'
+  adminToken?: string
 ): Promise<AdminAuditLogEntry[]> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await (supabaseAdmin.rpc as any)('get_admin_audit_logs', {
       p_limit: limit,
-      p_admin_token: adminToken,
+      p_admin_token: adminToken || undefined,
     });
 
     if (error) {

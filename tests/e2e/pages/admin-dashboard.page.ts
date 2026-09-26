@@ -194,7 +194,10 @@ export class AdminDashboardPage {
     await expect(this.page.getByTestId('admin-login-email')).toBeVisible();
   }
 
-  async loginAsAdmin(email = 'admin@appointments-tirupati.com', password = 'AdminSecure2026!') {
+  async loginAsAdmin(
+    email = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
+    password = process.env.TEST_ADMIN_PASSWORD || ''
+  ) {
     await expect(this.page.getByTestId('admin-login-email')).toBeVisible({ timeout: 10000 });
     await this.page.getByTestId('admin-login-email').fill(email);
     await this.page.getByTestId('admin-login-password').fill(password);
@@ -230,7 +233,7 @@ export class AdminDashboardPage {
     await this.page.getByTestId('admin-login-email').fill(email);
     await this.page.getByTestId('admin-login-password').fill(password);
     await this.page.getByTestId('admin-login-submit').click();
-    await expect(this.page.getByTestId('admin-login-error')).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByTestId('admin-login-error')).toBeVisible({ timeout: 15000 });
   }
 
   async signOutAdmin() {
@@ -363,18 +366,8 @@ export class AdminDashboardPage {
     await expect(blockBtn).toBeVisible({ timeout: 10000 });
     await blockBtn.click();
 
-    const feedbackOrStatus = this.page
-      .getByText(/Merchant Blocked & Suspended/i)
-      .or(row.getByText(/BLOCKED \/ SUSPENDED/i));
-    const succeeded = await feedbackOrStatus
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!succeeded && (await blockBtn.isVisible().catch(() => false))) {
-      await blockBtn.click();
-    }
-    await expect(feedbackOrStatus).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByText(/Merchant Blocked & Suspended/i)).toBeVisible({ timeout: 15000 });
+    await expect(row.getByText(/BLOCKED \/ SUSPENDED/i)).toBeVisible({ timeout: 10000 });
   }
 
   async unblockMerchant(merchantName: string) {
@@ -384,18 +377,8 @@ export class AdminDashboardPage {
     await expect(unblockBtn).toBeVisible({ timeout: 10000 });
     await unblockBtn.click();
 
-    const feedbackOrStatus = this.page
-      .getByText(/Merchant Activated & Visible/i)
-      .or(row.getByText(/ONBOARDED \(ACTIVE\)/i));
-    const succeeded = await feedbackOrStatus
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!succeeded && (await unblockBtn.isVisible().catch(() => false))) {
-      await unblockBtn.click();
-    }
-    await expect(feedbackOrStatus).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByText(/Merchant Activated & Visible/i)).toBeVisible({ timeout: 15000 });
+    await expect(row.getByText(/ONBOARDED \(ACTIVE\)/i)).toBeVisible({ timeout: 10000 });
   }
 
   async approveMerchant(merchantName: string) {

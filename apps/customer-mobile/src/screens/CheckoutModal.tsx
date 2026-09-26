@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Linking,
 } from 'react-native';
 import { Resource, Slot, getPlatformFee } from '@appointments/shared';
 import {
@@ -501,14 +502,20 @@ export default function CheckoutModal({
               )}
             </View>
 
-            {/* Cancellation Policy Badge */}
+            {/* Cancellation Policy — Consumer Protection (E-Commerce) Rules 2020 */}
             <View style={styles.policyCard}>
-              <Text style={styles.policyTitle}>🛡️ Cancellation & Reschedule Policy</Text>
+              <Text style={styles.policyTitle}>🛡️ Cancellation & Refund Policy</Text>
               <Text style={styles.policyText}>
-                • Free cancellation or reschedule up to 30 minutes before slot start.{'\n'}
-                • Deposit is automatically carried over on reschedule or refunded on cancellation.{'\n'}
-                • First 2 missed appointments: Full courtesy refund (Grace Period).{'\n'}
-                • 3rd missed appointment: ₹100 deposit forfeited to the merchant.
+                {'✅ Free cancellation up to 1 hour before your slot — full deposit refunded.\n'}
+                {'↩️  Reschedule free within the same window — deposit carries over.\n'}
+                {'⚠️  Cancel within 1 hour or no-show — deposit forfeited to merchant.\n'}
+                {'💰  If the merchant cancels — you are always refunded in full, no exceptions.\n'}
+                {'🚫  4 no-shows in 12 months triggers a temporary booking restriction.'}
+              </Text>
+              <Text style={styles.policyLinkText}
+                onPress={() => Linking.openURL('https://appointments4u.in/refund-policy')}
+              >
+                Read full Refund Policy →
               </Text>
             </View>
 
@@ -540,6 +547,27 @@ export default function CheckoutModal({
 
           {/* Pay Button */}
           <View style={styles.footer}>
+            {/* Fee Itemization — Consumer Protection (E-Commerce) Rules 2020 + GST readiness */}
+            <View style={styles.feeBreakdown}>
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>Booking Deposit (refundable)</Text>
+                <Text style={styles.feeValue}>₹{depositAmount}</Text>
+              </View>
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>Platform Convenience Fee</Text>
+                <Text style={styles.feeValue}>₹{platformFee}</Text>
+              </View>
+              <View style={styles.feeRow}>
+                <Text style={[styles.feeLabel, { color: '#94a3b8', fontSize: 11 }]}>GST on platform fee</Text>
+                <Text style={[styles.feeValue, { color: '#94a3b8', fontSize: 11 }]}>Not applicable*</Text>
+              </View>
+              <View style={[styles.feeRow, styles.feeTotalRow]}>
+                <Text style={styles.feeTotalLabel}>Total charged now</Text>
+                <Text style={styles.feeTotalValue}>₹{totalPayable}</Text>
+              </View>
+              <Text style={styles.feeFootnote}>* GST will be shown once platform obtains GSTIN</Text>
+            </View>
+
             {payError && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorBannerText}>⚠️ {payError}</Text>
@@ -710,6 +738,58 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#166534',
     lineHeight: 16,
+  },
+  policyLinkText: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+    marginTop: 6,
+  },
+  // Fee breakdown — Consumer Protection disclosure
+  feeBreakdown: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 12,
+    marginBottom: 12,
+  },
+  feeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  feeLabel: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  feeValue: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  feeTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    marginTop: 4,
+    paddingTop: 6,
+  },
+  feeTotalLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  feeTotalValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  feeFootnote: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 4,
   },
   scrollBody: {
     paddingBottom: 20,

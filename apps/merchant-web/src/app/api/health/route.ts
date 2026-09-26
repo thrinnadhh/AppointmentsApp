@@ -37,6 +37,7 @@ export async function GET() {
     return NextResponse.json(
       {
         status: 'healthy',
+        database: 'connected',
         timestamp: new Date().toISOString(),
         latency_ms: latency,
         environment: process.env.NODE_ENV || 'development',

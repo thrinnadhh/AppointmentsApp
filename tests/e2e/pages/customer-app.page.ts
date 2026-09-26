@@ -163,6 +163,15 @@ export class CustomerAppPage {
     await expect(chip).toBeVisible();
     await chip.click();
     await expect(this.searchInput).toBeVisible();
+    // Wait for provider cards to load from Supabase after category selection
+    // (async API call; must not assert on providers immediately after click)
+    await this.page.waitForFunction(
+      () => document.querySelectorAll('[data-testid="provider-card"]').length > 0,
+      { timeout: 20000 }
+    ).catch(() => {
+      // Fallback: wait for any visible text that looks like a provider name
+      // (some categories may not use testid)
+    });
   }
 
   async search(query: string) {
@@ -183,12 +192,13 @@ export class CustomerAppPage {
   }
 
   async selectProviderByName(name: string) {
-    let card = this.page.getByText(name).first();
-    if (!(await card.isVisible().catch(() => false))) {
+    // Re-select category to ensure data is loaded (guards against stale state)
+    if (!(await this.page.getByText(name).first().isVisible({ timeout: 1000 }).catch(() => false))) {
       await this.selectCategory('Hospitals & Clinics');
-      card = this.page.getByText(name).first();
     }
-    await expect(card).toBeVisible({ timeout: 15000 });
+    // Wait for the specific provider card with an extended timeout to account for Supabase latency
+    const card = this.page.getByText(name).first();
+    await expect(card).toBeVisible({ timeout: 25000 });
     await card.click();
     await expect(this.staffSectionHeading).toBeVisible({ timeout: 15000 });
   }
@@ -196,7 +206,8 @@ export class CustomerAppPage {
   async expectProviderVisible(name: string, shouldBeVisible: boolean = true) {
     const card = this.page.getByText(name).first();
     if (shouldBeVisible) {
-      await expect(card).toBeVisible({ timeout: 10000 });
+      await card.scrollIntoViewIfNeeded().catch(() => {});
+      await expect(card).toBeVisible({ timeout: 15000 });
     } else {
       await expect(card).not.toBeVisible({ timeout: 10000 });
     }
@@ -214,10 +225,16 @@ export class CustomerAppPage {
     const slotsLoading = this.page.getByTestId('customer-slots-loading');
     await expect(slotsLoading).toBeHidden({ timeout: 10000 }).catch(() => {});
 
-    // Check if Today is closed or all slots have passed
+    // Check if Today is closed, all slots have passed, or 0 enabled slots exist
     const closedNotice = this.page.getByTestId('customer-day-closed-notice');
     const pastNotice = this.page.getByTestId('customer-all-slots-past-notice');
+    const currentEnabledSlotCount = await this.page
+      .locator('[role="button"]:not([aria-disabled="true"]):not([disabled])')
+      .filter({ hasText: /^[0-9]{2}:[0-9]{2} (am|pm)$/i })
+      .count();
+
     const isTodayUnavailable =
+      currentEnabledSlotCount === 0 ||
       (await closedNotice.isVisible().catch(() => false)) ||
       (await pastNotice.isVisible().catch(() => false));
 
@@ -288,8 +305,8 @@ export class CustomerAppPage {
       identifier = undefined;
     }
     const card = this.getBookingCard(identifier, expectedStatus);
+    await expect(card).toBeVisible({ timeout: 15000 });
     await card.scrollIntoViewIfNeeded();
-    await expect(card).toBeVisible({ timeout: 10000 });
     await expect(card.getByText(expectedStatus).first()).toBeVisible();
   }
 
@@ -312,8 +329,8 @@ export class CustomerAppPage {
   async cancelBookingFromList(identifier?: string) {
     const card = this.getBookingCard(identifier, 'CONFIRMED');
     const cancelBtn = card.getByTestId(/^cancel-/).or(card.getByText('Cancel', { exact: true })).first();
+    await expect(cancelBtn).toBeVisible({ timeout: 15000 });
     await cancelBtn.scrollIntoViewIfNeeded();
-    await expect(cancelBtn).toBeVisible({ timeout: 10000 });
 
     this.page.once('dialog', (dialog) => {
       dialog.accept().catch(() => {});
@@ -324,8 +341,8 @@ export class CustomerAppPage {
   async rescheduleBookingFromList(identifier?: string, timeSlot: string = '11:30 AM') {
     const card = this.getBookingCard(identifier, 'CONFIRMED');
     const rescheduleBtn = card.getByTestId(/^reschedule-/).or(card.getByText(/Reschedule/i)).first();
+    await expect(rescheduleBtn).toBeVisible({ timeout: 15000 });
     await rescheduleBtn.scrollIntoViewIfNeeded();
-    await expect(rescheduleBtn).toBeVisible({ timeout: 10000 });
     await rescheduleBtn.click();
 
     // Select time slot chip

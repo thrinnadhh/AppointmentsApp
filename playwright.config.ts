@@ -1,5 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Load environment variables for E2E tests without hardcoding secrets in spec files
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile('apps/merchant-web/.env.local');
+  } catch {
+    // Fall back gracefully if file is absent in CI
+  }
+}
+
 export default defineConfig({
   testDir: './tests/e2e',
 
@@ -47,7 +56,12 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: ['**/edge-integrations.spec.ts'], // run integration suite separately
+      testIgnore: [
+        '**/customer-merchant-integration.spec.ts',
+        '**/admin-merchant-integration.spec.ts',
+        '**/edge-integrations.spec.ts',
+        '**/flow-audit.spec.ts',
+      ],
     },
 
     // ── Integration & cross-system suite (needs extra timeout) ────────────

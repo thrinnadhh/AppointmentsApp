@@ -1,11 +1,19 @@
-import { NextResponse } from 'next/server';
-import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAdminRequest } from '@/lib/auth-admin';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const providerId = searchParams.get('providerId');
     const status = searchParams.get('status');
+    const paymentStatus = searchParams.get('payment_status');
+    const needsReconciliation = searchParams.get('needs_reconciliation') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
@@ -39,6 +47,12 @@ export async function GET(request: Request) {
 
     if (status) {
       query = query.eq('status', status.toUpperCase() as 'HELD' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW');
+    }
+
+    if (paymentStatus) {
+      query = query.eq('payment_status', paymentStatus.toUpperCase() as 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'FORFEITED');
+    } else if (needsReconciliation) {
+      query = query.in('payment_status', ['REFUND_FAILED', 'REFUND_PENDING']);
     }
 
     const { data, error } = await query;

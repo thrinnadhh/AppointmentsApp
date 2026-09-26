@@ -81,19 +81,19 @@ export default function MyBookingsScreen({
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const confirmMessage =
-        diffMinutes > 30
-          ? 'Cancel Appointment: You are cancelling more than 30 minutes in advance. Your deposit will be refunded in full. Confirm cancellation?'
-          : 'Late Cancellation Warning: You are cancelling inside the 30-minute window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
+        diffMinutes > 60
+          ? 'Cancel Appointment: You are cancelling more than 1 hour in advance. Your deposit will be refunded in full. Confirm cancellation?'
+          : 'Late Cancellation Warning: You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
       if (window.confirm(confirmMessage)) {
         onCancelBooking(bookingId);
       }
       return;
     }
 
-    if (diffMinutes > 30) {
+    if (diffMinutes > 60) {
       Alert.alert(
         'Cancel Appointment',
-        'You are cancelling more than 30 minutes in advance. Your deposit will be refunded in full.',
+        'You are cancelling more than 1 hour in advance. Your deposit will be refunded in full.',
         [
           { text: 'Keep Booking', style: 'cancel' },
           { text: 'Confirm & Refund', style: 'destructive', onPress: () => onCancelBooking(bookingId) },
@@ -102,7 +102,7 @@ export default function MyBookingsScreen({
     } else {
       Alert.alert(
         'Late Cancellation Warning',
-        'You are cancelling inside the 30-minute window. Under the policy, your deposit will be forfeited to the business.',
+        'You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited to the business.',
         [
           { text: 'Keep Booking', style: 'cancel' },
           { text: 'Forfeit & Cancel', style: 'destructive', onPress: () => onCancelBooking(bookingId) },

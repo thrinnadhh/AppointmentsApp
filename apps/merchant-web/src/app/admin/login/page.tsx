@@ -79,13 +79,13 @@ function AdminLoginForm() {
         .single();
 
       if (profileError || !profile) {
-        await supabase.auth.signOut();
+        void supabase.auth.signOut();
         throw new Error('Access Denied: Unable to verify platform authority record.');
       }
 
       if (profile.role !== 'admin') {
         // Immediately terminate session for non-admin accounts attempting access
-        await supabase.auth.signOut();
+        void supabase.auth.signOut();
         throw new Error('Access Denied: This account lacks Super Administrator privileges.');
       }
 
@@ -583,7 +583,7 @@ function AdminLoginForm() {
               <button
                 type="button"
                 data-testid="quick-fill-admin"
-                onClick={() => handleQuickFill('admin@appointments-tirupati.com', 'AdminSecure2026!')}
+                onClick={() => handleQuickFill('admin@appointments-tirupati.com', process.env.NEXT_PUBLIC_TEST_ADMIN_PASSWORD || '')}
                 className="w-full text-left p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 hover:border-emerald-500/50 hover:bg-emerald-950/20 transition-all flex items-center justify-between group"
               >
                 <div>
@@ -603,7 +603,7 @@ function AdminLoginForm() {
               <button
                 type="button"
                 data-testid="quick-fill-merchant"
-                onClick={() => handleQuickFill('naturals.salon@tirupati-appointments.com', 'NaturalsSalon2026!')}
+                onClick={() => handleQuickFill('naturals.salon@tirupati-appointments.com', process.env.NEXT_PUBLIC_TEST_SALON_PASSWORD || '')}
                 className="w-full text-left p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 hover:border-rose-500/50 hover:bg-rose-950/20 transition-all flex items-center justify-between group"
               >
                 <div>

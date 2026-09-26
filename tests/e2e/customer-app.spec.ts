@@ -54,7 +54,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
 
     // 2. Verify Provider Info Header
     await expect(page.getByText('📍 Shop 12, Bhavani Nagar, Near RTC Bus Stand')).toBeVisible();
-    await expect(page.getByText(/🕒 Hours: 09:00 - 20:00/)).toBeVisible();
+    await expect(page.getByText(/9:00 AM - 9:00 PM/i)).toBeVisible();
     await expect(customerApp.staffSectionHeading).toBeVisible();
 
     // 3. Verify Staff Roster (Doctors)
@@ -107,12 +107,13 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
 
     // 4. Verify Pricing & Breakdown
     await expect(customerApp.paymentDetailsCard).toBeVisible();
-    await expect(page.getByText('Hold Deposit (Guarantees Slot)')).toBeVisible();
+    await expect(page.getByText(/Booking Deposit|Hold Deposit/i).first()).toBeVisible();
     await expect(page.getByText('Total Payable Now')).toBeVisible();
 
     // 5. Verify Cancellation Policy
-    await expect(page.getByText('🛡️ Cancellation & Reschedule Policy')).toBeVisible();
-    await expect(page.getByText(/Free cancellation or reschedule up to 30 minutes before/)).toBeVisible();
+    await expect(page.getByText('🛡️ Cancellation & Refund Policy')).toBeVisible();
+    await expect(page.getByText(/Free cancellation up to 1 hour before/)).toBeVisible();
+    await expect(page.getByText(/4 no-shows/i)).toBeVisible();
 
     // 5b. Verify Late Arrival Grace Policy (+2 Token Buffer)
     await expect(page.getByTestId('late-arrival-notice')).toBeVisible();
@@ -128,6 +129,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
   test('5. Should complete deposit payment, navigate to My Bookings, and support browse return', async ({ page }) => {
     // 1. Proceed to checkout
     await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+    await customerApp.selectDateOffset('Tomorrow');
     await customerApp.selectFirstSlot();
     await customerApp.openCheckout();
 
@@ -135,7 +137,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
     await customerApp.submitPayment();
 
     // 3. Verify Confirmation Toast
-    await expect(customerApp.confirmationToast).toBeVisible({ timeout: 10000 });
+    await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
 
     // 4. Verify transition to My Bookings Screen
     await expect(customerApp.myBookingsTitle).toBeVisible();
@@ -143,6 +145,16 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
     // 5. Verify Appointment card is rendered
     await expect(page.getByText('CONFIRMED').first()).toBeVisible();
     await expect(page.getByText(/Deposit Paid:/).first()).toBeVisible();
+
+    // 5b. Cancel booking to release slot for next test iteration
+    const cancelBtn = page.getByText('Cancel', { exact: true }).first();
+    if (await cancelBtn.isVisible().catch(() => false)) {
+      page.once('dialog', async (dialog) => {
+        await dialog.accept();
+      });
+      await cancelBtn.click();
+      await expect(page.getByText('CANCELLED').first()).toBeVisible({ timeout: 10000 }).catch(() => {});
+    }
 
     // 6. Return back to Browse Home
     await customerApp.backToBrowseBtn.click();

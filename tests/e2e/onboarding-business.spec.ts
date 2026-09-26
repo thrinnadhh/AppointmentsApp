@@ -10,7 +10,10 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
 
   test.beforeEach(async ({ page }) => {
     merchantPortal = new MerchantPortalPage(page);
-    await merchantPortal.gotoVenues('admin@appointments-tirupati.com', 'AdminSecure2026!');
+    await merchantPortal.gotoVenues(
+      process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
+      process.env.TEST_ADMIN_PASSWORD || ''
+    );
     await expect(page).toHaveTitle(/Merchant Dashboard/);
   });
 
@@ -141,7 +144,10 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
   });
 
   test('5. Should reflect newly added businesses and doctors on the Overview Dashboard', async ({ page }) => {
-    await merchantPortal.goto('admin@appointments-tirupati.com', 'AdminSecure2026!');
+    await merchantPortal.goto(
+      process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
+      process.env.TEST_ADMIN_PASSWORD || ''
+    );
 
     // Check Overview Heading
     await expect(page.getByRole('heading', { name: /City-Wide Vertical Summary/i })).toBeVisible();

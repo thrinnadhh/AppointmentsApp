@@ -26,6 +26,15 @@ env:
   EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
   EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+  RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID || '' }}
+  RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET || '' }}
+  RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET || '' }}
+  TEST_MERCHANT_EMAIL: ${{ secrets.TEST_MERCHANT_EMAIL || '' }}
+  TEST_MERCHANT_PASSWORD: ${{ secrets.TEST_MERCHANT_PASSWORD || '' }}
+  TEST_SALON_EMAIL: ${{ secrets.TEST_SALON_EMAIL || '' }}
+  TEST_SALON_PASSWORD: ${{ secrets.TEST_SALON_PASSWORD || '' }}
+  TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || '' }}
+  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || '' }}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 1 — Dependency Audit & Security Scan
@@ -364,7 +373,7 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run stress: 50-concurrent-hold (EC-INT-05) in isolation
+      - name: "Run stress: 50-concurrent-hold (EC-INT-05) in isolation"
         run: >
           pnpm exec playwright test
           tests/e2e/edge-integrations.spec.ts
@@ -374,7 +383,7 @@ jobs:
         env:
           CI: true
 
-      - name: Run stress: reference code uniqueness (EC-INT-09) in isolation
+      - name: "Run stress: reference code uniqueness (EC-INT-09) in isolation"
         run: >
           pnpm exec playwright test
           tests/e2e/edge-integrations.spec.ts

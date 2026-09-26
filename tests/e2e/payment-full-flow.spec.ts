@@ -3,8 +3,8 @@ import { CustomerAppPage } from './pages/customer-app.page';
 import { MerchantPortalPage } from './pages/merchant-portal.page';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlua2Rud2h1YmZrbm5uemp0cGVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzEyOTIsImV4cCI6MjEwNDQ0NzI5Mn0.Vaep3rcu8dDPkwAoiqCMPV9zovN8eWHCGaLUBC5CF-A';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 test.describe('Comprehensive Razorpay Payment Gateway Full-Flow Suite', () => {

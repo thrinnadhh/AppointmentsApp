@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { AdminDashboardPage } from './pages/admin-dashboard.page';
 
+const TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com';
+const TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || '';
+const TEST_SALON_EMAIL = process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com';
+const TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || '';
+
 test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
   test('TC-ADMIN-AUTH-01: Unauthenticated request to /admin redirects to /admin/login', async ({ page }) => {
     // Clear cookies and storage state to ensure unauthenticated request
@@ -23,8 +28,8 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
 
     // Attempt login with valid merchant credentials (Naturals Salon)
     await adminPage.loginExpectFailure(
-      'naturals.salon@tirupati-appointments.com',
-      'NaturalsSalon2026!'
+      TEST_SALON_EMAIL,
+      TEST_SALON_PASSWORD
     );
 
     // Verify rejection alert
@@ -44,8 +49,8 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
 
     // Sign in with Super Admin credentials
     await adminPage.loginAsAdmin(
-      'admin@appointments-tirupati.com',
-      'AdminSecure2026!'
+      TEST_ADMIN_EMAIL,
+      TEST_ADMIN_PASSWORD
     );
 
     // Verified on Admin Dashboard
@@ -84,8 +89,8 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
 
     await adminPage.gotoLoginPage();
     await adminPage.loginAsAdmin(
-      'admin@appointments-tirupati.com',
-      'AdminSecure2026!'
+      TEST_ADMIN_EMAIL,
+      TEST_ADMIN_PASSWORD
     );
 
     // Verify Audit Section in Dashboard
@@ -108,8 +113,23 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     expect([401, 403]).toContain(unauthResponse.status());
 
     // 2. Authenticated Admin request must succeed and return structured logs
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const authRes = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      headers: {
+        'apikey': anonKey,
+        'Content-Type': 'application/json',
+      },
+      data: {
+        email: TEST_ADMIN_EMAIL,
+        password: TEST_ADMIN_PASSWORD,
+      },
+    });
+    const authData = await authRes.json();
+    const token = authData?.access_token || '';
+
     const authResponse = await request.get('http://localhost:3000/api/admin/audit-logs', {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { Authorization: `Bearer ${token}` },
     });
     expect(authResponse.status()).toBe(200);
 
@@ -134,8 +154,8 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
 
     // Submit credentials without auto-skipping
     await adminPage.submitCredentials(
-      'admin@appointments-tirupati.com',
-      'AdminSecure2026!'
+      TEST_ADMIN_EMAIL,
+      TEST_ADMIN_PASSWORD
     );
 
     // Stage 2 must be rendered: 6-digit MFA code input and submit button
@@ -152,11 +172,11 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
 
     await adminPage.gotoLoginPage();
     await adminPage.submitCredentials(
-      'admin@appointments-tirupati.com',
-      'AdminSecure2026!'
+      TEST_ADMIN_EMAIL,
+      TEST_ADMIN_PASSWORD
     );
 
-    await expect(adminPage.mfaCodeInput).toBeVisible({ timeout: 10000 });
+    await expect(adminPage.mfaCodeInput).toBeVisible({ timeout: 20000 });
 
     // Verify whether in enrollment or challenge state, the UI provides secure controls
     const isEnrollment = await adminPage.mfaQrCode.isVisible().catch(() => false);
@@ -177,8 +197,8 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
 
     await adminPage.gotoLoginPage();
     await adminPage.submitCredentials(
-      'admin@appointments-tirupati.com',
-      'AdminSecure2026!'
+      TEST_ADMIN_EMAIL,
+      TEST_ADMIN_PASSWORD
     );
 
     await expect(adminPage.mfaCodeInput).toBeVisible({ timeout: 10000 });
@@ -199,8 +219,8 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
 
     await adminPage.gotoLoginPage();
     await adminPage.loginAsAdmin(
-      'admin@appointments-tirupati.com',
-      'AdminSecure2026!'
+      TEST_ADMIN_EMAIL,
+      TEST_ADMIN_PASSWORD
     );
 
     // Dashboard loaded
