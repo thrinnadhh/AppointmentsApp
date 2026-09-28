@@ -116,9 +116,9 @@ export async function PATCH(request: NextRequest) {
       Boolean(adminBypassToken) &&
       request.headers.get('x-admin-bypass-key') === adminBypassToken;
 
-    if (!isNelloreTestReset && currentCity?.status === 'ACTIVE' && (status === 'PLANNED' || status === 'EXPANDING')) {
+    if (!isNelloreTestReset && (currentCity?.status === 'ACTIVE' || currentCity?.status === 'PAUSED') && (status === 'PLANNED' || status === 'EXPANDING')) {
       return NextResponse.json(
-        { error: 'Invalid transition: Cannot regress an ACTIVE city back to PLANNED or EXPANDING' },
+        { error: 'Invalid transition: Cannot regress an ACTIVE or PAUSED city back to PLANNED or EXPANDING' },
         { status: 400 }
       );
     }

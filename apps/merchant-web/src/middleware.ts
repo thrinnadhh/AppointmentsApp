@@ -13,7 +13,7 @@ const PUBLIC_ROUTES = [
   '/refund-policy',
 ];
 
-// Strictly public API endpoints (webhook listeners, auth callbacks, and customer checkout)
+// Strictly public API endpoints (webhook listeners, auth callbacks, customer checkout, and territory endpoints)
 const PUBLIC_API_ROUTES = [
   '/api/webhooks/razorpay',
   '/api/auth/',
@@ -21,6 +21,7 @@ const PUBLIC_API_ROUTES = [
   '/api/payments/verify',
   '/api/bookings/hold',
   '/api/health',
+  '/api/cities/',
 ];
 
 export function middleware(req: NextRequest) {
