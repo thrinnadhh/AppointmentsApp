@@ -278,7 +278,21 @@ export class MerchantPortalPage {
     return this.page.locator('.divide-y > div').filter({ hasText: identifier }).first();
   }
 
+  async ensureBookingVisible(identifier: string) {
+    const card = this.getBookingCard(identifier);
+    if (!(await card.isVisible().catch(() => false))) {
+      if (await this.customerSearchInput.isVisible().catch(() => false)) {
+        await this.customerSearchInput.fill(identifier);
+        await this.page.waitForTimeout(300);
+      }
+    }
+    await card.scrollIntoViewIfNeeded().catch(() => {});
+  }
+
   async expectBookingInQueue(identifier?: string, expectedStatus?: string) {
+    if (identifier) {
+      await this.ensureBookingVisible(identifier);
+    }
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible({ timeout: 10000 });
     if (expectedStatus) {
@@ -287,6 +301,9 @@ export class MerchantPortalPage {
   }
 
   async markBookingCompleted(identifier: string) {
+    if (identifier) {
+      await this.ensureBookingVisible(identifier);
+    }
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible();
     const completeBtn = card.getByRole('button', { name: /Complete/i });
@@ -295,16 +312,26 @@ export class MerchantPortalPage {
     await expect(this.page.getByText(/Booking updated to COMPLETED|COMPLETED/i).first()).toBeVisible({ timeout: 10000 });
   }
 
-  async markBookingNoShow(identifier: string) {
+  async markBookingNoShow(identifier: string): Promise<string> {
+    if (identifier) {
+      await this.ensureBookingVisible(identifier);
+    }
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible();
     const noShowBtn = card.getByRole('button', { name: /No-Show/i });
     await expect(noShowBtn).toBeVisible();
     await noShowBtn.click();
-    await expect(this.page.getByText(/No-show recorded/i)).toBeVisible({ timeout: 10000 });
+    // Wait for any no-show toast (grace period OR penalty) and capture its text
+    const toast = this.page.getByText(/No-show recorded/i).first();
+    await expect(toast).toBeVisible({ timeout: 10000 });
+    const toastText = (await toast.textContent()) || '';
+    return toastText;
   }
 
   async cancelAndRefundBooking(identifier: string) {
+    if (identifier) {
+      await this.ensureBookingVisible(identifier);
+    }
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible();
     const cancelBtn = card.getByRole('button', { name: /Cancel & Refund/i });
@@ -316,11 +343,17 @@ export class MerchantPortalPage {
     if (await cancelledTab.isVisible().catch(() => false)) {
       await cancelledTab.click();
     }
+    if (identifier) {
+      await this.ensureBookingVisible(identifier);
+    }
     const cancelledCard = this.getBookingCard(identifier);
     await expect(cancelledCard.getByText('CANCELLED')).toBeVisible({ timeout: 10000 });
   }
 
   async substituteStaffMember(identifier: string, replacementStaffName?: string, reason?: string) {
+    if (identifier) {
+      await this.ensureBookingVisible(identifier);
+    }
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible({ timeout: 10000 });
     const substituteBtn = card.getByRole('button', { name: /Substitute/i });
@@ -332,7 +365,11 @@ export class MerchantPortalPage {
 
     if (replacementStaffName) {
       const select = modal.locator('select');
-      await select.selectOption({ label: replacementStaffName });
+      const option = select.locator('option').filter({ hasText: new RegExp(replacementStaffName, 'i') }).first();
+      const val = await option.getAttribute('value');
+      if (val) {
+        await select.selectOption(val);
+      }
     }
 
     if (reason) {
@@ -348,6 +385,9 @@ export class MerchantPortalPage {
   }
 
   async openNotificationModal(identifier: string) {
+    if (identifier) {
+      await this.ensureBookingVisible(identifier);
+    }
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible();
     const logsBtn = card.getByRole('button', { name: /WA\/SMS Logs/i });

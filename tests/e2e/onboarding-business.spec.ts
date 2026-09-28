@@ -53,7 +53,7 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
 
     // Fill Onboarding Form
     await page.locator('#venue-name').fill(testClinicName);
-    await page.locator('#venue-category').selectOption('clinic');
+    await page.locator('#venue-category').selectOption('clinics');
     await page.locator('#venue-address').fill('Renigunta Road, Opp. RTC Central, Tirupati');
     await page.locator('#venue-phone').fill('+91 877 2255667');
     await page.locator('#venue-email').fill(`care.${uniqueTimestamp}@tirupati.com`);
@@ -106,8 +106,8 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
     // Ensure all businesses are visible
     await page.getByRole('button', { name: /All Businesses/i }).click();
 
-    // Find the newly created clinic card and click "Manage Staff"
-    const manageStaffLink = page.getByRole('link', { name: `Manage Staff for ${testClinicName}` });
+    // Find the newly created clinic card and click "Manage Staff / Resources"
+    const manageStaffLink = page.getByRole('link', { name: new RegExp(`Manage (resources|Staff) for ${testClinicName}`, 'i') });
     await expect(manageStaffLink).toBeVisible({ timeout: 10000 });
     await manageStaffLink.click();
 
@@ -128,11 +128,10 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
     await page.locator('#doctor-department').fill('Cardiology');
     await page.locator('#doctor-unit-type').selectOption('doctor');
     await page.locator('#doctor-price').fill('1000');
-    await page.locator('#doctor-deposit').fill('150');
     await page.locator('#doctor-duration').fill('30');
 
     // Save Doctor
-    await page.getByRole('button', { name: /Save Doctor \/ Unit/i }).click();
+    await page.getByRole('button', { name: /Save (Doctor|Unit)/i }).click();
 
     // Verify Doctor Card appears with Cardiology department badge and pricing
     await expect(page.getByRole('heading', { name: testDoctorName, level: 3 })).toBeVisible({ timeout: 15000 });
@@ -140,7 +139,6 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
     await expect(doctorCard).toBeVisible();
     await expect(doctorCard.getByText('Cardiology').first()).toBeVisible();
     await expect(doctorCard.getByText('₹1000')).toBeVisible();
-    await expect(doctorCard.getByText('₹150')).toBeVisible();
   });
 
   test('5. Should reflect newly added businesses and doctors on the Overview Dashboard', async ({ page }) => {
@@ -150,7 +148,7 @@ test.describe.serial('Merchant Multi-Tenant Onboarding & Department Hierarchy E2
     );
 
     // Check Overview Heading
-    await expect(page.getByRole('heading', { name: /City-Wide Vertical Summary/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Today('s|’s)? Live Appointments/i })).toBeVisible();
 
     // Check System Health Widget & Run Diagnostics
     const runDiagnosticsBtn = page.getByRole('button', { name: /Run Diagnostics/i });

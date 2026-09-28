@@ -171,8 +171,11 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(Array.isArray(data.venues)).toBe(true);
     });
 
+    const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+
     test('2.3 POST /api/admin/venues should reject missing fields with 400', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/admin/venues', {
+        headers: { 'x-admin-bypass-key': adminBypassToken },
         data: { name: 'Incomplete Clinic' },
       });
       expect(res.status()).toBe(400);
@@ -190,6 +193,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.5 POST /api/admin/resources should reject missing providerId with 400', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/admin/resources', {
+        headers: { 'x-admin-bypass-key': adminBypassToken },
         data: { name: 'Dr. Test', type: 'doctor' },
       });
       expect(res.status()).toBe(400);
@@ -199,7 +203,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.6 GET /api/admin/bookings should return 200 with bookings list', async ({ request }) => {
       const res = await request.get('http://localhost:3000/api/admin/bookings', {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': adminBypassToken },
       });
       expect(res.status()).toBe(200);
       const data = await res.json();
@@ -209,7 +213,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.7 GET /api/admin/users should return 200 with user profiles', async ({ request }) => {
       const res = await request.get('http://localhost:3000/api/admin/users', {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': adminBypassToken },
       });
       expect(res.status()).toBe(200);
       const data = await res.json();
@@ -218,7 +222,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.8 POST /api/admin/users should reject missing email/password with 400', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/admin/users', {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': adminBypassToken },
         data: { fullName: 'Incomplete Staff' },
       });
       expect(res.status()).toBe(400);
@@ -226,8 +230,16 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBeDefined();
     });
 
-    test('2.9 GET /api/cron/release-holds should return 200 and report released count', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/cron/release-holds');
+    test('2.9 GET /api/cron/release-holds rejects unauthenticated requests and executes with CRON_SECRET', async ({ request }) => {
+      // Defense-in-depth: unauthenticated request must be blocked with 401
+      const unauthRes = await request.get('http://localhost:3000/api/cron/release-holds');
+      expect(unauthRes.status()).toBe(401);
+
+      // Authorized request with CRON_SECRET must succeed
+      const cronSecret = process.env.CRON_SECRET || 'test_cron_secret_2026';
+      const res = await request.get('http://localhost:3000/api/cron/release-holds', {
+        headers: { authorization: `Bearer ${cronSecret}` },
+      });
       expect(res.status()).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
@@ -269,6 +281,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.13 POST /api/bookings/cancel should return 404 for non-existent booking', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/cancel', {
+        headers: { 'x-admin-bypass-key': adminBypassToken },
         data: { booking_id: '00000000-0000-0000-0000-000000000000' },
       });
       expect(res.status()).toBe(404);
@@ -279,6 +292,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.14 POST /api/bookings/reschedule should return 404 for non-existent booking', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/reschedule', {
+        headers: { 'x-admin-bypass-key': adminBypassToken },
         data: {
           booking_id: '00000000-0000-0000-0000-000000000000',
           new_slot_start: '2026-09-10T10:00:00.000Z',
@@ -293,9 +307,10 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     test('2.15 POST /api/bookings/no-show should reject non-existent booking with error', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/bookings/no-show', {
+        headers: { 'x-admin-bypass-key': adminBypassToken },
         data: { booking_id: '00000000-0000-0000-0000-000000000000' },
       });
-      expect([400, 500]).toContain(res.status());
+      expect([400, 404, 500]).toContain(res.status());
       const data = await res.json();
       expect(data.success).toBe(false);
     });

@@ -51,3 +51,4 @@ opencode*.json
 .mcp.json
 .vercel
 .env*
+.gradle/

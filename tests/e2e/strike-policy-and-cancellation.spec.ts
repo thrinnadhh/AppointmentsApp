@@ -9,6 +9,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
   const BASE_URL = 'http://localhost:3000';
   const testResourceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const testCustomerId = '99999999-9999-9999-9999-999999999991'; // Valid seed user in auth.users
+  const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+  const CUSTOMER_HEADERS = { 'x-customer-id': testCustomerId };
+  const ADMIN_HEADERS = { 'x-admin-bypass-key': adminBypassToken };
   let originalStrikeCount = 0;
   let originalIsFlagged = false;
 
@@ -199,6 +202,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
     // Cancel booking via API as customer
     const cancelRes = await request.post(`${BASE_URL}/api/bookings/cancel`, {
+      headers: CUSTOMER_HEADERS,
       data: {
         booking_id,
         initiated_by: 'CUSTOMER',
@@ -243,6 +247,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
     // Cancel booking via API
     const cancelRes = await request.post(`${BASE_URL}/api/bookings/cancel`, {
+      headers: CUSTOMER_HEADERS,
       data: {
         booking_id,
         initiated_by: 'CUSTOMER',
@@ -289,6 +294,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
     // Cancel booking as MERCHANT
     const cancelRes = await request.post(`${BASE_URL}/api/bookings/cancel`, {
+      headers: ADMIN_HEADERS,
       data: {
         booking_id,
         reason: 'Provider emergency closure',
@@ -344,6 +350,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       .eq('id', booking_id);
 
     const cancelRes = await request.post(`${BASE_URL}/api/bookings/cancel`, {
+      headers: CUSTOMER_HEADERS,
       data: {
         booking_id,
         initiated_by: 'CUSTOMER',

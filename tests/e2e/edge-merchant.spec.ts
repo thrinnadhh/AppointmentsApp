@@ -42,11 +42,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       data: { booking_id, gateway_payment_id: `pay_cancel_then_complete_${Date.now()}` },
     });
     await request.post(`${BASE}/api/bookings/cancel`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { booking_id, reason: 'Test cancellation' },
     });
 
     // 2. Attempt to mark it COMPLETED
     const completeRes = await request.post(`${BASE}/api/bookings/complete`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { booking_id },
     });
     expect([409, 422]).toContain(completeRes.status());
@@ -68,10 +70,14 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await request.post(`${BASE}/api/bookings/confirm`, {
       data: { booking_id, gateway_payment_id: `pay_complete_then_noshow_${Date.now()}` },
     });
-    await request.post(`${BASE}/api/bookings/complete`, { data: { booking_id } });
+    await request.post(`${BASE}/api/bookings/complete`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      data: { booking_id },
+    });
 
     // Attempt no-show on already COMPLETED booking
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { booking_id },
     });
     expect([409, 422]).toContain(noShowRes.status());
@@ -97,6 +103,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
     // Attempt early no-show
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { booking_id },
     });
     expect([400, 409, 422]).toContain(noShowRes.status());

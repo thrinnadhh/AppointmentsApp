@@ -12,10 +12,11 @@ import { test, expect } from './fixtures/test-fixtures';
 test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () => {
 
   test.beforeEach(async ({ request, supabaseClient }) => {
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
     await request.patch('http://localhost:3000/api/admin/merchants', {
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': adminToken,
       },
       data: {
         providerId: '11111111-1111-1111-1111-111111111111',
@@ -51,6 +52,7 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
     const { customerApp, merchantPortal, adminDashboard } = triRole;
     let initialCompletedBookings = 0;
     let initialDepositVolume = 0;
+    let createdRefCode = '';
 
     await test.step('1. Super Admin records baseline executive metrics for verification', async () => {
       // Auto-waiting ensures admin dashboard data is fully loaded
@@ -75,20 +77,26 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       await expect(customerApp.confirmationToast.first()).toBeVisible({ timeout: 15000 });
       await expect(customerApp.myBookingsTitle).toBeVisible({ timeout: 15000 });
       await customerApp.expectBookingInList('CONFIRMED');
+
+      // Capture ref code from booking pass for use in merchant steps
+      await customerApp.openBookingPass('Sri Venkateswara Dental');
+      createdRefCode = await customerApp.getPassReferenceCode();
+      expect(createdRefCode).toMatch(/^TPT-[A-Z0-9]+/);
+      await customerApp.closeBookingPass();
     });
 
     await test.step('3. Merchant Web Queue immediately reflects newly placed appointment', async () => {
       await merchantPortal.gotoBookings();
       await merchantPortal.filterByStatus('CONFIRMED');
-      await merchantPortal.expectBookingInQueue('Sri Venkateswara Dental', 'CONFIRMED');
+      await merchantPortal.expectBookingInQueue(createdRefCode, 'CONFIRMED');
     });
 
     await test.step('4. Merchant marks booking as COMPLETED via web-first action', async () => {
-      await merchantPortal.markBookingCompleted('Sri Venkateswara Dental');
+      await merchantPortal.markBookingCompleted(createdRefCode);
 
       // Verify status transitions optimistically and in queue filter
       await merchantPortal.filterByStatus('COMPLETED');
-      await merchantPortal.expectBookingInQueue('Sri Venkateswara Dental', 'COMPLETED');
+      await merchantPortal.expectBookingInQueue(createdRefCode, 'COMPLETED');
     });
 
     await test.step('5. Super Admin Executive Overview dynamically reflects completed transaction and deposit velocity', async () => {
@@ -106,6 +114,7 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       await expect(adminDashboard.page.getByText(/% Completion Velocity/i)).toBeVisible();
     });
   });
+
 
   test('Flow 2 (Administrative Governance & Cross-App Synchronization): Super Admin suspends merchant, triggers immediate Merchant banner and Customer exclusion', async ({
     triRole,
@@ -323,16 +332,23 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       await customerApp.submitPayment();
 
       await expect(customerApp.confirmationToast).toBeVisible({ timeout: 15000 });
+      await expect(customerApp.myBookingsTitle).toBeVisible({ timeout: 15000 });
       await customerApp.expectBookingInList('CONFIRMED');
+
+      // Capture ref code from booking pass
+      await customerApp.openBookingPass('Sri Venkateswara Dental');
+      const refCode = await customerApp.getPassReferenceCode();
+      expect(refCode).toMatch(/^TPT-[A-Z0-9]+/);
+      await customerApp.closeBookingPass();
 
       // Merchant marks completed in private space
       await merchantPortal.gotoBookings();
       await merchantPortal.filterByStatus('CONFIRMED');
-      await merchantPortal.markBookingCompleted('Sri Venkateswara Dental');
+      await merchantPortal.markBookingCompleted(refCode);
 
       // Merchant verifies completed filter
       await merchantPortal.filterByStatus('COMPLETED');
-      await merchantPortal.expectBookingInQueue('Sri Venkateswara Dental', 'COMPLETED');
+      await merchantPortal.expectBookingInQueue(refCode, 'COMPLETED');
     });
 
     await test.step('4. Customer Mobile App reflects COMPLETED status in real-time', async () => {
@@ -340,6 +356,7 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       await customerApp.expectBookingInList('COMPLETED');
     });
   });
+
 
   test('Flow 7 (Customer Mobile Profile & Auth): Phone OTP authentication and session management', async ({
     customerApp,
@@ -390,6 +407,7 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
     await test.step('1. Customer books an appointment with default specialist (Dr. Murthy)', async () => {
       await customerApp.selectCategory('Hospitals & Clinics');
       await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+      await customerApp.selectStaffMember('Dr. S. K. Murthy');
       await customerApp.selectDateOffset('Tomorrow');
       await customerApp.selectFirstSlot();
       await customerApp.openCheckout();
@@ -410,7 +428,7 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       await merchantPortal.filterByStatus('CONFIRMED');
       await merchantPortal.expectBookingInQueue(createdRefCode, 'CONFIRMED');
 
-      await merchantPortal.substituteStaffMember(createdRefCode, undefined, 'Emergency doctor surgical delay');
+      await merchantPortal.substituteStaffMember(createdRefCode, 'Dr. Ananya Reddy', 'Emergency doctor surgical delay');
     });
 
     await test.step('3. Customer Mobile App immediately reflects substituted specialist', async () => {
@@ -504,9 +522,11 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
 
       await merchantPortal.gotoBookings();
       await merchantPortal.filterByStatus('CONFIRMED');
-      await merchantPortal.markBookingNoShow(createdRefCode);
-      await expect(merchantPortal.page.getByText(/Courtesy refund granted to customer/i).first()).toBeVisible({ timeout: 10000 });
+      const noShowToast = await merchantPortal.markBookingNoShow(createdRefCode);
+      // Courtesy grace period (strike 1 or 2) → toast contains 'Courtesy refund'
+      expect(noShowToast.toLowerCase()).toContain('courtesy refund');
     });
+
 
     await test.step('3. Customer Mobile reflects NO_SHOW status and 100% Refund badge', async () => {
       await customerApp.navigateToMyBookings();

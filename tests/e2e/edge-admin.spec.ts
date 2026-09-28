@@ -18,7 +18,7 @@ import { AdminDashboardPage } from './pages/admin-dashboard.page';
  */
 
 const BASE = 'http://localhost:3000';
-const ADMIN_BYPASS = 'tirupati-superadmin-e2e-2026';
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111';
 
 test.describe('Admin — Edge & Boundary Cases', () => {

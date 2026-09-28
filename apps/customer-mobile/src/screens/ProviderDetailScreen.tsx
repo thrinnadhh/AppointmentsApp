@@ -15,7 +15,7 @@ import { generateAvailableSlots, fetchProviderById, fetchBookedSlots, ProviderWi
 interface ProviderDetailScreenProps {
   providerId: string;
   onBack: () => void;
-  onProceedToHold: (resource: Resource, slot: Slot) => void;
+  onProceedToHold: (resource: Resource, slot: Slot, providerName?: string) => void;
 }
 
 export default function ProviderDetailScreen({
@@ -225,6 +225,7 @@ export default function ProviderDetailScreen({
                   testID={`customer-date-card-${index}`}
                   style={[styles.dateCard, isSelected && styles.dateCardSelected]}
                   onPress={() => {
+                    if (selectedDateIndex === index) return;
                     setSlotsLoading(true);
                     setSelectedDateIndex(index);
                     setSelectedSlot(null);
@@ -261,9 +262,13 @@ export default function ProviderDetailScreen({
             </View>
           ) : availableSlots.length > 0 && availableSlots.every((s) => !s.is_available) ? (
             <View style={styles.closedDayBanner} testID="customer-all-slots-past-notice">
-              <Text style={styles.closedDayTitle}>🌙 All Slots for Today Concluded</Text>
+              <Text style={styles.closedDayTitle}>
+                {selectedDateIndex === 0 ? '🌙 All Slots for Today Concluded' : '🌙 All Slots for This Day Booked'}
+              </Text>
               <Text style={styles.closedDaySub}>
-                All booking slots for today have already passed. Please tap &quot;Tomorrow&quot; above to view available appointments.
+                {selectedDateIndex === 0
+                  ? 'All booking slots for today have already passed. Please tap "Tomorrow" above to view available appointments.'
+                  : 'All booking slots for this date are fully reserved. Please select another date for your visit.'}
               </Text>
             </View>
           ) : (
@@ -279,6 +284,7 @@ export default function ProviderDetailScreen({
                 return (
                   <TouchableOpacity
                     key={index}
+                    testID={`customer-slot-${index}`}
                     disabled={!isAvailable}
                     accessibilityRole="button"
                     accessibilityState={{ disabled: !isAvailable }}
@@ -322,7 +328,7 @@ export default function ProviderDetailScreen({
           disabled={!selectedSlot || !selectedResource || provider.status === 'SUSPENDED'}
           onPress={() => {
             if (selectedSlot && selectedResource && provider.status !== 'SUSPENDED') {
-              onProceedToHold(selectedResource, selectedSlot);
+              onProceedToHold(selectedResource, selectedSlot, provider.name);
             }
           }}
         >

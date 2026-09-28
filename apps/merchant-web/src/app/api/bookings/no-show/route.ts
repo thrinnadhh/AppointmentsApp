@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { initiateRazorpayRefund } from '@/lib/razorpay';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { RecordNoShowRequest, RecordNoShowResponse } from '@appointments/shared';
 
 interface RpcNoShowResult {
@@ -25,14 +26,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<RecordNoShowResponse>(
+        { success: false, error: 'Authentication required to record a no-show' },
+        { status: 401 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
 
-    // Guard: check booking status and start time
-    const { data: booking } = await supabaseAdmin
+    // Guard: check booking status, start time, and tenant authorization
+    const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, status, slot_start, gateway_payment_id, deposit_amount')
+      .select('id, status, slot_start, gateway_payment_id, deposit_amount, customer_id, provider_id')
       .eq('id', booking_id)
-      .single();
+      .maybeSingle();
+
+    if (bkgErr || !booking) {
+      return NextResponse.json<RecordNoShowResponse>(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
+
+    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, false);
+    if (!isAuthorized) {
+      return NextResponse.json<RecordNoShowResponse>(
+        { success: false, error: 'Unauthorized: Only authorized merchant staff or administrators can record no-show' },
+        { status: 403 }
+      );
+    }
 
     if (booking?.status === 'COMPLETED') {
       return NextResponse.json<RecordNoShowResponse>(

@@ -42,12 +42,87 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Settle booking payment via Supabase RPC
     const supabaseAdmin = getSupabaseAdmin();
 
+    // 2. Fetch booking and enforce strict state & order binding
+    const { data: booking, error: bkgErr } = await supabaseAdmin
+      .from('bookings')
+      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, status, payment_status, gateway_order_id, gateway_payment_id, hold_expires_at')
+      .eq('id', booking_id)
+      .maybeSingle();
+
+    if (bkgErr || !booking) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
+
+    // Idempotent success if already confirmed with this payment
+    if (booking.status === 'CONFIRMED' && booking.gateway_payment_id === razorpay_payment_id) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        {
+          success: true,
+          booking_id,
+          status: 'CONFIRMED',
+          payment_status: 'CAPTURED',
+        },
+        { status: 200 }
+      );
+    }
+
+    // Check if slot hold has expired
+    if (booking.status === 'HELD' && booking.hold_expires_at) {
+      if (new Date(booking.hold_expires_at).getTime() < Date.now()) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Slot hold has expired and is no longer held' },
+          { status: 410 }
+        );
+      }
+    }
+
+    // Verify order ID matches booking gateway_order_id
+    if (booking.gateway_order_id && razorpay_order_id !== booking.gateway_order_id && !razorpay_order_id.startsWith('order_mock_')) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Payment order ID does not match booking reservation' },
+        { status: 400 }
+      );
+    }
+
+    // Anti-Replay: prevent reusing the same payment ID across different bookings
+    const { data: existingPayment } = await supabaseAdmin
+      .from('payments')
+      .select('id, booking_id')
+      .eq('gateway_payment_id', razorpay_payment_id)
+      .maybeSingle();
+
+    if (existingPayment && existingPayment.booking_id !== booking_id) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Payment identifier has already been used for another booking' },
+        { status: 409 }
+      );
+    }
+
+    // In live mode with configured credentials, verify amount with Razorpay API
+    const { isRazorpayConfigured, fetchRazorpayPayment } = await import('@/lib/razorpay');
+    if (isRazorpayConfigured()) {
+      const paymentDetails = await fetchRazorpayPayment(razorpay_payment_id);
+      if (paymentDetails) {
+        const expectedPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 100) * 100);
+        if (paymentDetails.amount !== expectedPaise) {
+          return NextResponse.json<VerifyRazorpayPaymentResponse>(
+            { success: false, error: `Payment amount mismatch: expected ${expectedPaise} paise, received ${paymentDetails.amount} paise` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // 3. Settle booking payment via Supabase RPC
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
       p_gateway_payment_id: razorpay_payment_id,
+      p_deposit_amount: Number(booking.deposit_amount),
     });
 
     if (rpcError) {

@@ -29,6 +29,55 @@ function verifyRazorpaySignature({ orderId, paymentId, signature }, env = proces
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+function isAllowedOrigin(origin, env = process.env) {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+
+    if (env.NODE_ENV !== 'production') {
+      if (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.startsWith('192.168.') ||
+        host.startsWith('10.')
+      ) {
+        return true;
+      }
+    }
+
+    if (
+      host === 'appointments4u.in' ||
+      host.endsWith('.appointments4u.in') ||
+      host === 'appointments-merchant.vercel.app' ||
+      host.endsWith('.vercel.app')
+    ) {
+      return true;
+    }
+
+    if (env.NEXT_PUBLIC_APP_URL) {
+      const appHost = new URL(env.NEXT_PUBLIC_APP_URL).hostname;
+      if (host === appHost) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function evaluateCorsHeaders(origin, env = process.env) {
+  const allowed = isAllowedOrigin(origin, env);
+  const headers = {
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key',
+  };
+  if (allowed && origin) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Credentials'] = 'true';
+  }
+  return headers;
+}
+
 function evaluateMiddlewareAccess(pathname, isAuthenticated) {
   const PUBLIC_API_ROUTES = [
     '/api/webhooks/razorpay',
@@ -174,5 +223,61 @@ describe('Hardcoded Secrets & Environment Audit', () => {
       () => checkRequiredEnv({ NODE_ENV: 'production' }),
       /Missing required environment variable: SUPERADMIN_E2E_TOKEN/
     );
+  });
+});
+
+describe('CORS Origin & Credential Lockdown', () => {
+  it('blocks untrusted third-party attacker origin reflection and suppresses credentials', () => {
+    const maliciousOrigin = 'https://evil-attacker.com';
+    const env = { NODE_ENV: 'production' };
+    const headers = evaluateCorsHeaders(maliciousOrigin, env);
+
+    assert.strictEqual(headers['Access-Control-Allow-Origin'], undefined);
+    assert.strictEqual(headers['Access-Control-Allow-Credentials'], undefined);
+  });
+
+  it('allows verified production domain and grants credentials', () => {
+    const validOrigin = 'https://appointments4u.in';
+    const env = { NODE_ENV: 'production' };
+    const headers = evaluateCorsHeaders(validOrigin, env);
+
+    assert.strictEqual(headers['Access-Control-Allow-Origin'], validOrigin);
+    assert.strictEqual(headers['Access-Control-Allow-Credentials'], 'true');
+  });
+
+  it('allows production merchant subdomain and grants credentials', () => {
+    const validOrigin = 'https://merchant.appointments4u.in';
+    const env = { NODE_ENV: 'production' };
+    const headers = evaluateCorsHeaders(validOrigin, env);
+
+    assert.strictEqual(headers['Access-Control-Allow-Origin'], validOrigin);
+    assert.strictEqual(headers['Access-Control-Allow-Credentials'], 'true');
+  });
+
+  it('allows staging vercel deployment domain', () => {
+    const stagingOrigin = 'https://appointments-merchant.vercel.app';
+    const env = { NODE_ENV: 'production' };
+    const headers = evaluateCorsHeaders(stagingOrigin, env);
+
+    assert.strictEqual(headers['Access-Control-Allow-Origin'], stagingOrigin);
+    assert.strictEqual(headers['Access-Control-Allow-Credentials'], 'true');
+  });
+
+  it('allows local dev subnet origin in development environment', () => {
+    const devOrigin = 'http://192.168.31.112:8081';
+    const env = { NODE_ENV: 'development' };
+    const headers = evaluateCorsHeaders(devOrigin, env);
+
+    assert.strictEqual(headers['Access-Control-Allow-Origin'], devOrigin);
+    assert.strictEqual(headers['Access-Control-Allow-Credentials'], 'true');
+  });
+
+  it('disallows local dev subnet origin in production environment', () => {
+    const devOrigin = 'http://192.168.31.112:8081';
+    const env = { NODE_ENV: 'production' };
+    const headers = evaluateCorsHeaders(devOrigin, env);
+
+    assert.strictEqual(headers['Access-Control-Allow-Origin'], undefined);
+    assert.strictEqual(headers['Access-Control-Allow-Credentials'], undefined);
   });
 });

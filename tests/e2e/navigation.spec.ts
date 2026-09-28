@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { CustomerAppPage } from './pages/customer-app.page';
 
 test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation Suite', () => {
   test.beforeEach(async ({ page }) => {
@@ -109,8 +110,8 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     await page.getByText('Sri Venkateswara Dental & Implant Care').first().click();
 
     // Select time slot
-    const slotBtn = page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ }).first();
-    await slotBtn.click();
+    const customerApp = new CustomerAppPage(page);
+    await customerApp.selectFirstSlot();
 
     // Open Checkout
     await page.getByText('Hold Slot & Pay Deposit →').click();
@@ -189,8 +190,8 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     await page.getByText('Sri Venkateswara Dental & Implant Care').first().click();
 
     // Select time slot
-    const slotBtn = page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ }).first();
-    await slotBtn.click();
+    const customerApp = new CustomerAppPage(page);
+    await customerApp.selectFirstSlot();
 
     // Open Checkout
     await page.getByText('Hold Slot & Pay Deposit →').click();

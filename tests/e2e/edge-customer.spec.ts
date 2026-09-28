@@ -160,6 +160,7 @@ test.describe('Customer — Edge & Boundary Cases', () => {
 
     // Now cancel — inside penalty window
     const cancelRes = await request.post(`${BASE}/api/bookings/cancel`, {
+      headers: { 'x-customer-id': SEED_CUSTOMER_ID },
       data: { booking_id, reason: 'Changed plans' },
     });
     expect(cancelRes.status()).toBe(200);
@@ -206,6 +207,7 @@ test.describe('Customer — Edge & Boundary Cases', () => {
 
     // Attempt to reschedule B → into the same slot as A
     const reschedRes = await request.post(`${BASE}/api/bookings/reschedule`, {
+      headers: { 'x-customer-id': SEED_CUSTOMER_ID },
       data: {
         booking_id: bookingB,
         new_slot_start: new Date(tomorrow).toISOString(),

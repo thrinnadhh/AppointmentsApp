@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
 
 interface RegisterShopRequestBody {
   shopName: string;
@@ -23,28 +24,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = getSupabaseAdmin();
-
-    // Determine target user ID
-    let targetUserId = userId;
-
-    if (!targetUserId) {
-      // Try resolving from auth header or session cookie
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user } } = await supabase.auth.getUser(token);
-        if (user) {
-          targetUserId = user.id;
-        }
-      }
-    }
-
-    if (!targetUserId) {
+    const caller = await verifyAuthenticatedUser(request);
+    if (!caller) {
       return NextResponse.json(
         { error: 'User must be authenticated through Google or have a valid user session.' },
         { status: 401 }
       );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Determine target user ID - defaults to authenticated caller
+    let targetUserId = caller.id;
+
+    if (userId && userId !== caller.id) {
+      // Only platform admins may provision on behalf of another user
+      const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+      if (isAdmin) {
+        targetUserId = userId;
+      } else {
+        return NextResponse.json(
+          { error: 'Forbidden: Cannot register a shop for another user without administrator privileges.' },
+          { status: 403 }
+        );
+      }
     }
 
     // Call PostgreSQL SECURITY DEFINER RPC to provision shop and link owner

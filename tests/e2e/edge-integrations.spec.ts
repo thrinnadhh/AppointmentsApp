@@ -18,7 +18,7 @@ import { createClient } from '@supabase/supabase-js';
  */
 
 const BASE = 'http://localhost:3000';
-const ADMIN_BYPASS = 'tirupati-superadmin-e2e-2026';
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';

@@ -204,8 +204,15 @@ export class CustomerAppPage {
   }
 
   async expectProviderVisible(name: string, shouldBeVisible: boolean = true) {
-    const card = this.page.getByText(name).first();
+    let card = this.page.getByText(name).first();
     if (shouldBeVisible) {
+      if (!(await card.isVisible().catch(() => false))) {
+        if (await this.searchInput.isVisible().catch(() => false)) {
+          await this.searchInput.fill(name);
+          await this.page.waitForTimeout(400);
+        }
+      }
+      card = this.page.getByText(name).first();
       await card.scrollIntoViewIfNeeded().catch(() => {});
       await expect(card).toBeVisible({ timeout: 15000 });
     } else {
@@ -214,7 +221,8 @@ export class CustomerAppPage {
   }
 
   async selectDateOffset(label: 'Today' | 'Tomorrow') {
-    const dateChip = this.page.getByText(label, { exact: true });
+    const cardTestId = label === 'Today' ? 'customer-date-card-0' : 'customer-date-card-1';
+    const dateChip = this.page.getByTestId(cardTestId);
     await expect(dateChip).toBeVisible();
     await dateChip.click();
   }
@@ -222,43 +230,32 @@ export class CustomerAppPage {
   async selectFirstSlot() {
     await expect(this.slotSectionHeading).toBeVisible({ timeout: 15000 });
 
-    const slotsLoading = this.page.getByTestId('customer-slots-loading');
-    await expect(slotsLoading).toBeHidden({ timeout: 10000 }).catch(() => {});
+    const slotsLoading = this.page.getByTestId('customer-slots-loading').or(this.page.getByText('Checking live slot availability...'));
+    await expect(slotsLoading).toBeHidden({ timeout: 15000 }).catch(() => {});
 
-    // Check if Today is closed, all slots have passed, or 0 enabled slots exist
-    const closedNotice = this.page.getByTestId('customer-day-closed-notice');
-    const pastNotice = this.page.getByTestId('customer-all-slots-past-notice');
-    const currentEnabledSlotCount = await this.page
-      .locator('[role="button"]:not([aria-disabled="true"]):not([disabled])')
-      .filter({ hasText: /^[0-9]{2}:[0-9]{2} (am|pm)$/i })
-      .count();
-
-    const isTodayUnavailable =
-      currentEnabledSlotCount === 0 ||
-      (await closedNotice.isVisible().catch(() => false)) ||
-      (await pastNotice.isVisible().catch(() => false));
-
-    if (isTodayUnavailable) {
-      // Switch to Tomorrow date card
-      const tomorrowCard = this.page.getByTestId('customer-date-card-1');
-      if (await tomorrowCard.isVisible().catch(() => false)) {
-        await tomorrowCard.click();
-      } else {
-        await this.page.getByText('Tomorrow', { exact: true }).click();
-      }
-      await expect(slotsLoading).toBeHidden({ timeout: 10000 }).catch(() => {});
-      await this.page.waitForTimeout(400);
-    }
-
-    // Find the first slot button that is truly enabled (not disabled)
+    // Try finding an enabled slot on the currently selected day
     const enabledSlot = this.page
       .locator('[role="button"]:not([aria-disabled="true"]):not([disabled])')
-      .filter({ hasText: /^[0-9]{2}:[0-9]{2} (am|pm)$/i })
+      .filter({ hasText: /^[0-9]{1,2}:[0-9]{2}(\s*(am|pm))?$/i })
       .first();
 
-    await expect(enabledSlot).toBeVisible({ timeout: 10000 });
-    await enabledSlot.click();
+    const pastNotice = this.page.getByTestId('customer-all-slots-past-notice');
+    const closedNotice = this.page.getByTestId('customer-day-closed-notice');
 
+    const isSlotAvailable =
+      !(await pastNotice.isVisible().catch(() => false)) &&
+      !(await closedNotice.isVisible().catch(() => false)) &&
+      (await enabledSlot.isVisible({ timeout: 2000 }).catch(() => false));
+
+    if (!isSlotAvailable) {
+      // If no slot is visible on currently selected day (e.g. today concluded/closed or all booked), switch to Tomorrow
+      await this.selectDateOffset('Tomorrow');
+      await expect(slotsLoading).toBeHidden({ timeout: 15000 }).catch(() => {});
+    }
+
+    await expect(enabledSlot).toBeVisible({ timeout: 15000 });
+    await enabledSlot.scrollIntoViewIfNeeded().catch(() => {});
+    await enabledSlot.click();
     await expect(this.holdDepositBtn).toBeEnabled({ timeout: 5000 });
   }
 
@@ -275,7 +272,10 @@ export class CustomerAppPage {
 
   async navigateToMyBookings() {
     if (await this.myBookingsTitle.isVisible().catch(() => false)) {
-      return;
+      if (await this.backToBrowseBtn.isVisible().catch(() => false)) {
+        await this.backToBrowseBtn.click();
+        await expect(this.appTitle).toBeVisible({ timeout: 10000 });
+      }
     }
     await expect(this.myBookingsBtn).toBeVisible();
     await this.myBookingsBtn.click();

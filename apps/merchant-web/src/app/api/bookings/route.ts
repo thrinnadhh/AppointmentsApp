@@ -1,23 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
 
 export async function GET(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customer_id');
     const providerId = searchParams.get('provider_id');
-    const merchantProviderId = req.headers.get('x-merchant-provider-id');
-
-    // Tenant isolation: if a merchant requests bookings for a provider that doesn't match their authenticated provider, reject with 403
-    if (providerId && merchantProviderId && providerId !== merchantProviderId) {
-      return NextResponse.json({ error: 'Forbidden: tenant isolation boundary violation' }, { status: 403 });
-    }
 
     if (!customerId && !providerId) {
       return NextResponse.json({ error: 'Missing customer_id or provider_id parameter' }, { status: 400 });
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+    const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+
+    // Non-admin callers must satisfy strict ownership / tenancy
+    if (!isAdmin) {
+      if (customerId && customerId !== caller.id) {
+        return NextResponse.json({ error: 'Forbidden: Cannot access bookings for another customer' }, { status: 403 });
+      }
+
+      if (providerId) {
+        const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
+          p_user_id: caller.id,
+        });
+        const allowedList = Array.isArray(authProviders) ? authProviders : [];
+        let isAuthorizedProvider = allowedList.includes(providerId);
+
+        if (!isAuthorizedProvider) {
+          const { data: prov } = await supabaseAdmin
+            .from('providers')
+            .select('owner_id')
+            .eq('id', providerId)
+            .maybeSingle();
+          if (prov && prov.owner_id === caller.id) {
+            isAuthorizedProvider = true;
+          }
+        }
+
+        if (!isAuthorizedProvider) {
+          return NextResponse.json({ error: 'Forbidden: Tenant isolation boundary violation' }, { status: 403 });
+        }
+      }
+    }
+
     let query = supabaseAdmin
       .from('bookings')
       .select(`

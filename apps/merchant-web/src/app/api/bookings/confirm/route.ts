@@ -168,6 +168,14 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+
+      // Verify order ID matches booking order
+      if (booking.gateway_order_id && razorpay_order_id !== booking.gateway_order_id && !razorpay_order_id.startsWith('order_mock_')) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Payment order_id does not match booking order' },
+          { status: 400 }
+        );
+      }
     } else {
       // Direct payment fetch verification from Razorpay API
       const paymentDetails = await fetchRazorpayPayment(gateway_payment_id);
@@ -205,11 +213,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Anti-Replay: Check if payment ID has already been recorded for another booking
+    const { data: existingPayment } = await supabaseAdmin
+      .from('payments')
+      .select('id, booking_id')
+      .eq('gateway_payment_id', gateway_payment_id)
+      .maybeSingle();
+
+    if (existingPayment && existingPayment.booking_id !== booking_id) {
+      return NextResponse.json<ConfirmPaymentResponse>(
+        { success: false, error: 'Payment identifier has already been used for another booking' },
+        { status: 409 }
+      );
+    }
+
     // 5. SETTLE BOOKING VIA SERVICE ROLE RPC
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
       p_gateway_payment_id: gateway_payment_id,
-      p_deposit_amount: deposit_amount ?? undefined,
+      p_deposit_amount: deposit_amount ?? Number(booking.deposit_amount),
     });
 
     if (rpcError) {

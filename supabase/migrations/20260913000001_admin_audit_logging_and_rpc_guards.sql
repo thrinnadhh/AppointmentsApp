@@ -93,10 +93,12 @@ GRANT EXECUTE ON FUNCTION public.log_admin_action(text, text, text, jsonb) TO au
 
 -- 3. Hardened admin_update_merchant_status with Role Verification & Audit Logging
 DROP FUNCTION IF EXISTS public.admin_update_merchant_status(uuid, text);
+DROP FUNCTION IF EXISTS public.admin_update_merchant_status(uuid, text, text);
 
 CREATE OR REPLACE FUNCTION public.admin_update_merchant_status(
   p_provider_id uuid,
-  p_status text
+  p_status text,
+  p_admin_token text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql

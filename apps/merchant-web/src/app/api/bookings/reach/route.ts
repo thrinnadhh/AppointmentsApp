@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,17 +14,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
     const { data: booking, error: fetchError } = await supabaseAdmin
       .from('bookings')
-      .select('id, provider_id, status, is_present, customer_arrived_at')
+      .select('id, customer_id, provider_id, status, is_present, customer_arrived_at')
       .eq('id', booking_id)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !booking) {
       return NextResponse.json(
         { success: false, error: 'Booking not found' },
         { status: 404 }
+      );
+    }
+
+    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Caller is not authorized for this booking' },
+        { status: 403 }
       );
     }
 

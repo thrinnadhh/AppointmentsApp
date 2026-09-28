@@ -24,6 +24,45 @@ const PUBLIC_API_ROUTES = [
   '/api/cities/',
 ];
 
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+
+    // Local development origins
+    if (process.env.NODE_ENV !== 'production') {
+      if (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.startsWith('192.168.') ||
+        host.startsWith('10.')
+      ) {
+        return true;
+      }
+    }
+
+    // Production whitelisted domains
+    if (
+      host === 'appointments4u.in' ||
+      host.endsWith('.appointments4u.in') ||
+      host === 'appointments-merchant.vercel.app' ||
+      host.endsWith('.vercel.app')
+    ) {
+      return true;
+    }
+
+    const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (configuredAppUrl) {
+      const appHost = new URL(configuredAppUrl).hostname;
+      if (host === appHost) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -36,13 +75,18 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
-  const origin = req.headers.get('origin') || '*';
+  const reqOrigin = req.headers.get('origin');
+  const originAllowed = isAllowedOrigin(reqOrigin);
+
   const corsHeaders: Record<string, string> = {
-    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key',
-    'Access-Control-Allow-Credentials': 'true',
   };
+
+  if (originAllowed && reqOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = reqOrigin;
+    corsHeaders['Access-Control-Allow-Credentials'] = 'true';
+  }
 
   // Handle CORS preflight OPTIONS requests immediately
   if (pathname.startsWith('/api/') && req.method === 'OPTIONS') {

@@ -46,7 +46,7 @@ interface CheckoutModalProps {
   categoryId?: string | null;
   customerId?: string;
   onClose: () => void;
-  onPaymentSuccess: (bookingId: string) => void;
+  onPaymentSuccess: (bookingId: string, referenceCode?: string) => void;
 }
 
 
@@ -243,11 +243,11 @@ export default function CheckoutModal({
       });
 
       if (verifyRes.success) {
-        onPaymentSuccess(bookingId);
+        onPaymentSuccess(bookingId, holdRes.reference_code);
       } else {
         // Fallback to direct Supabase confirmation if verification endpoint is unavailable
         await confirmBookingPaymentOnSupabase(bookingId, paymentId, attachedPath);
-        onPaymentSuccess(bookingId);
+        onPaymentSuccess(bookingId, holdRes.reference_code);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Payment failed. Please try again.';

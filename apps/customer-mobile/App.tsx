@@ -53,6 +53,7 @@ export default function App() {
   const [profileVisible, setProfileVisible] = useState<boolean>(false);
   const [activeResource, setActiveResource] = useState<Resource | null>(null);
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
+  const [activeProviderName, setActiveProviderName] = useState<string>('Sri Venkateswara Dental & Implant Care');
 
   // Authentication & Active Customer State
   const [activeCustomerId, setActiveCustomerId] = useState<string>(DEMO_CUSTOMER_ID);
@@ -318,13 +319,14 @@ export default function App() {
     ]);
   }, [selectedProviderId, activeCategoryId, loadBookings]);
 
-  const handleProceedToHold = (resource: Resource, slot: Slot) => {
+  const handleProceedToHold = (resource: Resource, slot: Slot, providerName?: string) => {
     setActiveResource(resource);
     setActiveSlot(slot);
+    if (providerName) setActiveProviderName(providerName);
     setCheckoutVisible(true);
   };
 
-  const handlePaymentSuccess = async (bookingId: string) => {
+  const handlePaymentSuccess = (bookingId: string, referenceCode?: string) => {
     setCheckoutVisible(false);
     const fee = getPlatformFee(activeCategoryId);
     const deposit = Number(activeResource?.deposit_amount) || 100;
@@ -343,7 +345,8 @@ export default function App() {
       deposit_amount: deposit,
       platform_fee: fee,
       total_amount: total,
-      provider_name: 'Sri Venkateswara Dental & Implant Care',
+      reference_code: referenceCode || `TPT-${bookingId.slice(0, 6).toUpperCase()}`,
+      provider_name: activeProviderName || 'Sri Venkateswara Dental & Implant Care',
       resource_name: activeResource?.name || 'Assigned Staff / Unit',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -355,7 +358,7 @@ export default function App() {
       ...prev,
       { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
     ]);
-    await loadBookings();
+    loadBookings();
 
     setTimeout(() => {
       setConfirmationToast(null);

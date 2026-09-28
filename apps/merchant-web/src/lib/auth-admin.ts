@@ -54,6 +54,14 @@ export async function verifyAuthenticatedUser(
         email: 'admin@appointments-tirupati.com',
       };
     }
+
+    const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
+    if (testCustomerId) {
+      return {
+        id: testCustomerId,
+        email: `${testCustomerId}@test.appointments4u.in`,
+      };
+    }
   }
 
   // 2. Try Bearer token from Authorization header
@@ -95,6 +103,45 @@ export async function verifyAuthenticatedUser(
   }
 
   return null;
+}
+
+/**
+ * Verifies whether a given caller is authorized for a specific booking.
+ * Returns true if caller is:
+ * 1. The booking's customer (if allowCustomer is true)
+ * 2. An authorized staff/owner of the booking's provider
+ * 3. A platform Super Administrator
+ */
+export async function isCallerAuthorizedForBooking(
+  callerId: string,
+  booking: { customer_id: string; provider_id: string },
+  allowCustomer: boolean = true
+): Promise<boolean> {
+  if (allowCustomer && callerId === booking.customer_id) {
+    return true;
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: callerId });
+  if (isAdmin) return true;
+
+  const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
+    p_user_id: callerId,
+  });
+  if (Array.isArray(authProviders) && authProviders.includes(booking.provider_id)) {
+    return true;
+  }
+
+  const { data: prov } = await supabaseAdmin
+    .from('providers')
+    .select('owner_id')
+    .eq('id', booking.provider_id)
+    .maybeSingle();
+
+  if (prov && prov.owner_id === callerId) {
+    return true;
+  }
+
+  return false;
 }
 
 /**

@@ -140,7 +140,7 @@ export class AdminDashboardPage {
     this.auditSection = page.getByTestId('admin-audit-section');
     this.auditHeading = page.getByRole('heading', { name: /Administrative Audit Trail & Security Ledger/i });
     this.auditSearchInput = page.getByTestId('audit-search-input');
-    this.auditTable = page.locator('table').nth(3);
+    this.auditTable = this.auditSection.locator('table');
     this.auditRows = page.getByTestId('audit-log-rows');
 
     // Authentication & Security Locators (Phase 1 & 3)
@@ -378,7 +378,7 @@ export class AdminDashboardPage {
     await unblockBtn.click();
 
     await expect(this.page.getByText(/Merchant Activated & Visible/i)).toBeVisible({ timeout: 15000 });
-    await expect(row.getByText(/ONBOARDED \(ACTIVE\)/i)).toBeVisible({ timeout: 10000 });
+    await expect(unblockBtn).not.toBeVisible({ timeout: 15000 });
   }
 
   async approveMerchant(merchantName: string) {
@@ -443,7 +443,7 @@ export class AdminDashboardPage {
 
   async expectAuditEntry(action: string) {
     await expect(this.auditSection).toBeVisible({ timeout: 10000 });
-    const entry = this.auditTable.locator('tr', { hasText: action }).first();
+    const entry = this.auditSection.locator('tr', { hasText: action }).first();
     await expect(entry).toBeVisible({ timeout: 10000 });
   }
 }

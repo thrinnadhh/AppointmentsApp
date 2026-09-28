@@ -238,7 +238,7 @@ export default function MyBookingsScreen({
                   </Text>
                 </View>
 
-                {(booking.status === 'CANCELLED' || booking.status === 'NO_SHOW') && booking.payment_status === 'REFUNDED' && (
+                {(booking.status === 'CANCELLED' || booking.status === 'NO_SHOW') && (booking.payment_status === 'REFUNDED' || booking.payment_status === 'REFUND_PENDING') && (
                   <View style={{ backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', borderRadius: 8, padding: 8, marginTop: 8 }}>
                     <Text style={{ fontSize: 11, color: '#166534', fontWeight: '600' }}>
                       💚 100% Refund Issued: Your deposit has been credited back to your account.

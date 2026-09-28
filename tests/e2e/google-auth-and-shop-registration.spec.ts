@@ -62,8 +62,9 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
   });
 
   test('TC-GOOGLE-06: /register presents shop details form with owner name, phone, address, and shop storefront photo upload', async ({ page }) => {
+    const bypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
     await page.setExtraHTTPHeaders({
-      'x-merchant-bypass-key': 'tirupati-superadmin-e2e-2026',
+      'x-merchant-bypass-key': bypassToken,
     });
 
     // Provide mock authenticated user state to view the registration form
@@ -96,8 +97,10 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     const uniqueSuffix = Date.now();
     const testPhotoUrl = `https://ynkdnwhubfknnnzjtpeg.supabase.co/storage/v1/object/public/venue-assets/test-shop-${uniqueSuffix}.webp`;
 
-    // 1. Register a shop with the photo URL using a valid user ID
+    const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+    // 1. Register a shop with the photo URL using a valid user ID (provisioned by admin)
     const regRes = await request.post('http://localhost:3000/api/merchant/register-shop', {
+      headers: { 'x-admin-bypass-key': adminBypass },
       data: {
         userId: '88888888-8888-8888-8888-888888888883',
         fullName: `Dr. Tester ${uniqueSuffix}`,
@@ -113,5 +116,15 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     const regData = await regRes.json();
     expect(regData.success).toBe(true);
     expect(regData.data.photos).toContain(testPhotoUrl);
+
+    // Clean up created test shop to prevent multi-tenant test bleed
+    if (regData.data?.id) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co',
+        process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+      );
+      await supabaseAdmin.from('providers').delete().eq('id', regData.data.id);
+    }
   });
 });
