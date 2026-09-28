@@ -2,6 +2,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // --- Reference implementations of route handler guards ---
 
@@ -325,6 +327,72 @@ function handleRegisterShop({ caller, targetUserId, payload }) {
   return { status: 200, success: true, provisionedFor: effectiveUserId };
 }
 
+// 9. Payment Order Creation & Idempotency Guard
+function handleCreateOrder({ caller, booking, clientIp, ipRequestCount = 1 }) {
+  if (ipRequestCount > 30) {
+    return { status: 429, error: 'Too many order requests. Please wait a minute.' };
+  }
+  if (!booking) {
+    return { status: 404, error: 'Booking not found' };
+  }
+  if (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') {
+    return { status: 400, error: 'Booking is already confirmed' };
+  }
+  if (booking.isHoldExpired) {
+    return { status: 410, error: 'Booking hold has expired. Please re-select a slot.' };
+  }
+  if (caller) {
+    const isAuthorized = caller.role === 'admin' ||
+      caller.id === booking.customer_id ||
+      (caller.authorizedProviders && caller.authorizedProviders.includes(booking.provider_id));
+    if (!isAuthorized) {
+      return { status: 403, error: 'Forbidden: You are not authorized to create an order for this booking' };
+    }
+  }
+
+  const depositInInr = Number(booking.deposit_amount) || 100;
+  const platformFeeInInr = 10;
+  const totalInInr = depositInInr + platformFeeInInr;
+  const amountInPaise = totalInInr * 100;
+
+  if (booking.gateway_order_id && Number(booking.total_amount) === totalInInr) {
+    return {
+      status: 200,
+      success: true,
+      order_id: booking.gateway_order_id,
+      amount: amountInPaise,
+      idempotent: true,
+    };
+  }
+
+  return {
+    status: 200,
+    success: true,
+    order_id: `order_${Math.random().toString(36).substring(2, 9)}`,
+    amount: amountInPaise,
+    idempotent: false,
+  };
+}
+
+// 10. Merchant Provider Info Tenant Guard
+function handleGetProvider({ caller, providerId, providerRecord }) {
+  if (!caller || !caller.id) {
+    return { status: 401, error: 'Unauthorized: Authentication required to view provider details' };
+  }
+  const isSuperAdmin = caller.role === 'admin';
+  if (!isSuperAdmin) {
+    const isAuthorized = (caller.authorizedProviders && caller.authorizedProviders.includes(providerId)) ||
+      (providerRecord && providerRecord.owner_id === caller.id);
+    if (!isAuthorized) {
+      return { status: 403, error: 'Forbidden: You are not authorized to view this provider record' };
+    }
+  }
+  if (!providerRecord) {
+    return { status: 404, error: 'Provider not found' };
+  }
+  return { status: 200, success: true, provider: providerRecord };
+}
+
 describe('4. Booking Mutation Auth & Ownership Guards (/api/bookings/*)', () => {
   const mockBooking = {
     id: 'bkg_123',
@@ -579,3 +647,133 @@ describe('8. Merchant Registration Privilege Escalation Guard (/api/merchant/reg
     assert.strictEqual(res.provisionedFor, 'designated_merchant_777');
   });
 });
+
+describe('9. Payment Order Creation & Idempotency Guards (/api/payments/create-order)', () => {
+  const heldBooking = {
+    id: 'bkg_held_1',
+    customer_id: 'cust_alice',
+    provider_id: 'prov_clinic',
+    deposit_amount: 100,
+    total_amount: 110,
+    status: 'HELD',
+    isHoldExpired: false,
+    gateway_order_id: null,
+  };
+
+  it('rejects with 429 when IP rate limit is exceeded', () => {
+    const res = handleCreateOrder({
+      caller: { id: 'cust_alice', role: 'customer' },
+      booking: heldBooking,
+      clientIp: '1.2.3.4',
+      ipRequestCount: 35,
+    });
+    assert.strictEqual(res.status, 429);
+    assert.match(res.error, /Too many order requests/);
+  });
+
+  it('prevents IDOR: blocks unauthorized caller from creating order for another user booking (403)', () => {
+    const res = handleCreateOrder({
+      caller: { id: 'cust_mallory', role: 'customer', authorizedProviders: [] },
+      booking: heldBooking,
+    });
+    assert.strictEqual(res.status, 403);
+    assert.match(res.error, /Forbidden/);
+  });
+
+  it('allows authorized customer to create order (200)', () => {
+    const res = handleCreateOrder({
+      caller: { id: 'cust_alice', role: 'customer' },
+      booking: heldBooking,
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.success, true);
+    assert.ok(res.order_id);
+    assert.strictEqual(res.amount, 11000);
+    assert.strictEqual(res.idempotent, false);
+  });
+
+  it('idempotently reuses existing order when booking already has an active order with matching amount', () => {
+    const bookingWithOrder = {
+      ...heldBooking,
+      gateway_order_id: 'order_existing_999',
+    };
+    const res = handleCreateOrder({
+      caller: { id: 'cust_alice', role: 'customer' },
+      booking: bookingWithOrder,
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.order_id, 'order_existing_999');
+    assert.strictEqual(res.idempotent, true);
+  });
+});
+
+describe('10. Merchant Provider Info Tenant Guard (/api/merchant/provider)', () => {
+  const providerAlpha = { id: 'prov_alpha', owner_id: 'merch_alpha_owner' };
+  const providerBeta = { id: 'prov_beta', owner_id: 'merch_beta_owner' };
+
+  it('rejects unauthenticated requests (401)', () => {
+    const res = handleGetProvider({ caller: null, providerId: 'prov_alpha', providerRecord: providerAlpha });
+    assert.strictEqual(res.status, 401);
+  });
+
+  it('prevents tenant boundary violation: blocks merchant A from viewing provider details of merchant B (403)', () => {
+    const merchantCaller = { id: 'merch_beta_owner', role: 'merchant', authorizedProviders: ['prov_beta'] };
+    const res = handleGetProvider({ caller: merchantCaller, providerId: 'prov_alpha', providerRecord: providerAlpha });
+    assert.strictEqual(res.status, 403);
+    assert.match(res.error, /Forbidden/);
+  });
+
+  it('allows merchant to view their authorized provider details (200)', () => {
+    const merchantCaller = { id: 'merch_alpha_owner', role: 'merchant', authorizedProviders: ['prov_alpha'] };
+    const res = handleGetProvider({ caller: merchantCaller, providerId: 'prov_alpha', providerRecord: providerAlpha });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.provider.id, 'prov_alpha');
+  });
+
+  it('allows platform superadmin to view any provider details (200)', () => {
+    const adminCaller = { id: 'admin_sys', role: 'admin' };
+    const res = handleGetProvider({ caller: adminCaller, providerId: 'prov_alpha', providerRecord: providerAlpha });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.provider.id, 'prov_alpha');
+  });
+});
+
+describe('11. Database SECURITY DEFINER Function search_path Audit', () => {
+  it('verifies all SECURITY DEFINER functions in migrations have immutable search_path configured', () => {
+    const migrationDir = path.join(process.cwd(), 'supabase', 'migrations');
+    const files = fs.readdirSync(migrationDir).filter((f) => f.endsWith('.sql')).sort();
+
+    const secDefRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([^\s\(]+)/i;
+    const latestFn = new Map();
+
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(migrationDir, file), 'utf8');
+      const chunks = content.split(/(?=CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION)/i);
+      for (const chunk of chunks) {
+        if (/SECURITY\s+DEFINER/i.test(chunk)) {
+          const m = chunk.match(secDefRegex);
+          if (!m) continue;
+          const fnName = m[1].toLowerCase().replace(/"/g, '');
+          const asIdx = chunk.search(/AS\s+(?:\$\$|'|\$FUNCTION\$)/i);
+          const header = asIdx !== -1 ? chunk.substring(0, asIdx) : chunk;
+          const hasSearchPath = /SET\s+SEARCH_PATH/i.test(header);
+          latestFn.set(fnName, { file, hasSearchPath });
+        }
+      }
+    }
+
+    const mutableFns = [];
+    for (const [fnName, details] of latestFn.entries()) {
+      if (!details.hasSearchPath) {
+        mutableFns.push(`${fnName} (from ${details.file})`);
+      }
+    }
+
+    assert.strictEqual(
+      mutableFns.length,
+      0,
+      `Detected SECURITY DEFINER functions with mutable search_path: ${mutableFns.join(', ')}`
+    );
+  });
+});
+

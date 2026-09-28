@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createRazorpayOrder, getRazorpayKeyId } from '@/lib/razorpay';
+import { checkRateLimit } from '@/lib/redis';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. IP rate limiting (30 requests/minute)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const rateLimit = await checkRateLimit(`order-ip:${clientIp}`, 30, 60);
+    if (!rateLimit.allowed) {
+      return NextResponse.json<CreateRazorpayOrderResponse>(
+        { success: false, error: 'Too many order requests. Please wait a minute.' },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as Partial<CreateRazorpayOrderRequest>;
     const { booking_id } = body;
 
@@ -20,7 +32,7 @@ export async function POST(req: NextRequest) {
     // Verify booking exists and is in an active lock / held state
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, status, hold_expires_at')
+      .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, status, hold_expires_at, gateway_order_id')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -37,6 +49,18 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Booking not found' },
         { status: 404 }
       );
+    }
+
+    // Check if caller is authenticated and authorized for this booking
+    const caller = await verifyAuthenticatedUser(req);
+    if (caller) {
+      const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
+      if (!isAuthorized) {
+        return NextResponse.json<CreateRazorpayOrderResponse>(
+          { success: false, error: 'Forbidden: You are not authorized to create an order for this booking' },
+          { status: 403 }
+        );
+      }
     }
 
     // Check if booking is already confirmed or completed
@@ -71,6 +95,24 @@ export async function POST(req: NextRequest) {
     const platformFeeInInr = getPlatformFee(categoryId);
     const totalInInr = depositInInr + platformFeeInInr;
     const amountInPaise = Math.round(totalInInr * 100);
+
+    // Idempotency: Reuse existing active gateway_order_id if amount matches
+    if (booking.gateway_order_id && Number(booking.total_amount) === totalInInr) {
+      return NextResponse.json<CreateRazorpayOrderResponse>(
+        {
+          success: true,
+          order_id: booking.gateway_order_id,
+          key_id: getRazorpayKeyId(),
+          amount: amountInPaise,
+          currency: 'INR',
+          is_mock: booking.gateway_order_id.startsWith('order_mock_'),
+          deposit_amount: depositInInr,
+          platform_fee: platformFeeInInr,
+          total_amount: totalInInr,
+        },
+        { status: 200 }
+      );
+    }
 
     // Defensively sync platform fee & total amount onto booking record
     await supabaseAdmin

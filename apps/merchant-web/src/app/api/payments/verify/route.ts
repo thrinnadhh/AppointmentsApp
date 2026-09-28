@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyRazorpaySignature } from '@/lib/razorpay';
+import { checkRateLimit } from '@/lib/redis';
 import { VerifyRazorpayPaymentRequest, VerifyRazorpayPaymentResponse, getPlatformFee } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
   try {
+    // 0. IP rate limiting (30 attempts/minute)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const rateLimit = await checkRateLimit(`pay-verify-ip:${clientIp}`, 30, 60);
+    if (!rateLimit.allowed) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Too many payment verification attempts. Please wait a minute.' },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as Partial<VerifyRazorpayPaymentRequest>;
     const {
       booking_id,

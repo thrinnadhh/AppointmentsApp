@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { acquireSlotLock, releaseSlotLock, checkRateLimit } from '@/lib/redis';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { captureException } from '@/lib/sentry';
 import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
 
@@ -28,7 +29,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Rate Limit: max 10 reservation attempts per customer per minute
+    // IP Rate Limit: max 30 reservation attempts per IP per minute
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, 30, 60);
+    if (!ipRateLimit.allowed) {
+      return NextResponse.json<CreateHoldResponse>(
+        {
+          success: false,
+          error: 'Too many reservation attempts from this network. Please wait a minute.',
+        },
+        { status: 429 }
+      );
+    }
+
+    // Customer Rate Limit: max 10 reservation attempts per customer per minute
     const rateLimit = await checkRateLimit(`hold:${customer_id}`, 10, 60);
     if (!rateLimit.allowed) {
       return NextResponse.json<CreateHoldResponse>(
@@ -38,6 +52,29 @@ export async function POST(req: NextRequest) {
         },
         { status: 429 }
       );
+    }
+
+    // Customer Identity Integrity: prevent creating holds under another user's customer_id
+    const caller = await verifyAuthenticatedUser(req);
+    if (caller && caller.id !== customer_id) {
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', caller.id)
+        .maybeSingle();
+
+      const roleStr = profile?.role as string | undefined;
+      const isStaffOrAdmin = roleStr === 'admin' || roleStr === 'merchant' || roleStr === 'manager';
+      if (!isStaffOrAdmin) {
+        return NextResponse.json<CreateHoldResponse>(
+          {
+            success: false,
+            error: 'Forbidden: You cannot reserve appointments on behalf of another customer',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Past slot validation
