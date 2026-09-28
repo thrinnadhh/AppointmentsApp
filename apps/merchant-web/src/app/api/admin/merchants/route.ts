@@ -48,7 +48,8 @@ export async function PATCH(request: NextRequest) {
           { status: 400 }
         );
       }
-      const result = await updateAdminMerchantStatus(providerId, status);
+      const adminToken = request.headers.get('x-admin-bypass-key') || undefined;
+      const result = await updateAdminMerchantStatus(providerId, status, adminToken);
       console.log('[API Admin Merchants PATCH]', { providerId, status, result });
       if (!result.success) {
         return NextResponse.json({ error: result.error || 'Update failed' }, { status: 400 });

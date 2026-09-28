@@ -19,7 +19,8 @@
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test:e2e": "playwright test",
-    "test": "pnpm test:e2e"
+    "test": "pnpm test:e2e",
+    "test:security": "node --test test-security.mjs test-routes.mjs"
   },
   "keywords": [
     "appointments",

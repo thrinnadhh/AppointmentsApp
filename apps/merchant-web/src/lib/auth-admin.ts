@@ -24,7 +24,78 @@ export interface AdminAuthFailure {
 
 export type AdminAuthResult = AdminAuthSuccess | AdminAuthFailure;
 
-export const E2E_ADMIN_BYPASS_SECRET = 'tirupati-superadmin-e2e-2026';
+export const E2E_ADMIN_BYPASS_SECRET = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
+
+// Fail-fast production check: Ensure admin credentials/secrets are defined
+if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN) {
+  throw new Error('CRITICAL SECURITY ERROR: ADMIN_SECRET (or SUPERADMIN_E2E_TOKEN) environment variable is required in production.');
+}
+
+/**
+ * Resolves the authenticated user from Bearer header, SSR cookies, or non-production test bypass.
+ */
+export async function verifyAuthenticatedUser(
+  request: NextRequest
+): Promise<{ id: string; email?: string } | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  // 1. Non-production E2E test bypass header check
+  if (process.env.NODE_ENV !== 'production' && E2E_ADMIN_BYPASS_SECRET) {
+    const adminBypass = request.headers.get('x-admin-bypass-key');
+    const merchantBypass = request.headers.get('x-merchant-bypass-key');
+    if (adminBypass === E2E_ADMIN_BYPASS_SECRET || merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
+      return {
+        id: '88888888-8888-8888-8888-888888888881',
+        email: 'admin@appointments-tirupati.com',
+      };
+    }
+  }
+
+  // 2. Try Bearer token from Authorization header
+  const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (token) {
+      try {
+        const directClient = createClient(supabaseUrl, supabaseAnonKey);
+        const { data, error } = await directClient.auth.getUser(token);
+        if (!error && data?.user) {
+          return { id: data.user.id, email: data.user.email };
+        }
+      } catch (err) {
+        console.warn('[auth] Bearer token verification failed:', err);
+      }
+    }
+  }
+
+  // 3. Fallback to Supabase SSR cookie inspection
+  try {
+    const ssrClient = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll() {
+          // Read-only inspection in API route guard
+        },
+      },
+    });
+
+    const { data, error } = await ssrClient.auth.getUser();
+    if (!error && data?.user) {
+      return { id: data.user.id, email: data.user.email };
+    }
+  } catch (err) {
+    console.warn('[auth] Cookie auth verification failed:', err);
+  }
+
+  return null;
+}
 
 /**
  * Verifies that an incoming NextRequest originates from an authenticated session
@@ -44,7 +115,7 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
   }
 
   // 1. Non-production E2E test bypass header check
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && E2E_ADMIN_BYPASS_SECRET) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
     if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
       return {
@@ -62,47 +133,7 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
     }
   }
 
-  let user: { id: string; email?: string } | null = null;
-
-  // 2. Try Bearer token from Authorization header
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (token) {
-      try {
-        const directClient = createClient(supabaseUrl, supabaseAnonKey);
-        const { data, error } = await directClient.auth.getUser(token);
-        if (!error && data?.user) {
-          user = { id: data.user.id, email: data.user.email };
-        }
-      } catch (err) {
-        console.warn('[auth-admin] Bearer token verification failed:', err);
-      }
-    }
-  }
-
-  // 3. Fallback to Supabase SSR cookie inspection
-  if (!user) {
-    try {
-      const ssrClient = createServerClient(supabaseUrl, supabaseAnonKey, {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll() {
-            // Read-only inspection in API route guard
-          },
-        },
-      });
-
-      const { data, error } = await ssrClient.auth.getUser();
-      if (!error && data?.user) {
-        user = { id: data.user.id, email: data.user.email };
-      }
-    } catch (err) {
-      console.warn('[auth-admin] Cookie auth verification failed:', err);
-    }
-  }
+  const user = await verifyAuthenticatedUser(request);
 
   // If no valid user found in cookies or Bearer token
   if (!user) {
@@ -166,7 +197,7 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
   }
 
   // 1. Non-production E2E test bypass header check
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && E2E_ADMIN_BYPASS_SECRET) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
     if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
       return {

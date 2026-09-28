@@ -197,6 +197,24 @@ export async function updateBookingStatus(
   paymentStatus?: Database['public']['Enums']['payment_status']
 ) {
   if (status === 'CANCELLED') {
+    try {
+      const resp = await fetch('/api/bookings/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          booking_id: bookingId,
+          reason: 'Merchant status update',
+          initiated_by: 'MERCHANT',
+        }),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.success) return json;
+      }
+    } catch {
+      // Fall through to RPC if fetch fails
+    }
+
     const { data, error } = await supabase.rpc('cancel_booking', {
       p_booking_id: bookingId,
       p_reason: 'Merchant status update',
@@ -292,6 +310,20 @@ export async function reassignBookingResource(bookingId: string, newResourceId: 
 }
 
 export async function recordMerchantNoShow(bookingId: string) {
+  try {
+    const resp = await fetch('/api/bookings/no-show', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
+    if (resp.ok) {
+      const json = await resp.json();
+      if (json.success) return json;
+    }
+  } catch {
+    // Fall through to RPC if fetch fails
+  }
+
   const { data, error } = await supabase.rpc('record_no_show', {
     p_booking_id: bookingId,
   });

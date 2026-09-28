@@ -21,12 +21,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
-    // 2. Secret resolution with dev fallback
-    const webhookSecret =
-      process.env.RAZORPAY_WEBHOOK_SECRET ||
-      (process.env.NODE_ENV !== 'production' ? '30772a35dc5bf0a5889b1af5dfd0409c364749e83c6e0e1d' : undefined);
+    // 2. Secret resolution strictly from environment variable
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('CRITICAL SECURITY ERROR: RAZORPAY_WEBHOOK_SECRET environment variable is missing in production');
+      }
       console.error('RAZORPAY_WEBHOOK_SECRET is not configured — refusing webhook request');
       return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
     }
@@ -160,7 +161,7 @@ export async function POST(req: NextRequest) {
         { onConflict: 'gateway_payment_id' }
       );
 
-      return NextResponse.json({ success: true, booking_id: booking.id, status: 'CONFIRMED' }, { status: 200 });
+      return NextResponse.json({ success: true, received: true, event, booking_id: booking.id, status: 'CONFIRMED' }, { status: 200 });
     } else if (event === 'payment.failed') {
       const orderIdOrNotes = orderId;
       if (orderIdOrNotes) {

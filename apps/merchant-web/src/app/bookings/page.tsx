@@ -170,7 +170,7 @@ export default function BookingsManagementPage() {
     try {
       if (newStatus === 'NO_SHOW') {
         const res = (await recordMerchantNoShow(bookingId)) as { payment_status?: string; penalty_applied?: boolean } | null;
-        if (res?.payment_status === 'REFUNDED') {
+        if (res?.payment_status === 'REFUNDED' || res?.payment_status === 'REFUND_PENDING') {
           setFeedbackToast('No-show recorded: Courtesy refund granted to customer (Grace Period).');
         } else {
           setFeedbackToast('No-show recorded: Strike 3 penalty applied, deposit forfeited to shop.');

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 interface RpcReleaseResult {
@@ -7,16 +7,36 @@ interface RpcReleaseResult {
   timestamp: string;
 }
 
-export async function GET() {
-  return handleRelease();
+function verifyCronAuth(req: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Cron Security] CRON_SECRET is not configured in production environment');
+    }
+    return false;
+  }
+
+  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+  return authHeader === `Bearer ${cronSecret}`;
 }
 
-export async function POST() {
-  return handleRelease();
+export async function GET(req: NextRequest) {
+  return handleRelease(req);
 }
 
-async function handleRelease() {
+export async function POST(req: NextRequest) {
+  return handleRelease(req);
+}
+
+async function handleRelease(req: NextRequest) {
   try {
+    if (!verifyCronAuth(req)) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Invalid or missing cron secret' },
+        { status: 401 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin.rpc('release_expired_holds');
 
@@ -45,3 +65,4 @@ async function handleRelease() {
     );
   }
 }
+

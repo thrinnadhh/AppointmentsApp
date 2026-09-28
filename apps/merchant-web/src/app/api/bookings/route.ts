@@ -5,21 +5,35 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customer_id');
+    const providerId = searchParams.get('provider_id');
+    const merchantProviderId = req.headers.get('x-merchant-provider-id');
 
-    if (!customerId) {
-      return NextResponse.json({ error: 'Missing customer_id parameter' }, { status: 400 });
+    // Tenant isolation: if a merchant requests bookings for a provider that doesn't match their authenticated provider, reject with 403
+    if (providerId && merchantProviderId && providerId !== merchantProviderId) {
+      return NextResponse.json({ error: 'Forbidden: tenant isolation boundary violation' }, { status: 403 });
+    }
+
+    if (!customerId && !providerId) {
+      return NextResponse.json({ error: 'Missing customer_id or provider_id parameter' }, { status: 400 });
     }
 
     const supabaseAdmin = getSupabaseAdmin();
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('bookings')
       .select(`
         *,
         providers ( name ),
         resources ( name )
-      `)
-      .eq('customer_id', customerId)
-      .order('slot_start', { ascending: false });
+      `);
+
+    if (customerId) {
+      query = query.eq('customer_id', customerId);
+    }
+    if (providerId) {
+      query = query.eq('provider_id', providerId);
+    }
+
+    const { data, error } = await query.order('slot_start', { ascending: false });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
