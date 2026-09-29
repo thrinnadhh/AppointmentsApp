@@ -254,8 +254,18 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     // Minimal 1x1 transparent PNG binary
     const pngBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 
-    // 1. Upload public venue asset (image/png)
-    const { data: uploadVenueData, error: uploadVenueError } = await customerSupabase.storage
+    // 1. Upload public venue asset (image/png) under admin/service session
+    const adminUploadClient = SUPABASE_SERVICE_ROLE_KEY
+      ? serviceSupabase
+      : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
+      await adminUploadClient.auth.signInWithPassword({
+        email: process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
+        password: process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!',
+      });
+    }
+
+    const { data: uploadVenueData, error: uploadVenueError } = await adminUploadClient.storage
       .from('venue-assets')
       .upload(`test-venue/${testFileName}`, pngBuffer, {
         contentType: 'image/png',
@@ -304,7 +314,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(signedUrlData?.signedUrl).toContain('token=');
 
     // Clean up test objects
-    await customerSupabase.storage.from('venue-assets').remove([uploadVenueData!.path]);
+    await adminUploadClient.storage.from('venue-assets').remove([uploadVenueData!.path]);
     await customerSupabase.storage.from('prescriptions-and-records').remove([rxPath]);
     await customerSupabase.auth.signOut();
   });
