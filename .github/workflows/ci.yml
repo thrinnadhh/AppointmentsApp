@@ -68,7 +68,7 @@ jobs:
 
       - name: Check for secrets in source tree (PR)
         if: github.event_name == 'pull_request'
-        uses: trufflesecurity/trufflehog@a39626eec102ad07b8a86a60e6b8c8d8b4e72390 # v3.88.1
+        uses: trufflesecurity/trufflehog@d73edfb85d79432e3c767c407afdee59c9a34fde # v3.88.1
         with:
           path: ./
           base: ${{ github.base_ref }}
@@ -78,7 +78,7 @@ jobs:
 
       - name: Check for secrets in source tree (Push)
         if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before != github.sha
-        uses: trufflesecurity/trufflehog@a39626eec102ad07b8a86a60e6b8c8d8b4e72390 # v3.88.1
+        uses: trufflesecurity/trufflehog@d73edfb85d79432e3c767c407afdee59c9a34fde # v3.88.1
         with:
           path: ./
           base: ${{ github.event.before }}
