@@ -110,7 +110,7 @@ export default function BookingsManagementPage() {
         },
         (payload) => {
           const newStatus = (payload.new as { status?: string })?.status;
-          setFeedbackToast(`Realtime Sync: Slot ${newStatus || 'updated'}`);
+          setFeedbackToast((current) => current || `Realtime Sync: Slot ${newStatus || 'updated'}`);
           loadData();
           setTimeout(() => setFeedbackToast(null), 4000);
         }
@@ -565,7 +565,7 @@ export default function BookingsManagementPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
         {filteredBookings.length === 0 ? (
           <div className="p-12 text-center text-slate-500 text-sm">
-            No bookings found matching the selected filters.
+            No bookings found for {verticalConfig.resourceLabelSingular}: All active appointment slots are currently open.
           </div>
         ) : (
           filteredBookings.map((booking) => {

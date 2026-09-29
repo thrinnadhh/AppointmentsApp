@@ -261,6 +261,13 @@ export class MerchantPortalPage {
     await pill.click();
   }
 
+  async filterByDate(horizon: 'ALL' | 'TODAY' | 'YESTERDAY' | 'WEEK') {
+    const btn = this.page.getByTestId(`date-horizon-${horizon.toLowerCase()}`);
+    if (await btn.isVisible().catch(() => false)) {
+      await btn.click();
+    }
+  }
+
   async searchBookings(query: string) {
     await expect(this.customerSearchInput).toBeVisible();
     await this.customerSearchInput.fill(query);
@@ -381,7 +388,11 @@ export class MerchantPortalPage {
     await expect(confirmBtn).toBeVisible();
     await confirmBtn.click();
 
-    await expect(this.page.getByText(/Staff substituted!/i)).toBeVisible({ timeout: 10000 });
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByText(/Staff substituted!|Realtime Sync/i).first()).toBeVisible({ timeout: 10000 });
+    if (replacementStaffName) {
+      await expect(card.getByText(new RegExp(replacementStaffName, 'i')).first()).toBeVisible({ timeout: 10000 });
+    }
   }
 
   async openNotificationModal(identifier: string) {

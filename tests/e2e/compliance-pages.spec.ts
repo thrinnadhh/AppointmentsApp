@@ -368,12 +368,40 @@ test.describe('Customer Data Masking — DPIIT & DPDPA Compliance', () => {
     };
 
     // 2. Query merchant_bookings REST view
-    const bookingsRes = await request.get(
+    let bookingsRes = await request.get(
       `${supabaseUrl}/rest/v1/merchant_bookings?select=id,customer_id,customer_name,customer_phone,status&limit=5`,
       { headers: merchantHeaders }
     );
     expect(bookingsRes.status()).toBe(200);
-    const bookings = await bookingsRes.json();
+    let bookings = await bookingsRes.json();
+
+    if (bookings.length === 0) {
+      const slotStart = new Date(Date.now() + 86400000 * 25).toISOString();
+      const slotEnd = new Date(Date.now() + 86400000 * 25 + 1800000).toISOString();
+      const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+        data: {
+          customer_id: '99999999-9999-9999-9999-999999999991',
+          resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          slot_start: slotStart,
+          slot_end: slotEnd,
+        },
+      });
+      if (holdRes.ok()) {
+        const { booking_id } = await holdRes.json();
+        await request.post('http://localhost:3000/api/bookings/confirm', {
+          data: {
+            booking_id,
+            payment_id: 'pay_compliance_seed_123',
+          },
+        });
+        bookingsRes = await request.get(
+          `${supabaseUrl}/rest/v1/merchant_bookings?select=id,customer_id,customer_name,customer_phone,status&limit=5`,
+          { headers: merchantHeaders }
+        );
+        bookings = await bookingsRes.json();
+      }
+    }
+
     expect(bookings.length).toBeGreaterThan(0);
 
     for (const b of bookings) {

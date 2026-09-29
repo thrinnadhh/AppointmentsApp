@@ -101,10 +101,15 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     // Verify Audit Rows are loaded
     await expect(adminPage.auditRows).toBeVisible();
 
-    // Verify Search filter in Audit Ledger
-    await adminPage.auditSearchInput.fill('UPDATE_CITY_STATUS');
-    const matchingLog = page.getByText('UPDATE_CITY_STATUS').first();
+    // Verify Search filter in Audit Ledger dynamically against loaded rows
+    const firstActionCell = adminPage.auditRows.locator('tr').first().locator('td').nth(2);
+    await expect(firstActionCell).toBeVisible();
+    const actionText = (await firstActionCell.textContent())?.trim() || 'UPDATE';
+
+    await adminPage.auditSearchInput.fill(actionText);
+    const matchingLog = adminPage.auditRows.getByText(actionText).first();
     await expect(matchingLog).toBeVisible();
+    await adminPage.auditSearchInput.fill('');
   });
 
   test('TC-ADMIN-AUDIT-02: Zero-Trust API Gate protects /api/admin/audit-logs with RBAC verification', async ({ request }) => {

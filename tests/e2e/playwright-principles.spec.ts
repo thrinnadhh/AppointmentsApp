@@ -12,6 +12,13 @@ import { test, expect } from './fixtures/test-fixtures';
 test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () => {
 
   test.beforeEach(async ({ request, supabaseClient }) => {
+    try {
+      await supabaseClient
+        .from('providers')
+        .update({ status: 'ACTIVE' })
+        .eq('id', '11111111-1111-1111-1111-111111111111');
+    } catch {}
+
     const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
     await request.patch('http://localhost:3000/api/admin/merchants', {
       headers: {
@@ -43,6 +50,15 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
         p_provider_id: '11111111-1111-1111-1111-111111111111',
         p_customer_id: '99999999-9999-9999-9999-999999999991',
       });
+    } catch {}
+  });
+
+  test.afterEach(async ({ supabaseClient }) => {
+    try {
+      await supabaseClient
+        .from('providers')
+        .update({ status: 'ACTIVE' })
+        .eq('id', '11111111-1111-1111-1111-111111111111');
     } catch {}
   });
 
@@ -595,9 +611,10 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
 
     await test.step('3. Multi-role Merchant portal inspects and manages queue entry', async () => {
       await merchantPortal.gotoBookings();
+      await merchantPortal.filterByDate('ALL');
       await merchantPortal.filterByStatus('CONFIRMED');
       await merchantPortal.searchBookings('Kalyan');
-      await merchantPortal.expectBookingInQueue('CONFIRMED');
+      await merchantPortal.expectBookingInQueue('Kalyan', 'CONFIRMED');
       await merchantPortal.clearSearch();
     });
   });

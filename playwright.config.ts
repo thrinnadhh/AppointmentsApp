@@ -61,6 +61,9 @@ export default defineConfig({
         '**/admin-merchant-integration.spec.ts',
         '**/edge-integrations.spec.ts',
         '**/flow-audit.spec.ts',
+        '**/customer-app.spec.ts',
+        '**/customer-reflection.spec.ts',
+        '**/edge-customer.spec.ts',
       ],
     },
 
