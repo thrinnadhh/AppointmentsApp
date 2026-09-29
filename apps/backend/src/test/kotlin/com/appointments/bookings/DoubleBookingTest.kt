@@ -127,6 +127,7 @@ class DoubleBookingTest {
                     )
                     successes.incrementAndGet()
                 } catch (ex: Exception) {
+                    println("Booking attempt failed: ${ex.javaClass.name}: ${ex.message}")
                     conflicts.incrementAndGet()
                 }
             }
