@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { NotificationLog } from '@appointments/shared';
+import { verifyAdminRequest } from '@/lib/auth-admin';
+import { NotificationLog, maskPhoneNumber } from '@appointments/shared';
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const bookingId = searchParams.get('bookingId');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
@@ -25,11 +31,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Mask recipient phone numbers in audit logs
+    const sanitized = (data || []).map((log) => ({
+      ...log,
+      recipient_phone: maskPhoneNumber(log.recipient_phone),
+    }));
+
     return NextResponse.json(
       {
         success: true,
-        count: data?.length || 0,
-        notifications: (data || []) as NotificationLog[],
+        count: sanitized.length,
+        notifications: sanitized as NotificationLog[],
       },
       { status: 200 }
     );
@@ -41,6 +53,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const body = await request.json();
     const { action, booking_id, event_type = 'BOOKING_CONFIRMED' } = body;
     const supabaseAdmin = getSupabaseAdmin();

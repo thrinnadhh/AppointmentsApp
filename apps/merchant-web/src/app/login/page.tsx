@@ -174,246 +174,320 @@ export default function LoginPage() {
   };
 
   return (
-    <div data-hydrated={mounted ? "true" : "false"} className="min-h-[85vh] flex items-center justify-center py-10 px-4 sm:px-6 lg:px-8 bg-slate-50/50">
-      <div className="max-w-lg w-full space-y-6 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-        
-        {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-sm mb-4">
-            <Building2 className="w-6 h-6" />
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            Merchant & Admin Access Portal
-          </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Unified workspace & business registration for Tirupati providers
-          </p>
-        </div>
+    <div
+      data-hydrated={mounted ? "true" : "false"}
+      style={{
+        minHeight: '88vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px 16px',
+        background: 'var(--color-surface-raised)',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 440,
+          width: '100%',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.05)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Card Top Accent */}
+        <div style={{ height: 4, background: 'linear-gradient(90deg, #047857 0%, #059669 60%, #10b981 100%)' }} />
 
-        {/* Mode Switcher Tabs */}
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button
-            type="button"
-            data-testid="auth-tab-signin"
-            onClick={() => {
-              setAuthMode('signin');
-              setErrorMsg(null);
-            }}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-              authMode === 'signin'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            data-testid="auth-tab-register"
-            onClick={() => {
-              setAuthMode('register');
-              setErrorMsg(null);
-            }}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-              authMode === 'register'
-                ? 'bg-white text-emerald-800 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Register Business
-          </button>
-        </div>
-
-        {/* Alerts */}
-        {errorMsg && (
-          <div className="rounded-lg bg-rose-50 border border-rose-200 p-3.5 flex items-start gap-2.5 text-sm text-rose-700">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-500 mt-0.5" />
-            <div>
-              <p className="font-semibold text-xs">Action failed</p>
-              <p className="text-xs text-rose-600">{errorMsg}</p>
+        <div style={{ padding: '32px 32px 28px' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{
+              width: 48,
+              height: 48,
+              margin: '0 auto 16px',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(4,120,87,0.3)',
+            }}>
+              <Building2 style={{ width: 24, height: 24, color: '#fff' }} />
             </div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-ink)', letterSpacing: '-0.02em', margin: '0 0 6px' }}>
+              Merchant &amp; Admin Access
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--color-ink-tertiary)', margin: 0 }}>
+              Workspace &amp; business registration for Tirupati providers
+            </p>
           </div>
-        )}
 
-        {successMsg && (
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3.5 flex items-start gap-2.5 text-sm text-emerald-700">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600 mt-0.5" />
-            <div>
-              <p className="font-semibold text-xs">{successMsg}</p>
+          {/* Mode Switcher */}
+          <div style={{
+            display: 'flex',
+            background: 'var(--color-surface-sunken)',
+            padding: 4,
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 24,
+            gap: 4,
+          }}>
+            {(['signin', 'register'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                data-testid={`auth-tab-${mode}`}
+                onClick={() => { setAuthMode(mode); setErrorMsg(null); }}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 120ms ease',
+                  background: authMode === mode ? 'var(--color-surface)' : 'transparent',
+                  color: authMode === mode ? (mode === 'register' ? 'var(--color-primary)' : 'var(--color-ink)') : 'var(--color-ink-tertiary)',
+                  boxShadow: authMode === mode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                }}
+              >
+                {mode === 'signin' ? 'Sign In' : 'Register Business'}
+              </button>
+            ))}
+          </div>
+
+          {/* Alerts */}
+          {errorMsg && (
+            <div style={{
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-error-bg)',
+              border: '1px solid var(--color-error-border)',
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              marginBottom: 20,
+            }}>
+              <AlertCircle style={{ width: 16, height: 16, flexShrink: 0, color: 'var(--color-error)', marginTop: 1 }} />
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-error)', margin: '0 0 2px' }}>Authentication failed</p>
+                <p style={{ fontSize: 12, color: '#9f1239', margin: 0, lineHeight: 1.5 }}>{errorMsg}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Primary Entry Point: Google Verified Authentication */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center space-y-3">
-          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Google Verified Authentication</span>
-          </div>
-          <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
-            {authMode === 'register'
-              ? 'Authenticate with Google to verify your business email. After signing in, you will configure your shop profile, address, and upload your storefront photo in Step 2.'
-              : 'Sign in with your Google account. First-time merchants will be prompted to set up their venue profile and storefront photo; returning merchants enter directly into their workspace.'}
-          </p>
-          <button
-            type="button"
-            data-testid="google-auth-btn"
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            className="w-full flex justify-center items-center gap-3 py-3 px-4 border border-slate-300 rounded-xl shadow-xs text-xs sm:text-sm font-semibold text-slate-800 bg-white hover:bg-slate-100 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all cursor-pointer"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.35 24 12 24z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-              />
-            </svg>
-            <span>{authMode === 'register' ? 'Register with Google' : 'Continue with Google'}</span>
-          </button>
-          <div className="flex items-center justify-center gap-3 text-[11px] text-slate-500 pt-0.5">
-            <span>✓ Verified Email</span>
-            <span>•</span>
-            <span>✓ Storefront Photo Sync</span>
-            <span>•</span>
-            <span>✓ Direct Workspace</span>
-          </div>
-
-          <div className="relative pt-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
+          {successMsg && (
+            <div style={{
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-success-bg)',
+              border: '1px solid var(--color-primary-muted)',
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              marginBottom: 20,
+            }}>
+              <CheckCircle2 style={{ width: 16, height: 16, flexShrink: 0, color: 'var(--color-primary)', marginTop: 1 }} />
+              <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-success)', margin: 0 }}>{successMsg}</p>
             </div>
-            <div className="relative flex justify-center text-[10px] uppercase tracking-wider font-semibold">
-              <span className="bg-slate-50 px-2 text-slate-400">
+          )}
+
+          {/* Google Auth Section */}
+          <div style={{
+            background: 'var(--color-surface-raised)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px',
+            textAlign: 'center',
+            marginBottom: 20,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+              <ShieldCheck style={{ width: 14, height: 14, color: 'var(--color-primary)' }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                Google Verified Authentication
+              </span>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--color-ink-tertiary)', lineHeight: 1.6, maxWidth: 300, margin: '0 auto 16px' }}>
+              {authMode === 'register'
+                ? 'Verify your business email via Google. After signing in, configure your shop profile in Step 2.'
+                : 'Sign in with Google. Returning merchants enter their workspace directly.'}
+            </p>
+            <button
+              type="button"
+              data-testid="google-auth-btn"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="btn btn-secondary"
+              style={{ width: '100%', justifyContent: 'center', padding: '11px 16px', fontSize: 14 }}
+            >
+              <svg style={{ width: 16, height: 16, flexShrink: 0 }} viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.35 24 12 24z" />
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
+              </svg>
+              {authMode === 'register' ? 'Register with Google' : 'Continue with Google'}
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10, fontSize: 11, color: 'var(--color-ink-tertiary)' }}>
+              <span>✓ Verified Email</span>
+              <span style={{ opacity: 0.4 }}>·</span>
+              <span>✓ Storefront Photo Sync</span>
+              <span style={{ opacity: 0.4 }}>·</span>
+              <span>✓ Secure Workspace</span>
+            </div>
+
+            {/* Divider */}
+            <div style={{ position: 'relative', marginTop: 16 }}>
+              <div style={{ borderTop: '1px solid var(--color-border)', position: 'absolute', left: 0, right: 0, top: '50%' }} />
+              <span style={{
+                position: 'relative',
+                display: 'inline-block',
+                padding: '0 10px',
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'var(--color-ink-tertiary)',
+                background: 'var(--color-surface-raised)',
+              }}>
                 {authMode === 'signin' ? 'Or sign in with password' : 'How registration works'}
               </span>
             </div>
           </div>
-        </div>
 
-        {/* TAB 1: Sign In Mode (Password Login) */}
-        {authMode === 'signin' && (
-          <form className="space-y-4" onSubmit={handleLogin}>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Merchant or Admin Email
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Mail className="h-4 w-4" />
-                </div>
-                <input
-                  id="login-email"
-                  name="loginEmail"
-                  data-testid="login-email"
-                  aria-label="Authorized Email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="owner@tirupati-salon.com"
-                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="login-password" className="block text-xs font-semibold text-slate-700">
-                  Password
+          {/* Sign In Form */}
+          {authMode === 'signin' && (
+            <form style={{ display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={handleLogin}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-ink-secondary)', marginBottom: 6 }}>
+                  Merchant or Admin Email
                 </label>
-                <span className="text-[11px] text-slate-400">Min 6 characters</span>
+                <div style={{ position: 'relative' }}>
+                  <Mail style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'var(--color-ink-tertiary)', pointerEvents: 'none' }} />
+                  <input
+                    id="login-email"
+                    name="loginEmail"
+                    data-testid="login-email"
+                    aria-label="Authorized Email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="owner@tirupati-clinic.com"
+                    className="input"
+                    style={{ paddingLeft: 34 }}
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Lock className="h-4 w-4" />
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label htmlFor="login-password" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ink-secondary)' }}>
+                    Password
+                  </label>
+                  <span style={{ fontSize: 11, color: 'var(--color-ink-tertiary)' }}>Min 6 characters</span>
                 </div>
-                <input
-                  id="login-password"
-                  name="loginPassword"
-                  data-testid="login-password"
-                  aria-label="Password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                />
+                <div style={{ position: 'relative' }}>
+                  <Lock style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'var(--color-ink-tertiary)', pointerEvents: 'none' }} />
+                  <input
+                    id="login-password"
+                    name="loginPassword"
+                    data-testid="login-password"
+                    aria-label="Password"
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••"
+                    className="input"
+                    style={{ paddingLeft: 34 }}
+                  />
+                </div>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              data-testid="login-submit"
-              disabled={loading}
-              className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-xl shadow-xs text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  Verifying Credentials...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  Sign In to Workspace
-                  <ArrowRight className="w-4 h-4" />
-                </span>
-              )}
-            </button>
-          </form>
-        )}
-
-        {/* TAB 2: Register Explanation (2-Step Flow) */}
-        {authMode === 'register' && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                Two-Step Business Registration
-              </h4>
-            </div>
-            <ol className="space-y-2.5 text-xs text-slate-700">
-              <li className="flex items-start gap-2.5">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px]">1</span>
-                <div>
-                  <span className="font-semibold text-slate-900">Verify Email with Google:</span> Click &ldquo;Register with Google&rdquo; above to link your official business email address.
-                </div>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-200 text-emerald-900 font-bold flex items-center justify-center text-[10px]">2</span>
-                <div>
-                  <span className="font-semibold text-slate-900">Shop Profile & Photo Setup:</span> On the next screen, enter your venue name, owner contact, address, and upload your storefront photo.
-                </div>
-              </li>
-            </ol>
-            <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between text-xs">
-              <span className="text-slate-500">Already have an account?</span>
               <button
-                type="button"
-                onClick={() => setAuthMode('signin')}
-                className="font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                type="submit"
+                data-testid="login-submit"
+                disabled={loading}
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center', padding: '11px 20px', fontSize: 14 }}
               >
-                Sign In with Password →
+                {loading ? (
+                  <>
+                    <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    Sign In to Workspace
+                    <ArrowRight style={{ width: 15, height: 15 }} />
+                  </>
+                )}
               </button>
-            </div>
-          </div>
-        )}
+            </form>
+          )}
 
-        <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center pt-2">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Postgres Row Level Security (RLS) & Multi-Tenant Isolated</span>
+          {/* Register Explanation */}
+          {authMode === 'register' && (
+            <div style={{
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-primary-muted)',
+              background: 'var(--color-primary-light)',
+              padding: '20px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
+                <Sparkles style={{ width: 15, height: 15, color: 'var(--color-primary)' }} />
+                <h4 style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
+                  Two-Step Business Registration
+                </h4>
+              </div>
+              <ol style={{ listStyle: 'none', padding: 0, margin: '0 0 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { n: 1, label: 'Verify Email with Google:', desc: 'Click "Register with Google" above to link your official business email address.' },
+                  { n: 2, label: 'Shop Profile & Photo Setup:', desc: 'Enter your venue name, owner contact, address, and upload your storefront photo.' },
+                ].map(({ n, label, desc }) => (
+                  <li key={n} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{
+                      flexShrink: 0,
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      background: n === 1 ? 'var(--color-primary)' : 'var(--color-primary-muted)',
+                      color: n === 1 ? '#fff' : 'var(--color-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)',
+                    }}>{n}</span>
+                    <div style={{ fontSize: 13, color: 'var(--color-ink-secondary)', lineHeight: 1.5 }}>
+                      <strong style={{ color: 'var(--color-ink)', fontWeight: 600 }}>{label}</strong>{' '}{desc}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div style={{ borderTop: '1px solid var(--color-primary-muted)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--color-ink-tertiary)' }}>Already have an account?</span>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('signin')}
+                  style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  Sign In →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Trust Footer */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
+            <ShieldCheck style={{ width: 13, height: 13, color: 'var(--color-primary)' }} />
+            <span style={{ fontSize: 11, color: 'var(--color-ink-tertiary)', fontFamily: 'var(--font-mono)' }}>
+              RLS · Multi-Tenant Isolated · TLS
+            </span>
+          </div>
         </div>
       </div>
     </div>

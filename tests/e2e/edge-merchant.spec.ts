@@ -174,8 +174,8 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
       const emailInput = page.getByTestId('login-email');
       if (await emailInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await emailInput.fill('svims.clinic@tirupati-appointments.com');
-        await page.getByTestId('login-password').fill('SvimsClinic2026!');
+        await emailInput.fill(process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com');
+        await page.getByTestId('login-password').fill(process.env.TEST_MERCHANT_PASSWORD || '');
         await page.getByTestId('login-submit').click();
       }
       await page.waitForURL(/localhost:3000/, { timeout: 15000 }).catch(() => null);
@@ -301,8 +301,8 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
     const emailInput = page.getByTestId('login-email');
     if (!await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) { test.skip(); return; }
-    await emailInput.fill('naturals.salon@tirupati-appointments.com');
-    await page.getByTestId('login-password').fill('NaturalsSalon2026!');
+    await emailInput.fill(process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com');
+    await page.getByTestId('login-password').fill(process.env.TEST_SALON_PASSWORD || '');
     await page.getByTestId('login-submit').click();
     await expect(page.getByText('Tirupati Merchant Hub')).toBeVisible({ timeout: 15000 });
 

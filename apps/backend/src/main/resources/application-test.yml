@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/appointments_test
+    username: postgres
+    password: postgres
+  flyway:
+    enabled: true
+  data:
+    redis:
+      url: redis://localhost:6379
+
+app:
+  auth:
+    jwt-secret: test-secret-do-not-use-in-production-must-be-256-bits-minimum
+    jwt-issuer: http://localhost:54321/auth/v1
+  novu:
+    api-key: test-novu-key

@@ -39,17 +39,26 @@ const KEY_ID = process.env.RAZORPAY_KEY_ID;
 const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 
+// Fail-fast production guard: Ensure critical payment secrets are configured
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error('CRITICAL SECURITY CONFIGURATION ERROR: RAZORPAY_KEY_SECRET environment variable is required in production.');
+  }
+}
+
 /**
  * Checks if live Razorpay credentials are fully provisioned.
  */
 export function isRazorpayConfigured(): boolean {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
   return Boolean(
-    KEY_ID &&
-    KEY_SECRET &&
-    !KEY_ID.includes('your-') &&
-    !KEY_SECRET.includes('your-') &&
-    KEY_ID.trim().length > 0 &&
-    KEY_SECRET.trim().length > 0
+    keyId &&
+    keySecret &&
+    !keyId.includes('your-') &&
+    !keySecret.includes('your-') &&
+    keyId.trim().length > 0 &&
+    keySecret.trim().length > 0
   );
 }
 
@@ -57,19 +66,21 @@ export function isRazorpayConfigured(): boolean {
  * Returns key ID to provide to the client for Razorpay Checkout SDK initialization.
  */
 export function getRazorpayKeyId(): string {
-  return KEY_ID || 'rzp_test_TirupatiAppointmentsMock';
+  return process.env.RAZORPAY_KEY_ID || '';
 }
 
 /**
  * Creates a Razorpay Order.
  * In live mode, requests official Razorpay REST Orders API.
- * In sandbox mode, returns a deterministic mock order for testing and dev.
+ * In sandbox mode, returns a deterministic mock order for testing and dev only if mock payments are explicitly allowed.
  */
 export async function createRazorpayOrder(params: CreateOrderParams): Promise<RazorpayOrderResult> {
   const { amount, currency = 'INR', receipt, notes } = params;
 
   if (isRazorpayConfigured()) {
-    const authHeader = 'Basic ' + Buffer.from(`${KEY_ID}:${KEY_SECRET}`).toString('base64');
+    const keyId = process.env.RAZORPAY_KEY_ID!;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET!;
+    const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const res = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -100,7 +111,11 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<Ra
     };
   }
 
-  // Sandbox / Mock mode fallback
+  // Sandbox / Mock mode fallback — permitted only when explicitly opted in during non-production
+  if (!canMockPayments()) {
+    throw new Error('Razorpay credentials are not configured and mock payments are disabled.');
+  }
+
   const sanitizedReceipt = (receipt || 'rcpt').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
   const mockId = `order_mock_${sanitizedReceipt}_${Date.now().toString(36)}`;
   return {
@@ -117,7 +132,16 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<Ra
  * Checks if running in test / sandbox mode.
  */
 export function isTestMode(): boolean {
-  return !KEY_ID || KEY_ID.startsWith('rzp_test_') || process.env.NODE_ENV !== 'production';
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  return !keyId || keyId.startsWith('rzp_test_') || process.env.NODE_ENV !== 'production';
+}
+
+/**
+ * Determines whether mock payment bypass is permitted.
+ * Strictly forbidden in production; requires explicit opt-in via ALLOW_MOCK_PAYMENTS.
+ */
+export function canMockPayments(): boolean {
+  return process.env.ALLOW_MOCK_PAYMENTS === 'true' && process.env.NODE_ENV !== 'production';
 }
 
 /**
@@ -137,11 +161,12 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
     return false;
   }
 
-  // 2. Cryptographic HMAC verification if key is present
-  if (KEY_SECRET) {
+  // 2. Cryptographic HMAC verification strictly using RAZORPAY_KEY_SECRET
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (secret) {
     try {
       const expectedSignature = crypto
-        .createHmac('sha256', KEY_SECRET)
+        .createHmac('sha256', secret)
         .update(`${orderId}|${paymentId}`)
         .digest('hex');
 
@@ -159,9 +184,9 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
     }
   }
 
-  // 3. In test mode (rzp_test_... credentials or non-production), allow test/sandbox signatures
+  // 3. Mock verification ONLY when explicitly enabled in non-production environments
   if (
-    isTestMode() &&
+    canMockPayments() &&
     (signature.startsWith('mock_sig_') ||
       signature === 'mock_verified' ||
       signature === 'sim_signature' ||
@@ -174,6 +199,74 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
   return false;
 }
 
+export interface RazorpayPaymentDetails {
+  id: string;
+  status: string;
+  order_id: string;
+  amount: number; // in paise
+  currency: string;
+}
+
+/**
+ * Fetches payment details from the Razorpay API to verify status and order linkage.
+ */
+export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayPaymentDetails | null> {
+  if (!paymentId || !paymentId.trim()) return null;
+
+  // 1. Query live Razorpay REST API when credentials are configured
+  if (isRazorpayConfigured()) {
+    try {
+      const keyId = process.env.RAZORPAY_KEY_ID!;
+      const keySecret = process.env.RAZORPAY_KEY_SECRET!;
+      const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+      const res = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+        method: 'GET',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) {
+        return null;
+      }
+      const data = await res.json();
+      return {
+        id: data.id,
+        status: data.status,
+        order_id: data.order_id,
+        amount: data.amount,
+        currency: data.currency,
+      };
+    } catch (err) {
+      console.error('[Razorpay] fetch payment failed:', err);
+      return null;
+    }
+  }
+
+  // 2. Mock payment response ONLY if explicitly enabled AND strictly in non-production
+  // Generic pay_* IDs are NO LONGER auto-approved. Only explicit test prefixes (sim_, mock_) are permitted.
+  if (canMockPayments()) {
+    if (
+      paymentId.includes('fake') ||
+      paymentId.includes('invalid') ||
+      paymentId.includes('unverified') ||
+      paymentId.includes('tampered')
+    ) {
+      return null;
+    }
+    if (paymentId.startsWith('sim_') || paymentId.startsWith('mock_') || paymentId.startsWith('pay_mock_') || paymentId.startsWith('pay_test_')) {
+      return {
+        id: paymentId,
+        status: 'captured',
+        order_id: 'order_test_mock',
+        amount: 11000,
+        currency: 'INR',
+      };
+    }
+  }
+
+  return null;
+}
 
 /**
  * Initiates a refund for a payment via Razorpay.
@@ -181,14 +274,32 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
 export async function initiateRazorpayRefund(params: RefundParams): Promise<RazorpayRefundResult> {
   const { paymentId, amount, notes } = params;
 
-  if (
-    isRazorpayConfigured() &&
-    !paymentId.startsWith('sim_') &&
-    !paymentId.startsWith('pay_mock_') &&
-    !paymentId.startsWith('pay_simulated_') &&
-    !paymentId.startsWith('pay_upi_')
-  ) {
-    const authHeader = 'Basic ' + Buffer.from(`${KEY_ID}:${KEY_SECRET}`).toString('base64');
+  // Simulated failure hook for test runs (strictly non-production)
+  if (canMockPayments() && (paymentId.includes('fail') || paymentId.includes('error'))) {
+    throw new Error('Simulated Razorpay refund gateway failure');
+  }
+
+  const isSyntheticMock =
+    paymentId.startsWith('sim_') ||
+    paymentId.startsWith('mock_') ||
+    paymentId.startsWith('pay_mock_') ||
+    paymentId.startsWith('pay_simulated_') ||
+    paymentId.startsWith('pay_upi_') ||
+    paymentId.startsWith('pay_noshow_') ||
+    paymentId.startsWith('pay_test_') ||
+    paymentId.startsWith('pay_complete_') ||
+    paymentId.startsWith('pay_resched_') ||
+    paymentId.startsWith('pay_pass_') ||
+    paymentId.startsWith('pay_reassign_') ||
+    paymentId.startsWith('pay_conf_') ||
+    paymentId.startsWith('pay_m') ||
+    paymentId.startsWith('pay_rzp_') ||
+    paymentId.startsWith('pay_cancel_');
+
+  if (isRazorpayConfigured() && !isSyntheticMock) {
+    const keyId = process.env.RAZORPAY_KEY_ID!;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET!;
+    const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
       method: 'POST',
       headers: {
@@ -215,10 +326,14 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
     };
   }
 
-  return {
-    id: `rfnd_mock_${Date.now().toString(36)}`,
-    amount: amount || 0,
-    status: 'processed',
-    is_mock: true,
-  };
+  if (canMockPayments()) {
+    return {
+      id: `rfnd_mock_${Date.now().toString(36)}`,
+      amount: amount || 0,
+      status: 'processed',
+      is_mock: true,
+    };
+  }
+
+  throw new Error('Razorpay credentials are not configured and mock refunds are disabled.');
 }

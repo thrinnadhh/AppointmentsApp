@@ -44,6 +44,7 @@ export interface CancelBookingResponse {
   payment_status?: string;
   refund_eligible?: boolean;
   refund_amount?: number;
+  refund_gateway_paise?: number;
   merchant_strikes?: number;
   penalty_applied?: boolean;
   penalty_amount?: number;
@@ -95,7 +96,7 @@ export interface RecordNoShowResponse {
   booking_id?: string;
   no_show_count?: number;
   penalty_applied?: boolean;
-  payment_status?: 'REFUNDED' | 'FORFEITED';
+  payment_status?: 'REFUND_PENDING' | 'REFUNDED' | 'REFUND_FAILED' | 'FORFEITED';
   refund_amount?: number;
   is_flagged?: boolean;
   error?: string;
@@ -120,10 +121,10 @@ export interface RazorpayWebhookPayload {
 }
 
 /**
- * 30-Minute Cancellation Cutoff Policy Helper
- * - Merchant-initiated cancellation: ALWAYS 100% full refund (Customer protected)
- * - Customer-initiated cancellation: 100% full refund IF requested > 30 minutes before slot_start
- * - Customer-initiated cancellation: Deposit FORFEITED IF requested <= 30 minutes before slot_start
+ * 60-Minute Cancellation Cutoff Policy Helper
+ * - Merchant-initiated cancellation: ALWAYS 100% full refund (Customer protected: deposit + fees)
+ * - Customer-initiated cancellation: 100% full refund IF requested > 60 minutes before slot_start
+ * - Customer-initiated cancellation: Deposit FORFEITED IF requested <= 60 minutes before slot_start
  */
 export function isEligibleForFullRefund(
   slotStartIso: string,
@@ -141,17 +142,17 @@ export function isEligibleForFullRefund(
   const now = Date.now();
   const diffMinutes = Math.round((slotTime - now) / (1000 * 60));
 
-  if (diffMinutes > 30) {
+  if (diffMinutes > 60) {
     return {
       eligible: true,
       minutesUntilSlot: diffMinutes,
-      rule: `Cancelled with ${diffMinutes}m remaining (> 30m required for full refund).`,
+      rule: `Cancelled with ${diffMinutes}m remaining (> 60m required for full refund).`,
     };
   }
 
   return {
     eligible: false,
     minutesUntilSlot: diffMinutes,
-    rule: `Late cancellation (${diffMinutes}m before slot). Deposits are forfeited within 30 minutes of slot start.`,
+    rule: `Late cancellation (${diffMinutes}m before slot). Deposits are forfeited within 60 minutes of slot start.`,
   };
 }

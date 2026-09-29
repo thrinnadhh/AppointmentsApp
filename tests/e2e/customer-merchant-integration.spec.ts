@@ -5,12 +5,27 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
 
 test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () => {
   const testCustomerEmail = 'customer.integration@tirupati.care';
   const testCustomerId = '99999999-9999-9999-9999-999999999991'; // Kalyan Chakravarthy seed account
   const testResourceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // Dr. S. K. Murthy
+
+  test.beforeAll(async () => {
+    // Clean up test customer slots for Dr Murthy to ensure idempotent test runs
+    const { data: oldBookings } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('customer_id', testCustomerId)
+      .eq('resource_id', testResourceId);
+    if (oldBookings && oldBookings.length > 0) {
+      const ids = oldBookings.map((b) => b.id);
+      await supabase.from('payments').delete().in('booking_id', ids);
+      await supabase.from('bookings').delete().in('id', ids);
+    }
+  });
 
   test('1. [Customer Booking -> Merchant Live Queue] Customer books appointment on mobile app; Merchant sees it live on bookings dashboard', async ({ browser }) => {
     // Context A: Customer Mobile App (Expo Web on port 8081)
@@ -23,6 +38,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // 1. Customer browses to Clinics and selects Sri Venkateswara Dental
     await customerApp.selectCategory('Hospitals & Clinics');
     await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+    await customerApp.selectDateOffset('Tomorrow');
     await customerApp.selectFirstSlot();
     await customerApp.openCheckout();
 
@@ -130,12 +146,13 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     });
     const { booking_id } = await holdRes.json();
 
-    await request.post('http://localhost:3000/api/bookings/confirm', {
+    const confirmRes = await request.post('http://localhost:3000/api/bookings/confirm', {
       data: {
         booking_id,
         gateway_payment_id: `pay_resched_${Date.now()}`,
       },
     });
+    expect(confirmRes.status()).toBe(200);
 
     const { data: booking } = await supabase
       .from('bookings')
@@ -249,7 +266,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await request.post('http://localhost:3000/api/bookings/confirm', {
       data: {
         booking_id,
-        gateway_payment_id: `pay_cust_cancel_${Date.now()}`,
+        gateway_payment_id: `pay_mock_cust_cancel_${Date.now()}`,
       },
     });
 
@@ -324,7 +341,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await request.post('http://localhost:3000/api/bookings/confirm', {
       data: {
         booking_id,
-        gateway_payment_id: `pay_cancel_${Date.now()}`,
+        gateway_payment_id: `pay_mock_cancel_${Date.now()}`,
       },
     });
 

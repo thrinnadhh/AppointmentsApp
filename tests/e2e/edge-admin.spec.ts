@@ -123,7 +123,10 @@ test.describe('Admin — Edge & Boundary Cases', () => {
     const adminPage = new AdminDashboardPage(page);
 
     await adminPage.gotoLoginPage();
-    await adminPage.submitCredentials('admin@appointments-tirupati.com', 'AdminSecure2026!');
+    await adminPage.submitCredentials(
+      process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
+      process.env.TEST_ADMIN_PASSWORD || ''
+    );
 
     // Wait for MFA input to appear
     const mfaInput = adminPage.mfaCodeInput;

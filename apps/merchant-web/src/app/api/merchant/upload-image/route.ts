@@ -1,27 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import crypto from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+/**
+ * Inspects file buffer magic bytes for JPEG, PNG, and WebP formats.
+ */
+function detectImageFormat(buffer: Buffer): { ext: string; mime: string } | null {
+  if (!buffer || buffer.length < 12) {
+    return null;
+  }
+
+  // 1. JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { ext: 'jpg', mime: 'image/jpeg' };
+  }
+
+  // 2. PNG: 89 50 4E 47 (0x89 'P' 'N' 'G')
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return { ext: 'png', mime: 'image/png' };
+  }
+
+  // 3. WebP: RIFF (52 49 46 46) ... WEBP (57 45 42 50)
+  const isRiff = buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46;
+  const isWebp = buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+  if (isRiff && isWebp) {
+    return { ext: 'webp', mime: 'image/webp' };
+  }
+
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Authenticate user via Supabase session
+    const caller = await verifyAuthenticatedUser(request);
+    if (!caller) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required to upload files' },
+        { status: 401 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-    const providerId = (formData.get('providerId') as string) || 'onboarding';
 
     if (!file) {
       return NextResponse.json(
         { error: 'No image file provided in request.' },
-        { status: 400 }
-      );
-    }
-
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Invalid file format. Please upload a JPG, PNG, or WebP image.' },
         { status: 400 }
       );
     }
@@ -33,18 +63,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = getSupabaseAdmin();
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storagePath = `${providerId}/${Date.now()}-${sanitizedFileName}`;
-
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // 2. Deep inspection of magic bytes (reject spoofed client mime types)
+    const detectedFormat = detectImageFormat(buffer);
+    if (!detectedFormat) {
+      return NextResponse.json(
+        { error: 'Invalid file format. Magic-byte verification failed for JPG, PNG, or WebP.' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Scope storage path prefix to authenticated user's ID
+    const merchantId = caller.id;
+    const randomId = crypto.randomBytes(6).toString('hex');
+    const timestamp = Date.now();
+    const storagePath = `${merchantId}/${timestamp}-${randomId}.${detectedFormat.ext}`;
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // 4. Upload with blind overwriting disabled (upsert: false)
     const { data, error: uploadError } = await supabaseAdmin.storage
       .from('venue-assets')
       .upload(storagePath, buffer, {
-        contentType: file.type,
-        upsert: true,
+        contentType: detectedFormat.mime,
+        upsert: false,
       });
 
     if (uploadError) {
@@ -70,3 +114,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

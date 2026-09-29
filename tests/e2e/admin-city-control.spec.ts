@@ -12,8 +12,13 @@ test.describe.serial('Super Admin Multi-City Rollout & Expansion Hub', () => {
 
   test.beforeEach(async ({ request }) => {
     // Reset test territory baseline state for idempotent repeatability
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
     await request.patch('http://localhost:3000/api/admin/cities', {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': adminToken },
+      data: { cityId: 'tirupati', status: 'ACTIVE' },
+    });
+    await request.patch('http://localhost:3000/api/admin/cities', {
+      headers: { 'x-admin-bypass-key': adminToken },
       data: { cityId: 'nellore', status: 'EXPANDING' },
     });
   });

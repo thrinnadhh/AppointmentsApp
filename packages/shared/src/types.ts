@@ -10,7 +10,7 @@ export type BookingStatus =
   | 'CANCELLED'
   | 'NO_SHOW';
 
-export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'FORFEITED';
+export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'FORFEITED';
 
 export type ResourceType = 'doctor' | 'table' | 'court' | 'stylist' | 'groomer' | 'vet';
 

@@ -16,7 +16,6 @@ import {
   Activity,
   Clock,
   Settings,
-  MapPin,
   Scissors,
   Stethoscope,
   Gamepad2,
@@ -82,7 +81,6 @@ export default function Navigation() {
     router.push('/login');
   };
 
-  // Determine vertical icon
   const VerticalIcon = verticalConfig.id === 'salons' 
     ? Scissors 
     : verticalConfig.id === 'gaming' 
@@ -91,47 +89,58 @@ export default function Navigation() {
     ? Utensils
     : Stethoscope;
 
-  // Adaptive nav items: verticalized resource label, conditionally include /admin for Super Admin only
   const navItems = [
     { href: '/', label: 'Overview', icon: LayoutDashboard },
     ...(isSuperAdmin ? [{ href: '/admin', label: 'Platform Admin', icon: ShieldCheck }] : []),
-    { href: '/venues', label: isLocked ? 'My Venue' : 'Venues & Businesses', icon: Building2 },
-    { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s & Services`, icon: Users },
-    { href: '/bookings', label: 'Bookings Queue', icon: CalendarDays },
-    { href: '/schedule', label: 'Availability & Hours', icon: Clock },
-    { href: '/team', label: 'Team & Access', icon: UserCheck },
-    { href: '/settings', label: 'Settings & Profile', icon: Settings },
+    { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },
+    { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users },
+    { href: '/bookings', label: 'Bookings', icon: CalendarDays },
+    { href: '/schedule', label: 'Schedule', icon: Clock },
+    { href: '/team', label: 'Team', icon: UserCheck },
+    { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname.startsWith('/admin/login');
 
+  const logoMark = (
+    <div
+      style={{
+        height: 36,
+        width: 36,
+        borderRadius: 9,
+        background: 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 2px 8px rgba(4,120,87,0.28)',
+        flexShrink: 0,
+        transition: 'transform 120ms ease, box-shadow 120ms ease',
+      }}
+      className="group-hover:scale-105"
+    >
+      <VerticalIcon className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} />
+    </div>
+  );
+
   if (isAuthPage) {
     return (
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/login" className="flex items-center space-x-3 group">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-                <Building2 className="w-5 h-5" />
-              </div>
+      <header style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }} className="sticky top-0 z-40">
+        <div className="max-w-screen-xl mx-auto px-6 lg:px-8">
+          <div className="flex justify-between items-center" style={{ height: 60 }}>
+            <Link href="/login" className="flex items-center gap-3 group">
+              {logoMark}
               <div>
-                <span className="font-bold text-slate-900 tracking-tight text-base">
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-ink)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                   Tirupati Merchant Hub
-                </span>
-                <p className="text-xs text-slate-500">Merchant Onboarding & Workspace</p>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-tertiary)', lineHeight: 1.3 }}>Merchant Onboarding &amp; Workspace</div>
               </div>
             </Link>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/login?mode=register"
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition"
-              >
+            <div className="flex items-center gap-2">
+              <Link href="/login?mode=register" className="btn btn-primary" style={{ fontSize: 12, padding: '7px 14px' }}>
                 Register Venue
               </Link>
-              <Link
-                href="/login?mode=signin"
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
-              >
+              <Link href="/login?mode=signin" className="btn btn-secondary" style={{ fontSize: 12, padding: '7px 14px' }}>
                 Sign In
               </Link>
             </div>
@@ -142,43 +151,57 @@ export default function Navigation() {
   }
 
   const hasPortalAccess = Boolean(currentUser && (activeProvider || isSuperAdmin));
+  const userInitials = currentUser?.fullName ? currentUser.fullName.substring(0, 2).toUpperCase() : 'ME';
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Brand Logo & Platform Title */}
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-              <VerticalIcon className="w-5 h-5" />
-            </div>
+    <header style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }} className="sticky top-0 z-40">
+      <div className="max-w-screen-xl mx-auto px-6 lg:px-8">
+        <div className="flex justify-between items-center" style={{ height: 60 }}>
+
+          {/* Brand */}
+          <Link href="/" className="flex items-center gap-3 group" style={{ textDecoration: 'none' }}>
+            {logoMark}
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 tracking-tight text-base group-hover:text-emerald-700 transition-colors">
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-ink)', letterSpacing: '-0.02em' }}>
                   Tirupati Merchant Hub
                 </span>
                 {hasPortalAccess && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <ShieldCheck className="w-3 h-3 mr-1 text-emerald-600" />
-                    Verified Portal
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: '2px 7px',
+                    borderRadius: 99,
+                    background: 'var(--color-primary-light)',
+                    color: 'var(--color-primary)',
+                    border: '1px solid var(--color-primary-muted)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    letterSpacing: '0.01em',
+                  }}>
+                    <ShieldCheck style={{ width: 10, height: 10 }} />
+                    Verified
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 flex items-center gap-1">
-                <Activity className="w-3 h-3 text-emerald-500 animate-pulse" />
-                <span className="font-semibold text-slate-700">{activeProvider?.name || 'Private Merchant Space'}</span>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-tertiary)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                <Activity style={{ width: 10, height: 10, color: 'var(--color-primary)', flexShrink: 0 }} className="animate-pulse" />
+                <span style={{ fontWeight: 500, color: 'var(--color-ink-secondary)', fontSize: 11 }}>
+                  {activeProvider?.name || 'Private Merchant Space'}
+                </span>
                 {activeProvider && (
-                  <span className="text-[11px] text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded ml-1 font-medium">
+                  <span style={{ fontSize: 10, color: 'var(--color-primary)', background: 'var(--color-primary-light)', padding: '1px 6px', borderRadius: 99 }}>
                     {verticalConfig.badgeLabel}
                   </span>
                 )}
-              </p>
+              </div>
             </div>
           </Link>
 
-          {/* Desktop Navigation Links - only visible when user has an active registered venue or is super admin */}
+          {/* Desktop Nav */}
           {hasPortalAccess && (
-            <nav className="hidden lg:flex space-x-1">
+            <nav className="hidden lg:flex items-center" style={{ gap: 2 }}>
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
@@ -186,13 +209,14 @@ export default function Navigation() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`inline-flex items-center px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
-                      isActive
-                        ? 'bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200/60 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
+                    className="nav-link"
+                    style={isActive ? {
+                      background: 'var(--color-primary-light)',
+                      color: 'var(--color-primary)',
+                      fontWeight: 600,
+                    } : {}}
                   >
-                    <Icon className={`w-4 h-4 mr-2 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <Icon style={{ width: 14, height: 14, flexShrink: 0, color: isActive ? 'var(--color-primary)' : 'var(--color-ink-tertiary)' }} />
                     {item.label}
                   </Link>
                 );
@@ -200,57 +224,79 @@ export default function Navigation() {
             </nav>
           )}
 
-          {/* Right Status Actions & User Account */}
-          <div className="flex items-center space-x-3">
+          {/* Right Actions */}
+          <div className="flex items-center" style={{ gap: 10 }}>
             {hasPortalAccess && (
               <Link
                 href="/"
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg relative"
-                title="Notifications & System Alerts"
+                className="btn btn-ghost"
+                title="Notifications"
+                style={{ padding: '7px', borderRadius: 'var(--radius-md)', position: 'relative' }}
               >
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-white"></span>
+                <Bell style={{ width: 17, height: 17 }} />
+                <span style={{
+                  position: 'absolute',
+                  top: 7,
+                  right: 7,
+                  width: 7,
+                  height: 7,
+                  background: 'var(--color-primary)',
+                  borderRadius: '50%',
+                  border: '1.5px solid white',
+                }} />
               </Link>
             )}
 
             {currentUser ? (
-              <div className="flex items-center pl-3 border-l border-slate-200 gap-3">
-                <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-slate-900">{currentUser.fullName}</p>
-                  <div className="flex items-center justify-end gap-1.5">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <p className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
+              <div className="flex items-center" style={{ paddingLeft: 12, borderLeft: '1px solid var(--color-border)', gap: 10 }}>
+                <div className="hidden sm:block text-right">
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ink)', lineHeight: 1.2 }}>{currentUser.fullName}</div>
+                  <div style={{ fontSize: 10, color: 'var(--color-ink-tertiary)', display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end', marginTop: 2 }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--color-primary)', display: 'inline-block' }} />
+                    <span style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
                       {currentUser.role === 'admin' ? 'Super Admin' : `${verticalConfig.badgeLabel} Owner`}
-                    </p>
+                    </span>
                   </div>
                 </div>
-                <div 
-                  className="w-9 h-9 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-xs font-bold text-emerald-800 shadow-xs"
+                <div
                   title={currentUser.email}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: '50%',
+                    background: 'var(--color-primary-light)',
+                    border: '1.5px solid var(--color-primary-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: 'var(--color-primary)',
+                    flexShrink: 0,
+                    fontFamily: 'var(--font-mono)',
+                    cursor: 'default',
+                  }}
                 >
-                  {currentUser.fullName ? currentUser.fullName.substring(0, 2).toUpperCase() : 'ME'}
+                  {userInitials}
                 </div>
                 <button
                   onClick={handleSignOut}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                  className="btn btn-ghost"
                   title="Sign Out"
+                  style={{ padding: '7px', color: 'var(--color-ink-tertiary)' }}
+                  onMouseOver={(e) => ((e.currentTarget as HTMLElement).style.color = 'var(--color-error)')}
+                  onMouseOut={(e) => ((e.currentTarget as HTMLElement).style.color = 'var(--color-ink-tertiary)')}
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut style={{ width: 15, height: 15 }} />
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/login?mode=register"
-                  className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
-                >
+              <div className="flex items-center" style={{ gap: 8 }}>
+                <Link href="/login?mode=register" className="btn btn-primary" style={{ fontSize: 12, padding: '7px 14px' }}>
                   Register Venue
                 </Link>
-                <Link
-                  href="/login?mode=signin"
-                  className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                >
-                  <LogIn className="w-3.5 h-3.5 mr-1" />
+                <Link href="/login?mode=signin" className="btn btn-ghost" style={{ fontSize: 12, padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <LogIn style={{ width: 13, height: 13 }} />
                   Sign In
                 </Link>
               </div>
@@ -259,9 +305,17 @@ export default function Navigation() {
         </div>
       </div>
 
-      {/* Mobile Sub-Navigation Bar - only visible when portal access is active */}
+      {/* Mobile scrollable sub-nav */}
       {hasPortalAccess && (
-        <div className="lg:hidden flex overflow-x-auto border-t border-slate-100 px-2 py-1.5 bg-slate-50/80 gap-1 scrollbar-none">
+        <div
+          className="lg:hidden flex overflow-x-auto scrollbar-none"
+          style={{
+            borderTop: '1px solid var(--color-border)',
+            background: 'var(--color-surface)',
+            padding: '6px 16px',
+            gap: 4,
+          }}
+        >
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -269,13 +323,24 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex-shrink-0 inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  isActive
-                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 bg-white border border-slate-200'
-                }`}
+                style={{
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '5px 10px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 12,
+                  fontWeight: isActive ? 700 : 500,
+                  whiteSpace: 'nowrap',
+                  textDecoration: 'none',
+                  background: isActive ? 'var(--color-primary)' : 'var(--color-surface-raised)',
+                  color: isActive ? '#fff' : 'var(--color-ink-secondary)',
+                  border: `1px solid ${isActive ? 'transparent' : 'var(--color-border)'}`,
+                  transition: 'background 100ms, color 100ms',
+                }}
               >
-                <Icon className="w-3.5 h-3.5 mr-1.5" />
+                <Icon style={{ width: 13, height: 13 }} />
                 {item.label}
               </Link>
             );

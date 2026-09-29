@@ -5,7 +5,11 @@ import { MerchantPortalPage } from './pages/merchant-portal.page';
 // Initialize Supabase Client mirroring Customer Mobile App configuration
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const customerSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const serviceSupabase = SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : customerSupabase;
 
 // Customer Mobile App data fetching engine (mirroring apps/customer-mobile/src/services/api.ts)
 async function customerFetchProvidersByCategory(categoryId?: string) {
@@ -259,9 +263,17 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
     expect(publicUrlData.publicUrl).toContain('venue-assets');
 
-    // 3. Upload private patient prescription (application/pdf)
+    // 3. Upload private patient prescription (application/pdf) under authenticated customer session
+    await customerSupabase.auth.signInWithOtp({ phone: '+919999999991' });
+    const { data: authData } = await customerSupabase.auth.verifyOtp({
+      phone: '+919999999991',
+      token: '123456',
+      type: 'sms',
+    });
+    const authUserId = authData.user?.id || '99999999-9999-9999-9999-999999999991';
+
     const rxFileName = `test_rx_${Date.now()}.pdf`;
-    const rxPath = `99999999-9999-9999-9999-999999999991/${rxFileName}`;
+    const rxPath = `${authUserId}/${rxFileName}`;
     const pdfBuffer = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
     const { data: uploadRxData, error: uploadRxError } = await customerSupabase.storage
       .from('prescriptions-and-records')
@@ -285,6 +297,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     // Clean up test objects
     await customerSupabase.storage.from('venue-assets').remove([uploadVenueData!.path]);
     await customerSupabase.storage.from('prescriptions-and-records').remove([rxPath]);
+    await customerSupabase.auth.signOut();
   });
 
   test('8. Should verify Supabase Phone OTP Authentication, Verification & Profile Auto-Linking flow', async ({ page }) => {
@@ -365,7 +378,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
   test('9. Phase 4 Feature 7: Automated WhatsApp & SMS Notifications and 1-Hour & 30-Minute Reminders', async ({ page, request }) => {
     // 1. Fetch any confirmed booking
-    const { data: bookings, error: bookingsError } = await customerSupabase
+    const { data: bookings, error: bookingsError } = await serviceSupabase
       .from('bookings')
       .select('id, reference_code, customer_id, provider_id')
       .eq('status', 'CONFIRMED')
@@ -376,7 +389,9 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     const testBooking = bookings![0];
 
     // 2. Dispatch BOOKING_CONFIRMED notification via admin API
+    const adminHeaders = { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' };
     const notifyRes = await request.post('http://localhost:3000/api/admin/notifications', {
+      headers: adminHeaders,
       data: {
         booking_id: testBooking.id,
         event_type: 'BOOKING_CONFIRMED',
@@ -389,7 +404,9 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(notifyJson.dispatch.recipient_phone).toBeDefined();
 
     // 3. Verify notification_logs in Supabase contains both WhatsApp and SMS records
-    const logsRes = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`);
+    const logsRes = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`, {
+      headers: adminHeaders,
+    });
     expect(logsRes.status()).toBe(200);
     const logsJson = await logsRes.json();
     expect(logsJson.success).toBe(true);
@@ -403,6 +420,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     // 4. Test 1-Hour and 30-Minute Reminders trigger
     // Update booking slot_start to 50 mins from now to test 1-hour window (40-75 min)
     const setSlotRes1 = await request.post('http://localhost:3000/api/admin/notifications', {
+      headers: adminHeaders,
       data: {
         action: 'set_slot_time',
         booking_id: testBooking.id,
@@ -413,12 +431,15 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
     // Call check_reminders API
     const reminderRes1 = await request.post('http://localhost:3000/api/admin/notifications', {
+      headers: adminHeaders,
       data: { action: 'check_reminders' },
     });
     expect(reminderRes1.status()).toBe(200);
 
     // Verify 1-hour reminder logged
-    const logsRes1h = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`);
+    const logsRes1h = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`, {
+      headers: adminHeaders,
+    });
     const logsJson1h = await logsRes1h.json();
     const reminder1hLogs = (logsJson1h.notifications as Array<{ event_type: string }>).filter(
       (l) => l.event_type === 'BOOKING_REMINDER_1H'
@@ -427,6 +448,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
     // Update booking slot_start to 20 mins from now to test 30-minute window (10-35 min)
     const setSlotRes2 = await request.post('http://localhost:3000/api/admin/notifications', {
+      headers: adminHeaders,
       data: {
         action: 'set_slot_time',
         booking_id: testBooking.id,
@@ -436,12 +458,15 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(setSlotRes2.status()).toBe(200);
 
     const reminderRes2 = await request.post('http://localhost:3000/api/admin/notifications', {
+      headers: adminHeaders,
       data: { action: 'check_reminders' },
     });
     expect(reminderRes2.status()).toBe(200);
 
     // Verify 30-minute reminder logged
-    const logsRes30m = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`);
+    const logsRes30m = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`, {
+      headers: adminHeaders,
+    });
     const logsJson30m = await logsRes30m.json();
     const reminder30mLogs = (logsJson30m.notifications as Array<{ event_type: string }>).filter(
       (l) => l.event_type === 'BOOKING_REMINDER_30M'
@@ -450,6 +475,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
     // 5. Test Cancellation notification dispatch
     const cancelRes = await request.post('http://localhost:3000/api/admin/notifications', {
+      headers: adminHeaders,
       data: {
         booking_id: testBooking.id,
         event_type: 'BOOKING_CANCELLED',

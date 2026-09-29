@@ -40,6 +40,7 @@ import {
   DaySchedule
 } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { CustomerContactBadge } from '@/components/CustomerContactBadge';
 
 const DEFAULT_WEEKLY_HOURS: WeeklyHours = {
   monday: { open: '09:00', close: '21:00', is_closed: false },
@@ -529,20 +530,20 @@ export default function MerchantOverviewPage() {
         setSelectedProviderId(targetProviderId);
         return;
       }
-      const { data, error } = await supabase.from('bookings')
-        .select('*, profiles(full_name, phone, no_show_count), resources(name, type), providers(name)')
+      const { data, error } = await (supabase as any).from('merchant_bookings')
+        .select('*')
         .eq('provider_id', targetProviderId)
         .order('slot_start', { ascending: true });
       if (error) throw error;
       if (version !== loadVersion.current) return;
-      setBookings((data || []).map((booking) => ({
+      setBookings((data || []).map((booking: any) => ({
         ...booking,
-        customer_name: booking.profiles?.full_name || 'Walk-in / Guest',
-        customer_phone: booking.profiles?.phone || 'Not provided',
-        no_show_count: booking.profiles?.no_show_count ?? 0,
-        resource_name: booking.resources?.name || 'Standard Unit',
-        resource_type: booking.resources?.type || 'slot',
-        provider_name: booking.providers?.name || 'Merchant Venue',
+        customer_name: booking.customer_name || 'Walk-in / Guest',
+        customer_phone: booking.customer_phone || 'Not provided',
+        no_show_count: booking.no_show_count ?? 0,
+        resource_name: booking.resource_name || 'Standard Unit',
+        resource_type: booking.resource_type || 'slot',
+        provider_name: booking.provider_name || 'Merchant Venue',
       })));
     } catch {
       if (version === loadVersion.current) {
@@ -1130,13 +1131,17 @@ export default function MerchantOverviewPage() {
                           <span>•</span>
                           <span className="font-medium text-slate-700">{booking.resource_name}</span>
                         </p>
-                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3" />
-                          {booking.customer_phone}
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <CustomerContactBadge
+                            phone={booking.customer_phone}
+                            bookingId={booking.id}
+                            bookingStatus={booking.status}
+                            isArrived={Boolean(booking.customer_arrived_at)}
+                          />
                           {booking.no_show_count ? (
-                            <span className="ml-2 text-rose-500 font-medium">({booking.no_show_count} past no-shows)</span>
+                            <span className="text-xs text-rose-500 font-medium">({booking.no_show_count} past no-shows)</span>
                           ) : null}
-                        </p>
+                        </div>
                         {booking.customer_arrived_at && (
                           <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 mt-1">
                             <span>✓ Reached Venue at {new Date(booking.customer_arrived_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>

@@ -7,7 +7,7 @@ interface RpcNoShowResult {
   success: boolean;
   no_show_count?: number;
   penalty_applied?: boolean;
-  payment_status?: 'REFUNDED' | 'FORFEITED';
+  payment_status?: 'REFUND_PENDING' | 'REFUNDED' | 'REFUND_FAILED' | 'FORFEITED';
   refund_amount?: number;
   flagged?: boolean;
   error?: string;
@@ -72,19 +72,92 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let finalPaymentStatus: 'REFUND_PENDING' | 'REFUNDED' | 'REFUND_FAILED' | 'FORFEITED' =
+      result.payment_status || 'FORFEITED';
+
     // If Strike 1 or Strike 2 (Courtesy Grace Period with refund), initiate gateway refund
-    if (result.payment_status === 'REFUNDED' && booking?.gateway_payment_id) {
+    if (result.payment_status === 'REFUND_PENDING' && booking?.gateway_payment_id) {
+      const refundAmt = Math.round(Number(result.refund_amount ?? booking.deposit_amount ?? 100) * 100);
       try {
         await initiateRazorpayRefund({
           paymentId: booking.gateway_payment_id,
-          amount: Math.round(Number(result.refund_amount ?? booking.deposit_amount ?? 100) * 100),
+          amount: refundAmt,
           notes: {
             booking_id,
             reason: `Courtesy no-show grace refund (Strike ${result.no_show_count})`,
           },
         });
+
+        // Refund succeeded -> promote to REFUNDED
+        finalPaymentStatus = 'REFUNDED';
+        await supabaseAdmin
+          .from('bookings')
+          .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
+          .eq('id', booking_id);
+
+        await supabaseAdmin
+          .from('payments')
+          .update({ status: 'REFUNDED', updated_at: new Date().toISOString() })
+          .eq('booking_id', booking_id);
+
       } catch (refundErr) {
-        console.error('Courtesy no-show refund warning (non-fatal):', refundErr);
+        // Refund failed -> mark REFUND_FAILED and alert operators
+        finalPaymentStatus = 'REFUND_FAILED';
+        const errorMsg = refundErr instanceof Error ? refundErr.message : String(refundErr);
+
+        await supabaseAdmin
+          .from('bookings')
+          .update({ payment_status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+          .eq('id', booking_id);
+
+        await supabaseAdmin
+          .from('payments')
+          .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+          .eq('booking_id', booking_id);
+
+        // Log prominently to console for monitoring & on-call alerts
+        console.error(
+          '\n====================================================================\n' +
+          '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
+          `Booking ID: ${booking_id}\n` +
+          `Payment ID: ${booking.gateway_payment_id}\n` +
+          `Refund Amount: ₹${result.refund_amount ?? booking.deposit_amount ?? 100}\n` +
+          `Error: ${errorMsg}\n` +
+          'Action: Manual investigation required in Razorpay Dashboard.\n' +
+          '====================================================================\n'
+        );
+
+        // Record in admin_audit_logs for incident tracking
+        await supabaseAdmin.from('admin_audit_logs').insert({
+          admin_id: null,
+          action: 'REFUND_MANUAL_INTERVENTION_REQUIRED',
+          target_type: 'bookings',
+          target_id: booking_id,
+          details: {
+            error: errorMsg,
+            gateway_payment_id: booking.gateway_payment_id,
+            refund_amount: result.refund_amount ?? booking.deposit_amount ?? 100,
+            reason: `Courtesy no-show grace refund (Strike ${result.no_show_count})`,
+            failed_at: new Date().toISOString(),
+          },
+        });
+
+        // Dispatch critical internal alert into notification_logs
+        await supabaseAdmin.from('notification_logs').insert({
+          booking_id,
+          recipient_phone: '+910000000000',
+          recipient_name: 'Operations Team',
+          event_type: 'REFUND_FAILED_ALERT',
+          channel: 'SYSTEM_AUDIT',
+          status: 'FAILED',
+          message_content: `Automated no-show refund failed for booking ${booking_id} (Payment: ${booking.gateway_payment_id}, Amount: ₹${result.refund_amount ?? booking.deposit_amount ?? 100}). Reason: ${errorMsg}. Requires manual settlement.`,
+          provider_response: {
+            error: errorMsg,
+            gateway_payment_id: booking.gateway_payment_id,
+            refund_amount: result.refund_amount ?? booking.deposit_amount ?? 100,
+            failed_at: new Date().toISOString(),
+          },
+        });
       }
     }
 
@@ -94,7 +167,7 @@ export async function POST(req: NextRequest) {
         booking_id,
         no_show_count: result.no_show_count,
         penalty_applied: result.penalty_applied ?? false,
-        payment_status: result.payment_status || 'FORFEITED',
+        payment_status: finalPaymentStatus,
         refund_amount: result.refund_amount !== undefined ? Number(result.refund_amount) : 0,
         is_flagged: result.flagged,
       },

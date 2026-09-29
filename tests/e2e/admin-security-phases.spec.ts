@@ -1,5 +1,10 @@
 import { test, expect } from './fixtures/test-fixtures';
 
+const TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com';
+const TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || '';
+const TEST_SALON_EMAIL = process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com';
+const TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || '';
+
 /**
  * Super Admin Security Hardening E2E Test Suite (Phases 1, 2, and 3)
  *
@@ -29,8 +34,8 @@ test.describe.serial('Super Admin Security Hardening - Three Phases E2E Suite', 
 
     await test.step('2. Unhappy Path: Non-admin merchant credentials get rejected with Access Denied', async () => {
       await admin.loginExpectFailure(
-        'naturals.salon@tirupati-appointments.com',
-        'NaturalsSalon2026!'
+        TEST_SALON_EMAIL,
+        TEST_SALON_PASSWORD
       );
       await expect(admin.loginErrorAlert).toBeVisible();
       await expect(admin.loginErrorAlert).toContainText(/Access Denied/i);
@@ -46,8 +51,8 @@ test.describe.serial('Super Admin Security Hardening - Three Phases E2E Suite', 
 
     await test.step('4. Super Admin authenticates, reaches dashboard, displays Identity Badge, and signs out', async () => {
       await admin.loginAsAdmin(
-        'admin@appointments-tirupati.com',
-        'AdminSecure2026!'
+        TEST_ADMIN_EMAIL,
+        TEST_ADMIN_PASSWORD
       );
 
       await expect(admin.pageHeading).toBeVisible();
@@ -114,8 +119,8 @@ test.describe.serial('Super Admin Security Hardening - Three Phases E2E Suite', 
     await test.step('1. Credentials submission triggers Stage 2 MFA prompt (Challenge or Enrollment)', async () => {
       await admin.gotoLoginPage();
       await admin.submitCredentials(
-        'admin@appointments-tirupati.com',
-        'AdminSecure2026!'
+        TEST_ADMIN_EMAIL,
+        TEST_ADMIN_PASSWORD
       );
 
       // Deterministic auto-wait for Stage 2 MFA code input
@@ -177,8 +182,8 @@ test.describe.serial('Super Admin Security Hardening - Three Phases E2E Suite', 
 
     await test.step('Step 2 (Phase 1 & 3): Super Admin inputs credentials and elevates via Stage 2 MFA', async () => {
       await admin.submitCredentials(
-        'admin@appointments-tirupati.com',
-        'AdminSecure2026!'
+        TEST_ADMIN_EMAIL,
+        TEST_ADMIN_PASSWORD
       );
       await expect(admin.mfaCodeInput).toBeVisible();
       await expect(admin.mfaSkipBtn).toBeVisible();

@@ -1,88 +1,150 @@
 ---
-version: "1.0.0"
-name: Tirupati Trust & Velocity
-description: Design system for Hyperlocal Multi-Vertical Appointments Platform (Merchant Web & Customer Mobile)
+version: "2.0.0"
+name: Tirupati Merchant Command
+description: Design system v2 for Hyperlocal Multi-Vertical Appointments Platform
 colors:
-  primary: "#059669"
-  primary-dark: "#064e3b"
-  primary-light: "#f0fdf4"
-  secondary: "#0284c7"
-  accent: "#d97706"
+  primary: "#047857"
+  primary-hover: "#065f46"
+  primary-light: "#ecfdf5"
+  primary-muted: "#d1fae5"
+  ink: "#0c1a14"
+  ink-secondary: "#374151"
+  ink-tertiary: "#6b7280"
   surface: "#ffffff"
-  surface-subtle: "#f8fafc"
-  border: "#e2e8f0"
-  text-primary: "#0f172a"
-  text-secondary: "#475569"
-  error: "#e11d48"
-  success: "#10b981"
+  surface-raised: "#f9fafb"
+  border: "#e5e7eb"
+  border-strong: "#d1d5db"
+  accent-amber: "#b45309"
+  accent-amber-bg: "#fffbeb"
+  error: "#be123c"
+  error-bg: "#fff1f2"
+  success: "#065f46"
+  success-bg: "#ecfdf5"
+  dark-zone: "#0f1f17"
+  dark-zone-text: "#d1fae5"
 typography:
-  headline-1:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    fontSize: "32px"
+  display:
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontSize: "30px"
     fontWeight: "700"
-    lineHeight: "1.2"
-    letterSpacing: "-0.02em"
-  headline-2:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    fontSize: "24px"
+    lineHeight: "1.15"
+    letterSpacing: "-0.03em"
+  headline:
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontSize: "22px"
     fontWeight: "600"
-    lineHeight: "1.3"
+    lineHeight: "1.25"
+    letterSpacing: "-0.02em"
+  title:
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontSize: "16px"
+    fontWeight: "600"
+    lineHeight: "1.4"
     letterSpacing: "-0.01em"
   body:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    fontSize: "15px"
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontSize: "14px"
     fontWeight: "400"
-    lineHeight: "1.5"
-  caption:
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    lineHeight: "1.55"
+  label:
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
     fontSize: "12px"
     fontWeight: "500"
     lineHeight: "1.4"
+    letterSpacing: "0.01em"
+  mono:
+    fontFamily: "'Geist Mono', 'JetBrains Mono', 'Fira Code', monospace"
+    fontSize: "13px"
+    fontWeight: "500"
+    lineHeight: "1.5"
 rounded:
+  none: "0px"
+  xs: "4px"
   sm: "6px"
-  md: "10px"
-  lg: "16px"
+  md: "8px"
+  lg: "12px"
+  xl: "16px"
   full: "9999px"
 spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "16px"
-  lg: "24px"
-  xl: "32px"
+  1: "4px"
+  2: "8px"
+  3: "12px"
+  4: "16px"
+  6: "24px"
+  8: "32px"
+  12: "48px"
+components:
+  card:
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.lg}"
+    padding: "24px"
+    border: "1px solid {colors.border}"
+    shadow: "0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.03)"
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.surface}"
+    rounded: "{rounded.md}"
+    padding: "10px 20px"
+  button-secondary:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink-secondary}"
+    rounded: "{rounded.md}"
+    border: "1px solid {colors.border-strong}"
+  input:
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.md}"
+    padding: "10px 12px"
+    border: "1px solid {colors.border-strong}"
+  nav:
+    backgroundColor: "{colors.surface}"
+    height: "60px"
+  dark-control-bar:
+    backgroundColor: "{colors.dark-zone}"
+    textColor: "{colors.dark-zone-text}"
+    rounded: "{rounded.lg}"
+    padding: "16px 20px"
 ---
 
-# Tirupati Appointments Design Specification
+# Tirupati Merchant Command — Design System v2
 
 ## Overview
-A high-trust, responsive visual system designed for multi-vertical booking across Tier-2/3 commerce (Clinics, Restaurants, Turfs, Salons, Pet Care in Tirupati).
-The interface balances merchant operational efficiency with customer mobile speed and clarity.
+High-authority, operationally-dense visual system. Emotional register: Trust → Control → Speed.
+Audience: Business owners aged 25-55, daily ops on tablets/desktops in commercial spaces.
 
 ## Colors
-- **Emerald Green (`#059669`)**: Core primary tone representing confirmed appointments, vitality, health, and verified status.
-- **Deep Slate (`#0f172a` / `#475569`)**: Authoritative text hierarchy ensuring maximum readability under varied sunlight and device conditions.
-- **Amber Gold (`#d97706`)**: Highlights deposits, held slots (5-min countdown), and warning thresholds (late cancellation windows).
-- **Subtle Surface (`#f8fafc`)**: Crisp, glare-free background with clean border definition (`#e2e8f0`).
-- **No Purple Clause**: Strictly complies with the AG Kit Purple Ban — no indigo/purple SaaS gradients.
+- **Primary Emerald (#047857)**: Deepened for 4.8:1 contrast on white. Confirmed/active/success states only.
+- **Ink (#0c1a14)**: Near-black with green undertone. Headlines and critical data.
+- **Surface Raised (#f9fafb)**: Page background. Warm off-white prevents eye strain.
+- **Dark Zone (#0f1f17)**: Control bars and operational toggles. Signals "machine control panel."
+- **Amber (#b45309)**: Deposit amounts, hold timers, cancellation warnings only.
+- No Purple Clause: AG Kit Purple Ban strictly enforced.
 
 ## Typography
-- Native system font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto`) for zero network latency, instant initial paint, and familiar platform rendering across iOS, Android, and Web.
-- Clear numeric readability for slot times, countdown timers, deposit figures, and distance indications.
+- Inter from Google Fonts (400/500/600/700). Better numeric rendering for ₹ amounts and time slots.
+- Geist Mono for booking codes, timestamps, all numeric alignment in lists.
+- Negative letter-spacing on headlines (-0.03em) for premium feel.
 
 ## Layout
-- **Merchant Web**: Fixed top-bar + persistent desktop sub-nav / compact mobile nav. Clean information density with high data-to-ink ratio.
-- **Customer Mobile**: Single-hand reachability, bottom-sheet slot selectors, sticky bottom confirmation bars, clear visual vertical categories.
+- Page background: #f9fafb — not pure white, prevents cards from blending in.
+- Content width: max-w-screen-xl (1280px). Padding: px-6 mobile, px-8 desktop.
+- Cards: 24px internal padding minimum. Section gaps: gap-6 related, gap-8 major sections.
+- Nav height: 60px.
 
 ## Elevation & Depth
-- Flat, modern surfaces with subtle single-pixel borders (`#e2e8f0`) rather than heavy floating drop-shadows.
-- Soft shadow (`box-shadow: 0 1px 3px rgba(0,0,0,0.06)`) on active cards and booking modals.
+- Level 0 (page): #f9fafb, no shadow.
+- Level 1 (card): 0 1px 4px rgba(0,0,0,0.06) + 1px border.
+- Level 2 (hover): 0 4px 16px rgba(0,0,0,0.08) + green ring.
+- Level 3 (modal): 0 20px 60px rgba(0,0,0,0.18) with dark backdrop.
 
-## Components
-- **Category Badge**: Pill badges with vertical-specific icons and tint backgrounds.
-- **Booking Card**: Displays resource name, customer contact, scheduled slot time, deposit payment state, and quick triage actions (Accept / Reschedule / Complete / No-Show).
-- **Slot Button**: Interactive chip indicating available, held, or confirmed states with instant visual feedback.
+## Shapes
+- Cards: rounded-xl (12px). Buttons: rounded-lg (8px). Badges: rounded-full. Inputs: rounded-lg.
+- Never mix 24px and 8px radii on the same card layer.
 
 ## Do's and Don'ts
-- **DO**: Display deposit amounts clearly with ₹ symbols everywhere to maintain upfront honesty.
-- **DO**: Visually differentiate between customer late cancellation (forfeited) vs business change (full refund).
-- **DON'T**: Use generic purple/violet aesthetic or generic corporate stock illustrations.
-- **DON'T**: Hide slot hold timers; always make the 5-minute countdown explicit to prevent cart abandon confusion.
+- DO use gap-6 minimum between sections — whitespace is clarity.
+- DO put ₹ and slot times in mono font.
+- DO use dark-zone for operational control bars.
+- DON'T use rounded-2xl on cards — reads as mobile-port.
+- DON'T use bg-slate-50 as page background — too cold.
+- DON'T use purple/indigo/violet.
+- DON'T use text-xs for primary body content — minimum 13px.

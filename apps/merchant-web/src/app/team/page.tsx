@@ -109,6 +109,7 @@ export default function TeamManagementPage() {
           password,
           role,
           phone: phone.trim() || undefined,
+          providerId: activeProvider?.id,
         }),
       });
 

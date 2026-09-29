@@ -1,5 +1,6 @@
 // Supabase Edge Function: release-expired-holds
 // Cron-triggered function to sweep and release holds older than 5 minutes.
+// Internal-only function: restricted to service_role or internal cron secret.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
@@ -16,9 +17,23 @@ serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase credentials not configured');
+    }
 
+    // Require service_role key in Authorization header
+    const authHeader = req.headers.get('Authorization');
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
+
+    if (!token || token !== supabaseServiceKey) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Internal service role key required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { data, error } = await supabase.rpc('release_expired_holds');
 
     if (error) {

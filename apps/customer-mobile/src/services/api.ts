@@ -297,6 +297,21 @@ interface CustomerBookingRow extends Booking {
 
 export async function fetchCustomerBookingsFromSupabase(customerId: string = '99999999-9999-9999-9999-999999999991') {
   try {
+    const baseUrl = getApiBaseUrl();
+    if (baseUrl) {
+      try {
+        const resp = await fetch(`${baseUrl}/api/bookings?customer_id=${encodeURIComponent(customerId)}`);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.success && Array.isArray(json.bookings)) {
+            return json.bookings as (Booking & { provider_name?: string; resource_name?: string })[];
+          }
+        }
+      } catch {
+        // Fall through to direct Supabase
+      }
+    }
+
     const { data, error } = await supabase
       .from('bookings')
       .select(`
@@ -661,6 +676,23 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
 
 export async function fetchBookedSlots(resourceId: string, date: Date): Promise<string[]> {
   try {
+    const baseUrl = getApiBaseUrl();
+    if (baseUrl) {
+      try {
+        const resp = await fetch(
+          `${baseUrl}/api/slots/booked?resource_id=${encodeURIComponent(resourceId)}&date=${encodeURIComponent(date.toISOString())}`
+        );
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.success && Array.isArray(json.booked_slots)) {
+            return json.booked_slots;
+          }
+        }
+      } catch {
+        // Fall back to direct Supabase
+      }
+    }
+
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);

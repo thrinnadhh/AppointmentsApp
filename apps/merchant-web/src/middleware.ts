@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PUBLIC_ROUTES = ['/login', '/register', '/admin/login', '/auth/', '/api/', '/_next/', '/favicon.ico'];
+// Strictly public user-facing page routes
+const PUBLIC_ROUTES = [
+  '/login',
+  '/register',
+  '/admin/login',
+  '/auth/',
+  '/_next/',
+  '/favicon.ico',
+  '/privacy',
+  '/terms',
+  '/refund-policy',
+];
+
+// Strictly public API endpoints (webhook listeners, auth callbacks, customer checkout, and territory endpoints)
+const PUBLIC_API_ROUTES = [
+  '/api/webhooks/razorpay',
+  '/api/auth/',
+  '/api/payments/create-order',
+  '/api/payments/verify',
+  '/api/bookings/hold',
+  '/api/health',
+  '/api/cities/',
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -14,36 +36,33 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
-  // Handle CORS for /api/ routes to allow customer-mobile (port 8081) communication
-  if (pathname.startsWith('/api/')) {
-    const origin = req.headers.get('origin') || '*';
-    if (req.method === 'OPTIONS') {
-      return new NextResponse(null, {
-        status: 204,
-        headers: {
-          'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key',
-          'Access-Control-Allow-Credentials': 'true',
-        },
-      });
-    }
-    const res = NextResponse.next();
-    res.headers.set('Access-Control-Allow-Origin', origin);
-    res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key');
-    res.headers.set('Access-Control-Allow-Credentials', 'true');
-    return res;
+  const origin = req.headers.get('origin') || '*';
+  const corsHeaders: Record<string, string> = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+
+  // Handle CORS preflight OPTIONS requests immediately
+  if (pathname.startsWith('/api/') && req.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
-  // Allow other public routes through without auth check
-  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
+  // Non-production E2E test bypass header verification using environment variable
+  const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET;
+  const isE2EBypass =
+    process.env.NODE_ENV !== 'production' &&
+    Boolean(adminBypassToken) &&
+    (req.headers.get('x-merchant-bypass-key') === adminBypassToken ||
+      req.headers.get('x-admin-bypass-key') === adminBypassToken);
 
-  // Check for Supabase auth cookie (project-ref based naming)
+  // Check for Supabase session cookies
   const cookies = req.cookies;
-  const hasAuthToken = Array.from(cookies.getAll()).some((cookie) => {
+  const hasAuthCookie = Array.from(cookies.getAll()).some((cookie) => {
     if (cookie.name.includes('code-verifier')) return false;
     const isSupabaseCookie =
       cookie.name.includes('auth-token') ||
@@ -53,23 +72,53 @@ export function middleware(req: NextRequest) {
     return val.length > 20 && val !== 'base64-deleted';
   });
 
-  const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login';
-  const hasAdminBypass = req.headers.get('x-admin-bypass-key') === 'tirupati-superadmin-e2e-2026';
+  // Check for Authorization: Bearer <jwt> header
+  const authHeader = req.headers.get('authorization');
+  const hasBearerToken = Boolean(
+    authHeader &&
+    authHeader.startsWith('Bearer ') &&
+    authHeader.replace(/^Bearer\s+/i, '').trim().length > 20
+  );
 
-  // Enforce strict authentication gate on /admin routes across all environments
-  if (isAdminRoute && !hasAuthToken && !hasAdminBypass) {
+  const isAuthenticated = hasAuthCookie || hasBearerToken;
+
+  // 1. API Route Access Control: Enforce authentication for all sensitive / non-whitelisted routes
+  if (pathname.startsWith('/api/')) {
+    const isPublicApi = PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route));
+
+    if (!isPublicApi && !isE2EBypass && !isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    const res = NextResponse.next();
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.headers.set(key, value);
+    });
+    return res;
+  }
+
+  // 2. Public Page Routes Gate
+  if (
+    PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) ||
+    (pathname === '/' && req.nextUrl.searchParams.get('demo') === '1') ||
+    isE2EBypass
+  ) {
+    return NextResponse.next();
+  }
+
+  // 3. Admin Page Routes Gate
+  const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login';
+  if (isAdminRoute && !isAuthenticated) {
     const adminLoginUrl = new URL('/admin/login', req.url);
     adminLoginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(adminLoginUrl);
   }
 
-  const hasMerchantBypass =
-    hasAdminBypass ||
-    req.headers.get('x-merchant-bypass-key') === 'tirupati-superadmin-e2e-2026' ||
-    req.nextUrl.searchParams.get('demo') === '1';
-
-  // Enforce authentication gate for standard merchant routes
-  if (!hasAuthToken && !hasMerchantBypass) {
+  // 4. Standard Merchant Page Routes Gate
+  if (!isAuthenticated) {
     const loginUrl = new URL('/login', req.url);
     if (pathname !== '/') {
       loginUrl.searchParams.set('redirect', pathname);

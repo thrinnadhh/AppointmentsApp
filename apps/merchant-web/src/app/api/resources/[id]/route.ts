@@ -1,30 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyStaffManagerRequest } from '@/lib/auth-admin';
 
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await verifyStaffManagerRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const { id } = await context.params;
     const body = await request.json();
     const { is_active } = body;
-    const adminToken = request.headers.get('x-admin-bypass-key') || 'tirupati-superadmin-e2e-2026';
 
-    const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('admin_update_resource_status', {
-      p_resource_id: id,
-      p_is_active: is_active,
-      p_admin_token: adminToken,
-    });
-
-    if (rpcError) {
-      return NextResponse.json({ error: rpcError.message }, { status: 400 });
+    if (typeof is_active !== 'boolean') {
+      return NextResponse.json({ error: 'is_active (boolean) is required' }, { status: 400 });
     }
 
-    const res = rpcData as { success?: boolean; error?: string };
-    if (!res?.success) {
-      const isConflict = res?.error?.includes('Conflict') || res?.error?.includes('confirmed bookings');
-      return NextResponse.json({ error: res?.error || 'Failed to update resource' }, { status: isConflict ? 409 : 400 });
+    const supabaseAdmin = getSupabaseAdmin();
+
+    const { data: resource, error: resError } = await supabaseAdmin
+      .from('resources')
+      .select('id, provider_id, name')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (resError || !resource) {
+      return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
+    }
+
+    // Verify merchant authorization if caller is not platform admin
+    if (authResult.profile.role === 'merchant') {
+      const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
+        p_user_id: authResult.user.id,
+      });
+      const authorizedList = Array.isArray(authProviders) ? authProviders : [];
+      if (!authorizedList.includes(resource.provider_id)) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to manage this resource' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Prevent deactivation if there are upcoming active confirmed bookings
+    if (is_active === false) {
+      const { count } = await supabaseAdmin
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('resource_id', id)
+        .eq('status', 'CONFIRMED')
+        .gt('slot_start', new Date().toISOString());
+
+      if (count && count > 0) {
+        return NextResponse.json(
+          { error: 'Conflict: Cannot deactivate resource with confirmed bookings' },
+          { status: 409 }
+        );
+      }
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('resources')
+      .update({ is_active, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 400 });
     }
 
     return NextResponse.json({ success: true, id, is_active });

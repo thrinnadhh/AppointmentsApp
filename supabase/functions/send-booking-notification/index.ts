@@ -1,6 +1,8 @@
 // Supabase Edge Function: send-booking-notification
-// Dispatches automated WhatsApp and SMS notifications for booking confirmations,
+// Dispatches automated WhatsApp, SMS, and Push notifications for booking confirmations,
 // 1-hour and 30-minute pre-slot reminders, and cancellations.
+// Strictly authenticates caller and derives recipient details from booking & profile records,
+// rejecting client-supplied arbitrary phone numbers.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
@@ -19,7 +21,6 @@ type NotificationEventType =
 interface NotificationRequest {
   booking_id: string;
   event_type?: NotificationEventType;
-  channel?: 'whatsapp' | 'sms' | 'all';
 }
 
 serve(async (req: Request) => {
@@ -27,7 +28,7 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Allow GET health/status check
+  // Health/status check
   if (req.method === 'GET') {
     return new Response(
       JSON.stringify({
@@ -39,7 +40,6 @@ serve(async (req: Request) => {
           'BOOKING_REMINDER_30M',
           'BOOKING_CANCELLED',
         ],
-        supported_channels: ['whatsapp', 'sms'],
         timestamp: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -48,9 +48,35 @@ serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseServiceKey =
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase service role credentials not configured');
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // ── 0. Require & Verify Authorization ────────────────────────────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization header is required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    let isInternalServiceRole = token === supabaseServiceKey;
+
+    let callerUserId: string | null = null;
+    if (!isInternalServiceRole) {
+      const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+      if (authErr || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired session token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      callerUserId = user.id;
+    }
 
     const body: NotificationRequest = await req.json();
     const { booking_id, event_type = 'BOOKING_CONFIRMED' } = body;
@@ -62,7 +88,43 @@ serve(async (req: Request) => {
       );
     }
 
-    // Invoke atomic database notification procedure
+    // ── 1. Fetch booking to verify ownership and derive recipient ────────────
+    const { data: booking, error: bkgErr } = await supabase
+      .from('bookings')
+      .select('id, reference_code, customer_id, provider_id, status')
+      .eq('id', booking_id)
+      .maybeSingle();
+
+    if (bkgErr || !booking) {
+      return new Response(JSON.stringify({ error: 'Booking not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify caller authorization if not internal service role
+    if (!isInternalServiceRole && callerUserId) {
+      let isAuthorized = callerUserId === booking.customer_id;
+      if (!isAuthorized) {
+        const { data: isAdmin } = await supabase.rpc('is_admin', { p_user_id: callerUserId });
+        if (isAdmin) isAuthorized = true;
+      }
+      if (!isAuthorized) {
+        const { data: allowedProviders } = await supabase.rpc('get_user_authorized_providers', { p_user_id: callerUserId });
+        if (Array.isArray(allowedProviders) && allowedProviders.includes(booking.provider_id)) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        return new Response(JSON.stringify({ error: 'Access denied: You are not authorized for this booking' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // ── 2. Invoke atomic database notification procedure ─────────────────────
     const { data: dispatchResult, error: dispatchError } = await supabase.rpc(
       'dispatch_booking_notification',
       {
@@ -75,30 +137,24 @@ serve(async (req: Request) => {
       throw new Error(`Dispatch failed: ${dispatchError.message}`);
     }
 
-    // Check if customer has an active Expo Push Token (free-for.dev 100% free channel)
+    // ── 3. Derive push token strictly from customer profile in database ──────
     let pushResult = { sent: false, channel: 'expo-push' };
-    try {
-      const { data: bookingData } = await supabase
-        .from('bookings')
-        .select('id, reference_code, customer_id')
-        .eq('id', booking_id)
-        .single();
+    if (booking.customer_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('expo_push_token')
+        .eq('id', booking.customer_id)
+        .maybeSingle();
 
-      if (bookingData?.customer_id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('expo_push_token')
-          .eq('id', bookingData.customer_id)
-          .single();
-
-        if (profile?.expo_push_token?.startsWith('ExponentPushToken')) {
+      if (profile?.expo_push_token?.startsWith('ExponentPushToken')) {
+        try {
           const pushRes = await fetch('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({
               to: profile.expo_push_token,
               sound: 'default',
-              title: `Appointment Update (${bookingData.reference_code || 'Tirupati'})`,
+              title: `Appointment Update (${booking.reference_code || 'Tirupati'})`,
               body: `Your appointment status has updated: ${event_type}`,
               data: { booking_id, event_type },
             }),
@@ -106,15 +162,11 @@ serve(async (req: Request) => {
           if (pushRes.ok) {
             pushResult = { sent: true, channel: 'expo-push' };
           }
+        } catch (pushErr) {
+          console.warn('[send-booking-notification] Push dispatch error:', pushErr);
         }
       }
-    } catch {
-      // Non-blocking fallback
     }
-
-    // If external SMS/WhatsApp API keys are configured, outbound requests can be dispatched here
-    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const gupshupApiKey = Deno.env.get('GUPSHUP_API_KEY');
 
     return new Response(
       JSON.stringify({
@@ -123,11 +175,6 @@ serve(async (req: Request) => {
         event_type,
         dispatch: dispatchResult,
         push_notification: pushResult,
-        gateways: {
-          expo_push_free: pushResult.sent,
-          twilio_configured: Boolean(twilioAccountSid),
-          gupshup_configured: Boolean(gupshupApiKey),
-        },
         processed_at: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
