@@ -126,9 +126,16 @@ export function validateEnv(env = process.env, options = {}) {
   };
 }
 
-// Auto-validate on startup unless explicitly opted out (e.g. for lightweight scripts)
+const isBuildPhase =
+  process.env.NEXT_PHASE === 'phase-production-build' ||
+  process.env.npm_lifecycle_event === 'build' ||
+  Boolean(process.env.CI && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN);
+
+// Auto-validate on startup unless explicitly opted out (e.g. for lightweight scripts or build phase)
 if (process.env.SKIP_ENV_VALIDATION !== 'true') {
   validateEnv(process.env, {
-    throwOnError: process.env.NODE_ENV === 'production',
+    throwOnError: process.env.NODE_ENV === 'production' && !isBuildPhase,
+    isProduction: process.env.NODE_ENV === 'production' && !isBuildPhase,
   });
 }
+

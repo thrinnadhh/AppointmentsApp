@@ -5,6 +5,8 @@ import { Database } from '@appointments/shared';
 
 type ProviderStatus = Database['public']['Enums']['provider_status'];
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAdminRequest(request);

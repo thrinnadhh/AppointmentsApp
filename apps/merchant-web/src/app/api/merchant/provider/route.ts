@@ -7,6 +7,8 @@ import { verifyAuthenticatedUser } from '@/lib/auth-admin';
  * Allows the merchant web app to retrieve its own provider record (including status: ACTIVE, PENDING_APPROVAL, SUSPENDED)
  * via the server-side Supabase admin client, bypassing anon RLS restrictions on suspended venues.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const caller = await verifyAuthenticatedUser(request);
