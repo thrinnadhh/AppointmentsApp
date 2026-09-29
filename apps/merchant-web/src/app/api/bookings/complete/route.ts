@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,12 +14,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required to complete a booking' },
+        { status: 401 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
     const { data: booking, error: fetchError } = await supabaseAdmin
       .from('bookings')
-      .select('id, provider_id, status, payment_status')
+      .select('id, customer_id, provider_id, status, payment_status')
       .eq('id', booking_id)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !booking) {
       return NextResponse.json(
@@ -27,11 +36,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Multitenancy guard: check if merchant header is passed and matches owning provider
-    const merchantHeader = req.headers.get('x-merchant-provider-id');
-    if (merchantHeader && merchantHeader !== booking.provider_id) {
+    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, false);
+    if (!isAuthorized) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized: Booking belongs to a different provider' },
+        { success: false, error: 'Unauthorized: Only authorized merchant staff or administrators can complete this booking' },
         { status: 403 }
       );
     }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/auth-admin';
 import { maskPhoneNumber } from '@appointments/shared';
 
 function maskIdentifier(id: string): string {
@@ -20,6 +22,15 @@ function maskIdentifier(id: string): string {
  */
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const ipLimit = await checkRateLimit(`public-del-req:${clientIp}`, 5, 300);
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a few minutes before trying again.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const { identifier, reason } = body;
 
@@ -34,6 +45,22 @@ export async function POST(req: NextRequest) {
     const isEmail = cleanInput.includes('@');
     const digitsOnly = cleanInput.replace(/\D/g, '');
 
+    if (isEmail) {
+      if (cleanInput.includes('%') || cleanInput.includes('_') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanInput)) {
+        return NextResponse.json(
+          { error: 'Please enter a valid registered email address or phone number.' },
+          { status: 400 }
+        );
+      }
+    } else {
+      if (digitsOnly.length < 10 || digitsOnly.length > 13) {
+        return NextResponse.json(
+          { error: 'Please enter a valid 10-digit phone number.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
     let userId: string | null = null;
 
@@ -41,27 +68,24 @@ export async function POST(req: NextRequest) {
       const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('id')
-        .ilike('email', cleanInput)
+        .eq('email', cleanInput)
         .maybeSingle();
 
       if (profile) {
         userId = profile.id;
       }
-    } else if (digitsOnly.length >= 10) {
-      // Search by phone suffix (last 10 digits)
+    } else {
+      // Direct indexed query by exact phone formats instead of full table scan
       const national10 = digitsOnly.slice(-10);
-      const { data: profiles } = await supabaseAdmin
+      const { data: profile } = await supabaseAdmin
         .from('profiles')
-        .select('id, phone')
-        .not('phone', 'is', null);
+        .select('id')
+        .or(`phone.eq.${digitsOnly},phone.eq.+91${national10},phone.eq.${national10}`)
+        .limit(1)
+        .maybeSingle();
 
-      const matched = (profiles || []).find((p) => {
-        const pDigits = (p.phone || '').replace(/\D/g, '');
-        return pDigits.endsWith(national10);
-      });
-
-      if (matched) {
-        userId = matched.id;
+      if (profile) {
+        userId = profile.id;
       }
     }
 

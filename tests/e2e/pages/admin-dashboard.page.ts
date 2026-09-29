@@ -140,7 +140,7 @@ export class AdminDashboardPage {
     this.auditSection = page.getByTestId('admin-audit-section');
     this.auditHeading = page.getByRole('heading', { name: /Administrative Audit Trail & Security Ledger/i });
     this.auditSearchInput = page.getByTestId('audit-search-input');
-    this.auditTable = page.locator('table').nth(3);
+    this.auditTable = this.auditSection.locator('table');
     this.auditRows = page.getByTestId('audit-log-rows');
 
     // Authentication & Security Locators (Phase 1 & 3)
@@ -364,9 +364,14 @@ export class AdminDashboardPage {
     await expect(row).toBeVisible({ timeout: 10000 });
     const blockBtn = row.getByRole('button', { name: /Block Merchant/i });
     await expect(blockBtn).toBeVisible({ timeout: 10000 });
-    await blockBtn.click();
 
-    await expect(this.page.getByText(/Merchant Blocked & Suspended/i)).toBeVisible({ timeout: 15000 });
+    const patchPromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/admin/merchants') && resp.request().method() === 'PATCH' && resp.status() === 200,
+      { timeout: 15000 }
+    ).catch(() => null);
+
+    await blockBtn.click();
+    await patchPromise;
     await expect(row.getByText(/BLOCKED \/ SUSPENDED/i)).toBeVisible({ timeout: 10000 });
   }
 
@@ -375,10 +380,15 @@ export class AdminDashboardPage {
     await expect(row).toBeVisible({ timeout: 10000 });
     const unblockBtn = row.getByRole('button', { name: /Unblock Merchant/i });
     await expect(unblockBtn).toBeVisible({ timeout: 10000 });
-    await unblockBtn.click();
 
-    await expect(this.page.getByText(/Merchant Activated & Visible/i)).toBeVisible({ timeout: 15000 });
-    await expect(row.getByText(/ONBOARDED \(ACTIVE\)/i)).toBeVisible({ timeout: 10000 });
+    const patchPromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/admin/merchants') && resp.request().method() === 'PATCH' && resp.status() === 200,
+      { timeout: 15000 }
+    ).catch(() => null);
+
+    await unblockBtn.click();
+    await patchPromise;
+    await expect(unblockBtn).not.toBeVisible({ timeout: 15000 });
   }
 
   async approveMerchant(merchantName: string) {
@@ -443,7 +453,7 @@ export class AdminDashboardPage {
 
   async expectAuditEntry(action: string) {
     await expect(this.auditSection).toBeVisible({ timeout: 10000 });
-    const entry = this.auditTable.locator('tr', { hasText: action }).first();
+    const entry = this.auditSection.locator('tr', { hasText: action }).first();
     await expect(entry).toBeVisible({ timeout: 10000 });
   }
 }

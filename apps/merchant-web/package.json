@@ -6,13 +6,14 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint",
+    "lint": "SKIP_ENV_VALIDATION=true next lint",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@appointments/shared": "workspace:*",
     "@supabase/ssr": "^0.5.0",
     "@supabase/supabase-js": "^2.45.0",
+    "libphonenumber-js": "^1.13.14",
     "lucide-react": "^0.428.0",
     "next": "15.5.25",
     "react": "^18.3.1",

@@ -15,10 +15,11 @@ test.describe('Admin Merchant Governance & Cross-App Integration', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ request }) => {
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
     await request.patch('http://localhost:3000/api/admin/merchants', {
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': adminToken,
       },
       data: {
         providerId: '11111111-1111-1111-1111-111111111111',

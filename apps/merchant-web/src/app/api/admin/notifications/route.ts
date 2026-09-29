@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAdminRequest } from '@/lib/auth-admin';
 import { NotificationLog, maskPhoneNumber } from '@appointments/shared';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAdminRequest(request);

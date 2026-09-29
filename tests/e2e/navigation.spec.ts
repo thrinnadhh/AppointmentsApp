@@ -1,9 +1,26 @@
 import { test, expect } from '@playwright/test';
+import { CustomerAppPage } from './pages/customer-app.page';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const testCustomerId = '99999999-9999-9999-9999-999999999991';
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '');
 
 test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation Suite', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:8081', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('Instant Appointments')).toBeVisible({ timeout: 20000 });
+  });
+
+  test.afterAll(async () => {
+    if (SUPABASE_SERVICE_ROLE_KEY) {
+      await supabase
+        .from('bookings')
+        .update({ status: 'CANCELLED' })
+        .eq('customer_id', testCustomerId)
+        .in('status', ['HELD', 'CONFIRMED']);
+    }
   });
 
   test('1. Should navigate between 5-Category Hub and every individual category view forward and back', async ({ page }) => {
@@ -109,8 +126,8 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     await page.getByText('Sri Venkateswara Dental & Implant Care').first().click();
 
     // Select time slot
-    const slotBtn = page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ }).first();
-    await slotBtn.click();
+    const customerApp = new CustomerAppPage(page);
+    await customerApp.selectFirstSlot();
 
     // Open Checkout
     await page.getByText('Hold Slot & Pay Deposit →').click();
@@ -182,6 +199,15 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
   });
 
   test('8. Should complete booking, land on My Appointments, and return to Category Browse without resetting to first Hub page', async ({ page }) => {
+    // Ensure clean state for customer booking slots before running
+    if (SUPABASE_SERVICE_ROLE_KEY) {
+      await supabase
+        .from('bookings')
+        .update({ status: 'CANCELLED' })
+        .eq('customer_id', testCustomerId)
+        .in('status', ['HELD', 'CONFIRMED']);
+    }
+
     // Navigate into Hospitals & Clinics — wait for Supabase data
     await page.getByText('Hospitals & Clinics', { exact: true }).first().click();
     await expect(page.getByText('Hospitals & Clinics in Tirupati')).toBeVisible();
@@ -189,8 +215,8 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     await page.getByText('Sri Venkateswara Dental & Implant Care').first().click();
 
     // Select time slot
-    const slotBtn = page.locator('div').filter({ hasText: /^(10|11|12|01|02|03|04|05):[0-9]{2} (AM|PM)$/ }).first();
-    await slotBtn.click();
+    const customerApp = new CustomerAppPage(page);
+    await customerApp.selectFirstSlot();
 
     // Open Checkout
     await page.getByText('Hold Slot & Pay Deposit →').click();
@@ -212,5 +238,14 @@ test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation S
     // Clicking All Categories returns to the 5-category hub
     await page.getByText('← All Categories').click();
     await expect(page.getByText('Choose a Service')).toBeVisible();
+
+    // Cleanup created test booking to ensure slot remains free for subsequent test runs
+    if (SUPABASE_SERVICE_ROLE_KEY) {
+      await supabase
+        .from('bookings')
+        .update({ status: 'CANCELLED' })
+        .eq('customer_id', testCustomerId)
+        .in('status', ['HELD', 'CONFIRMED']);
+    }
   });
 });

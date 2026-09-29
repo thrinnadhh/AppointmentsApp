@@ -17,7 +17,7 @@ WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
-COPY --from=builder /workspace/build/libs/*.jar app.jar
+COPY --chown=appuser:appgroup --from=builder /workspace/build/libs/*.jar app.jar
 
 # ARM64-friendly JVM flags: small heap, CRaC-friendly, minimal footprint
 ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseZGC -XX:+ZGenerational \

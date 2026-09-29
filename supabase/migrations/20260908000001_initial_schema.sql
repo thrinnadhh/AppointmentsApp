@@ -122,10 +122,15 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     CONSTRAINT check_booking_times CHECK (slot_start < slot_end)
 );
 
--- CONCURRENCY GUARD: No two overlapping active bookings for the same resource slot
-CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_resource_slot 
-ON public.bookings(resource_id, slot_start) 
-WHERE status IN ('HELD', 'PENDING_PAYMENT', 'CONFIRMED');
+-- CONCURRENCY GUARD: PostgreSQL btree_gist range exclusion constraint
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+ALTER TABLE public.bookings 
+ADD CONSTRAINT no_overlapping_active_bookings 
+EXCLUDE USING gist (
+  resource_id WITH =,
+  tstzrange(slot_start, slot_end) WITH &&
+) WHERE (status IN ('HELD', 'CONFIRMED'));
 
 -- 9. PAYMENTS LEDGER
 CREATE TABLE IF NOT EXISTS public.payments (

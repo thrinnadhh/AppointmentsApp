@@ -7,6 +7,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubf
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'superadmin-dev-secret-token';
 
 test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () => {
   const testCustomerEmail = 'customer.integration@tirupati.care';
@@ -38,8 +39,9 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // 1. Customer browses to Clinics and selects Sri Venkateswara Dental
     await customerApp.selectCategory('Hospitals & Clinics');
     await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+    await customerApp.selectStaffMember('Dr. S. K. Murthy, MDS (Implantologist)');
     await customerApp.selectDateOffset('Tomorrow');
-    await customerApp.selectFirstSlot();
+    await customerApp.selectFirstSlot(2);
     await customerApp.openCheckout();
 
     // 2. Customer submits payment via simulated payment gateway
@@ -225,6 +227,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const newSlotEnd = new Date(Date.now() + 86400000 + 7200000 + 1800000).toISOString();
 
     const rescheduleRes = await request.post('http://localhost:3000/api/bookings/reschedule', {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS, 'x-customer-id': testCustomerId },
       data: {
         booking_id,
         new_slot_start: newSlotStart,
@@ -347,6 +350,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     // 2. Merchant cancels booking
     const cancelRes = await request.post('http://localhost:3000/api/bookings/cancel', {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         booking_id,
         reason: 'Staff emergency leave',
@@ -404,6 +408,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     // 3. Merchant reports No-Show via endpoint
     const noShowRes = await request.post('http://localhost:3000/api/bookings/no-show', {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         booking_id,
       },
@@ -440,6 +445,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     // 1. Merchant registers a new salon venue
     const venueRes = await request.post('http://localhost:3000/api/admin/venues', {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         name: newSalonName,
         categoryId: 'salons',
@@ -456,6 +462,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     // 2. Merchant adds a specialist resource
     const resourceRes = await request.post('http://localhost:3000/api/admin/resources', {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId,
         name: newSpecialistName,
@@ -616,6 +623,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
     // 2. Customer reaches hospital/venue and says reached via API
     const reachRes = await request.post('http://localhost:3000/api/bookings/reach', {
+      headers: { 'x-customer-id': testCustomerId },
       data: { booking_id: bookingId },
     });
     expect(reachRes.ok()).toBeTruthy();

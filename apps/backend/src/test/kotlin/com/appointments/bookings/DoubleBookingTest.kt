@@ -56,6 +56,7 @@ class DoubleBookingTest {
     @Autowired lateinit var merchantRepository: MerchantRepository
     @Autowired lateinit var serviceRepository: ServiceRepository
     @Autowired lateinit var availabilityRuleRepository: AvailabilityRuleRepository
+    @Autowired lateinit var jdbcTemplate: org.springframework.jdbc.core.JdbcTemplate
 
     private lateinit var merchantId: UUID
     private lateinit var serviceId: UUID
@@ -63,8 +64,21 @@ class DoubleBookingTest {
 
     @BeforeEach
     fun setup() {
-        val cityId     = UUID.randomUUID()
-        val categoryId = UUID.randomUUID()
+        val cityId = jdbcTemplate.query(
+            "SELECT id FROM cities WHERE slug = 'tirupati'",
+            { rs, _ -> rs.getObject("id", UUID::class.java) }
+        ).firstOrNull() ?: jdbcTemplate.queryForObject(
+            "INSERT INTO cities (slug, name, timezone, is_active) VALUES ('tirupati', 'Tirupati', 'Asia/Kolkata', true) RETURNING id",
+            UUID::class.java
+        )!!
+
+        val categoryId = jdbcTemplate.query(
+            "SELECT id FROM categories WHERE slug = 'salon'",
+            { rs, _ -> rs.getObject("id", UUID::class.java) }
+        ).firstOrNull() ?: jdbcTemplate.queryForObject(
+            "INSERT INTO categories (slug, name, icon_key) VALUES ('salon', 'Salon & Beauty', 'scissors') RETURNING id",
+            UUID::class.java
+        )!!
 
         val owner = userRepository.save(UserEntity(authRef = "owner-${UUID.randomUUID()}", role = "merchant_staff"))
         val merchant = merchantRepository.save(
@@ -113,6 +127,7 @@ class DoubleBookingTest {
                     )
                     successes.incrementAndGet()
                 } catch (ex: Exception) {
+                    println("Booking attempt failed: ${ex.javaClass.name}: ${ex.message}")
                     conflicts.incrementAndGet()
                 }
             }

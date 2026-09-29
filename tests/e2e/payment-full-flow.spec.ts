@@ -4,11 +4,21 @@ import { MerchantPortalPage } from './pages/merchant-portal.page';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 test.describe('Comprehensive Razorpay Payment Gateway Full-Flow Suite', () => {
   const testCustomerId = '99999999-9999-9999-9999-999999999991'; // Kalyan Chakravarthy seed account
+
+  test.beforeEach(async () => {
+    // Cancel any stale active holds or bookings for the test customer on this resource to prevent slot collision
+    await supabase
+      .from('bookings')
+      .update({ status: 'CANCELLED' })
+      .eq('customer_id', testCustomerId)
+      .eq('resource_id', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+      .in('status', ['HELD', 'CONFIRMED', 'PENDING_PAYMENT']);
+  });
 
   test('End-to-End Payment: UI Method Selection -> Order Creation -> Verification -> DB Settle -> Merchant Queue', async ({ browser }) => {
     // =========================================================================

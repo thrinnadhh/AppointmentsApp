@@ -25,6 +25,15 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.context().clearCookies();
+    await page.goto('http://localhost:3000/login');
+    await page.evaluate(() => {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {}
+    });
+    await page.goto('http://localhost:3000/login');
+    await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
   });
 
   test('TC-TENANT-01: Salon Merchant has strictly isolated salon space and controls', async ({ page }) => {

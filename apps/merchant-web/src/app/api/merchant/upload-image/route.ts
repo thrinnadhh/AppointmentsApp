@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { checkRateLimit } from '@/lib/redis';
 import crypto from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized: Authentication required to upload files' },
         { status: 401 }
+      );
+    }
+
+    // 2. Rate limit: max 15 uploads per merchant per minute
+    const rateLimit = await checkRateLimit(`upload:${caller.id}`, 15, 60);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many upload attempts. Please wait a minute.' },
+        { status: 429 }
       );
     }
 

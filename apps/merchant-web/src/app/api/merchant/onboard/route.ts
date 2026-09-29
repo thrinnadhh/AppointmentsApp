@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/auth-admin';
 
 interface OnboardRequestBody {
   fullName: string;
@@ -80,7 +81,7 @@ async function verifyCaptcha(token?: string, ip?: string): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const ip = getClientIp(request);
 
     // 1. RATE LIMITING: Maximum 5 registration attempts per 5 minutes per IP
     const rateLimit = await checkRateLimit(`merchant_onboard:${ip}`, 5, 300);
@@ -132,19 +133,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. IT ACT SECTION 79 TOS ACCEPTANCE
-    if (tosAccepted === false) {
+    // 5. IT ACT SECTION 79 TOS ACCEPTANCE (Strict explicit acceptance required)
+    if (tosAccepted !== true) {
       return NextResponse.json(
         { error: 'You must accept the Merchant Partner Terms of Service to register.' },
         { status: 400 }
       );
     }
 
-    // 6. EXECUTE ATOMIC SELF-REGISTRATION VIA SERVICE ROLE
     const supabaseAdmin = getSupabaseAdmin();
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 6. ACCOUNT TAKEOVER & DUPLICATE REGISTRATION GUARDS
+    // Prevent overwriting an already registered business email
+    const { data: existingProvider } = await supabaseAdmin
+      .from('providers')
+      .select('id, name')
+      .ilike('email', cleanEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingProvider) {
+      return NextResponse.json(
+        { error: 'A business with this email address is already registered. Please sign in or reset your password.' },
+        { status: 409 }
+      );
+    }
+
+    // Prevent account takeover of existing profile/auth identity
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email')
+      .ilike('email', cleanEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return NextResponse.json(
+        { error: 'An account with this email address is already registered. Please sign in or reset your password.' },
+        { status: 409 }
+      );
+    }
+
+    // 7. EXECUTE ATOMIC SELF-REGISTRATION VIA SERVICE ROLE
     const { data, error } = await (supabaseAdmin.rpc as any)('merchant_self_register', {
       p_full_name:   fullName.trim(),
-      p_email:       email.trim().toLowerCase(),
+      p_email:       cleanEmail,
       p_password:    password,
       p_phone:       phone.trim(),
       p_shop_name:   shopName.trim(),
@@ -154,9 +188,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[Onboard RPC Error]:', error);
+      const isConflict = error.code === '23505' ||
+        error.message?.includes('already registered') ||
+        error.message?.includes('already exists');
       return NextResponse.json(
         { error: error.message || 'Failed to complete merchant shop registration' },
-        { status: 400 }
+        { status: isConflict ? 409 : 400 }
       );
     }
 

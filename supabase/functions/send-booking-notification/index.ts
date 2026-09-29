@@ -7,10 +7,38 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || req.headers.get('origin') || '';
+  let allowedOrigin = 'https://appointments4u.in';
+
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      const host = url.hostname;
+      if (
+        host === 'appointments4u.in' ||
+        host.endsWith('.appointments4u.in') ||
+        host === 'appointments-merchant.vercel.app' ||
+        (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app')) ||
+        host === 'appointments4u.pages.dev' ||
+        host.endsWith('.appointments4u.pages.dev') ||
+        host === 'localhost' ||
+        host === '127.0.0.1'
+      ) {
+        allowedOrigin = origin;
+      }
+    } catch {
+      // Fallback to default
+    }
+  }
+
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  };
+}
 
 type NotificationEventType =
   | 'BOOKING_CONFIRMED'
@@ -24,6 +52,8 @@ interface NotificationRequest {
 }
 
 serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -80,6 +110,22 @@ serve(async (req: Request) => {
 
     const body: NotificationRequest = await req.json();
     const { booking_id, event_type = 'BOOKING_CONFIRMED' } = body;
+
+    const ALLOWED_EVENT_TYPES = new Set([
+      'BOOKING_CONFIRMED',
+      'BOOKING_REMINDER_1H',
+      'BOOKING_REMINDER_30M',
+      'BOOKING_CANCELLED',
+      'RESOURCE_REASSIGNED',
+      'REFUND_FAILED_ALERT',
+    ]);
+
+    if (!ALLOWED_EVENT_TYPES.has(event_type)) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Invalid event_type: ${event_type}` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
 
     if (!booking_id) {
       return new Response(
@@ -147,23 +193,33 @@ serve(async (req: Request) => {
         .maybeSingle();
 
       if (profile?.expo_push_token?.startsWith('ExponentPushToken')) {
-        try {
-          const pushRes = await fetch('https://exp.host/--/api/v2/push/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-              to: profile.expo_push_token,
-              sound: 'default',
-              title: `Appointment Update (${booking.reference_code || 'Tirupati'})`,
-              body: `Your appointment status has updated: ${event_type}`,
-              data: { booking_id, event_type },
-            }),
-          });
-          if (pushRes.ok) {
-            pushResult = { sent: true, channel: 'expo-push' };
+        const isMockToken = /\[(tpt_|mock_|fake_|test_)/i.test(profile.expo_push_token);
+        const isProductionEnv =
+          Deno.env.get('ENVIRONMENT') === 'production' ||
+          Deno.env.get('NODE_ENV') === 'production';
+
+        if (isProductionEnv && isMockToken) {
+          console.warn('[send-booking-notification] Skipping mock push token in production:', profile.expo_push_token);
+          pushResult = { sent: false, channel: 'expo-push', reason: 'mock_token_rejected_in_production' } as any;
+        } else {
+          try {
+            const pushRes = await fetch('https://exp.host/--/api/v2/push/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({
+                to: profile.expo_push_token,
+                sound: 'default',
+                title: `Appointment Update (${booking.reference_code || 'Tirupati'})`,
+                body: `Your appointment status has updated: ${event_type}`,
+                data: { booking_id, event_type },
+              }),
+            });
+            if (pushRes.ok) {
+              pushResult = { sent: true, channel: 'expo-push' };
+            }
+          } catch (pushErr) {
+            console.warn('[send-booking-notification] Push dispatch error:', pushErr);
           }
-        } catch (pushErr) {
-          console.warn('[send-booking-notification] Push dispatch error:', pushErr);
         }
       }
     }

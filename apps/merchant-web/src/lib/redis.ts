@@ -54,43 +54,79 @@ async function upstashCommand<T = unknown>(...args: (string | number)[]): Promis
   }
 }
 
-/**
- * Acquire an atomic lock for an appointment slot.
- * Returns true if lock was acquired, false if slot is already locked by another request.
- */
-export async function acquireSlotLock(slotKey: string, ttlSeconds: number = 300): Promise<boolean> {
-  const key = `lock:slot:${slotKey}`;
-
-  if (isUpstashConfigured) {
-    const result = await upstashCommand<string>('SET', key, 'locked', 'EX', ttlSeconds, 'NX');
-    if (result === 'OK') return true;
-    if (result !== null) {
-      return false;
-    }
-  }
-
-  // In-Memory Fallback
-  const now = Date.now();
-  const existing = memoryStore.get(key);
-  if (existing && existing.expiresAt > now) {
-    return false; // Already locked
-  }
-
-  memoryStore.set(key, {
-    value: 'locked',
-    expiresAt: now + ttlSeconds * 1000,
-  });
-  return true;
+export interface SlotLockResult {
+  acquired: boolean;
+  token: string;
 }
 
 /**
- * Release slot lock after booking confirmation, rejection, or cancellation
+ * Acquire an atomic lock for an appointment slot.
+ * Returns { acquired: true, token } if acquired, or { acquired: false, token: '' } if already locked.
+ *
+ * PRODUCTION SAFETY:
+ * - Increases default timeout to cover slow DB transactions (30s).
+ * - Issues a unique random token per acquisition to prevent cross-caller lock release.
+ * - When Upstash is configured, fails CLOSED on infrastructure errors to prevent double-booking.
  */
-export async function releaseSlotLock(slotKey: string): Promise<boolean> {
+export async function acquireSlotLock(
+  slotKey: string,
+  ttlSeconds: number = 30,
+  lockToken?: string
+): Promise<SlotLockResult> {
+  const key = `lock:slot:${slotKey}`;
+  const token = lockToken || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
+
+  if (isUpstashConfigured) {
+    const result = await upstashCommand<string>('SET', key, token, 'EX', ttlSeconds, 'NX');
+    if (result === 'OK') {
+      return { acquired: true, token };
+    }
+    if (result === null) {
+      console.error('[Redis] Upstash lock acquisition failed (fail-closed to prevent double-booking)');
+      return { acquired: false, token: '' };
+    }
+    return { acquired: false, token: '' };
+  }
+
+  // In-Memory Fallback (Local Development Only)
+  const now = Date.now();
+  const existing = memoryStore.get(key);
+  if (existing && existing.expiresAt > now) {
+    return { acquired: false, token: '' }; // Already locked
+  }
+
+  memoryStore.set(key, {
+    value: token,
+    expiresAt: now + ttlSeconds * 1000,
+  });
+  return { acquired: true, token };
+}
+
+/**
+ * Release slot lock after booking confirmation, rejection, or cancellation.
+ * Ensures release targets only the caller's specific token (via Lua script or token match)
+ * to prevent deleting locks re-acquired by subsequent processes.
+ */
+export async function releaseSlotLock(slotKey: string, lockToken?: string): Promise<boolean> {
   const key = `lock:slot:${slotKey}`;
 
   if (isUpstashConfigured) {
+    if (lockToken) {
+      const script = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
+      const result = await upstashCommand<number>('EVAL', script, 1, key, lockToken);
+      return result === 1;
+    }
     await upstashCommand('DEL', key);
+    return true;
+  }
+
+  if (lockToken) {
+    const existing = memoryStore.get(key);
+    if (existing && existing.value === lockToken) {
+      memoryStore.delete(key);
+      return true;
+    }
+    return false;
   }
 
   memoryStore.delete(key);
@@ -175,9 +211,14 @@ export function getRedisStatus(): {
 }
 
 /**
- * Clear all in-memory locks (used during test resets)
+ * Clear all in-memory locks (strictly restricted to test resets)
+ * DO NOT CALL FROM PRODUCTION APPLICATION FLOWS
  */
 export function clearAllMemoryLocks(): void {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[Redis] Refusing to clearAllMemoryLocks in production');
+    return;
+  }
   memoryStore.clear();
 }
 

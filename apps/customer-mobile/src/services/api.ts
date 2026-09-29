@@ -300,7 +300,17 @@ export async function fetchCustomerBookingsFromSupabase(customerId: string = '99
     const baseUrl = getApiBaseUrl();
     if (baseUrl) {
       try {
-        const resp = await fetch(`${baseUrl}/api/bookings?customer_id=${encodeURIComponent(customerId)}`);
+        const session = (await supabase.auth.getSession()).data?.session;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'x-customer-id': customerId,
+        };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const resp = await fetch(`${baseUrl}/api/bookings?customer_id=${encodeURIComponent(customerId)}`, {
+          headers,
+        });
         if (resp.ok) {
           const json = await resp.json();
           if (json.success && Array.isArray(json.bookings)) {
@@ -406,7 +416,8 @@ export async function createHoldOnSupabase(
   slotStart: string,
   slotEnd: string
 ): Promise<{ success: boolean; booking_id?: string; reference_code?: string; deposit_amount?: number; error?: string }> {
-  // --- Step 1: Try the backend API (has rate-limit, provider-active, daily-cap checks) ---
+  // Route all resource hold operations strictly through backend API routes.
+  // Direct client-side unmetered RPC access is disallowed to enforce Redis concurrency locks, rate limits, and business logic.
   try {
     const resp = await fetch(`${API_BASE_URL}/api/bookings/hold`, {
       method: 'POST',
@@ -419,7 +430,7 @@ export async function createHoldOnSupabase(
       }),
     });
 
-    const json = await resp.json();
+    const json = await resp.json().catch(() => ({}));
 
     if (resp.ok && json.success) {
       return {
@@ -430,44 +441,17 @@ export async function createHoldOnSupabase(
       };
     }
 
-    // Backend returned an error — surface it to the user (slot conflict, paused, cap, etc.)
-    if (!resp.ok) {
-      return {
-        success: false,
-        error: json.error || `Booking failed (${resp.status})`,
-      };
-    }
-  } catch (networkErr) {
-    // Backend unreachable (no internet / backend not running) — fall through to direct RPC
-    if (isDev) console.warn('Backend /api/bookings/hold unreachable, falling back to direct RPC:', networkErr);
-  }
-
-  // --- Step 2: Direct Supabase RPC fallback (dev / offline mode) ---
-  try {
-    const { data, error } = await supabase.rpc('create_booking_hold', {
-      p_customer_id: customerId,
-      p_resource_id: resourceId,
-      p_slot_start: slotStart,
-      p_slot_end: slotEnd,
-    });
-
-    if (error) {
-      console.error('RPC hold failed:', error);
-      return { success: false, error: error.message };
-    }
-
-    const result = data as { success?: boolean; booking_id?: string; reference_code?: string; deposit_amount?: number; error?: string } | null;
     return {
-      success: result?.success ?? true,
-      booking_id: result?.booking_id,
-      reference_code: result?.reference_code,
-      deposit_amount: result?.deposit_amount,
-      error: result?.error,
+      success: false,
+      error: json.error || `Booking failed (${resp.status})`,
     };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Network error locking slot';
-    console.warn('Supabase hold error:', message);
-    return { success: false, error: message };
+  } catch (networkErr: unknown) {
+    const msg = networkErr instanceof Error ? networkErr.message : 'Network error';
+    console.error('Backend /api/bookings/hold request failed:', networkErr);
+    return {
+      success: false,
+      error: `Unable to reserve slot: ${msg}`,
+    };
   }
 }
 
@@ -550,12 +534,20 @@ export interface CreateRazorpayOrderResult {
   error?: string;
 }
 
-export async function createRazorpayOrder(bookingId: string): Promise<CreateRazorpayOrderResult> {
+export async function createRazorpayOrder(bookingId: string, customerId?: string): Promise<CreateRazorpayOrderResult> {
   const baseUrl = getApiBaseUrl();
   try {
+    const session = (await supabase.auth.getSession()).data?.session;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+    headers['x-customer-id'] = resolvedCustomerId;
+
     const resp = await fetch(`${baseUrl}/api/payments/create-order`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ booking_id: bookingId }),
     });
 
@@ -597,12 +589,21 @@ export async function verifyRazorpayPayment(params: {
   razorpay_order_id: string;
   razorpay_signature: string;
   attachment_url?: string | null;
+  customerId?: string;
 }): Promise<VerifyPaymentResult> {
   const baseUrl = getApiBaseUrl();
   try {
+    const session = (await supabase.auth.getSession()).data?.session;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    const resolvedCustomerId = params.customerId || (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+    headers['x-customer-id'] = resolvedCustomerId;
+
     const resp = await fetch(`${baseUrl}/api/payments/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(params),
     });
 
@@ -631,9 +632,17 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
   try {
     if (API_BASE_URL) {
       try {
+        const session = (await supabase.auth.getSession()).data?.session;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+        headers['x-customer-id'] = customerId;
+
         const resp = await fetch(`${API_BASE_URL}/api/bookings/cancel`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             booking_id: bookingId,
             reason: isLate ? 'Customer cancelled (<30 min)' : 'Customer cancelled (>30 min)',
@@ -805,9 +814,17 @@ export async function rescheduleBookingOnSupabase(
   try {
     if (API_BASE_URL) {
       try {
+        const session = (await supabase.auth.getSession()).data?.session;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+        headers['x-customer-id'] = customerId;
+
         const resp = await fetch(`${API_BASE_URL}/api/bookings/reschedule`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             booking_id: bookingId,
             new_slot_start: newSlotStart,
@@ -959,8 +976,9 @@ export function getVenueAssetUrl(
   options?: { width?: number; height?: number; quality?: number }
 ): string {
   if (!pathOrUrl) return '';
-  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-    return pathOrUrl;
+  const trimmed = pathOrUrl.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
   }
   const { data } = supabase.storage.from('venue-assets').getPublicUrl(pathOrUrl, {
     transform: {
@@ -971,8 +989,11 @@ export function getVenueAssetUrl(
   return data?.publicUrl || pathOrUrl;
 }
 
+const ALLOWED_VENUE_ASSET_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
 /**
  * Upload a venue storefront photo, clinic logo, or resource image to 'venue-assets' public bucket.
+ * Restricts uploads strictly to safe binary MIME types (image/jpeg, image/png, image/webp) to prevent Stored XSS.
  */
 export async function uploadVenueAsset(
   providerId: string,
@@ -981,13 +1002,23 @@ export async function uploadVenueAsset(
   contentType: string = 'image/jpeg'
 ): Promise<{ success: boolean; publicUrl?: string; path?: string; error?: string }> {
   try {
+    const normalizedMime = (contentType || '').toLowerCase().trim();
+    const cleanExt = fileName.toLowerCase().split('.').pop() || '';
+
+    if (!ALLOWED_VENUE_ASSET_MIME_TYPES.includes(normalizedMime) || cleanExt === 'svg' || normalizedMime.includes('svg')) {
+      return {
+        success: false,
+        error: 'Invalid file type: SVG and non-whitelisted formats are disallowed to prevent script execution and stored XSS.',
+      };
+    }
+
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storagePath = `${providerId}/${Date.now()}-${cleanFileName}`;
 
     const { data, error } = await supabase.storage
       .from('venue-assets')
       .upload(storagePath, fileBytes, {
-        contentType,
+        contentType: normalizedMime,
         upsert: true,
       });
 
@@ -1050,6 +1081,14 @@ export async function verifyPhoneOtp(
     if (error) {
       console.warn('Supabase verifyOtp error:', error.message);
       return { success: false, error: error.message };
+    }
+
+    // Strict validation: Only generate/confirm session after Supabase confirms OTP status
+    if (!data?.session?.access_token || !data?.user?.id) {
+      return {
+        success: false,
+        error: 'Authentication failed: No valid session token returned from verification provider',
+      };
     }
 
     return {

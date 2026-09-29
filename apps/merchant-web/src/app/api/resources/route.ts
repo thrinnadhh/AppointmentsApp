@@ -1,21 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const providerId = searchParams.get('provider_id') || searchParams.get('providerId');
 
-    let query = supabase
-      .from('resources')
-      .select('*, providers(id, name, category_id)')
-      .order('created_at', { ascending: false });
-
-    if (providerId) {
-      query = query.eq('provider_id', providerId);
+    if (!providerId) {
+      return NextResponse.json(
+        { error: 'Missing provider_id parameter. Provider scoping is required.' },
+        { status: 400 }
+      );
     }
 
-    const { data, error } = await query;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(providerId)) {
+      return NextResponse.json(
+        { error: 'Invalid provider_id format' },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('resources')
+      .select('*, providers(id, name, category_id)')
+      .eq('provider_id', providerId)
+      .order('created_at', { ascending: false });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

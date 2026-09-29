@@ -20,7 +20,8 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test:e2e": "playwright test",
     "test": "pnpm test:e2e",
-    "test:security": "node --test test-security.mjs test-routes.mjs"
+    "test:validation": "node --test test-validation.mjs",
+    "test:security": "node --test test-security.mjs test-routes.mjs test-validation.mjs"
   },
   "keywords": [
     "appointments",

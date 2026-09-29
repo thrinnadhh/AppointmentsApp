@@ -6,10 +6,15 @@ import { MerchantPortalPage } from './pages/merchant-portal.page';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const customerSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const customerSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false },
+});
 const serviceSupabase = SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
   : customerSupabase;
+
+const ADMIN_BYPASS_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+const ADMIN_HEADERS = { 'x-admin-bypass-key': ADMIN_BYPASS_TOKEN };
 
 // Customer Mobile App data fetching engine (mirroring apps/customer-mobile/src/services/api.ts)
 async function customerFetchProvidersByCategory(categoryId?: string) {
@@ -60,6 +65,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
   test('1. Should register a new Clinic via Merchant API and verify instant reflection in Customer Dashboard data layer', async ({ request }) => {
     // 1. Merchant registers a new clinic
     const registerResponse = await request.post('http://localhost:3000/api/admin/venues', {
+      headers: ADMIN_HEADERS,
       data: {
         name: testClinicName,
         categoryId: 'clinic', // Test singular normalization
@@ -100,6 +106,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
     // 1. Merchant attaches doctor to the registered business
     const resourceResponse = await request.post('http://localhost:3000/api/admin/resources', {
+      headers: ADMIN_HEADERS,
       data: {
         providerId: createdClinicId,
         name: testDoctorName,
@@ -148,6 +155,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
   test('4. Should register a Sports Turf and verify it reflects under Gaming in Customer Dashboard', async ({ request }) => {
     // 1. Register sports turf
     const turfResponse = await request.post('http://localhost:3000/api/admin/venues', {
+      headers: ADMIN_HEADERS,
       data: {
         name: testTurfName,
         categoryId: 'gaming',
@@ -165,6 +173,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
     // 2. Add court resource to the turf
     await request.post('http://localhost:3000/api/admin/resources', {
+      headers: ADMIN_HEADERS,
       data: {
         providerId: createdTurfId,
         name: 'Court 1 (Yonex Pro Mat)',
@@ -389,7 +398,8 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     const testBooking = bookings![0];
 
     // 2. Dispatch BOOKING_CONFIRMED notification via admin API
-    const adminHeaders = { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' };
+    const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
+    const adminHeaders = { 'x-admin-bypass-key': adminBypassToken };
     const notifyRes = await request.post('http://localhost:3000/api/admin/notifications', {
       headers: adminHeaders,
       data: {

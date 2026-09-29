@@ -4,6 +4,8 @@ import { getRedisStatus } from '@/lib/redis';
 import { getSentryStatus } from '@/lib/sentry';
 import { getStorageStatus } from '@/lib/storage';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const start = Date.now();
   try {

@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAdminRequest, verifyStaffManagerRequest } from '@/lib/auth-admin';
 import { maskPhoneNumber } from '@appointments/shared';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAdminRequest(request);
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin();
     let targetProviderId = providerId;
 
-    // 2. Merchants can only manage staff for their own venue
+    // 2. Merchants can only manage staff for their own venue and must be the store owner
     if (authResult.profile.role === 'merchant') {
       const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
         p_user_id: authResult.user.id,
@@ -82,6 +84,29 @@ export async function POST(request: NextRequest) {
       if (!authorizedList.includes(targetProviderId)) {
         return NextResponse.json(
           { error: 'Forbidden: You can only manage staff for your own venue.' },
+          { status: 403 }
+        );
+      }
+
+      // Restrict staff creation to store owners
+      const { data: providerData } = await supabaseAdmin
+        .from('providers')
+        .select('id, owner_id')
+        .eq('id', targetProviderId)
+        .maybeSingle();
+
+      const { data: ownerMembership } = await supabaseAdmin
+        .from('merchant_memberships')
+        .select('id')
+        .eq('provider_id', targetProviderId)
+        .eq('user_id', authResult.user.id)
+        .eq('role', 'owner')
+        .maybeSingle();
+
+      const isStoreOwner = providerData?.owner_id === authResult.user.id || Boolean(ownerMembership);
+      if (!isStoreOwner) {
+        return NextResponse.json(
+          { error: 'Forbidden: Only store owners or super administrators can provision staff.' },
           { status: 403 }
         );
       }
@@ -110,6 +135,81 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, user: data }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const authResult = await verifyStaffManagerRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const { userId, providerId, role } = body;
+
+    if (!userId || !providerId || !role) {
+      return NextResponse.json(
+        { error: 'Missing required parameters: userId, providerId, and role are required' },
+        { status: 400 }
+      );
+    }
+
+    const validRoles = ['owner', 'manager', 'staff'];
+    if (!validRoles.includes(role)) {
+      return NextResponse.json(
+        { error: `Invalid role: "${role}". Must be one of: ${validRoles.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Restrict staff role modification strictly to store owners or superadmins
+    if (authResult.profile.role === 'merchant') {
+      const { data: providerData } = await supabaseAdmin
+        .from('providers')
+        .select('id, owner_id')
+        .eq('id', providerId)
+        .maybeSingle();
+
+      const { data: ownerMembership } = await supabaseAdmin
+        .from('merchant_memberships')
+        .select('id')
+        .eq('provider_id', providerId)
+        .eq('user_id', authResult.user.id)
+        .eq('role', 'owner')
+        .maybeSingle();
+
+      const isStoreOwner = providerData?.owner_id === authResult.user.id || Boolean(ownerMembership);
+      if (!isStoreOwner) {
+        return NextResponse.json(
+          { error: 'Forbidden: Only store owners or super administrators can modify staff roles.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('merchant_memberships')
+      .update({ role, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('provider_id', providerId)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (!data) {
+      return NextResponse.json({ error: 'Membership record not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, membership: data }, { status: 200 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });

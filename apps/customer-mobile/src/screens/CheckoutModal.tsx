@@ -32,6 +32,8 @@ const loadRazorpayScript = (): Promise<boolean> => {
     }
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.integrity = 'sha384-NGmSb1KehQLbxaQireyZsxqw5m8oN1qSYAOEkPd7JW3f2liirqbwcgV1ANfaqxpe';
+    script.crossOrigin = 'anonymous';
     script.async = true;
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
@@ -46,7 +48,7 @@ interface CheckoutModalProps {
   categoryId?: string | null;
   customerId?: string;
   onClose: () => void;
-  onPaymentSuccess: (bookingId: string) => void;
+  onPaymentSuccess: (bookingId: string, referenceCode?: string) => void;
 }
 
 
@@ -176,7 +178,7 @@ export default function CheckoutModal({
       const bookingId = holdRes.booking_id;
 
       // 2. Create official Razorpay order on backend
-      const orderRes = await createRazorpayOrder(bookingId);
+      const orderRes = await createRazorpayOrder(bookingId, customerId);
       if (!orderRes.success || !orderRes.order_id) {
         setPayError(orderRes.error || 'Failed to initialize payment gateway order.');
         setIsProcessing(false);
@@ -206,9 +208,10 @@ export default function CheckoutModal({
                   razorpay_payment_id: response.razorpay_payment_id,
                   razorpay_signature: response.razorpay_signature,
                   attachment_url: attachedPath,
+                  customerId,
                 });
                 if (verifyRes.success) {
-                  onPaymentSuccess(bookingId);
+                  onPaymentSuccess(bookingId, holdRes.reference_code);
                 } else {
                   setPayError(verifyRes.error || 'Payment verification failed.');
                 }
@@ -240,14 +243,15 @@ export default function CheckoutModal({
         razorpay_payment_id: paymentId,
         razorpay_signature: signature,
         attachment_url: attachedPath,
+        customerId,
       });
 
       if (verifyRes.success) {
-        onPaymentSuccess(bookingId);
+        onPaymentSuccess(bookingId, holdRes.reference_code);
       } else {
         // Fallback to direct Supabase confirmation if verification endpoint is unavailable
         await confirmBookingPaymentOnSupabase(bookingId, paymentId, attachedPath);
-        onPaymentSuccess(bookingId);
+        onPaymentSuccess(bookingId, holdRes.reference_code);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Payment failed. Please try again.';

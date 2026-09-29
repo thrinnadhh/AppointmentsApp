@@ -5,11 +5,14 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
   const BASE_URL = 'http://localhost:3000';
   const DUMMY_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const DUMMY_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
+  const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
+  const bypassHeaders = adminBypass ? { 'x-admin-bypass-key': adminBypass } : {};
 
   test.describe('1. POST /api/payments/create-order', () => {
     test('1.1 should reject requests missing booking_id with 400', async ({ request }) => {
       const res = await request.post(`${BASE_URL}/api/payments/create-order`, {
         data: {},
+        headers: bypassHeaders,
       });
       expect(res.status()).toBe(400);
       const data = await res.json();
@@ -20,6 +23,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
     test('1.2 should return 404 for non-existent booking_id', async ({ request }) => {
       const res = await request.post(`${BASE_URL}/api/payments/create-order`, {
         data: { booking_id: '00000000-0000-0000-0000-000000000000' },
+        headers: bypassHeaders,
       });
       expect(res.status()).toBe(404);
       const data = await res.json();
@@ -39,6 +43,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
           slot_start: slotStart,
           slot_end: slotEnd,
         },
+        headers: bypassHeaders,
       });
 
       expect(holdRes.status()).toBe(201);
@@ -50,6 +55,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
       // 2. Request order creation
       const orderRes = await request.post(`${BASE_URL}/api/payments/create-order`, {
         data: { booking_id: bookingId },
+        headers: bypassHeaders,
       });
 
       expect(orderRes.status()).toBe(200);
@@ -77,6 +83,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
           slot_start: slotStart,
           slot_end: slotEnd,
         },
+        headers: bypassHeaders,
       });
 
       expect(holdRes.status()).toBe(201);
@@ -87,6 +94,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
 
       const orderRes = await request.post(`${BASE_URL}/api/payments/create-order`, {
         data: { booking_id: bookingId },
+        headers: bypassHeaders,
       });
 
       expect(orderRes.status()).toBe(200);
@@ -105,6 +113,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
     test('2.1 should reject requests with missing parameters with 400', async ({ request }) => {
       const res = await request.post(`${BASE_URL}/api/payments/verify`, {
         data: { booking_id: '123' },
+        headers: bypassHeaders,
       });
       expect(res.status()).toBe(400);
       const data = await res.json();
@@ -120,6 +129,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
           razorpay_payment_id: 'pay_12345',
           razorpay_signature: 'invalid_forged_signature_token',
         },
+        headers: bypassHeaders,
       });
       expect(res.status()).toBe(400);
       const data = await res.json();
@@ -139,6 +149,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
           slot_start: slotStart,
           slot_end: slotEnd,
         },
+        headers: bypassHeaders,
       });
 
       expect(holdRes.status()).toBe(201);
@@ -148,6 +159,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
       // 2. Create order
       const orderRes = await request.post(`${BASE_URL}/api/payments/create-order`, {
         data: { booking_id: bookingId },
+        headers: bypassHeaders,
       });
       const orderData = await orderRes.json();
       const orderId = orderData.order_id;
@@ -162,6 +174,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
           razorpay_payment_id: paymentId,
           razorpay_signature: signature,
         },
+        headers: bypassHeaders,
       });
 
       expect(verifyRes.status()).toBe(200);
@@ -174,8 +187,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
   });
 
   test.describe('3. POST /api/webhooks/razorpay', () => {
-    const webhookSecret =
-      process.env.RAZORPAY_WEBHOOK_SECRET || '30772a35dc5bf0a5889b1af5dfd0409c364749e83c6e0e1d';
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
 
 
     test('3.1 should reject requests missing x-razorpay-signature header with 401', async ({ request }) => {
@@ -214,6 +226,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
           slot_start: slotStart,
           slot_end: slotEnd,
         },
+        headers: bypassHeaders,
       });
 
       expect(holdRes.status()).toBe(201);
@@ -227,7 +240,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
           order: {
             entity: {
               id: `order_wh_${Date.now().toString(36)}`,
-              amount: 10000,
+              amount: 11000,
               currency: 'INR',
               notes: {
                 booking_id: bookingId,
@@ -237,7 +250,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
           payment: {
             entity: {
               id: `pay_wh_${Date.now().toString(36)}`,
-              amount: 10000,
+              amount: 11000,
               currency: 'INR',
               notes: {
                 booking_id: bookingId,

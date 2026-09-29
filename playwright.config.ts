@@ -42,12 +42,24 @@ export default defineConfig({
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
+      env: {
+        ADMIN_SECRET: process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026',
+        SUPERADMIN_E2E_TOKEN: process.env.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026',
+        ALLOW_MOCK_PAYMENTS: 'true',
+        RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || 'rzp_test_51MockAppPlatform',
+        RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || 'mock_secret_key_1234567890',
+      },
     },
     {
       command: 'pnpm dev:mobile',
       url: 'http://localhost:8081',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
+      env: {
+        ALLOW_MOCK_PAYMENTS: 'true',
+        ADMIN_SECRET: process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026',
+        SUPERADMIN_E2E_TOKEN: process.env.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026',
+      },
     },
   ],
 
@@ -61,6 +73,9 @@ export default defineConfig({
         '**/admin-merchant-integration.spec.ts',
         '**/edge-integrations.spec.ts',
         '**/flow-audit.spec.ts',
+        '**/customer-app.spec.ts',
+        '**/customer-reflection.spec.ts',
+        '**/edge-customer.spec.ts',
       ],
     },
 

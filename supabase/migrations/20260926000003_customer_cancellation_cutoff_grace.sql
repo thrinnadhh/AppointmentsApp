@@ -57,6 +57,9 @@ BEGIN
     END IF;
   END IF;
 
+  -- Set trusted write context so internal provider strikes and booking transitions bypass guard triggers
+  PERFORM set_config('app.trusted_write', 'true', true);
+
   v_is_merchant := (upper(p_initiated_by) = 'MERCHANT');
   v_minutes_to_slot := EXTRACT(EPOCH FROM (v_booking.slot_start - NOW())) / 60;
 

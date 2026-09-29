@@ -256,3 +256,42 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.reset_test_customer_strikes(uuid, int) TO anon, authenticated, service_role;
+
+-- -----------------------------------------------------------------------------
+-- 5. Test Utility RPC: reset_test_bookings
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.reset_test_bookings(
+  p_provider_id UUID,
+  p_customer_id UUID DEFAULT NULL::uuid
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  PERFORM set_config('app.trusted_write', 'true', true);
+
+  DELETE FROM public.payments
+  WHERE booking_id IN (
+    SELECT id FROM public.bookings
+    WHERE provider_id = p_provider_id
+      OR (p_customer_id IS NOT NULL AND customer_id = p_customer_id)
+  );
+
+  DELETE FROM public.notification_logs
+  WHERE booking_id IN (
+    SELECT id FROM public.bookings
+    WHERE provider_id = p_provider_id
+      OR (p_customer_id IS NOT NULL AND customer_id = p_customer_id)
+  );
+
+  DELETE FROM public.bookings
+  WHERE provider_id = p_provider_id
+    OR (p_customer_id IS NOT NULL AND customer_id = p_customer_id);
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.reset_test_bookings(uuid, uuid) TO anon, authenticated, service_role;

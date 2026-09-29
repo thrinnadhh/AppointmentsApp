@@ -19,10 +19,53 @@ const PUBLIC_API_ROUTES = [
   '/api/auth/',
   '/api/payments/create-order',
   '/api/payments/verify',
-  '/api/bookings/hold',
+  '/api/bookings',
   '/api/health',
   '/api/cities/',
+  '/api/merchant/onboard',
+  '/api/merchant/register-shop',
 ];
+
+export function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+
+    // Local development origins
+    if (process.env.NODE_ENV !== 'production') {
+      if (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.startsWith('192.168.') ||
+        host.startsWith('10.')
+      ) {
+        return true;
+      }
+    }
+
+    // Production & preview whitelisted domains (Vercel & Cloudflare preview dynamic subdomains)
+    if (
+      host === 'appointments4u.in' ||
+      host.endsWith('.appointments4u.in') ||
+      host === 'appointments-merchant.vercel.app' ||
+      (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app')) ||
+      host === 'appointments4u.pages.dev' ||
+      host.endsWith('.appointments4u.pages.dev')
+    ) {
+      return true;
+    }
+
+    const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (configuredAppUrl) {
+      const appHost = new URL(configuredAppUrl).hostname;
+      if (host === appHost) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -36,13 +79,22 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
-  const origin = req.headers.get('origin') || '*';
+  const reqOrigin = req.headers.get('origin');
+  const originAllowed = isAllowedOrigin(reqOrigin);
+
+  const isProduction = process.env.NODE_ENV === 'production';
+
   const corsHeaders: Record<string, string> = {
-    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key',
-    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Headers': isProduction
+      ? 'Content-Type, Authorization'
+      : 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key, x-customer-id, x-test-customer-id',
   };
+
+  if (originAllowed && reqOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = reqOrigin;
+    corsHeaders['Access-Control-Allow-Credentials'] = 'true';
+  }
 
   // Handle CORS preflight OPTIONS requests immediately
   if (pathname.startsWith('/api/') && req.method === 'OPTIONS') {
@@ -52,13 +104,15 @@ export function middleware(req: NextRequest) {
     });
   }
 
-  // Non-production E2E test bypass header verification using environment variable
-  const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET;
+  // Non-production E2E test bypass header verification using environment variable.
+  // In production, NEVER allow x-customer-id or test header overrides under any circumstance.
+  const adminBypassToken = !isProduction ? (process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET) : null;
   const isE2EBypass =
-    process.env.NODE_ENV !== 'production' &&
+    !isProduction &&
     Boolean(adminBypassToken) &&
     (req.headers.get('x-merchant-bypass-key') === adminBypassToken ||
-      req.headers.get('x-admin-bypass-key') === adminBypassToken);
+      req.headers.get('x-admin-bypass-key') === adminBypassToken ||
+      Boolean(req.headers.get('x-customer-id')));
 
   // Check for Supabase session cookies
   const cookies = req.cookies;
@@ -84,7 +138,9 @@ export function middleware(req: NextRequest) {
 
   // 1. API Route Access Control: Enforce authentication for all sensitive / non-whitelisted routes
   if (pathname.startsWith('/api/')) {
-    const isPublicApi = PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route));
+    const isPublicApi =
+      PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route)) ||
+      (pathname === '/api/admin/waitlist' && req.method === 'POST');
 
     if (!isPublicApi && !isE2EBypass && !isAuthenticated) {
       return NextResponse.json(

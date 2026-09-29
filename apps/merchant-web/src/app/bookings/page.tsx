@@ -99,13 +99,18 @@ export default function BookingsManagementPage() {
     loadData();
 
     const channel = supabase
-      .channel('bookings-mgmt-realtime')
+      .channel(`bookings-mgmt-realtime-${selectedProviderId || 'all'}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'bookings' },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: selectedProviderId ? `provider_id=eq.${selectedProviderId}` : undefined,
+        },
         (payload) => {
           const newStatus = (payload.new as { status?: string })?.status;
-          setFeedbackToast(`Realtime Sync: Slot ${newStatus || 'updated'}`);
+          setFeedbackToast((current) => current || `Realtime Sync: Slot ${newStatus || 'updated'}`);
           loadData();
           setTimeout(() => setFeedbackToast(null), 4000);
         }
@@ -115,7 +120,7 @@ export default function BookingsManagementPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loadData]);
+  }, [loadData, selectedProviderId]);
 
   // Date Horizon Calculation Helpers
   const now = new Date();
@@ -147,6 +152,7 @@ export default function BookingsManagementPage() {
       (b.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.reference_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.resource_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.provider_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.id.toLowerCase().includes(searchQuery.toLowerCase());
 
     let matchesDate = true;
@@ -559,7 +565,7 @@ export default function BookingsManagementPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
         {filteredBookings.length === 0 ? (
           <div className="p-12 text-center text-slate-500 text-sm">
-            No bookings found matching the selected filters.
+            No bookings found for {verticalConfig.resourceLabelSingular}: All active appointment slots are currently open.
           </div>
         ) : (
           filteredBookings.map((booking) => {

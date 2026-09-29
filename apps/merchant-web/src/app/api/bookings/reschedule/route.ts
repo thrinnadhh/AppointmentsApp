@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { RescheduleBookingRequest, RescheduleBookingResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
@@ -14,7 +15,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: 'Authentication required to reschedule a booking' },
+        { status: 401 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
+
+    const { data: booking, error: bkgErr } = await supabaseAdmin
+      .from('bookings')
+      .select('id, customer_id, provider_id, status')
+      .eq('id', booking_id)
+      .maybeSingle();
+
+    if (bkgErr || !booking) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
+
+    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
+    if (!isAuthorized) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: 'Unauthorized: Caller is not authorized to reschedule this booking' },
+        { status: 403 }
+      );
+    }
 
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('reschedule_booking_slot', {
       p_booking_id: booking_id,

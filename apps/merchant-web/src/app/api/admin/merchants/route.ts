@@ -5,6 +5,8 @@ import { Database } from '@appointments/shared';
 
 type ProviderStatus = Database['public']['Enums']['provider_status'];
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAdminRequest(request);
@@ -40,6 +42,28 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(providerId)) {
+      return NextResponse.json(
+        { error: 'Invalid providerId format' },
+        { status: 400 }
+      );
+    }
+
+    if (daily_booking_limit !== undefined && daily_booking_limit !== null) {
+      if (
+        typeof daily_booking_limit !== 'number' ||
+        !Number.isInteger(daily_booking_limit) ||
+        daily_booking_limit < 0 ||
+        daily_booking_limit > 100000
+      ) {
+        return NextResponse.json(
+          { error: 'daily_booking_limit must be an integer between 0 and 100,000' },
+          { status: 400 }
+        );
+      }
+    }
+
     if (status) {
       const validStatuses: ProviderStatus[] = ['ACTIVE', 'PENDING_APPROVAL', 'SUSPENDED'];
       if (!validStatuses.includes(status)) {
@@ -53,10 +77,6 @@ export async function PATCH(request: NextRequest) {
       console.log('[API Admin Merchants PATCH]', { providerId, status, result });
       if (!result.success) {
         return NextResponse.json({ error: result.error || 'Update failed' }, { status: 400 });
-      }
-      if (status === 'ACTIVE') {
-        const { clearAllMemoryLocks } = await import('@/lib/redis');
-        clearAllMemoryLocks();
       }
     }
 

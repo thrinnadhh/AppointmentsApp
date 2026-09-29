@@ -26,9 +26,32 @@ export type AdminAuthResult = AdminAuthSuccess | AdminAuthFailure;
 
 export const E2E_ADMIN_BYPASS_SECRET = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
 
-// Fail-fast production check: Ensure admin credentials/secrets are defined
-if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN) {
+// Fail-fast production check: Ensure admin credentials/secrets are defined at runtime
+const isBuildPhase =
+  process.env.NEXT_PHASE === 'phase-production-build' ||
+  process.env.npm_lifecycle_event === 'build' ||
+  Boolean(process.env.CI && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN);
+
+if (process.env.NODE_ENV === 'production' && !isBuildPhase && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN) {
   throw new Error('CRITICAL SECURITY ERROR: ADMIN_SECRET (or SUPERADMIN_E2E_TOKEN) environment variable is required in production.');
+}
+
+/**
+ * Safely extracts client IP to prevent rate-limiter spoofing via forged X-Forwarded-For headers.
+ * Prioritizes socket/platform IP, trusted proxy headers, and the rightmost trusted hop in X-Forwarded-For.
+ */
+export function getClientIp(req: Request | NextRequest): string {
+  if ((req as any).ip) return (req as any).ip;
+  const xRealIp = req.headers.get('x-real-ip');
+  if (xRealIp) return xRealIp.trim();
+  const cfConnectingIp = req.headers.get('cf-connecting-ip');
+  if (cfConnectingIp) return cfConnectingIp.trim();
+  const xff = req.headers.get('x-forwarded-for');
+  if (xff) {
+    const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return '127.0.0.1';
 }
 
 /**
@@ -44,14 +67,25 @@ export async function verifyAuthenticatedUser(
     return null;
   }
 
-  // 1. Non-production E2E test bypass header check
-  if (process.env.NODE_ENV !== 'production' && E2E_ADMIN_BYPASS_SECRET) {
-    const adminBypass = request.headers.get('x-admin-bypass-key');
-    const merchantBypass = request.headers.get('x-merchant-bypass-key');
-    if (adminBypass === E2E_ADMIN_BYPASS_SECRET || merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
+  // 1. Non-production E2E test bypass header check - completely disabled in production
+  if (process.env.NODE_ENV !== 'production') {
+    if (E2E_ADMIN_BYPASS_SECRET) {
+      const adminBypass = request.headers.get('x-admin-bypass-key');
+      const merchantBypass = request.headers.get('x-merchant-bypass-key');
+      if (adminBypass === E2E_ADMIN_BYPASS_SECRET || merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
+        return {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+        };
+      }
+    }
+
+    // Only allow customer header override in non-production environments
+    const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
+    if (testCustomerId) {
       return {
-        id: '88888888-8888-8888-8888-888888888881',
-        email: 'admin@appointments-tirupati.com',
+        id: testCustomerId,
+        email: `${testCustomerId}@test.appointments4u.in`,
       };
     }
   }
@@ -95,6 +129,45 @@ export async function verifyAuthenticatedUser(
   }
 
   return null;
+}
+
+/**
+ * Verifies whether a given caller is authorized for a specific booking.
+ * Returns true if caller is:
+ * 1. The booking's customer (if allowCustomer is true)
+ * 2. An authorized staff/owner of the booking's provider
+ * 3. A platform Super Administrator
+ */
+export async function isCallerAuthorizedForBooking(
+  callerId: string,
+  booking: { customer_id: string; provider_id: string },
+  allowCustomer: boolean = true
+): Promise<boolean> {
+  if (allowCustomer && callerId === booking.customer_id) {
+    return true;
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: callerId });
+  if (isAdmin) return true;
+
+  const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
+    p_user_id: callerId,
+  });
+  if (Array.isArray(authProviders) && authProviders.includes(booking.provider_id)) {
+    return true;
+  }
+
+  const { data: prov } = await supabaseAdmin
+    .from('providers')
+    .select('owner_id')
+    .eq('id', booking.provider_id)
+    .maybeSingle();
+
+  if (prov && prov.owner_id === callerId) {
+    return true;
+  }
+
+  return false;
 }
 
 /**

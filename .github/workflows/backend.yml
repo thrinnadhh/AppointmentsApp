@@ -19,14 +19,18 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     defaults:
       run:
         working-directory: apps/backend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@6a0805fcefea3d4657a47ac4c165951e33482018 # v4.2.2
         with:
           distribution: temurin
           java-version: '21'
@@ -39,40 +43,63 @@ jobs:
 
       - name: Publish test report
         if: always()
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@31a54ee7ebcacc03a09ea97a7e5465a47b84aea5 # v1.9.1
         with:
           name: JUnit Tests
           path: apps/backend/build/test-results/**/*.xml
           reporter: java-junit
+          fail-on-empty: 'false'
+        continue-on-error: true
 
   # ──────────────────────────────────────────────────────────────────────────
   build-push:
-    name: Build & Push Image
+    name: Build, Scan & Push Container Image
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
+      security-events: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up QEMU (ARM64 emulation)
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push (linux/arm64)
-        uses: docker/build-push-action@v6
+      - name: Build local container image for vulnerability scan
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        with:
+          context: apps/backend
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-target
+          cache-from: type=gha
+
+      - name: Scan container image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # v0.29.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-target
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: Build and push multi-arch image (linux/arm64)
+        id: build-push
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
         with:
           context: apps/backend
           platforms: linux/arm64
@@ -82,3 +109,10 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Attest build provenance (Sigstore / GHCR Image Signature)
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build-push.outputs.digest }}
+          push-to-registry: true

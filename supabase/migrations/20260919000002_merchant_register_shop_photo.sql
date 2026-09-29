@@ -24,11 +24,25 @@ DECLARE
   v_category text := lower(trim(p_category_id));
   v_photos text[] := NULL;
 BEGIN
-  -- 1. Look up authenticated user's email
+  -- 1. Caller Authorization Guard
+  IF NOT (
+    auth.role() = 'service_role' 
+    OR auth.uid() = p_user_id 
+    OR public.is_admin(auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'Access Denied: Not authorized to register shop for this user' USING ERRCODE = '42501';
+  END IF;
+
+  -- 2. Look up authenticated user's email
   SELECT lower(trim(email)) INTO v_clean_email FROM auth.users WHERE id = p_user_id;
 
   IF v_clean_email IS NULL THEN
     RAISE EXCEPTION 'User not found or unverified';
+  END IF;
+
+  -- Prevent registering a business with an email that is already registered
+  IF EXISTS (SELECT 1 FROM public.providers WHERE lower(trim(email)) = v_clean_email) THEN
+    RAISE EXCEPTION 'A business with this email address is already registered. Please sign in.' USING ERRCODE = '23505';
   END IF;
 
   IF length(trim(p_shop_name)) = 0 THEN
@@ -89,4 +103,5 @@ BEGIN
 END;
 $function$;
 
-GRANT EXECUTE ON FUNCTION public.merchant_register_shop_for_user(uuid, text, text, text, text, text, text) TO authenticated, service_role, anon;
+REVOKE ALL ON FUNCTION public.merchant_register_shop_for_user(uuid, text, text, text, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.merchant_register_shop_for_user(uuid, text, text, text, text, text, text) TO authenticated, service_role;

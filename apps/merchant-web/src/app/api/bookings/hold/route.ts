@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { acquireSlotLock, releaseSlotLock, checkRateLimit } from '@/lib/redis';
+import { verifyAuthenticatedUser, getClientIp } from '@/lib/auth-admin';
 import { captureException } from '@/lib/sentry';
 import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
 
 interface RpcHoldResult {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
   deposit_amount?: number;
   hold_expires_at?: string;
   error?: string;
@@ -14,6 +16,7 @@ interface RpcHoldResult {
 
 export async function POST(req: NextRequest) {
   let slotKey = '';
+  let lockToken = '';
   try {
     const body = (await req.json()) as Partial<CreateHoldRequest>;
     const { resource_id, slot_start, slot_end, customer_id } = body;
@@ -28,7 +31,64 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Rate Limit: max 10 reservation attempts per customer per minute
+    // Validate UUID format
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(resource_id)) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid resource_id format' },
+        { status: 400 }
+      );
+    }
+    if (!UUID_REGEX.test(customer_id)) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid customer_id format' },
+        { status: 400 }
+      );
+    }
+
+    // Validate slot timestamp boundaries and duration
+    const startMs = new Date(slot_start).getTime();
+    const endMs = new Date(slot_end).getTime();
+    if (isNaN(startMs) || isNaN(endMs)) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid slot timestamps' },
+        { status: 400 }
+      );
+    }
+    if (endMs <= startMs) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid slot interval: slot_end must be strictly after slot_start' },
+        { status: 400 }
+      );
+    }
+    const durationMinutes = (endMs - startMs) / (60 * 1000);
+    if (durationMinutes < 5 || durationMinutes > 480) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid slot duration: duration must be between 5 minutes and 8 hours' },
+        { status: 400 }
+      );
+    }
+
+    // IP Rate Limit: prioritize platform-verified IP or rightmost trusted proxy before client headers
+    const clientIp = (req as any).ip
+      || req.headers.get('x-real-ip')
+      || req.headers.get('cf-connecting-ip')
+      || (req.headers.get('x-forwarded-for')
+          ? req.headers.get('x-forwarded-for')!.split(',').map((s) => s.trim()).filter(Boolean).pop()
+          : undefined)
+      || '127.0.0.1';
+    const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, 30, 60);
+    if (!ipRateLimit.allowed) {
+      return NextResponse.json<CreateHoldResponse>(
+        {
+          success: false,
+          error: 'Too many reservation attempts from this network. Please wait a minute.',
+        },
+        { status: 429 }
+      );
+    }
+
+    // Customer Rate Limit: max 10 reservation attempts per customer per minute
     const rateLimit = await checkRateLimit(`hold:${customer_id}`, 10, 60);
     if (!rateLimit.allowed) {
       return NextResponse.json<CreateHoldResponse>(
@@ -38,6 +98,38 @@ export async function POST(req: NextRequest) {
         },
         { status: 429 }
       );
+    }
+
+    // Customer Identity Integrity: prevent creating holds under another user's customer_id
+    const caller = await verifyAuthenticatedUser(req);
+    if (process.env.NODE_ENV === 'production' && !caller) {
+      return NextResponse.json<CreateHoldResponse>(
+        {
+          success: false,
+          error: 'Unauthorized: Authentication required to create booking hold',
+        },
+        { status: 401 }
+      );
+    }
+    if (caller && caller.id !== customer_id) {
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', caller.id)
+        .maybeSingle();
+
+      const roleStr = profile?.role as string | undefined;
+      const isStaffOrAdmin = roleStr === 'admin' || roleStr === 'merchant' || roleStr === 'manager';
+      if (!isStaffOrAdmin) {
+        return NextResponse.json<CreateHoldResponse>(
+          {
+            success: false,
+            error: 'Forbidden: You cannot reserve appointments on behalf of another customer',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Past slot validation
@@ -53,8 +145,8 @@ export async function POST(req: NextRequest) {
 
     // Distributed Slot Mutex (Upstash Redis / Memory)
     slotKey = `${resource_id}:${slot_start}`;
-    const acquired = await acquireSlotLock(slotKey, 10);
-    if (!acquired) {
+    const lockResult = await acquireSlotLock(slotKey, 30);
+    if (!lockResult.acquired) {
       return NextResponse.json<CreateHoldResponse>(
         {
           success: false,
@@ -63,6 +155,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
+    lockToken = lockResult.token;
 
     const supabaseAdmin = getSupabaseAdmin();
 
@@ -81,7 +174,7 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (prov && prov.status === 'SUSPENDED') {
-        if (slotKey) await releaseSlotLock(slotKey);
+        if (slotKey) await releaseSlotLock(slotKey, lockToken);
         return NextResponse.json<CreateHoldResponse>(
           {
             success: false,
@@ -92,7 +185,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (prov && prov.is_active === false) {
-        if (slotKey) await releaseSlotLock(slotKey);
+        if (slotKey) await releaseSlotLock(slotKey, lockToken);
         return NextResponse.json<CreateHoldResponse>(
           {
             success: false,
@@ -104,11 +197,18 @@ export async function POST(req: NextRequest) {
 
       if (prov?.daily_booking_limit && prov.daily_booking_limit > 0) {
         const dailyLimit = prov.daily_booking_limit;
+
+        // Calculate operational calendar day in merchant venue timezone (Asia/Kolkata, UTC+5:30)
         const targetSlotDate = new Date(slot_start);
-        const slotDayStart = new Date(targetSlotDate);
-        slotDayStart.setHours(0, 0, 0, 0);
-        const slotDayEnd = new Date(targetSlotDate);
-        slotDayEnd.setHours(23, 59, 59, 999);
+        const istDateStr = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(targetSlotDate); // "YYYY-MM-DD"
+
+        const slotDayStart = new Date(`${istDateStr}T00:00:00.000+05:30`);
+        const slotDayEnd = new Date(`${istDateStr}T23:59:59.999+05:30`);
 
         const { count: slotDayBookingsCount } = await supabaseAdmin
           .from('bookings')
@@ -119,7 +219,7 @@ export async function POST(req: NextRequest) {
           .in('status', ['HELD', 'CONFIRMED', 'COMPLETED']);
 
         if ((slotDayBookingsCount || 0) >= dailyLimit) {
-          if (slotKey) await releaseSlotLock(slotKey);
+          if (slotKey) await releaseSlotLock(slotKey, lockToken);
           return NextResponse.json<CreateHoldResponse>(
             {
               success: false,
@@ -139,7 +239,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      if (slotKey) await releaseSlotLock(slotKey);
+      if (slotKey) await releaseSlotLock(slotKey, lockToken);
       console.error('Supabase RPC create_booking_hold error:', error);
       const isConflict =
         error.code === '23505' ||
@@ -164,7 +264,7 @@ export async function POST(req: NextRequest) {
     const result = data as unknown as RpcHoldResult;
 
     if (!result?.success) {
-      if (slotKey) await releaseSlotLock(slotKey);
+      if (slotKey) await releaseSlotLock(slotKey, lockToken);
       const isConflict = result?.error?.includes('already held') || result?.error?.includes('conflict');
       const isSuspended = result?.error?.toLowerCase().includes('suspended') || result?.error?.toLowerCase().includes('blocked');
       return NextResponse.json<CreateHoldResponse>(
@@ -180,13 +280,14 @@ export async function POST(req: NextRequest) {
       {
         success: true,
         booking_id: result.booking_id,
+        reference_code: result.reference_code,
         deposit_amount: result.deposit_amount,
         hold_expires_at: result.hold_expires_at,
       },
       { status: 201 }
     );
   } catch (err: unknown) {
-    if (slotKey) await releaseSlotLock(slotKey);
+    if (slotKey) await releaseSlotLock(slotKey, lockToken);
     await captureException(err, { tags: { endpoint: '/api/bookings/hold' } });
     const message = err instanceof Error ? err.message : 'Invalid request payload';
     return NextResponse.json<CreateHoldResponse>(

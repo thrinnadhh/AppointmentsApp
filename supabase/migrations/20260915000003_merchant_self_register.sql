@@ -43,40 +43,56 @@ BEGIN
     v_category := 'salons';
   END IF;
 
-  -- 1. Check or Create User in auth.users
-  SELECT id INTO v_user_id FROM auth.users WHERE email = v_clean_email;
+  -- 1. Check existing identity in auth.users, auth.identities, profiles, or providers
+  SELECT id INTO v_user_id FROM auth.users WHERE lower(trim(email)) = v_clean_email;
 
-  IF v_user_id IS NOT NULL THEN
-    -- Update existing password so user can sign in immediately
-    UPDATE auth.users 
-    SET encrypted_password = v_encrypted_pw,
-        raw_user_meta_data = jsonb_build_object('full_name', p_full_name, 'role', 'merchant'),
-        updated_at = now()
-    WHERE id = v_user_id;
-  ELSE
-    v_user_id := gen_random_uuid();
-
-    INSERT INTO auth.users (
-      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
-      confirmation_token, recovery_token, email_change_token_new, email_change,
-      phone_change_token, reauthentication_token, email_change_token_current, is_super_admin
-    ) VALUES (
-      '00000000-0000-0000-0000-000000000000', v_user_id, 'authenticated', 'authenticated',
-      v_clean_email, v_encrypted_pw, now(),
-      '{"provider": "email", "providers": ["email"]}'::jsonb,
-      jsonb_build_object('full_name', p_full_name, 'role', 'merchant'),
-      now(), now(), '', '', '', '', '', '', '', false
-    );
-
-    INSERT INTO auth.identities (
-      id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
-    ) VALUES (
-      gen_random_uuid(), v_user_id,
-      jsonb_build_object('sub', v_user_id, 'email', v_clean_email),
-      'email', v_user_id::text, now(), now(), now()
-    );
+  IF v_user_id IS NULL THEN
+    SELECT user_id INTO v_user_id 
+    FROM auth.identities 
+    WHERE lower(trim(identity_data->>'email')) = v_clean_email 
+       OR lower(trim(provider_id)) = v_clean_email 
+    LIMIT 1;
   END IF;
+
+  IF v_user_id IS NULL THEN
+    SELECT id INTO v_user_id 
+    FROM public.profiles 
+    WHERE lower(trim(email)) = v_clean_email 
+    LIMIT 1;
+  END IF;
+
+  -- Prevent account takeover: Never overwrite an existing user's credentials
+  IF v_user_id IS NOT NULL THEN
+    RAISE EXCEPTION 'An account with this email is already registered. Please sign in or reset your password.' USING ERRCODE = '23505';
+  END IF;
+
+  -- Prevent registering a business with an email that is already registered
+  IF EXISTS (SELECT 1 FROM public.providers WHERE lower(trim(email)) = v_clean_email) THEN
+    RAISE EXCEPTION 'A business with this email address is already registered. Please sign in.' USING ERRCODE = '23505';
+  END IF;
+
+  v_user_id := gen_random_uuid();
+
+  INSERT INTO auth.users (
+    instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, recovery_token, email_change_token_new, email_change,
+    phone_change_token, reauthentication_token, email_change_token_current, is_super_admin
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000000', v_user_id, 'authenticated', 'authenticated',
+    v_clean_email, v_encrypted_pw, now(),
+    '{"provider": "email", "providers": ["email"]}'::jsonb,
+    jsonb_build_object('full_name', p_full_name, 'role', 'merchant'),
+    now(), now(), '', '', '', '', '', '', '', false
+  );
+
+  INSERT INTO auth.identities (
+    id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_user_id,
+    jsonb_build_object('sub', v_user_id, 'email', v_clean_email),
+    'email', v_user_id::text, now(), now(), now()
+  );
 
   -- 2. Upsert Profile
   INSERT INTO public.profiles (id, full_name, phone, role, email, updated_at)

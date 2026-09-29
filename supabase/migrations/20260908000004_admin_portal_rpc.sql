@@ -238,6 +238,28 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.admin_delete_resource(p_resource_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF auth.role() != 'service_role' AND NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'Unauthorized: only administrators can delete resources' USING ERRCODE = '42501';
+  END IF;
+
+  DELETE FROM public.resources WHERE id = p_resource_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Resource not found');
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'deleted_id', p_resource_id);
+END;
+$$;
+
 GRANT EXECUTE ON FUNCTION public.admin_create_user TO authenticated, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_create_venue TO authenticated, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_create_resource TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_delete_resource TO authenticated, anon, service_role;

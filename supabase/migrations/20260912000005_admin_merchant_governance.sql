@@ -33,7 +33,24 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_res jsonb;
+  v_caller_id uuid := auth.uid();
+  v_caller_role text := auth.role();
+  v_is_authorized boolean := false;
 BEGIN
+  IF v_caller_role = 'service_role' THEN
+    v_is_authorized := true;
+  ELSIF v_caller_id IS NOT NULL THEN
+    IF public.is_admin(v_caller_id) THEN
+      v_is_authorized := true;
+    ELSIF p_provider_id IN (SELECT public.get_user_authorized_providers(v_caller_id)) THEN
+      v_is_authorized := true;
+    END IF;
+  END IF;
+
+  IF NOT v_is_authorized THEN
+    RAISE EXCEPTION 'Unauthorized: Caller does not have permission to view provider details' USING ERRCODE = '42501';
+  END IF;
+
   SELECT to_jsonb(p.*) || jsonb_build_object(
     'resources', COALESCE(
       (SELECT jsonb_agg(to_jsonb(r.*)) FROM public.resources r WHERE r.provider_id = p.id),
@@ -48,7 +65,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_provider_details(uuid) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.get_provider_details(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_provider_details(uuid) TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.admin_fetch_merchants(
   p_city_id text DEFAULT NULL

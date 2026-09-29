@@ -41,8 +41,8 @@ class MerchantService(
             categoryId = categoryId,
             name = name,
             address = address,
-            lat = lat,
-            lng = lng,
+            lat = lat?.let { java.math.BigDecimal.valueOf(it) },
+            lng = lng?.let { java.math.BigDecimal.valueOf(it) },
             photoUrl = photoUrl,
         )
         val saved = merchantRepository.save(merchant)
@@ -71,8 +71,8 @@ class MerchantService(
         requireOwnerOrAdmin(merchant, authRef)
         name?.let { merchant.name = it }
         address?.let { merchant.address = it }
-        lat?.let { merchant.lat = it }
-        lng?.let { merchant.lng = it }
+        lat?.let { merchant.lat = java.math.BigDecimal.valueOf(it) }
+        lng?.let { merchant.lng = java.math.BigDecimal.valueOf(it) }
         photoUrl?.let { merchant.photoUrl = it }
         return merchantRepository.save(merchant)
     }

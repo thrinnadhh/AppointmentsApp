@@ -13,12 +13,40 @@
  *  - GST: platform_fee_gst column included; GSTIN shown once registered
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || req.headers.get('origin') || '';
+  let allowedOrigin = 'https://appointments4u.in';
+
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      const host = url.hostname;
+      if (
+        host === 'appointments4u.in' ||
+        host.endsWith('.appointments4u.in') ||
+        host === 'appointments-merchant.vercel.app' ||
+        (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app')) ||
+        host === 'appointments4u.pages.dev' ||
+        host.endsWith('.appointments4u.pages.dev') ||
+        host === 'localhost' ||
+        host === '127.0.0.1'
+      ) {
+        allowedOrigin = origin;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  };
+}
 
 interface InvoicePayload {
   booking_id: string;
@@ -34,6 +62,8 @@ function maskCustomerPhone(phone?: string | null): string {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

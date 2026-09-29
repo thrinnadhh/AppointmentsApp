@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
 
 interface RegisterShopRequestBody {
   shopName: string;
@@ -23,28 +24,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = getSupabaseAdmin();
-
-    // Determine target user ID
-    let targetUserId = userId;
-
-    if (!targetUserId) {
-      // Try resolving from auth header or session cookie
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user } } = await supabase.auth.getUser(token);
-        if (user) {
-          targetUserId = user.id;
-        }
-      }
-    }
-
-    if (!targetUserId) {
+    const caller = await verifyAuthenticatedUser(request);
+    if (!caller) {
       return NextResponse.json(
         { error: 'User must be authenticated through Google or have a valid user session.' },
         { status: 401 }
       );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Determine target user ID - defaults to authenticated caller
+    let targetUserId = caller.id;
+
+    if (userId && userId !== caller.id) {
+      // Only platform admins may provision on behalf of another user
+      const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+      if (isAdmin) {
+        targetUserId = userId;
+      } else {
+        return NextResponse.json(
+          { error: 'Forbidden: Cannot register a shop for another user without administrator privileges.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Validate optional photoUrl against safe HTTP/HTTPS protocol scheme
+    const trimmedPhotoUrl = typeof photoUrl === 'string' ? photoUrl.trim() : null;
+    let safePhotoUrl: string | null = null;
+    if (trimmedPhotoUrl) {
+      if (!/^https?:\/\//i.test(trimmedPhotoUrl)) {
+        return NextResponse.json(
+          { error: 'Invalid photoUrl: only secure http:// or https:// URL protocols are permitted.' },
+          { status: 400 }
+        );
+      }
+      safePhotoUrl = trimmedPhotoUrl;
     }
 
     // Call PostgreSQL SECURITY DEFINER RPC to provision shop and link owner
@@ -55,7 +71,7 @@ export async function POST(request: NextRequest) {
       p_phone: phone.trim(),
       p_address: address?.trim() || 'AIR Bypass Road, Tirupati',
       p_full_name: fullName?.trim() || 'Merchant Owner',
-      p_photo_url: photoUrl?.trim() || null,
+      p_photo_url: safePhotoUrl,
     });
 
     if (error) {
@@ -67,10 +83,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Explicitly ensure photos array is populated on the newly created provider
-    if (photoUrl?.trim() && data?.provider_id) {
+    if (safePhotoUrl && data?.provider_id) {
       await supabaseAdmin
         .from('providers')
-        .update({ photos: [photoUrl.trim()] })
+        .update({ photos: [safePhotoUrl] })
         .eq('id', data.provider_id);
     }
 

@@ -42,11 +42,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       data: { booking_id, gateway_payment_id: `pay_cancel_then_complete_${Date.now()}` },
     });
     await request.post(`${BASE}/api/bookings/cancel`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { booking_id, reason: 'Test cancellation' },
     });
 
     // 2. Attempt to mark it COMPLETED
     const completeRes = await request.post(`${BASE}/api/bookings/complete`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { booking_id },
     });
     expect([409, 422]).toContain(completeRes.status());
@@ -68,10 +70,14 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await request.post(`${BASE}/api/bookings/confirm`, {
       data: { booking_id, gateway_payment_id: `pay_complete_then_noshow_${Date.now()}` },
     });
-    await request.post(`${BASE}/api/bookings/complete`, { data: { booking_id } });
+    await request.post(`${BASE}/api/bookings/complete`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      data: { booking_id },
+    });
 
     // Attempt no-show on already COMPLETED booking
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { booking_id },
     });
     expect([409, 422]).toContain(noShowRes.status());
@@ -97,6 +103,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
     // Attempt early no-show
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: { booking_id },
     });
     expect([400, 409, 422]).toContain(noShowRes.status());
@@ -249,6 +256,12 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     if (createRes.status() === 201) {
       const body = await createRes.json();
       expect(body.resource?.deposit_amount ?? body.deposit_amount).toBe(0);
+      const resId = body.resource?.id ?? body.id;
+      if (resId) {
+        await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
+          headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        });
+      }
     } else {
       expect([400, 422]).toContain(createRes.status());
       const body = await createRes.json();
@@ -274,24 +287,34 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       },
     });
     if (createFirst.status() !== 201) { test.skip(); return; }
+    const firstBody = await createFirst.json();
+    const firstId = firstBody.resource?.id ?? firstBody.id;
 
-    const createSecond = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
-      data: {
-        providerId: MERCHANT_A_PROVIDER_ID,
-        name: uniqueName, // same name
-        type: 'doctor',
-        department: 'General',
-        price: 300,
-        depositAmount: 50,
-        durationMinutes: 30,
-        capacity: 1,
-      },
-    });
+    try {
+      const createSecond = await request.post(`${BASE}/api/admin/resources`, {
+        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        data: {
+          providerId: MERCHANT_A_PROVIDER_ID,
+          name: uniqueName, // same name
+          type: 'doctor',
+          department: 'General',
+          price: 300,
+          depositAmount: 50,
+          durationMinutes: 30,
+          capacity: 1,
+        },
+      });
 
-    expect([409, 422]).toContain(createSecond.status());
-    const body = await createSecond.json();
-    expect(body.error).toMatch(/duplicate|already exists|unique/i);
+      expect([409, 422]).toContain(createSecond.status());
+      const body = await createSecond.json();
+      expect(body.error).toMatch(/duplicate|already exists|unique/i);
+    } finally {
+      if (firstId) {
+        await request.delete(`${BASE}/api/admin/resources?id=${firstId}`, {
+          headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        });
+      }
+    }
   });
 
   // ─── EC-MERCH-10: Merchant cannot access /admin ────────────────────────────

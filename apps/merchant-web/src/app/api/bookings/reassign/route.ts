@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { ReassignResourceRequest, ReassignResourceResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
@@ -14,7 +15,57 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<ReassignResourceResponse>(
+        { success: false, error: 'Authentication required to reassign staff resource' },
+        { status: 401 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
+
+    const { data: booking, error: bkgErr } = await supabaseAdmin
+      .from('bookings')
+      .select('id, customer_id, provider_id, status')
+      .eq('id', booking_id)
+      .maybeSingle();
+
+    if (bkgErr || !booking) {
+      return NextResponse.json<ReassignResourceResponse>(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
+
+    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, false);
+    if (!isAuthorized) {
+      return NextResponse.json<ReassignResourceResponse>(
+        { success: false, error: 'Unauthorized: Only authorized merchant staff or administrators can reassign resources' },
+        { status: 403 }
+      );
+    }
+
+    // Verify target resource belongs to same provider
+    const { data: targetResource } = await supabaseAdmin
+      .from('resources')
+      .select('id, provider_id')
+      .eq('id', new_resource_id)
+      .maybeSingle();
+
+    if (!targetResource) {
+      return NextResponse.json<ReassignResourceResponse>(
+        { success: false, error: 'Target resource not found' },
+        { status: 404 }
+      );
+    }
+
+    if (targetResource.provider_id !== booking.provider_id) {
+      return NextResponse.json<ReassignResourceResponse>(
+        { success: false, error: 'Target resource belongs to a different provider' },
+        { status: 403 }
+      );
+    }
 
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('reassign_booking_resource', {
       p_booking_id: booking_id,

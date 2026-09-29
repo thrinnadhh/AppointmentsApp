@@ -6,6 +6,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 export interface BookingApiHelper {
   createHold: (params: {
@@ -66,7 +67,7 @@ export interface AppTestFixtures {
  */
 export const test = base.extend<AppTestFixtures>({
   supabaseClient: async ({}, use) => {
-    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const client = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
     await use(client);
   },
 
@@ -170,7 +171,12 @@ export const test = base.extend<AppTestFixtures>({
       },
 
       async sendNotification(params) {
+        const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
         const res = await request.post('http://localhost:3000/api/admin/notifications', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
+          },
           data: {
             booking_id: params.bookingId,
             event_type: params.eventType || 'BOOKING_CONFIRMED',
@@ -185,7 +191,12 @@ export const test = base.extend<AppTestFixtures>({
       },
 
       async joinWaitlist(params) {
+        const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
         const res = await request.post('http://localhost:3000/api/admin/waitlist', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
+          },
           data: {
             cityId: params.cityId,
             contactInfo: params.contactInfo,

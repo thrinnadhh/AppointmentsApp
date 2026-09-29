@@ -76,6 +76,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
   test('3. Should select date, pick real-time available time slot, and update deposit summary', async ({ page }) => {
     // 1. Open Provider Detail
     await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+    await customerApp.selectStaffMember('Dr. S. K. Murthy, MDS (Implantologist)');
 
     // 2. Check Date Selector
     await expect(customerApp.dateSectionHeading).toBeVisible();
@@ -129,8 +130,9 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
   test('5. Should complete deposit payment, navigate to My Bookings, and support browse return', async ({ page }) => {
     // 1. Proceed to checkout
     await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+    await customerApp.selectStaffMember('Dr. S. K. Murthy, MDS (Implantologist)');
     await customerApp.selectDateOffset('Tomorrow');
-    await customerApp.selectFirstSlot();
+    await customerApp.selectFirstSlot(1);
     await customerApp.openCheckout();
 
     // 2. Submit Payment via Razorpay action

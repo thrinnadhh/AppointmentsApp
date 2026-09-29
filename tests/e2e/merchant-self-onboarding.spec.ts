@@ -61,6 +61,7 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
         shopName: shopName,
         categoryId: 'salons',
         address: 'AIR Bypass Road, Tirupati',
+        tosAccepted: true,
       },
     });
     expect(onboardRes.ok()).toBeTruthy();
