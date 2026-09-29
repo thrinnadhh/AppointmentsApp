@@ -1,10 +1,26 @@
 import { test, expect } from '@playwright/test';
 import { CustomerAppPage } from './pages/customer-app.page';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const testCustomerId = '99999999-9999-9999-9999-999999999991';
 
 test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
   let customerApp: CustomerAppPage;
 
   test.beforeEach(async ({ page }) => {
+    // Cancel any stale active holds or bookings for the test customer on this resource to prevent slot collision
+    if (SUPABASE_KEY) {
+      await supabase
+        .from('bookings')
+        .update({ status: 'CANCELLED' })
+        .eq('customer_id', testCustomerId)
+        .eq('resource_id', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+        .in('status', ['HELD', 'CONFIRMED', 'PENDING_PAYMENT']);
+    }
+
     customerApp = new CustomerAppPage(page);
     await customerApp.goto();
   });

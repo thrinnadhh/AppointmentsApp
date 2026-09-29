@@ -125,7 +125,7 @@ test.describe('Admin — Edge & Boundary Cases', () => {
     await adminPage.gotoLoginPage();
     await adminPage.submitCredentials(
       process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
-      process.env.TEST_ADMIN_PASSWORD || ''
+      process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!'
     );
 
     // Wait for MFA input to appear

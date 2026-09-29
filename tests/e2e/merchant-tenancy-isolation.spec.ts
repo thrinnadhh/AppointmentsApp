@@ -172,7 +172,7 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
 
     // 2. Sign In for Super Admin
     await page.getByTestId('login-email').fill(process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com');
-    await page.getByTestId('login-password').fill(process.env.TEST_ADMIN_PASSWORD || '');
+    await page.getByTestId('login-password').fill(process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!');
     await page.getByTestId('login-submit').click();
 
     // 3. Verify Redirection

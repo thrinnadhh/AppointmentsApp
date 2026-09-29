@@ -133,7 +133,7 @@ export class MerchantPortalPage {
   // Navigation Methods
   async loginAsMerchant(
     email = process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com',
-    password = process.env.TEST_MERCHANT_PASSWORD || ''
+    password = process.env.TEST_MERCHANT_PASSWORD || 'SvimsClinic2026!'
   ) {
     await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
     const emailInput = this.page.getByTestId('login-email');

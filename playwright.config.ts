@@ -9,6 +9,17 @@ if (typeof process.loadEnvFile === 'function') {
   }
 }
 
+// Invariant E2E test credentials and configuration defaults
+process.env.TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com';
+process.env.TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!';
+process.env.TEST_MERCHANT_EMAIL = process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com';
+process.env.TEST_MERCHANT_PASSWORD = process.env.TEST_MERCHANT_PASSWORD || 'SvimsClinic2026!';
+process.env.TEST_SALON_EMAIL = process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com';
+process.env.TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || 'NaturalsSalon2026!';
+process.env.ADMIN_SECRET = process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+process.env.SUPERADMIN_E2E_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026';
+process.env.ALLOW_MOCK_PAYMENTS = 'true';
+
 export default defineConfig({
   testDir: './tests/e2e',
 

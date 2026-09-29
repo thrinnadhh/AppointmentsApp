@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AdminDashboardPage } from './pages/admin-dashboard.page';
 
 const TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com';
-const TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || '';
+const TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!';
 const TEST_SALON_EMAIL = process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com';
 const TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || '';
 

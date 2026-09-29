@@ -252,7 +252,9 @@ export class CustomerAppPage {
       await expect(slotsLoading).toBeHidden({ timeout: 15000 }).catch(() => {});
     }
 
-    const targetSlot = enabledSlots.nth(slotIndex);
+    const count = await enabledSlots.count();
+    const index = (slotIndex >= 0 && slotIndex < count) ? slotIndex : 0;
+    const targetSlot = enabledSlots.nth(index);
     await expect(targetSlot).toBeVisible({ timeout: 15000 });
     await targetSlot.scrollIntoViewIfNeeded().catch(() => {});
     await targetSlot.click();

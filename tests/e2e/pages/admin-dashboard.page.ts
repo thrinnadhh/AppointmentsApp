@@ -196,7 +196,7 @@ export class AdminDashboardPage {
 
   async loginAsAdmin(
     email = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
-    password = process.env.TEST_ADMIN_PASSWORD || ''
+    password = process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!'
   ) {
     await expect(this.page.getByTestId('admin-login-email')).toBeVisible({ timeout: 10000 });
     await this.page.getByTestId('admin-login-email').fill(email);
