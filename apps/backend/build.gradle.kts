@@ -61,6 +61,7 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
     testImplementation("io.rest-assured:rest-assured:5.5.0")
     testImplementation("io.rest-assured:kotlin-extensions:5.5.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 // Testcontainers BOM

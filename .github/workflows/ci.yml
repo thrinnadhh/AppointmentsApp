@@ -35,6 +35,8 @@ env:
   TEST_SALON_PASSWORD: ${{ secrets.TEST_SALON_PASSWORD || '' }}
   TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || '' }}
   TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || '' }}
+  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || 'ci-test-admin-secret-placeholder' }}
+  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || 'ci-test-admin-token-placeholder' }}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 1 — Dependency Audit & Security Scan

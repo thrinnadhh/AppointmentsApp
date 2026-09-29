@@ -26,8 +26,13 @@ export type AdminAuthResult = AdminAuthSuccess | AdminAuthFailure;
 
 export const E2E_ADMIN_BYPASS_SECRET = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
 
-// Fail-fast production check: Ensure admin credentials/secrets are defined
-if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN) {
+// Fail-fast production check: Ensure admin credentials/secrets are defined at runtime
+const isBuildPhase =
+  process.env.NEXT_PHASE === 'phase-production-build' ||
+  process.env.npm_lifecycle_event === 'build' ||
+  Boolean(process.env.CI && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN);
+
+if (process.env.NODE_ENV === 'production' && !isBuildPhase && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN) {
   throw new Error('CRITICAL SECURITY ERROR: ADMIN_SECRET (or SUPERADMIN_E2E_TOKEN) environment variable is required in production.');
 }
 
