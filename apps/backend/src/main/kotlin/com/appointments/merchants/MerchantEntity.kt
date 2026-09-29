@@ -1,6 +1,7 @@
 package com.appointments.merchants
 
 import jakarta.persistence.*
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
@@ -25,11 +26,11 @@ class MerchantEntity(
     @Column
     var address: String? = null,
 
-    @Column
-    var lat: Double? = null,
+    @Column(precision = 9, scale = 6)
+    var lat: BigDecimal? = null,
 
-    @Column
-    var lng: Double? = null,
+    @Column(precision = 9, scale = 6)
+    var lng: BigDecimal? = null,
 
     @Column(name = "photo_url")
     var photoUrl: String? = null,

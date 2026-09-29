@@ -18,7 +18,7 @@ concurrency:
 
 # ─── Environment defaults shared across jobs ───────────────────────────────────
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   PNPM_VERSION: '8.15.0'
   # Supabase — populated from repo secrets; fall back to stubs for build-only jobs
   NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
@@ -281,17 +281,17 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run Customer E2E — App flows
-        run: pnpm exec playwright test tests/e2e/customer-app.spec.ts --reporter=github,list,html
+        run: pnpm exec playwright test tests/e2e/customer-app.spec.ts --project=mobile-chrome --reporter=github,list,html
         env:
           CI: true
 
       - name: Run Customer E2E — Reflections
-        run: pnpm exec playwright test tests/e2e/customer-reflection.spec.ts --reporter=github,list,html
+        run: pnpm exec playwright test tests/e2e/customer-reflection.spec.ts --project=mobile-chrome --reporter=github,list,html
         env:
           CI: true
 
       - name: Run Customer Edge Cases
-        run: pnpm exec playwright test tests/e2e/edge-customer.spec.ts --reporter=github,list,html
+        run: pnpm exec playwright test tests/e2e/edge-customer.spec.ts --project=mobile-chrome --reporter=github,list,html
         env:
           CI: true
 

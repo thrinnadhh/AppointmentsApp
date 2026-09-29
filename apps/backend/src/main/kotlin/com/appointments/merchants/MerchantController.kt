@@ -92,6 +92,6 @@ data class MerchantDto(
 
 fun MerchantEntity.toDto() = MerchantDto(
     id = id, cityId = cityId, categoryId = categoryId,
-    name = name, address = address, lat = lat, lng = lng,
+    name = name, address = address, lat = lat?.toDouble(), lng = lng?.toDouble(),
     photoUrl = photoUrl, status = status,
 )
