@@ -26,17 +26,19 @@ env:
   EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
   EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
-  RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID || '' }}
-  RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET || '' }}
-  RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET || '' }}
-  TEST_MERCHANT_EMAIL: ${{ secrets.TEST_MERCHANT_EMAIL || '' }}
-  TEST_MERCHANT_PASSWORD: ${{ secrets.TEST_MERCHANT_PASSWORD || '' }}
-  TEST_SALON_EMAIL: ${{ secrets.TEST_SALON_EMAIL || '' }}
-  TEST_SALON_PASSWORD: ${{ secrets.TEST_SALON_PASSWORD || '' }}
-  TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || '' }}
-  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || '' }}
-  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || '' }}
-  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || '' }}
+  RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID || 'rzp_test_51MockAppPlatform' }}
+  RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET || 'mock_secret_key_1234567890' }}
+  RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET || 'mock_webhook_secret' }}
+  TEST_MERCHANT_EMAIL: ${{ secrets.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com' }}
+  TEST_MERCHANT_PASSWORD: ${{ secrets.TEST_MERCHANT_PASSWORD || 'SvimsClinic2026!' }}
+  TEST_SALON_EMAIL: ${{ secrets.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com' }}
+  TEST_SALON_PASSWORD: ${{ secrets.TEST_SALON_PASSWORD || 'NaturalsSalon2026!' }}
+  TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com' }}
+  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'AdminSecure2026!' }}
+  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026' }}
+  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026' }}
+  ALLOW_MOCK_PAYMENTS: 'true'
+  CRON_SECRET: ${{ secrets.CRON_SECRET || 'test_cron_secret_2026' }}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 1 — Dependency Audit & Security Scan
