@@ -400,10 +400,13 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
       },
     });
 
-    // Backdate slot_start to past so premature no-show check passes
+    // Backdate slot_start and slot_end to past so premature no-show check passes
     await supabase
       .from('bookings')
-      .update({ slot_start: new Date(Date.now() - 3600000).toISOString() })
+      .update({
+        slot_start: new Date(Date.now() - 3600000).toISOString(),
+        slot_end: new Date(Date.now() - 1800000).toISOString(),
+      })
       .eq('id', booking_id);
 
     // 3. Merchant reports No-Show via endpoint
