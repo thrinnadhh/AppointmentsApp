@@ -35,8 +35,8 @@ export async function registerForPushNotificationsAsync(
         await supabase
           .from('profiles')
           .update({
-            full_name: undefined,
-          })
+            expo_push_token: token,
+          } as any)
           .eq('id', customerId);
       } catch {
         // Non-blocking

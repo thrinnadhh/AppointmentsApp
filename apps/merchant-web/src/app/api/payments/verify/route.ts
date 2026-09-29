@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyRazorpaySignature } from '@/lib/razorpay';
+import { verifyRazorpaySignature, canMockPayments } from '@/lib/razorpay';
 import { checkRateLimit } from '@/lib/redis';
 import { VerifyRazorpayPaymentRequest, VerifyRazorpayPaymentResponse, getPlatformFee } from '@appointments/shared';
 
@@ -35,6 +35,26 @@ export async function POST(req: NextRequest) {
     if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
       return NextResponse.json<VerifyRazorpayPaymentResponse>(
         { success: false, error: 'Missing required payment verification parameters' },
+        { status: 400 }
+      );
+    }
+
+    // Mock payment ID & order guard: strictly reject mock IDs when mock payments are disabled
+    const isMockPayment =
+      razorpay_payment_id.startsWith('mock_') ||
+      razorpay_payment_id.startsWith('sim_') ||
+      razorpay_payment_id.startsWith('pay_mock_') ||
+      razorpay_payment_id.startsWith('pay_test_') ||
+      razorpay_payment_id.toLowerCase().includes('mock');
+
+    const isMockOrder =
+      razorpay_order_id.startsWith('order_mock_') ||
+      razorpay_order_id.startsWith('order_test_') ||
+      razorpay_order_id.toLowerCase().includes('mock');
+
+    if ((isMockPayment || isMockOrder) && !canMockPayments()) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Mock payments and mock orders are disabled in this environment' },
         { status: 400 }
       );
     }
@@ -93,7 +113,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify order ID matches booking gateway_order_id
-    if (booking.gateway_order_id && razorpay_order_id !== booking.gateway_order_id && !razorpay_order_id.startsWith('order_mock_')) {
+    const orderMatches = booking.gateway_order_id ? razorpay_order_id === booking.gateway_order_id : true;
+    const allowMockOrder = canMockPayments() && razorpay_order_id.startsWith('order_mock_');
+    if (booking.gateway_order_id && !orderMatches && !allowMockOrder) {
       return NextResponse.json<VerifyRazorpayPaymentResponse>(
         { success: false, error: 'Payment order ID does not match booking reservation' },
         { status: 400 }

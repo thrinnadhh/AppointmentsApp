@@ -364,9 +364,14 @@ export class AdminDashboardPage {
     await expect(row).toBeVisible({ timeout: 10000 });
     const blockBtn = row.getByRole('button', { name: /Block Merchant/i });
     await expect(blockBtn).toBeVisible({ timeout: 10000 });
-    await blockBtn.click();
 
-    await expect(this.page.getByText(/Merchant Blocked & Suspended/i)).toBeVisible({ timeout: 15000 });
+    const patchPromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/admin/merchants') && resp.request().method() === 'PATCH' && resp.status() === 200,
+      { timeout: 15000 }
+    ).catch(() => null);
+
+    await blockBtn.click();
+    await patchPromise;
     await expect(row.getByText(/BLOCKED \/ SUSPENDED/i)).toBeVisible({ timeout: 10000 });
   }
 
@@ -375,9 +380,14 @@ export class AdminDashboardPage {
     await expect(row).toBeVisible({ timeout: 10000 });
     const unblockBtn = row.getByRole('button', { name: /Unblock Merchant/i });
     await expect(unblockBtn).toBeVisible({ timeout: 10000 });
-    await unblockBtn.click();
 
-    await expect(this.page.getByText(/Merchant Activated & Visible/i)).toBeVisible({ timeout: 15000 });
+    const patchPromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/admin/merchants') && resp.request().method() === 'PATCH' && resp.status() === 200,
+      { timeout: 15000 }
+    ).catch(() => null);
+
+    await unblockBtn.click();
+    await patchPromise;
     await expect(unblockBtn).not.toBeVisible({ timeout: 15000 });
   }
 

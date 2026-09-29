@@ -66,7 +66,8 @@ export default function ShopRegistrationPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         let authUser: any = session?.user;
-        if (!authUser && typeof window !== 'undefined') {
+        const isNonProduction = process.env.NODE_ENV !== 'production';
+        if (!authUser && typeof window !== 'undefined' && isNonProduction) {
           const testUserRaw = window.sessionStorage.getItem('test_merchant_user');
           if (testUserRaw) {
             try {
@@ -99,7 +100,7 @@ export default function ShopRegistrationPage() {
           .or(`owner_id.eq.${authUser.id},email.ilike.${userEmail}`)
           .limit(1);
 
-        if (existingShop && existingShop.length > 0 && !window.location.search.includes('dev=true')) {
+        if (existingShop && existingShop.length > 0 && !(isNonProduction && window.location.search.includes('dev=true'))) {
           // User already has a shop! Send directly to workspace
           router.replace('/');
           return;

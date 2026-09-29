@@ -3,7 +3,7 @@ version: "3.9"
 services:
   # ── Spring Boot API ──────────────────────────────────────────────────────
   api:
-    image: ghcr.io/${GITHUB_REPO}/appointments-api:latest
+    image: ghcr.io/${GITHUB_REPO:-thrinnadhh/appointments}/appointments-api:${APP_VERSION:-1.0.0}
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
@@ -67,6 +67,7 @@ services:
       WATCHTOWER_POLL_INTERVAL: 300
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_INCLUDE_STOPPED: "false"
+      WATCHTOWER_LABEL_ENABLE: "true"
 
 volumes:
   redis_data:

@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 /**
  * Google Auth Verification & First-Time Shop Registration Flow
@@ -118,13 +123,9 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     expect(regData.data.photos).toContain(testPhotoUrl);
 
     // Clean up created test shop to prevent multi-tenant test bleed
-    if (regData.data?.id) {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co',
-        process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-      );
-      await supabaseAdmin.from('providers').delete().eq('id', regData.data.id);
+    const providerId = regData.data?.provider_id || regData.data?.id;
+    if (providerId) {
+      await supabaseAdmin.from('providers').delete().eq('id', providerId);
     }
   });
 });

@@ -591,6 +591,9 @@ AS $$
 DECLARE
   v_booking public.bookings%ROWTYPE;
   v_conflict_id UUID;
+  v_caller_id UUID := auth.uid();
+  v_caller_role TEXT := auth.role();
+  v_is_authorized BOOLEAN := FALSE;
 BEGIN
   SELECT * INTO v_booking
   FROM public.bookings
@@ -598,6 +601,24 @@ BEGIN
 
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Booking not found');
+  END IF;
+
+  -- Caller Authorization Guard:
+  -- Allowed: service_role, owning customer (customer_id = auth.uid()), platform superadmin, or authorized provider staff/owners
+  IF v_caller_role = 'service_role' THEN
+    v_is_authorized := TRUE;
+  ELSIF v_caller_id IS NOT NULL THEN
+    IF v_caller_id = v_booking.customer_id THEN
+      v_is_authorized := TRUE;
+    ELSIF public.is_admin(v_caller_id) THEN
+      v_is_authorized := TRUE;
+    ELSIF v_booking.provider_id IN (SELECT public.get_user_authorized_providers(v_caller_id)) THEN
+      v_is_authorized := TRUE;
+    END IF;
+  END IF;
+
+  IF NOT v_is_authorized THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Unauthorized: Caller is not authorized to reschedule this booking');
   END IF;
 
   IF v_booking.status IN ('CANCELLED', 'COMPLETED') THEN
@@ -635,7 +656,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.reschedule_booking_slot(uuid, timestamptz, timestamptz) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.reschedule_booking_slot(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.reschedule_booking_slot(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated, service_role;
 
 -- -----------------------------------------------------------------------------
 -- 14. RPC: cancel_booking

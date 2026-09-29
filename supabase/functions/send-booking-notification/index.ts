@@ -81,6 +81,22 @@ serve(async (req: Request) => {
     const body: NotificationRequest = await req.json();
     const { booking_id, event_type = 'BOOKING_CONFIRMED' } = body;
 
+    const ALLOWED_EVENT_TYPES = new Set([
+      'BOOKING_CONFIRMED',
+      'BOOKING_REMINDER_1H',
+      'BOOKING_REMINDER_30M',
+      'BOOKING_CANCELLED',
+      'RESOURCE_REASSIGNED',
+      'REFUND_FAILED_ALERT',
+    ]);
+
+    if (!ALLOWED_EVENT_TYPES.has(event_type)) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Invalid event_type: ${event_type}` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
     if (!booking_id) {
       return new Response(
         JSON.stringify({ success: false, error: 'booking_id is required' }),

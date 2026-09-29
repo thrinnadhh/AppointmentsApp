@@ -208,7 +208,7 @@ export default function CheckoutModal({
                   attachment_url: attachedPath,
                 });
                 if (verifyRes.success) {
-                  onPaymentSuccess(bookingId);
+                  onPaymentSuccess(bookingId, holdRes.reference_code);
                 } else {
                   setPayError(verifyRes.error || 'Payment verification failed.');
                 }

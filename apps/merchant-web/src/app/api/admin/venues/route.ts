@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAdminRequest } from '@/lib/auth-admin';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const { data, error } = await supabase
       .from('providers')
       .select('*, resources(count)')

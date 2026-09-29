@@ -22,12 +22,17 @@ serve(async (req: Request) => {
       throw new Error('Supabase credentials not configured');
     }
 
-    // Require service_role key in Authorization header
-    const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.replace(/^Bearer\s+/i, '');
+    // Require CRON_SECRET or service_role key in Authorization header
+    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
+    const token = authHeader?.replace(/^Bearer\s+/i, '').trim();
+    const cronSecret = Deno.env.get('CRON_SECRET');
 
-    if (!token || token !== supabaseServiceKey) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Internal service role key required' }), {
+    const isAuthorized =
+      (token && token === supabaseServiceKey) ||
+      (cronSecret && token === cronSecret);
+
+    if (!token || !isAuthorized) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Valid CRON_SECRET or service role key required' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

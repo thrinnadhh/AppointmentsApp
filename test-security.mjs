@@ -50,7 +50,7 @@ function isAllowedOrigin(origin, env = process.env) {
       host === 'appointments4u.in' ||
       host.endsWith('.appointments4u.in') ||
       host === 'appointments-merchant.vercel.app' ||
-      host.endsWith('.vercel.app')
+      (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app'))
     ) {
       return true;
     }
@@ -191,7 +191,7 @@ describe('Hardcoded Secrets & Environment Audit', () => {
         if (!['node_modules', '.next', '.git', 'dist'].includes(entry.name)) {
           findings = findings.concat(scanDirectory(fullPath));
         }
-      } else if (/\.(ts|tsx|js|mjs)$/.test(entry.name) && entry.name !== 'test-security.mjs') {
+      } else if (/\.(ts|tsx|js|mjs|sql)$/.test(entry.name) && entry.name !== 'test-security.mjs') {
         const content = fs.readFileSync(fullPath, 'utf8');
         for (const pattern of LEAKED_PATTERNS) {
           if (content.includes(pattern)) {
@@ -203,9 +203,12 @@ describe('Hardcoded Secrets & Environment Audit', () => {
     return findings;
   }
 
-  it('source code contains no hardcoded superadmin or leaked tokens', () => {
-    const targetDir = path.resolve(process.cwd(), 'apps/merchant-web/src');
-    const leakedOccurrences = scanDirectory(targetDir);
+  it('source code and migrations contain no hardcoded superadmin or leaked tokens', () => {
+    const targetDirs = [
+      path.resolve(process.cwd(), 'apps/merchant-web/src'),
+      path.resolve(process.cwd(), 'supabase/migrations'),
+    ];
+    const leakedOccurrences = targetDirs.flatMap((dir) => scanDirectory(dir));
     assert.deepStrictEqual(leakedOccurrences, [], `Leaked secrets found: ${JSON.stringify(leakedOccurrences)}`);
   });
 
@@ -223,6 +226,40 @@ describe('Hardcoded Secrets & Environment Audit', () => {
       () => checkRequiredEnv({ NODE_ENV: 'production' }),
       /Missing required environment variable: SUPERADMIN_E2E_TOKEN/
     );
+  });
+
+  it('.env.production files exist, enforce ALLOW_MOCK_PAYMENTS=false, and contain no default test secrets', () => {
+    const envPaths = [
+      path.resolve(process.cwd(), '.env.production'),
+      path.resolve(process.cwd(), 'apps/merchant-web/.env.production'),
+    ];
+
+    for (const envPath of envPaths) {
+      assert.ok(fs.existsSync(envPath), `Missing production env file at ${envPath}`);
+      const content = fs.readFileSync(envPath, 'utf8');
+
+      // 1. Verify ALLOW_MOCK_PAYMENTS=false
+      assert.match(
+        content,
+        /^ALLOW_MOCK_PAYMENTS=false$/m,
+        `ALLOW_MOCK_PAYMENTS must be strictly 'false' in ${path.basename(envPath)}`
+      );
+
+      // 2. Verify NODE_ENV=production
+      assert.match(
+        content,
+        /^NODE_ENV=production$/m,
+        `NODE_ENV must be strictly 'production' in ${path.basename(envPath)}`
+      );
+
+      // 3. Verify no leaked test secrets
+      for (const pattern of LEAKED_PATTERNS) {
+        assert.ok(
+          !content.includes(pattern),
+          `Found forbidden test secret matching ${pattern} in ${path.basename(envPath)}`
+        );
+      }
+    }
   });
 });
 

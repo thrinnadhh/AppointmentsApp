@@ -55,10 +55,18 @@ export async function GET(req: NextRequest) {
         .select('provider_id')
         .eq('user_id', caller.id);
 
-      const hasMemberships = memberships && memberships.length > 0;
-      const isVenueStaff = hasMemberships && memberships.some((m) => m.provider_id === resource.provider_id);
+      const isVenueStaff = memberships && memberships.some((m) => m.provider_id === resource.provider_id);
 
-      if (hasMemberships && !isVenueStaff) {
+      // Also check if caller directly owns the provider
+      const { data: provider } = await supabaseAdmin
+        .from('providers')
+        .select('owner_id')
+        .eq('id', resource.provider_id)
+        .maybeSingle();
+
+      const isOwner = provider?.owner_id === caller.id;
+
+      if (!isVenueStaff && !isOwner) {
         return NextResponse.json(
           { error: 'Forbidden: Caller is not authorized for this provider/venue' },
           { status: 403 }

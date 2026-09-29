@@ -227,17 +227,16 @@ export class CustomerAppPage {
     await dateChip.click();
   }
 
-  async selectFirstSlot() {
+  async selectFirstSlot(slotIndex: number = 0) {
     await expect(this.slotSectionHeading).toBeVisible({ timeout: 15000 });
 
     const slotsLoading = this.page.getByTestId('customer-slots-loading').or(this.page.getByText('Checking live slot availability...'));
     await expect(slotsLoading).toBeHidden({ timeout: 15000 }).catch(() => {});
 
     // Try finding an enabled slot on the currently selected day
-    const enabledSlot = this.page
+    const enabledSlots = this.page
       .locator('[role="button"]:not([aria-disabled="true"]):not([disabled])')
-      .filter({ hasText: /^[0-9]{1,2}:[0-9]{2}(\s*(am|pm))?$/i })
-      .first();
+      .filter({ hasText: /^[0-9]{1,2}:[0-9]{2}(\s*(am|pm))?$/i });
 
     const pastNotice = this.page.getByTestId('customer-all-slots-past-notice');
     const closedNotice = this.page.getByTestId('customer-day-closed-notice');
@@ -245,7 +244,7 @@ export class CustomerAppPage {
     const isSlotAvailable =
       !(await pastNotice.isVisible().catch(() => false)) &&
       !(await closedNotice.isVisible().catch(() => false)) &&
-      (await enabledSlot.isVisible({ timeout: 2000 }).catch(() => false));
+      (await enabledSlots.first().isVisible({ timeout: 2000 }).catch(() => false));
 
     if (!isSlotAvailable) {
       // If no slot is visible on currently selected day (e.g. today concluded/closed or all booked), switch to Tomorrow
@@ -253,9 +252,10 @@ export class CustomerAppPage {
       await expect(slotsLoading).toBeHidden({ timeout: 15000 }).catch(() => {});
     }
 
-    await expect(enabledSlot).toBeVisible({ timeout: 15000 });
-    await enabledSlot.scrollIntoViewIfNeeded().catch(() => {});
-    await enabledSlot.click();
+    const targetSlot = enabledSlots.nth(slotIndex);
+    await expect(targetSlot).toBeVisible({ timeout: 15000 });
+    await targetSlot.scrollIntoViewIfNeeded().catch(() => {});
+    await targetSlot.click();
     await expect(this.holdDepositBtn).toBeEnabled({ timeout: 5000 });
   }
 

@@ -113,7 +113,6 @@ BEGIN
   IF NOT (
     public.is_admin() 
     OR auth.role() = 'service_role'
-    OR (p_admin_token = 'tirupati-superadmin-e2e-2026')
   ) THEN
     RAISE EXCEPTION 'Access Denied: Administrator authority required to modify merchant status';
   END IF;
@@ -177,7 +176,6 @@ BEGIN
   IF NOT (
     public.is_admin() 
     OR auth.role() = 'service_role'
-    OR (p_admin_token = 'tirupati-superadmin-e2e-2026')
   ) THEN
     RAISE EXCEPTION 'Access Denied: Administrator authority required to update territory status';
   END IF;
@@ -245,7 +243,6 @@ BEGIN
   IF NOT (
     public.is_admin() 
     OR auth.role() = 'service_role'
-    OR (p_admin_token = 'tirupati-superadmin-e2e-2026')
   ) THEN
     RAISE EXCEPTION 'Access Denied: Administrator authority required to view audit logs';
   END IF;

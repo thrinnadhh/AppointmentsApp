@@ -71,6 +71,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
     // 4. Mark No-Show
     const noShowRes = await request.post(`${BASE_URL}/api/bookings/no-show`, {
+      headers: ADMIN_HEADERS,
       data: { booking_id },
     });
     expect(noShowRes.status()).toBe(200);
@@ -115,6 +116,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
     // Mark No-Show
     const noShowRes = await request.post(`${BASE_URL}/api/bookings/no-show`, {
+      headers: ADMIN_HEADERS,
       data: { booking_id },
     });
     expect(noShowRes.status()).toBe(200);
@@ -157,6 +159,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
     // Mark No-Show
     const noShowRes = await request.post(`${BASE_URL}/api/bookings/no-show`, {
+      headers: ADMIN_HEADERS,
       data: { booking_id },
     });
     expect(noShowRes.status()).toBe(200);

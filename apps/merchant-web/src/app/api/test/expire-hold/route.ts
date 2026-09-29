@@ -8,11 +8,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not available in production' }, { status: 404 });
     }
 
+    // Require CRON_SECRET or admin secret
+    const cronSecret = process.env.CRON_SECRET;
+    const adminSecret = process.env.ADMIN_SECRET || process.env.SUPERADMIN_E2E_TOKEN;
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+    const token = authHeader?.replace(/^Bearer\s+/i, '').trim();
+    const bypassHeader = req.headers.get('x-admin-bypass-key');
+
+    const isAuthorized =
+      (cronSecret && token === cronSecret) ||
+      (adminSecret && (token === adminSecret || bypassHeader === adminSecret));
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Valid CRON_SECRET or admin secret required' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const { booking_id } = body;
 
     if (!booking_id) {
       return NextResponse.json({ error: 'booking_id is required' }, { status: 400 });
+    }
+
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (typeof booking_id !== 'string' || !UUID_REGEX.test(booking_id)) {
+      return NextResponse.json({ error: 'Invalid booking_id format: must be UUID' }, { status: 400 });
     }
 
     const supabaseAdmin = getSupabaseAdmin();

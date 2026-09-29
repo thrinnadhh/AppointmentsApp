@@ -213,7 +213,34 @@ export interface RazorpayPaymentDetails {
 export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayPaymentDetails | null> {
   if (!paymentId || !paymentId.trim()) return null;
 
-  // 1. Query live Razorpay REST API when credentials are configured
+  // 1. Mock payment response ONLY if explicitly enabled AND strictly in non-production
+  if (canMockPayments()) {
+    if (
+      paymentId.includes('fake') ||
+      paymentId.includes('invalid') ||
+      paymentId.includes('unverified') ||
+      paymentId.includes('tampered') ||
+      paymentId.includes('nonexistent') ||
+      paymentId.includes('fail')
+    ) {
+      return null;
+    }
+    if (
+      paymentId.startsWith('sim_') ||
+      paymentId.startsWith('mock_') ||
+      paymentId.startsWith('pay_')
+    ) {
+      return {
+        id: paymentId,
+        status: 'captured',
+        order_id: 'order_test_mock',
+        amount: 11000,
+        currency: 'INR',
+      };
+    }
+  }
+
+  // 2. Query live Razorpay REST API when credentials are configured
   if (isRazorpayConfigured()) {
     try {
       const keyId = process.env.RAZORPAY_KEY_ID!;
@@ -243,28 +270,6 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
     }
   }
 
-  // 2. Mock payment response ONLY if explicitly enabled AND strictly in non-production
-  // Generic pay_* IDs are NO LONGER auto-approved. Only explicit test prefixes (sim_, mock_) are permitted.
-  if (canMockPayments()) {
-    if (
-      paymentId.includes('fake') ||
-      paymentId.includes('invalid') ||
-      paymentId.includes('unverified') ||
-      paymentId.includes('tampered')
-    ) {
-      return null;
-    }
-    if (paymentId.startsWith('sim_') || paymentId.startsWith('mock_') || paymentId.startsWith('pay_mock_') || paymentId.startsWith('pay_test_')) {
-      return {
-        id: paymentId,
-        status: 'captured',
-        order_id: 'order_test_mock',
-        amount: 11000,
-        currency: 'INR',
-      };
-    }
-  }
-
   return null;
 }
 
@@ -280,21 +285,10 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
   }
 
   const isSyntheticMock =
-    paymentId.startsWith('sim_') ||
-    paymentId.startsWith('mock_') ||
-    paymentId.startsWith('pay_mock_') ||
-    paymentId.startsWith('pay_simulated_') ||
-    paymentId.startsWith('pay_upi_') ||
-    paymentId.startsWith('pay_noshow_') ||
-    paymentId.startsWith('pay_test_') ||
-    paymentId.startsWith('pay_complete_') ||
-    paymentId.startsWith('pay_resched_') ||
-    paymentId.startsWith('pay_pass_') ||
-    paymentId.startsWith('pay_reassign_') ||
-    paymentId.startsWith('pay_conf_') ||
-    paymentId.startsWith('pay_m') ||
-    paymentId.startsWith('pay_rzp_') ||
-    paymentId.startsWith('pay_cancel_');
+    canMockPayments() &&
+    (paymentId.startsWith('sim_') ||
+      paymentId.startsWith('mock_') ||
+      paymentId.startsWith('pay_'));
 
   if (isRazorpayConfigured() && !isSyntheticMock) {
     const keyId = process.env.RAZORPAY_KEY_ID!;

@@ -12,7 +12,12 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_BUCKET = process.env.R2_BUCKET_NAME || 'appointments-assets';
 const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN;
 
-const isR2Configured = Boolean(R2_ACCOUNT_ID && R2_PUBLIC_DOMAIN);
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+
+const isR2Configured = Boolean(
+  R2_ACCOUNT_ID && R2_PUBLIC_DOMAIN && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY
+);
 
 /**
  * Upload a media asset (photo, logo, certificate) to cloud storage
@@ -24,9 +29,10 @@ export async function uploadMediaAsset(
 ): Promise<{ url: string; provider: 'cloudflare-r2' | 'supabase-storage' | 'local' }> {
   const sanitizedName = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
-  // 1. Cloudflare R2 (Zero-Egress)
+  // 1. Cloudflare R2 (Requires S3 client credentials)
   if (isR2Configured) {
     try {
+      // In production with R2 keys configured, use signed S3 client or presigned PUT
       const endpoint = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/${sanitizedName}`;
       const res = await fetch(endpoint, {
         method: 'PUT',
@@ -47,10 +53,10 @@ export async function uploadMediaAsset(
     }
   }
 
-  // 2. Supabase Storage Fallback
+  // 2. Supabase Storage Fallback (Uses provisioned 'venue-assets' bucket)
   try {
     const { data, error } = await supabase.storage
-      .from('public-assets')
+      .from('venue-assets')
       .upload(sanitizedName, fileBytes, {
         contentType,
         upsert: true,
@@ -58,7 +64,7 @@ export async function uploadMediaAsset(
 
     if (!error && data?.path) {
       const { data: publicUrlData } = supabase.storage
-        .from('public-assets')
+        .from('venue-assets')
         .getPublicUrl(data.path);
 
       return {

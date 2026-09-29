@@ -12,6 +12,7 @@ export interface CreateHoldRequest {
 export interface CreateHoldResponse {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
   deposit_amount?: number;
   hold_expires_at?: string;
   error?: string;
@@ -26,6 +27,7 @@ export interface ConfirmPaymentRequest {
 export interface ConfirmPaymentResponse {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
   status?: string;
   payment_status?: string;
   error?: string;

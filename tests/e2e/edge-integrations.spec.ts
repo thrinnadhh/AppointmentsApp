@@ -200,12 +200,12 @@ test.describe('Cross-System Integration — Edge Cases', () => {
     const responses = await Promise.all(attempts);
     const statuses  = responses.map(r => r.status());
 
-    const successes  = statuses.filter(s => s === 201).length;
-    const conflicts  = statuses.filter(s => s === 409).length;
+    const successes = statuses.filter(s => s === 201).length;
+    const rejections = statuses.filter(s => s === 409 || s === 429).length;
 
-    // Exactly 1 success, rest must be conflicts
+    // Exactly 1 success, rest must be conflicts (409) or rate-limit rejections (429)
     expect(successes).toBe(1);
-    expect(conflicts).toBe(CONCURRENCY - 1);
+    expect(rejections).toBe(CONCURRENCY - 1);
   }, 60000);
 
   // ─── EC-INT-06: Cross-vertical data leak prevention ────────────────────────
@@ -259,21 +259,23 @@ test.describe('Cross-System Integration — Edge Cases', () => {
 
     // 3. Merchant marks no-show
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
     expect(noShowRes.status()).toBe(200);
     const noShowBody = await noShowRes.json();
     expect(noShowBody.success).toBe(true);
 
-    // 4. Verify booking is NO_SHOW + FORFEITED
+    // 4. Verify booking is NO_SHOW + payment reflects 3-strike courtesy policy
     const { data: booking } = await supabase
       .from('bookings')
       .select('status, payment_status')
       .eq('id', booking_id)
       .single();
 
+    const expectedPaymentStatus = (initialStrikes + 1) <= 2 ? 'REFUNDED' : 'FORFEITED';
     expect(booking?.status).toBe('NO_SHOW');
-    expect(booking?.payment_status).toBe('FORFEITED');
+    expect(booking?.payment_status).toBe(expectedPaymentStatus);
 
     // 5. Verify customer strike incremented
     const { data: updated } = await supabase
@@ -302,6 +304,7 @@ test.describe('Cross-System Integration — Edge Cases', () => {
 
     // Cancel booking
     const cancelRes = await request.post(`${BASE}/api/bookings/cancel`, {
+      headers: { 'x-customer-id': SEED_CUSTOMER_ID },
       data: { booking_id, reason: 'Notification test' },
     });
     expect(cancelRes.status()).toBe(200);

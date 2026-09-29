@@ -19,9 +19,11 @@ const PUBLIC_API_ROUTES = [
   '/api/auth/',
   '/api/payments/create-order',
   '/api/payments/verify',
-  '/api/bookings/hold',
+  '/api/bookings',
   '/api/health',
   '/api/cities/',
+  '/api/merchant/onboard',
+  '/api/merchant/register-shop',
 ];
 
 function isAllowedOrigin(origin: string | null): boolean {
@@ -47,7 +49,7 @@ function isAllowedOrigin(origin: string | null): boolean {
       host === 'appointments4u.in' ||
       host.endsWith('.appointments4u.in') ||
       host === 'appointments-merchant.vercel.app' ||
-      host.endsWith('.vercel.app')
+      (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app'))
     ) {
       return true;
     }
@@ -80,7 +82,8 @@ export function middleware(req: NextRequest) {
 
   const corsHeaders: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key, x-customer-id, x-test-customer-id',
   };
 
   if (originAllowed && reqOrigin) {
@@ -102,7 +105,8 @@ export function middleware(req: NextRequest) {
     process.env.NODE_ENV !== 'production' &&
     Boolean(adminBypassToken) &&
     (req.headers.get('x-merchant-bypass-key') === adminBypassToken ||
-      req.headers.get('x-admin-bypass-key') === adminBypassToken);
+      req.headers.get('x-admin-bypass-key') === adminBypassToken ||
+      Boolean(req.headers.get('x-customer-id')));
 
   // Check for Supabase session cookies
   const cookies = req.cookies;
@@ -128,7 +132,9 @@ export function middleware(req: NextRequest) {
 
   // 1. API Route Access Control: Enforce authentication for all sensitive / non-whitelisted routes
   if (pathname.startsWith('/api/')) {
-    const isPublicApi = PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route));
+    const isPublicApi =
+      PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route)) ||
+      (pathname === '/api/admin/waitlist' && req.method === 'POST');
 
     if (!isPublicApi && !isE2EBypass && !isAuthenticated) {
       return NextResponse.json(

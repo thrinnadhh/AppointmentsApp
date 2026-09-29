@@ -300,7 +300,17 @@ export async function fetchCustomerBookingsFromSupabase(customerId: string = '99
     const baseUrl = getApiBaseUrl();
     if (baseUrl) {
       try {
-        const resp = await fetch(`${baseUrl}/api/bookings?customer_id=${encodeURIComponent(customerId)}`);
+        const session = (await supabase.auth.getSession()).data?.session;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'x-customer-id': customerId,
+        };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const resp = await fetch(`${baseUrl}/api/bookings?customer_id=${encodeURIComponent(customerId)}`, {
+          headers,
+        });
         if (resp.ok) {
           const json = await resp.json();
           if (json.success && Array.isArray(json.bookings)) {
@@ -631,9 +641,17 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
   try {
     if (API_BASE_URL) {
       try {
+        const session = (await supabase.auth.getSession()).data?.session;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+        headers['x-customer-id'] = customerId;
+
         const resp = await fetch(`${API_BASE_URL}/api/bookings/cancel`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             booking_id: bookingId,
             reason: isLate ? 'Customer cancelled (<30 min)' : 'Customer cancelled (>30 min)',
@@ -805,9 +823,17 @@ export async function rescheduleBookingOnSupabase(
   try {
     if (API_BASE_URL) {
       try {
+        const session = (await supabase.auth.getSession()).data?.session;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+        headers['x-customer-id'] = customerId;
+
         const resp = await fetch(`${API_BASE_URL}/api/bookings/reschedule`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             booking_id: bookingId,
             new_slot_start: newSlotStart,
@@ -1050,6 +1076,14 @@ export async function verifyPhoneOtp(
     if (error) {
       console.warn('Supabase verifyOtp error:', error.message);
       return { success: false, error: error.message };
+    }
+
+    // Strict validation: Only generate/confirm session after Supabase confirms OTP status
+    if (!data?.session?.access_token || !data?.user?.id) {
+      return {
+        success: false,
+        error: 'Authentication failed: No valid session token returned from verification provider',
+      };
     }
 
     return {

@@ -4,6 +4,11 @@ import { verifyAdminRequest } from '@/lib/auth-admin';
 
 export async function GET(request: Request) {
   try {
+    const authResult = await verifyAdminRequest(request as NextRequest);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const providerId = searchParams.get('providerId');
 
@@ -53,6 +58,49 @@ export async function POST(request: NextRequest) {
         { error: 'Provider ID, name, and type are required' },
         { status: 400 }
       );
+    }
+
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(providerId)) {
+      return NextResponse.json({ error: 'Invalid providerId format' }, { status: 400 });
+    }
+
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice < 0 || numPrice > 1000000) {
+      return NextResponse.json(
+        { error: 'Invalid price: must be a number between 0 and 1,000,000' },
+        { status: 400 }
+      );
+    }
+
+    if (depositAmount !== undefined && depositAmount !== null) {
+      const numDeposit = Number(depositAmount);
+      if (isNaN(numDeposit) || numDeposit < 0 || numDeposit > (numPrice || 1000000)) {
+        return NextResponse.json(
+          { error: 'Invalid deposit amount: must be non-negative and not exceed price' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (durationMinutes !== undefined && durationMinutes !== null) {
+      const numDuration = Number(durationMinutes);
+      if (isNaN(numDuration) || numDuration < 5 || numDuration > 720) {
+        return NextResponse.json(
+          { error: 'Invalid duration: must be between 5 and 720 minutes' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (capacity !== undefined && capacity !== null) {
+      const numCapacity = Number(capacity);
+      if (isNaN(numCapacity) || numCapacity < 1 || numCapacity > 1000) {
+        return NextResponse.json(
+          { error: 'Invalid capacity: must be between 1 and 1,000' },
+          { status: 400 }
+        );
+      }
     }
 
     const supabaseAdmin = getSupabaseAdmin();

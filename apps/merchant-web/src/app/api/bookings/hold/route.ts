@@ -8,6 +8,7 @@ import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
 interface RpcHoldResult {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
   deposit_amount?: number;
   hold_expires_at?: string;
   error?: string;
@@ -29,8 +30,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // IP Rate Limit: max 30 reservation attempts per IP per minute
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    // Validate UUID format
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(resource_id)) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid resource_id format' },
+        { status: 400 }
+      );
+    }
+    if (!UUID_REGEX.test(customer_id)) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid customer_id format' },
+        { status: 400 }
+      );
+    }
+
+    // Validate slot timestamp boundaries and duration
+    const startMs = new Date(slot_start).getTime();
+    const endMs = new Date(slot_end).getTime();
+    if (isNaN(startMs) || isNaN(endMs)) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid slot timestamps' },
+        { status: 400 }
+      );
+    }
+    if (endMs <= startMs) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid slot interval: slot_end must be strictly after slot_start' },
+        { status: 400 }
+      );
+    }
+    const durationMinutes = (endMs - startMs) / (60 * 1000);
+    if (durationMinutes < 5 || durationMinutes > 480) {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid slot duration: duration must be between 5 minutes and 8 hours' },
+        { status: 400 }
+      );
+    }
+
+    // IP Rate Limit: prioritize platform-verified IP before client headers
+    const clientIp = req.headers.get('x-real-ip')
+      || req.headers.get('cf-connecting-ip')
+      || req.headers.get('x-forwarded-for')?.split(',')[0].trim()
+      || '127.0.0.1';
     const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, 30, 60);
     if (!ipRateLimit.allowed) {
       return NextResponse.json<CreateHoldResponse>(
@@ -56,6 +98,15 @@ export async function POST(req: NextRequest) {
 
     // Customer Identity Integrity: prevent creating holds under another user's customer_id
     const caller = await verifyAuthenticatedUser(req);
+    if (process.env.NODE_ENV === 'production' && !caller) {
+      return NextResponse.json<CreateHoldResponse>(
+        {
+          success: false,
+          error: 'Unauthorized: Authentication required to create booking hold',
+        },
+        { status: 401 }
+      );
+    }
     if (caller && caller.id !== customer_id) {
       const supabaseAdmin = getSupabaseAdmin();
       const { data: profile } = await supabaseAdmin
@@ -217,6 +268,7 @@ export async function POST(req: NextRequest) {
       {
         success: true,
         booking_id: result.booking_id,
+        reference_code: result.reference_code,
         deposit_amount: result.deposit_amount,
         hold_expires_at: result.hold_expires_at,
       },

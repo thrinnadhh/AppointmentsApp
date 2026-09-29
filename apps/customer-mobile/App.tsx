@@ -190,7 +190,7 @@ export default function App() {
     setAuthError(null);
     try {
       const res = await verifyPhoneOtp(authPhone, authOtp);
-      if (res.success && res.user) {
+      if (res.success && res.user && res.session?.access_token) {
         const uid = res.user.id;
         const phone = res.user.phone || authPhone;
         const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;

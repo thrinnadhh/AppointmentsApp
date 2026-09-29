@@ -164,14 +164,16 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.database).toBe('connected');
     });
 
+    const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+
     test('2.2 GET /api/admin/venues should return 200 with venues array', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/admin/venues');
+      const res = await request.get('http://localhost:3000/api/admin/venues', {
+        headers: { 'x-admin-bypass-key': adminBypassToken },
+      });
       expect(res.status()).toBe(200);
       const data = await res.json();
       expect(Array.isArray(data.venues)).toBe(true);
     });
-
-    const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
 
     test('2.3 POST /api/admin/venues should reject missing fields with 400', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/admin/venues', {
@@ -184,7 +186,9 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
     });
 
     test('2.4 GET /api/admin/resources should return 200 and support providerId filter', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/admin/resources');
+      const res = await request.get('http://localhost:3000/api/admin/resources', {
+        headers: { 'x-admin-bypass-key': adminBypassToken },
+      });
       expect(res.status()).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);

@@ -140,11 +140,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. EXECUTE ATOMIC SELF-REGISTRATION VIA SERVICE ROLE
     const supabaseAdmin = getSupabaseAdmin();
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 6. ACCOUNT TAKEOVER & DUPLICATE REGISTRATION GUARDS
+    // Prevent overwriting an already registered business email
+    const { data: existingProvider } = await supabaseAdmin
+      .from('providers')
+      .select('id, name')
+      .ilike('email', cleanEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingProvider) {
+      return NextResponse.json(
+        { error: 'A business with this email address is already registered. Please sign in or reset your password.' },
+        { status: 409 }
+      );
+    }
+
+    // Prevent account takeover of existing profile/auth identity
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email')
+      .ilike('email', cleanEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return NextResponse.json(
+        { error: 'An account with this email address is already registered. Please sign in or reset your password.' },
+        { status: 409 }
+      );
+    }
+
+    // 7. EXECUTE ATOMIC SELF-REGISTRATION VIA SERVICE ROLE
     const { data, error } = await (supabaseAdmin.rpc as any)('merchant_self_register', {
       p_full_name:   fullName.trim(),
-      p_email:       email.trim().toLowerCase(),
+      p_email:       cleanEmail,
       p_password:    password,
       p_phone:       phone.trim(),
       p_shop_name:   shopName.trim(),
@@ -154,9 +187,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[Onboard RPC Error]:', error);
+      const isConflict = error.code === '23505' ||
+        error.message?.includes('already registered') ||
+        error.message?.includes('already exists');
       return NextResponse.json(
         { error: error.message || 'Failed to complete merchant shop registration' },
-        { status: 400 }
+        { status: isConflict ? 409 : 400 }
       );
     }
 

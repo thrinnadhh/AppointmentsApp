@@ -393,6 +393,137 @@ function handleGetProvider({ caller, providerId, providerRecord }) {
   return { status: 200, success: true, provider: providerRecord };
 }
 
+// 12. Merchant Onboarding & Account Takeover Prevention Guard
+function handleMerchantOnboard({ body, existingProfiles = [], existingProviders = [] }) {
+  const { fullName, email, password, shopName, categoryId, phone } = body || {};
+
+  if (!fullName || !email || !shopName || !categoryId || !phone) {
+    return { status: 400, error: 'Please provide full name, email, shop name, category, and phone number.' };
+  }
+
+  if (!password || password.length < 8) {
+    return { status: 400, error: 'Password must be at least 8 characters long.' };
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  // Prevent duplicate business email overwrite
+  if (existingProviders.some((p) => p.email.toLowerCase() === cleanEmail)) {
+    return { status: 409, error: 'A business with this email address is already registered. Please sign in or reset your password.' };
+  }
+
+  // Prevent account takeover of existing user/profile
+  if (existingProfiles.some((p) => p.email.toLowerCase() === cleanEmail)) {
+    return { status: 409, error: 'An account with this email address is already registered. Please sign in or reset your password.' };
+  }
+
+  return {
+    status: 200,
+    success: true,
+    data: {
+      email: cleanEmail,
+      shop_name: shopName,
+      provider_id: 'new_prov_' + Math.random().toString(36).substring(2, 9),
+    },
+  };
+}
+
+// 13. Stored Procedure Ownership Guards (reschedule_booking_slot & get_provider_details)
+function simulateRescheduleBookingRpc({ caller, booking, newSlotStart, newSlotEnd, existingConflicts = [] }) {
+  if (!booking) {
+    return { success: false, error: 'Booking not found' };
+  }
+
+  let isAuthorized = false;
+  if (caller?.role === 'service_role') {
+    isAuthorized = true;
+  } else if (caller?.id) {
+    if (caller.id === booking.customer_id) {
+      isAuthorized = true;
+    } else if (caller.role === 'admin') {
+      isAuthorized = true;
+    } else if (caller.authorizedProviders?.includes(booking.provider_id)) {
+      isAuthorized = true;
+    }
+  }
+
+  if (!isAuthorized) {
+    return { success: false, error: 'Unauthorized: Caller is not authorized to reschedule this booking' };
+  }
+
+  if (['CANCELLED', 'COMPLETED'].includes(booking.status)) {
+    return { success: false, error: `Cannot reschedule a ${booking.status.toLowerCase()} booking` };
+  }
+
+  if (existingConflicts.some((c) => c.slot_start === newSlotStart && c.id !== booking.id)) {
+    return { success: false, error: 'The requested new slot is already booked or held' };
+  }
+
+  return {
+    success: true,
+    booking_id: booking.id,
+    slot_start: newSlotStart,
+    slot_end: newSlotEnd,
+    status: 'CONFIRMED',
+  };
+}
+
+function simulateGetProviderDetailsRpc({ caller, providerRecord }) {
+  if (!providerRecord) {
+    return { error: 'Provider not found', status: 404 };
+  }
+
+  let isAuthorized = false;
+  if (caller?.role === 'service_role') {
+    isAuthorized = true;
+  } else if (caller?.id) {
+    if (caller.role === 'admin') {
+      isAuthorized = true;
+    } else if (caller.authorizedProviders?.includes(providerRecord.id) || caller.id === providerRecord.owner_id) {
+      isAuthorized = true;
+    }
+  }
+
+  if (!isAuthorized) {
+    return { error: 'Unauthorized: Caller does not have permission to view provider details', status: 403 };
+  }
+
+  return { provider: providerRecord, status: 200 };
+}
+
+// 14. Mobile OTP Verification Guard
+function handleVerifyOtpRoute({ phone, token, rateLimitAllowed = true, supabaseResponse }) {
+  if (!phone || typeof phone !== 'string') {
+    return { status: 400, error: 'Phone number is required' };
+  }
+
+  if (!token || typeof token !== 'string' || !/^\d{6}$/.test(token.trim())) {
+    return { status: 400, error: 'A valid 6-digit verification code is required' };
+  }
+
+  if (!rateLimitAllowed) {
+    return { status: 429, error: 'Too many failed verification attempts. Please wait 10 minutes.' };
+  }
+
+  // Strict session token generation: ONLY issue token if Supabase confirms valid OTP
+  if (!supabaseResponse || !supabaseResponse.ok || !supabaseResponse.access_token || !supabaseResponse.user) {
+    return {
+      status: 400,
+      error: supabaseResponse?.error || 'Invalid or expired verification code',
+    };
+  }
+
+  return {
+    status: 200,
+    success: true,
+    session: {
+      access_token: supabaseResponse.access_token,
+      user: supabaseResponse.user,
+    },
+    user: supabaseResponse.user,
+  };
+}
+
 describe('4. Booking Mutation Auth & Ownership Guards (/api/bookings/*)', () => {
   const mockBooking = {
     id: 'bkg_123',
@@ -776,4 +907,245 @@ describe('11. Database SECURITY DEFINER Function search_path Audit', () => {
     );
   });
 });
+
+describe('12. Merchant Onboarding Account Takeover & Duplicate Email Prevention (/api/merchant/onboard)', () => {
+  const existingProfiles = [
+    { id: 'user_victim', email: 'registered.owner@tirupati.com' }
+  ];
+  const existingProviders = [
+    { id: 'prov_active', name: 'Tirupati Prime Salon', email: 'business.registered@tirupati.com' }
+  ];
+
+  it('rejects registration when email belongs to an existing profile/user (409)', () => {
+    const res = handleMerchantOnboard({
+      body: {
+        fullName: 'Attacker Impersonator',
+        email: 'registered.owner@tirupati.com',
+        password: 'AttackerPassword2026!',
+        shopName: 'Hijacked Salon',
+        categoryId: 'salons',
+        phone: '9848011223'
+      },
+      existingProfiles,
+      existingProviders
+    });
+    assert.strictEqual(res.status, 409);
+    assert.match(res.error, /already registered/);
+  });
+
+  it('rejects registration when email belongs to an existing registered business/provider (409)', () => {
+    const res = handleMerchantOnboard({
+      body: {
+        fullName: 'Second Owner',
+        email: 'business.registered@tirupati.com',
+        password: 'SecurePassword2026!',
+        shopName: 'Duplicate Shop',
+        categoryId: 'salons',
+        phone: '9848011223'
+      },
+      existingProfiles,
+      existingProviders
+    });
+    assert.strictEqual(res.status, 409);
+    assert.match(res.error, /already registered/);
+  });
+
+  it('rejects registration when password fails complexity requirements (400)', () => {
+    const res = handleMerchantOnboard({
+      body: {
+        fullName: 'New Owner',
+        email: 'new.fresh.owner@tirupati.com',
+        password: 'short',
+        shopName: 'Fresh Shop',
+        categoryId: 'salons',
+        phone: '9848011223'
+      },
+      existingProfiles,
+      existingProviders
+    });
+    assert.strictEqual(res.status, 400);
+    assert.match(res.error, /at least 8 characters/);
+  });
+
+  it('accepts valid merchant registration with new unverified business email (200)', () => {
+    const res = handleMerchantOnboard({
+      body: {
+        fullName: 'Legitimate Founder',
+        email: 'new.clean.founder@tirupati.com',
+        password: 'ValidFounderPassword2026!',
+        shopName: 'Apex Aesthetics',
+        categoryId: 'salons',
+        phone: '9848011223'
+      },
+      existingProfiles,
+      existingProviders
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.data.email, 'new.clean.founder@tirupati.com');
+  });
+});
+
+describe('13. Anonymous RPC Lockdown & Ownership Verification (reschedule_booking_slot & get_provider_details)', () => {
+  const mockBooking = {
+    id: 'bkg_target_123',
+    customer_id: 'cust_alice',
+    provider_id: 'prov_salon_456',
+    resource_id: 'res_chair_1',
+    status: 'CONFIRMED'
+  };
+
+  const mockProvider = {
+    id: 'prov_salon_456',
+    owner_id: 'merch_bob',
+    name: 'Bob Salon',
+    email: 'bob@salon.com'
+  };
+
+  it('blocks anonymous caller from calling reschedule_booking_slot', () => {
+    const res = simulateRescheduleBookingRpc({
+      caller: null,
+      booking: mockBooking,
+      newSlotStart: '2026-10-01T10:00:00Z',
+      newSlotEnd: '2026-10-01T10:30:00Z'
+    });
+    assert.strictEqual(res.success, false);
+    assert.match(res.error, /Unauthorized/);
+  });
+
+  it('prevents IDOR: blocks third-party caller from rescheduling someone else booking', () => {
+    const res = simulateRescheduleBookingRpc({
+      caller: { id: 'cust_eve', role: 'customer' },
+      booking: mockBooking,
+      newSlotStart: '2026-10-01T10:00:00Z',
+      newSlotEnd: '2026-10-01T10:30:00Z'
+    });
+    assert.strictEqual(res.success, false);
+    assert.match(res.error, /Unauthorized/);
+  });
+
+  it('allows owning customer to reschedule their own booking', () => {
+    const res = simulateRescheduleBookingRpc({
+      caller: { id: 'cust_alice', role: 'customer' },
+      booking: mockBooking,
+      newSlotStart: '2026-10-01T10:00:00Z',
+      newSlotEnd: '2026-10-01T10:30:00Z'
+    });
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.status, 'CONFIRMED');
+    assert.strictEqual(res.slot_start, '2026-10-01T10:00:00Z');
+  });
+
+  it('allows authorized merchant staff to reschedule booking under their venue', () => {
+    const res = simulateRescheduleBookingRpc({
+      caller: { id: 'merch_staff_charlie', role: 'merchant', authorizedProviders: ['prov_salon_456'] },
+      booking: mockBooking,
+      newSlotStart: '2026-10-01T11:00:00Z',
+      newSlotEnd: '2026-10-01T11:30:00Z'
+    });
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.status, 'CONFIRMED');
+  });
+
+  it('blocks anonymous caller from calling get_provider_details', () => {
+    const res = simulateGetProviderDetailsRpc({
+      caller: null,
+      providerRecord: mockProvider
+    });
+    assert.strictEqual(res.status, 403);
+    assert.match(res.error, /Unauthorized/);
+  });
+
+  it('blocks foreign merchant from viewing provider details of another venue', () => {
+    const res = simulateGetProviderDetailsRpc({
+      caller: { id: 'merch_eve', role: 'merchant', authorizedProviders: ['prov_other'] },
+      providerRecord: mockProvider
+    });
+    assert.strictEqual(res.status, 403);
+    assert.match(res.error, /Unauthorized/);
+  });
+
+  it('allows venue owner or admin to call get_provider_details', () => {
+    const resOwner = simulateGetProviderDetailsRpc({
+      caller: { id: 'merch_bob', role: 'merchant', authorizedProviders: ['prov_salon_456'] },
+      providerRecord: mockProvider
+    });
+    assert.strictEqual(resOwner.status, 200);
+
+    const resAdmin = simulateGetProviderDetailsRpc({
+      caller: { id: 'admin_dave', role: 'admin' },
+      providerRecord: mockProvider
+    });
+    assert.strictEqual(resAdmin.status, 200);
+  });
+
+  it('verifies latest migrations revoke reschedule_booking_slot and get_provider_details from anon', () => {
+    const migrationDir = path.join(process.cwd(), 'supabase', 'migrations');
+    const files = fs.readdirSync(migrationDir).filter((f) => f.endsWith('.sql')).sort();
+    
+    // Check that the latest migrations revoke functions from anon
+    const recentMigrations = files
+      .filter((f) => f.startsWith('20260928'))
+      .map((f) => fs.readFileSync(path.join(migrationDir, f), 'utf8'))
+      .join('\n');
+    assert.match(recentMigrations, /REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.reschedule_booking_slot.*FROM\s+PUBLIC,\s*anon/i);
+    assert.match(recentMigrations, /REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.get_provider_details.*FROM\s+PUBLIC,\s*anon/i);
+    assert.match(recentMigrations, /REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.merchant_register_shop_for_user.*FROM\s+PUBLIC,\s*anon/i);
+  });
+});
+
+describe('14. Mobile OTP Verification & Strict Session Token Generation (/api/auth/otp/verify)', () => {
+  it('rejects verification if phone number is missing (400)', () => {
+    const res = handleVerifyOtpRoute({ phone: '', token: '123456' });
+    assert.strictEqual(res.status, 400);
+    assert.match(res.error, /Phone number is required/);
+  });
+
+  it('rejects verification if token format is not 6 digits (400)', () => {
+    const resShort = handleVerifyOtpRoute({ phone: '+919999999991', token: '123' });
+    assert.strictEqual(resShort.status, 400);
+    assert.match(resShort.error, /6-digit/);
+
+    const resLetters = handleVerifyOtpRoute({ phone: '+919999999991', token: 'abcdef' });
+    assert.strictEqual(resLetters.status, 400);
+    assert.match(resLetters.error, /6-digit/);
+  });
+
+  it('enforces rate limiting on verification attempts (429)', () => {
+    const res = handleVerifyOtpRoute({ phone: '+919999999991', token: '123456', rateLimitAllowed: false });
+    assert.strictEqual(res.status, 429);
+    assert.match(res.error, /Too many/);
+  });
+
+  it('strictly rejects and NEVER generates session token when Supabase rejects OTP', () => {
+    const res = handleVerifyOtpRoute({
+      phone: '+919999999991',
+      token: '000000',
+      rateLimitAllowed: true,
+      supabaseResponse: { ok: false, error: 'Token has expired or is invalid' }
+    });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.session, undefined);
+    assert.strictEqual(res.success, undefined);
+    assert.match(res.error, /expired or is invalid/);
+  });
+
+  it('strictly generates session token only when Supabase confirms OTP status with valid access_token and user', () => {
+    const res = handleVerifyOtpRoute({
+      phone: '+919999999991',
+      token: '123456',
+      rateLimitAllowed: true,
+      supabaseResponse: {
+        ok: true,
+        access_token: 'sbp_test_access_token_jwt',
+        user: { id: 'usr_customer_99', phone: '+919999999991', role: 'authenticated' }
+      }
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.session.access_token, 'sbp_test_access_token_jwt');
+    assert.strictEqual(res.user.id, 'usr_customer_99');
+  });
+});
+
 

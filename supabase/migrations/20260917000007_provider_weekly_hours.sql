@@ -48,7 +48,6 @@ BEGIN
   IF NOT (
     public.is_admin() 
     OR auth.role() = 'service_role'
-    OR (p_admin_token = 'tirupati-superadmin-e2e-2026')
     OR (auth.uid() IS NOT NULL AND p_provider_id IN (SELECT public.get_user_authorized_providers(auth.uid())))
   ) THEN
     RAISE EXCEPTION 'Access Denied: Not authorized to modify provider operational settings';
