@@ -25,10 +25,10 @@ class MerchantEntity(
     @Column
     var address: String? = null,
 
-    @Column(precision = 9, scale = 6)
+    @Column
     var lat: Double? = null,
 
-    @Column(precision = 9, scale = 6)
+    @Column
     var lng: Double? = null,
 
     @Column(name = "photo_url")

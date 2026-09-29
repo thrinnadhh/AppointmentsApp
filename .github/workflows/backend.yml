@@ -19,6 +19,10 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     defaults:
       run:
         working-directory: apps/backend
@@ -45,6 +49,7 @@ jobs:
           path: apps/backend/build/test-results/**/*.xml
           reporter: java-junit
           fail-on-empty: 'false'
+        continue-on-error: true
 
   # ──────────────────────────────────────────────────────────────────────────
   build-push:
