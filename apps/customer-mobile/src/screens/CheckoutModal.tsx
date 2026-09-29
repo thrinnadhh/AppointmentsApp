@@ -32,6 +32,8 @@ const loadRazorpayScript = (): Promise<boolean> => {
     }
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.integrity = 'sha384-NGmSb1KehQLbxaQireyZsxqw5m8oN1qSYAOEkPd7JW3f2liirqbwcgV1ANfaqxpe';
+    script.crossOrigin = 'anonymous';
     script.async = true;
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
@@ -176,7 +178,7 @@ export default function CheckoutModal({
       const bookingId = holdRes.booking_id;
 
       // 2. Create official Razorpay order on backend
-      const orderRes = await createRazorpayOrder(bookingId);
+      const orderRes = await createRazorpayOrder(bookingId, customerId);
       if (!orderRes.success || !orderRes.order_id) {
         setPayError(orderRes.error || 'Failed to initialize payment gateway order.');
         setIsProcessing(false);
@@ -206,6 +208,7 @@ export default function CheckoutModal({
                   razorpay_payment_id: response.razorpay_payment_id,
                   razorpay_signature: response.razorpay_signature,
                   attachment_url: attachedPath,
+                  customerId,
                 });
                 if (verifyRes.success) {
                   onPaymentSuccess(bookingId, holdRes.reference_code);
@@ -240,6 +243,7 @@ export default function CheckoutModal({
         razorpay_payment_id: paymentId,
         razorpay_signature: signature,
         attachment_url: attachedPath,
+        customerId,
       });
 
       if (verifyRes.success) {

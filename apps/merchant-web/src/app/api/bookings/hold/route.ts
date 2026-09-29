@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { acquireSlotLock, releaseSlotLock, checkRateLimit } from '@/lib/redis';
-import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser, getClientIp } from '@/lib/auth-admin';
 import { captureException } from '@/lib/sentry';
 import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
 
@@ -16,6 +16,7 @@ interface RpcHoldResult {
 
 export async function POST(req: NextRequest) {
   let slotKey = '';
+  let lockToken = '';
   try {
     const body = (await req.json()) as Partial<CreateHoldRequest>;
     const { resource_id, slot_start, slot_end, customer_id } = body;
@@ -68,10 +69,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // IP Rate Limit: prioritize platform-verified IP before client headers
-    const clientIp = req.headers.get('x-real-ip')
+    // IP Rate Limit: prioritize platform-verified IP or rightmost trusted proxy before client headers
+    const clientIp = (req as any).ip
+      || req.headers.get('x-real-ip')
       || req.headers.get('cf-connecting-ip')
-      || req.headers.get('x-forwarded-for')?.split(',')[0].trim()
+      || (req.headers.get('x-forwarded-for')
+          ? req.headers.get('x-forwarded-for')!.split(',').map((s) => s.trim()).filter(Boolean).pop()
+          : undefined)
       || '127.0.0.1';
     const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, 30, 60);
     if (!ipRateLimit.allowed) {
@@ -141,8 +145,8 @@ export async function POST(req: NextRequest) {
 
     // Distributed Slot Mutex (Upstash Redis / Memory)
     slotKey = `${resource_id}:${slot_start}`;
-    const acquired = await acquireSlotLock(slotKey, 10);
-    if (!acquired) {
+    const lockResult = await acquireSlotLock(slotKey, 30);
+    if (!lockResult.acquired) {
       return NextResponse.json<CreateHoldResponse>(
         {
           success: false,
@@ -151,6 +155,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
+    lockToken = lockResult.token;
 
     const supabaseAdmin = getSupabaseAdmin();
 
@@ -169,7 +174,7 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (prov && prov.status === 'SUSPENDED') {
-        if (slotKey) await releaseSlotLock(slotKey);
+        if (slotKey) await releaseSlotLock(slotKey, lockToken);
         return NextResponse.json<CreateHoldResponse>(
           {
             success: false,
@@ -180,7 +185,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (prov && prov.is_active === false) {
-        if (slotKey) await releaseSlotLock(slotKey);
+        if (slotKey) await releaseSlotLock(slotKey, lockToken);
         return NextResponse.json<CreateHoldResponse>(
           {
             success: false,
@@ -192,11 +197,18 @@ export async function POST(req: NextRequest) {
 
       if (prov?.daily_booking_limit && prov.daily_booking_limit > 0) {
         const dailyLimit = prov.daily_booking_limit;
+
+        // Calculate operational calendar day in merchant venue timezone (Asia/Kolkata, UTC+5:30)
         const targetSlotDate = new Date(slot_start);
-        const slotDayStart = new Date(targetSlotDate);
-        slotDayStart.setHours(0, 0, 0, 0);
-        const slotDayEnd = new Date(targetSlotDate);
-        slotDayEnd.setHours(23, 59, 59, 999);
+        const istDateStr = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(targetSlotDate); // "YYYY-MM-DD"
+
+        const slotDayStart = new Date(`${istDateStr}T00:00:00.000+05:30`);
+        const slotDayEnd = new Date(`${istDateStr}T23:59:59.999+05:30`);
 
         const { count: slotDayBookingsCount } = await supabaseAdmin
           .from('bookings')
@@ -207,7 +219,7 @@ export async function POST(req: NextRequest) {
           .in('status', ['HELD', 'CONFIRMED', 'COMPLETED']);
 
         if ((slotDayBookingsCount || 0) >= dailyLimit) {
-          if (slotKey) await releaseSlotLock(slotKey);
+          if (slotKey) await releaseSlotLock(slotKey, lockToken);
           return NextResponse.json<CreateHoldResponse>(
             {
               success: false,
@@ -227,7 +239,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      if (slotKey) await releaseSlotLock(slotKey);
+      if (slotKey) await releaseSlotLock(slotKey, lockToken);
       console.error('Supabase RPC create_booking_hold error:', error);
       const isConflict =
         error.code === '23505' ||
@@ -252,7 +264,7 @@ export async function POST(req: NextRequest) {
     const result = data as unknown as RpcHoldResult;
 
     if (!result?.success) {
-      if (slotKey) await releaseSlotLock(slotKey);
+      if (slotKey) await releaseSlotLock(slotKey, lockToken);
       const isConflict = result?.error?.includes('already held') || result?.error?.includes('conflict');
       const isSuspended = result?.error?.toLowerCase().includes('suspended') || result?.error?.toLowerCase().includes('blocked');
       return NextResponse.json<CreateHoldResponse>(
@@ -275,7 +287,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (err: unknown) {
-    if (slotKey) await releaseSlotLock(slotKey);
+    if (slotKey) await releaseSlotLock(slotKey, lockToken);
     await captureException(err, { tags: { endpoint: '/api/bookings/hold' } });
     const message = err instanceof Error ? err.message : 'Invalid request payload';
     return NextResponse.json<CreateHoldResponse>(

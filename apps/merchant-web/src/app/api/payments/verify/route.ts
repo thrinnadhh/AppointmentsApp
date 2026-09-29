@@ -3,11 +3,12 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyRazorpaySignature, canMockPayments } from '@/lib/razorpay';
 import { checkRateLimit } from '@/lib/redis';
 import { VerifyRazorpayPaymentRequest, VerifyRazorpayPaymentResponse, getPlatformFee } from '@appointments/shared';
+import { getClientIp } from '@/lib/auth-admin';
 
 export async function POST(req: NextRequest) {
   try {
     // 0. IP rate limiting (30 attempts/minute)
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const clientIp = getClientIp(req);
     const rateLimit = await checkRateLimit(`pay-verify-ip:${clientIp}`, 30, 60);
     if (!rateLimit.allowed) {
       return NextResponse.json<VerifyRazorpayPaymentResponse>(
@@ -175,15 +176,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. If optional clinical document attachment path was provided, persist to booking
-    if (attachment_url) {
-      await supabaseAdmin
-        .from('bookings')
-        .update({
-          attachment_url,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', booking_id);
+    // 3. If optional clinical document attachment path was provided, validate and persist to booking
+    if (attachment_url && typeof attachment_url === 'string') {
+      const trimmedAttachment = attachment_url.trim();
+      const isHttp = /^https?:\/\//i.test(trimmedAttachment);
+      const isSafeStoragePath = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/.test(trimmedAttachment);
+      if (isHttp || isSafeStoragePath) {
+        await supabaseAdmin
+          .from('bookings')
+          .update({
+            attachment_url: trimmedAttachment,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', booking_id);
+      }
     }
 
     const { data: bkg } = await supabaseAdmin

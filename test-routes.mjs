@@ -341,13 +341,14 @@ function handleCreateOrder({ caller, booking, clientIp, ipRequestCount = 1 }) {
   if (booking.isHoldExpired) {
     return { status: 410, error: 'Booking hold has expired. Please re-select a slot.' };
   }
-  if (caller) {
-    const isAuthorized = caller.role === 'admin' ||
-      caller.id === booking.customer_id ||
-      (caller.authorizedProviders && caller.authorizedProviders.includes(booking.provider_id));
-    if (!isAuthorized) {
-      return { status: 403, error: 'Forbidden: You are not authorized to create an order for this booking' };
-    }
+  if (!caller) {
+    return { status: 401, error: 'Unauthorized: Authentication required to create an order' };
+  }
+  const isAuthorized = caller.role === 'admin' ||
+    caller.id === booking.customer_id ||
+    (caller.authorizedProviders && caller.authorizedProviders.includes(booking.provider_id));
+  if (!isAuthorized) {
+    return { status: 403, error: 'Forbidden: You are not authorized to create an order for this booking' };
   }
 
   const depositInInr = Number(booking.deposit_amount) || 100;
@@ -395,7 +396,7 @@ function handleGetProvider({ caller, providerId, providerRecord }) {
 
 // 12. Merchant Onboarding & Account Takeover Prevention Guard
 function handleMerchantOnboard({ body, existingProfiles = [], existingProviders = [] }) {
-  const { fullName, email, password, shopName, categoryId, phone } = body || {};
+  const { fullName, email, password, shopName, categoryId, phone, tosAccepted } = body || {};
 
   if (!fullName || !email || !shopName || !categoryId || !phone) {
     return { status: 400, error: 'Please provide full name, email, shop name, category, and phone number.' };
@@ -403,6 +404,10 @@ function handleMerchantOnboard({ body, existingProfiles = [], existingProviders 
 
   if (!password || password.length < 8) {
     return { status: 400, error: 'Password must be at least 8 characters long.' };
+  }
+
+  if (tosAccepted !== true) {
+    return { status: 400, error: 'You must accept the Merchant Partner Terms of Service to register.' };
   }
 
   const cleanEmail = email.trim().toLowerCase();
@@ -802,6 +807,15 @@ describe('9. Payment Order Creation & Idempotency Guards (/api/payments/create-o
     assert.match(res.error, /Too many order requests/);
   });
 
+  it('rejects unauthenticated anonymous caller without active session (401)', () => {
+    const res = handleCreateOrder({
+      caller: null,
+      booking: heldBooking,
+    });
+    assert.strictEqual(res.status, 401);
+    assert.match(res.error, /Unauthorized/);
+  });
+
   it('prevents IDOR: blocks unauthorized caller from creating order for another user booking (403)', () => {
     const res = handleCreateOrder({
       caller: { id: 'cust_mallory', role: 'customer', authorizedProviders: [] },
@@ -924,7 +938,8 @@ describe('12. Merchant Onboarding Account Takeover & Duplicate Email Prevention 
         password: 'AttackerPassword2026!',
         shopName: 'Hijacked Salon',
         categoryId: 'salons',
-        phone: '9848011223'
+        phone: '9848011223',
+        tosAccepted: true,
       },
       existingProfiles,
       existingProviders
@@ -941,7 +956,8 @@ describe('12. Merchant Onboarding Account Takeover & Duplicate Email Prevention 
         password: 'SecurePassword2026!',
         shopName: 'Duplicate Shop',
         categoryId: 'salons',
-        phone: '9848011223'
+        phone: '9848011223',
+        tosAccepted: true,
       },
       existingProfiles,
       existingProviders
@@ -958,13 +974,49 @@ describe('12. Merchant Onboarding Account Takeover & Duplicate Email Prevention 
         password: 'short',
         shopName: 'Fresh Shop',
         categoryId: 'salons',
-        phone: '9848011223'
+        phone: '9848011223',
+        tosAccepted: true,
       },
       existingProfiles,
       existingProviders
     });
     assert.strictEqual(res.status, 400);
     assert.match(res.error, /at least 8 characters/);
+  });
+
+  it('rejects registration when tosAccepted is false (400)', () => {
+    const res = handleMerchantOnboard({
+      body: {
+        fullName: 'New Owner',
+        email: 'new.fresh.owner@tirupati.com',
+        password: 'ValidPassword2026!',
+        shopName: 'Fresh Shop',
+        categoryId: 'salons',
+        phone: '9848011223',
+        tosAccepted: false,
+      },
+      existingProfiles,
+      existingProviders
+    });
+    assert.strictEqual(res.status, 400);
+    assert.match(res.error, /Terms of Service/);
+  });
+
+  it('rejects registration when tosAccepted is omitted or undefined (400)', () => {
+    const res = handleMerchantOnboard({
+      body: {
+        fullName: 'New Owner',
+        email: 'new.fresh.owner@tirupati.com',
+        password: 'ValidPassword2026!',
+        shopName: 'Fresh Shop',
+        categoryId: 'salons',
+        phone: '9848011223',
+      },
+      existingProfiles,
+      existingProviders
+    });
+    assert.strictEqual(res.status, 400);
+    assert.match(res.error, /Terms of Service/);
   });
 
   it('accepts valid merchant registration with new unverified business email (200)', () => {
@@ -975,7 +1027,8 @@ describe('12. Merchant Onboarding Account Takeover & Duplicate Email Prevention 
         password: 'ValidFounderPassword2026!',
         shopName: 'Apex Aesthetics',
         categoryId: 'salons',
-        phone: '9848011223'
+        phone: '9848011223',
+        tosAccepted: true,
       },
       existingProfiles,
       existingProviders

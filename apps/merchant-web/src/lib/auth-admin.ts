@@ -37,6 +37,24 @@ if (process.env.NODE_ENV === 'production' && !isBuildPhase && !process.env.ADMIN
 }
 
 /**
+ * Safely extracts client IP to prevent rate-limiter spoofing via forged X-Forwarded-For headers.
+ * Prioritizes socket/platform IP, trusted proxy headers, and the rightmost trusted hop in X-Forwarded-For.
+ */
+export function getClientIp(req: Request | NextRequest): string {
+  if ((req as any).ip) return (req as any).ip;
+  const xRealIp = req.headers.get('x-real-ip');
+  if (xRealIp) return xRealIp.trim();
+  const cfConnectingIp = req.headers.get('cf-connecting-ip');
+  if (cfConnectingIp) return cfConnectingIp.trim();
+  const xff = req.headers.get('x-forwarded-for');
+  if (xff) {
+    const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return '127.0.0.1';
+}
+
+/**
  * Resolves the authenticated user from Bearer header, SSR cookies, or non-production test bypass.
  */
 export async function verifyAuthenticatedUser(
@@ -49,17 +67,20 @@ export async function verifyAuthenticatedUser(
     return null;
   }
 
-  // 1. Non-production E2E test bypass header check
-  if (process.env.NODE_ENV !== 'production' && E2E_ADMIN_BYPASS_SECRET) {
-    const adminBypass = request.headers.get('x-admin-bypass-key');
-    const merchantBypass = request.headers.get('x-merchant-bypass-key');
-    if (adminBypass === E2E_ADMIN_BYPASS_SECRET || merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
-      return {
-        id: '88888888-8888-8888-8888-888888888881',
-        email: 'admin@appointments-tirupati.com',
-      };
+  // 1. Non-production E2E test bypass header check - completely disabled in production
+  if (process.env.NODE_ENV !== 'production') {
+    if (E2E_ADMIN_BYPASS_SECRET) {
+      const adminBypass = request.headers.get('x-admin-bypass-key');
+      const merchantBypass = request.headers.get('x-merchant-bypass-key');
+      if (adminBypass === E2E_ADMIN_BYPASS_SECRET || merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
+        return {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+        };
+      }
     }
 
+    // Only allow customer header override in non-production environments
     const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
     if (testCustomerId) {
       return {

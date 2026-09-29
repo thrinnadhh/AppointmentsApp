@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createRazorpayOrder, getRazorpayKeyId } from '@/lib/razorpay';
 import { checkRateLimit } from '@/lib/redis';
-import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking, getClientIp } from '@/lib/auth-admin';
 import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
   try {
     // 1. IP rate limiting (30 requests/minute)
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const clientIp = getClientIp(req);
     const rateLimit = await checkRateLimit(`order-ip:${clientIp}`, 30, 60);
     if (!rateLimit.allowed) {
       return NextResponse.json<CreateRazorpayOrderResponse>(
@@ -53,14 +53,19 @@ export async function POST(req: NextRequest) {
 
     // Check if caller is authenticated and authorized for this booking
     const caller = await verifyAuthenticatedUser(req);
-    if (caller) {
-      const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
-      if (!isAuthorized) {
-        return NextResponse.json<CreateRazorpayOrderResponse>(
-          { success: false, error: 'Forbidden: You are not authorized to create an order for this booking' },
-          { status: 403 }
-        );
-      }
+    if (!caller) {
+      return NextResponse.json<CreateRazorpayOrderResponse>(
+        { success: false, error: 'Unauthorized: Authentication required to create an order' },
+        { status: 401 }
+      );
+    }
+
+    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
+    if (!isAuthorized) {
+      return NextResponse.json<CreateRazorpayOrderResponse>(
+        { success: false, error: 'Forbidden: You are not authorized to create an order for this booking' },
+        { status: 403 }
+      );
     }
 
     // Check if booking is already confirmed or completed

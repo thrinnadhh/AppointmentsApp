@@ -26,7 +26,7 @@ const PUBLIC_API_ROUTES = [
   '/api/merchant/register-shop',
 ];
 
-function isAllowedOrigin(origin: string | null): boolean {
+export function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
   try {
     const url = new URL(origin);
@@ -44,12 +44,14 @@ function isAllowedOrigin(origin: string | null): boolean {
       }
     }
 
-    // Production whitelisted domains
+    // Production & preview whitelisted domains (Vercel & Cloudflare preview dynamic subdomains)
     if (
       host === 'appointments4u.in' ||
       host.endsWith('.appointments4u.in') ||
       host === 'appointments-merchant.vercel.app' ||
-      (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app'))
+      (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app')) ||
+      host === 'appointments4u.pages.dev' ||
+      host.endsWith('.appointments4u.pages.dev')
     ) {
       return true;
     }
@@ -80,10 +82,13 @@ export function middleware(req: NextRequest) {
   const reqOrigin = req.headers.get('origin');
   const originAllowed = isAllowedOrigin(reqOrigin);
 
+  const isProduction = process.env.NODE_ENV === 'production';
+
   const corsHeaders: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers':
-      'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key, x-customer-id, x-test-customer-id',
+    'Access-Control-Allow-Headers': isProduction
+      ? 'Content-Type, Authorization'
+      : 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key, x-customer-id, x-test-customer-id',
   };
 
   if (originAllowed && reqOrigin) {
@@ -99,10 +104,11 @@ export function middleware(req: NextRequest) {
     });
   }
 
-  // Non-production E2E test bypass header verification using environment variable
-  const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET;
+  // Non-production E2E test bypass header verification using environment variable.
+  // In production, NEVER allow x-customer-id or test header overrides under any circumstance.
+  const adminBypassToken = !isProduction ? (process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET) : null;
   const isE2EBypass =
-    process.env.NODE_ENV !== 'production' &&
+    !isProduction &&
     Boolean(adminBypassToken) &&
     (req.headers.get('x-merchant-bypass-key') === adminBypassToken ||
       req.headers.get('x-admin-bypass-key') === adminBypassToken ||

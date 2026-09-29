@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/auth-admin';
 
 interface OnboardRequestBody {
   fullName: string;
@@ -80,7 +81,7 @@ async function verifyCaptcha(token?: string, ip?: string): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const ip = getClientIp(request);
 
     // 1. RATE LIMITING: Maximum 5 registration attempts per 5 minutes per IP
     const rateLimit = await checkRateLimit(`merchant_onboard:${ip}`, 5, 300);
@@ -132,8 +133,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. IT ACT SECTION 79 TOS ACCEPTANCE
-    if (tosAccepted === false) {
+    // 5. IT ACT SECTION 79 TOS ACCEPTANCE (Strict explicit acceptance required)
+    if (tosAccepted !== true) {
       return NextResponse.json(
         { error: 'You must accept the Merchant Partner Terms of Service to register.' },
         { status: 400 }

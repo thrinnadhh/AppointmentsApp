@@ -322,15 +322,18 @@ AS $function$
 DECLARE
     v_provider_id      UUID;
     v_provider_status  provider_status;
-    v_category_id      TEXT;
-    v_deposit_amount   NUMERIC(10, 2);
-    v_platform_fee     NUMERIC(10, 2);
-    v_total_amount     NUMERIC(10, 2);
-    v_is_active        BOOLEAN;
-    v_existing_id      UUID;
-    v_new_booking_id   UUID;
-    v_reference_code   TEXT;
-    v_hold_expiry      TIMESTAMPTZ;
+    v_category_id         TEXT;
+    v_deposit_amount      NUMERIC(10, 2);
+    v_platform_fee        NUMERIC(10, 2);
+    v_total_amount        NUMERIC(10, 2);
+    v_is_active           BOOLEAN;
+    v_daily_booking_limit INTEGER;
+    v_daily_count         BIGINT;
+    v_slot_date_ist       DATE;
+    v_existing_id         UUID;
+    v_new_booking_id      UUID;
+    v_reference_code      TEXT;
+    v_hold_expiry         TIMESTAMPTZ;
 BEGIN
     -- Verify caller identity: Client callers cannot forge customer_id
     IF auth.role() != 'service_role' THEN
@@ -368,25 +371,49 @@ BEGIN
         v_deposit_amount := 100.00;
     END IF;
 
-    -- Fetch provider status and category
-    SELECT status, category_id INTO v_provider_status, v_category_id
-    FROM public.providers WHERE id = v_provider_id;
+    -- Fetch provider status, category, and operational daily booking limit
+    SELECT status, category_id, daily_booking_limit 
+    INTO v_provider_status, v_category_id, v_daily_booking_limit
+    FROM public.providers 
+    WHERE id = v_provider_id;
 
     IF v_provider_status = 'SUSPENDED' THEN
         RETURN jsonb_build_object('success', false, 'error', 'Merchant provider is suspended');
+    END IF;
+
+    -- Daily Booking Limit Concurrency Guard:
+    -- Evaluate in operational timezone (Asia/Kolkata) inside advisory-locked transaction to prevent TOCTOU race
+    IF v_daily_booking_limit IS NOT NULL AND v_daily_booking_limit > 0 THEN
+        v_slot_date_ist := (p_slot_start AT TIME ZONE 'Asia/Kolkata')::date;
+
+        -- Transaction-level advisory lock on provider + IST calendar day
+        PERFORM pg_advisory_xact_lock(hashtext('daily_limit:' || v_provider_id::text || ':' || v_slot_date_ist::text));
+
+        SELECT COUNT(*) INTO v_daily_count
+        FROM public.bookings
+        WHERE provider_id = v_provider_id
+          AND (slot_start AT TIME ZONE 'Asia/Kolkata')::date = v_slot_date_ist
+          AND status IN ('HELD', 'CONFIRMED', 'COMPLETED');
+
+        IF v_daily_count >= v_daily_booking_limit THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error', 'This venue has reached its daily booking limit (' || v_daily_booking_limit || ') for this date. Please choose another day.'
+            );
+        END IF;
     END IF;
 
     -- Platform fee: ₹50 for Gaming & Turf, ₹10 for all others
     v_platform_fee := CASE WHEN v_category_id IN ('gaming', 'turf') THEN 50.00 ELSE 10.00 END;
     v_total_amount := v_deposit_amount + v_platform_fee;
 
-    -- Conflict check with 3-second lock timeout
+    -- Overlap exclusion check with 3-second lock timeout
     SET LOCAL lock_timeout = '3s';
     SELECT id INTO v_existing_id
     FROM public.bookings
     WHERE resource_id = p_resource_id
-      AND slot_start  = p_slot_start
-      AND status IN ('HELD', 'PENDING_PAYMENT', 'CONFIRMED')
+      AND tstzrange(slot_start, slot_end) && tstzrange(p_slot_start, p_slot_end)
+      AND status IN ('HELD', 'CONFIRMED')
     FOR UPDATE;
 
     IF v_existing_id IS NOT NULL THEN
@@ -395,18 +422,23 @@ BEGIN
 
     v_hold_expiry := NOW() + INTERVAL '5 minutes';
 
-    INSERT INTO public.bookings (
-        customer_id, provider_id, resource_id,
-        slot_start, slot_end, status, payment_status,
-        deposit_amount, platform_fee, total_amount, hold_expires_at,
-        disclaimer_version
-    ) VALUES (
-        p_customer_id, v_provider_id, p_resource_id,
-        p_slot_start, p_slot_end, 'HELD', 'PENDING',
-        v_deposit_amount, v_platform_fee, v_total_amount, v_hold_expiry,
-        'v1'
-    )
-    RETURNING id, reference_code INTO v_new_booking_id, v_reference_code;
+    BEGIN
+        INSERT INTO public.bookings (
+            customer_id, provider_id, resource_id,
+            slot_start, slot_end, status, payment_status,
+            deposit_amount, platform_fee, total_amount, hold_expires_at,
+            disclaimer_version
+        ) VALUES (
+            p_customer_id, v_provider_id, p_resource_id,
+            p_slot_start, p_slot_end, 'HELD', 'PENDING',
+            v_deposit_amount, v_platform_fee, v_total_amount, v_hold_expiry,
+            'v1'
+        )
+        RETURNING id, reference_code INTO v_new_booking_id, v_reference_code;
+    EXCEPTION
+        WHEN exclusion_violation OR unique_violation THEN
+            RETURN jsonb_build_object('success', false, 'error', 'Slot is already held or booked');
+    END;
 
     RETURN jsonb_build_object(
         'success',          true,

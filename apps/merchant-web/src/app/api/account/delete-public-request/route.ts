@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/auth-admin';
 import { maskPhoneNumber } from '@appointments/shared';
 
 function maskIdentifier(id: string): string {
@@ -21,7 +22,7 @@ function maskIdentifier(id: string): string {
  */
 export async function POST(req: NextRequest) {
   try {
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const clientIp = getClientIp(req);
     const ipLimit = await checkRateLimit(`public-del-req:${clientIp}`, 5, 300);
     if (!ipLimit.allowed) {
       return NextResponse.json(

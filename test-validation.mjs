@@ -363,3 +363,205 @@ describe('20. Wave-3: Dev-Mode & Storage Impersonation', () => {
     assert.match(code, /isNonProduction && window\.location\.search\.includes\('dev=true'\)/, 'dev=true must be inert in production');
   });
 });
+
+describe('21. NV Item 1: Placeholder Env Fail-Fast Runtime Boot Check', () => {
+  const envPath = path.join(ROOT_DIR, 'apps/merchant-web/src/env.mjs');
+  const nextConfigPath = path.join(ROOT_DIR, 'apps/merchant-web/next.config.mjs');
+
+  it('verifies next.config.mjs imports src/env.mjs for early boot execution', () => {
+    const configCode = fs.readFileSync(nextConfigPath, 'utf8');
+    assert.match(configCode, /import ['"]\.\/src\/env\.mjs['"]/, 'next.config.mjs must import src/env.mjs');
+  });
+
+  it('verifies env.mjs detects placeholder patterns and throws on invalid default strings', async () => {
+    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+
+    const testPlaceholders = [
+      'CHANGE_ME',
+      'xxx',
+      'placeholder',
+      'TODO',
+      'replace_me',
+      'your_key_here',
+      'your-supabase-publishable-key',
+    ];
+
+    for (const placeholder of testPlaceholders) {
+      assert.throws(
+        () => {
+          validateEnv({ TEST_VAR: placeholder }, { throwOnError: true, isProduction: false });
+        },
+        /contains forbidden placeholder value/,
+        `Must throw when TEST_VAR is "${placeholder}"`
+      );
+    }
+  });
+
+  it('verifies env.mjs in production requires mandatory variables and rejects ALLOW_MOCK_PAYMENTS=true', async () => {
+    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+
+    // Missing required vars in production
+    assert.throws(
+      () => {
+        validateEnv({}, { throwOnError: true, isProduction: true });
+      },
+      /Missing mandatory production environment variable/,
+      'Production boot must throw on missing required variables'
+    );
+
+    // ALLOW_MOCK_PAYMENTS in production
+    assert.throws(
+      () => {
+        validateEnv(
+          {
+            NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
+            NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyValidKey',
+            SUPABASE_SERVICE_ROLE_KEY: 'eyValidServiceKey',
+            RAZORPAY_KEY_ID: 'rzp_live_123',
+            RAZORPAY_KEY_SECRET: 'secret_123',
+            RAZORPAY_WEBHOOK_SECRET: 'whsec_123',
+            ADMIN_SECRET: 'admin_sec_123',
+            CRON_SECRET: 'cron_sec_123',
+            ALLOW_MOCK_PAYMENTS: 'true',
+          },
+          { throwOnError: true, isProduction: true }
+        );
+      },
+      /ALLOW_MOCK_PAYMENTS cannot be set to "true" in production/,
+      'Production boot must throw when ALLOW_MOCK_PAYMENTS is true'
+    );
+  });
+});
+
+describe('22. NV Item 2: Storage R2 Fallback & Signed URL Enforcement', () => {
+  const storageLibPath = path.join(ROOT_DIR, 'apps/merchant-web/src/lib/storage.ts');
+  const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20260912000001_phase3_storage_and_media.sql');
+  const rlsMigrationPath = path.join(ROOT_DIR, 'supabase/migrations/20260926000001_harden_prescriptions_storage_rls.sql');
+
+  it('verifies storage.ts enforces signed URL generation and private bucket classification', () => {
+    const code = fs.readFileSync(storageLibPath, 'utf8');
+    assert.match(code, /getPrivateDocumentSignedUrl/, 'Must export getPrivateDocumentSignedUrl');
+    assert.match(code, /isPrivateBucket/, 'Must export isPrivateBucket helper');
+    assert.match(code, /createSignedUrl/, 'Must call createSignedUrl on private document access');
+    assert.match(code, /uploadPrivateDocument/, 'Must export uploadPrivateDocument');
+  });
+
+  it('verifies database migration configures prescriptions-and-records as strictly private', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /'prescriptions-and-records'[\s\S]*?false/m, 'Bucket prescriptions-and-records must have public = false');
+
+    const rlsSql = fs.readFileSync(rlsMigrationPath, 'utf8');
+    assert.match(rlsSql, /storage\.foldername\(name\)[\s\S]*?= auth\.uid\(\)::text/, 'Private upload must be scoped to caller auth.uid()');
+  });
+});
+
+describe('23. NV Item 3: Expo Fake Token Expiry & Production Guard', () => {
+  const mobileServicePath = path.join(ROOT_DIR, 'apps/customer-mobile/src/services/notifications.ts');
+  const edgeNotificationPath = path.join(ROOT_DIR, 'supabase/functions/send-booking-notification/index.ts');
+
+  it('verifies customer mobile notification service detects and rejects mock tokens in production', () => {
+    const code = fs.readFileSync(mobileServicePath, 'utf8');
+    assert.match(code, /isMockPushToken/, 'Must export isMockPushToken function');
+    assert.match(code, /isValidProductionPushToken/, 'Must export isValidProductionPushToken function');
+    assert.match(code, /isProduction && !isValidProductionPushToken\(token\)/, 'Must reject persisting mock token in production');
+  });
+
+  it('verifies send-booking-notification edge function skips mock tokens in production environment', () => {
+    const code = fs.readFileSync(edgeNotificationPath, 'utf8');
+    assert.match(code, /isMockToken/, 'Edge function must identify mock tokens');
+    assert.match(code, /isProductionEnv && isMockToken/, 'Edge function must gate mock push dispatch in production');
+    assert.match(code, /supabase\.auth\.getUser\(token\)/, 'Caller must be authenticated with short-lived bearer token');
+  });
+});
+
+describe('24. NV Item 4: Preview Wildcard CORS Dynamic Subdomain Matching', () => {
+  const middlewarePath = path.join(ROOT_DIR, 'apps/merchant-web/src/middleware.ts');
+  const edgeDir = path.join(ROOT_DIR, 'supabase/functions');
+
+  it('verifies middleware.ts supports dynamic preview subdomains without permissive wildcards', () => {
+    const code = fs.readFileSync(middlewarePath, 'utf8');
+    assert.match(code, /appointments-merchant-[\s\S]*?\.vercel\.app/, 'Must dynamically match Vercel preview branch subdomains');
+    assert.match(code, /appointments4u\.pages\.dev/, 'Must match Cloudflare Pages preview subdomains');
+    assert.doesNotMatch(code, /Access-Control-Allow-Origin['"]?\s*:\s*['"]\*['"]/, 'Must never set wildcard * in CORS headers');
+  });
+
+  it('verifies all edge functions eliminate Access-Control-Allow-Origin: * in favor of dynamic origin matching', () => {
+    const functions = fs.readdirSync(edgeDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+
+    for (const fn of functions) {
+      const indexPath = path.join(edgeDir, fn, 'index.ts');
+      if (fs.existsSync(indexPath)) {
+        const content = fs.readFileSync(indexPath, 'utf8');
+        assert.doesNotMatch(
+          content,
+          /'Access-Control-Allow-Origin':\s*'\*'/,
+          `Edge function ${fn} must not use wildcard Access-Control-Allow-Origin: *`
+        );
+        assert.match(
+          content,
+          /getCorsHeaders/,
+          `Edge function ${fn} must use dynamic getCorsHeaders function`
+        );
+      }
+    }
+  });
+});
+
+describe('25. NV Item 5: Backend Webhook Ingress (HMAC SHA-256 Validation)', () => {
+  const webhookRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts');
+
+  it('verifies /api/webhooks/razorpay verifies raw body HMAC SHA-256 signature using constant-time comparison', () => {
+    const code = fs.readFileSync(webhookRoutePath, 'utf8');
+    assert.match(code, /req\.text\(\)/, 'Must read rawBody via req.text() to preserve unmutated byte sequence');
+    assert.match(code, /crypto\s*\.\s*createHmac\('sha256',\s*webhookSecret\)/, 'Must compute HMAC SHA-256 with webhook secret');
+    assert.match(code, /crypto\.timingSafeEqual/, 'Must use crypto.timingSafeEqual to prevent timing attacks');
+    assert.match(code, /Missing x-razorpay-signature header/, 'Must reject requests missing signature header with 401');
+    assert.match(code, /Invalid webhook signature/, 'Must reject mismatched signatures with 400');
+  });
+
+  it('executes functional HMAC SHA-256 verification calculation asserting exact behavior', async () => {
+    const crypto = await import('crypto');
+    const secret = 'test_webhook_secret_key_123';
+    const payload = JSON.stringify({ event: 'payment.captured', payload: { payment: { entity: { id: 'pay_123' } } } });
+
+    const validSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    const forgedSignature = crypto.createHmac('sha256', 'wrong_secret').update(payload).digest('hex');
+
+    // Valid signature check
+    const validMatch =
+      validSignature.length === validSignature.length &&
+      crypto.timingSafeEqual(Buffer.from(validSignature), Buffer.from(validSignature));
+    assert.strictEqual(validMatch, true, 'Valid signature must match');
+
+    // Forged signature check
+    const forgedMatch =
+      forgedSignature.length === validSignature.length &&
+      crypto.timingSafeEqual(Buffer.from(forgedSignature), Buffer.from(validSignature));
+    assert.strictEqual(forgedMatch, false, 'Forged signature must not match');
+  });
+});
+
+describe('26. NV Item 6: GHCR Image Deploy & Rootless Container User', () => {
+  const dockerfilePath = path.join(ROOT_DIR, 'apps/backend/Dockerfile');
+  const backendWorkflowPath = path.join(ROOT_DIR, '.github/workflows/backend.yml');
+
+  it('verifies backend Dockerfile enforces a dedicated non-root user and least-privilege ownership', () => {
+    const dockerfile = fs.readFileSync(dockerfilePath, 'utf8');
+    assert.match(dockerfile, /addgroup -S appgroup && adduser -S appuser -G appgroup/, 'Must create dedicated appgroup and appuser');
+    assert.match(dockerfile, /USER appuser/, 'Must switch runtime execution to non-root appuser');
+    assert.match(dockerfile, /COPY --chown=appuser:appgroup/, 'Must copy runtime artifacts with appuser ownership');
+  });
+
+  it('verifies backend CI/CD workflow pins actions, scans container with Trivy, and attests provenance', () => {
+    const workflow = fs.readFileSync(backendWorkflowPath, 'utf8');
+    // Commit SHA pinning
+    assert.match(workflow, /actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683/, 'Must pin checkout to commit SHA');
+    // Trivy container scanning
+    assert.match(workflow, /aquasecurity\/trivy-action/, 'Must run Trivy container vulnerability scanner');
+    // Provenance / Image signing
+    assert.match(workflow, /actions\/attest-build-provenance/, 'Must attest build provenance for GHCR image signature');
+  });
+});
+

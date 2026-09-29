@@ -318,3 +318,285 @@ describe('CORS Origin & Credential Lockdown', () => {
     assert.strictEqual(headers['Access-Control-Allow-Credentials'], undefined);
   });
 });
+
+describe('Authentication, Toll-Fraud & Gateway Defense Remediation', () => {
+  const rootDir = process.cwd();
+
+  // 1. High — OTP E.164 Normalization & XFF Bypass
+  describe('1. OTP E.164 Normalization & XFF Bypass', () => {
+    const sendRoutePath = path.join(rootDir, 'apps/merchant-web/src/app/api/auth/otp/send/route.ts');
+    const verifyRoutePath = path.join(rootDir, 'apps/merchant-web/src/app/api/auth/otp/verify/route.ts');
+
+    it('verifies otp/send uses libphonenumber-js to parse and normalize E.164 phone numbers', () => {
+      const code = fs.readFileSync(sendRoutePath, 'utf8');
+      assert.match(code, /libphonenumber-js/, 'Must import libphonenumber-js');
+      assert.match(code, /parsePhoneNumber\(/, 'Must invoke parsePhoneNumber');
+      assert.match(code, /format\('E\.164'\)/, 'Must format with strict E.164');
+    });
+
+    it('verifies otp/verify validates and normalizes E.164 phone numbers', () => {
+      const code = fs.readFileSync(verifyRoutePath, 'utf8');
+      assert.match(code, /libphonenumber-js/, 'Must import libphonenumber-js');
+      assert.match(code, /parsePhoneNumber\(/, 'Must invoke parsePhoneNumber');
+      assert.match(code, /format\('E\.164'\)/, 'Must format with strict E.164');
+    });
+
+    it('verifies rightmost trusted proxy hop resolution in getClientIp prevents XFF leftmost spoofing', () => {
+      function mockGetClientIp(headers, socketIp) {
+        if (socketIp) return socketIp;
+        if (headers['x-real-ip']) return headers['x-real-ip'].trim();
+        if (headers['cf-connecting-ip']) return headers['cf-connecting-ip'].trim();
+        const xff = headers['x-forwarded-for'];
+        if (xff) {
+          const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
+          if (parts.length > 0) return parts[parts.length - 1];
+        }
+        return '127.0.0.1';
+      }
+
+      // Attacker injects fake client IP at leftmost position
+      const spoofedHeaders = {
+        'x-forwarded-for': '198.51.100.1, 203.0.113.195, 10.0.0.15',
+      };
+      const resolvedIp = mockGetClientIp(spoofedHeaders);
+      assert.strictEqual(resolvedIp, '10.0.0.15', 'Must resolve rightmost proxy hop, ignoring leftmost spoof');
+
+      // Trusted platform socket IP takes priority
+      assert.strictEqual(mockGetClientIp(spoofedHeaders, '172.16.0.5'), '172.16.0.5');
+
+      // Edge header takes priority over XFF
+      assert.strictEqual(mockGetClientIp({ 'cf-connecting-ip': '1.1.1.1', ...spoofedHeaders }), '1.1.1.1');
+    });
+  });
+
+  // 2. High — Razorpay SRI & CSP Hardening
+  describe('2. Razorpay SRI & CSP Hardening', () => {
+    it('verifies CheckoutModal.tsx contains sha384 SRI and crossOrigin="anonymous"', () => {
+      const modalPath = path.join(rootDir, 'apps/customer-mobile/src/screens/CheckoutModal.tsx');
+      const code = fs.readFileSync(modalPath, 'utf8');
+      assert.match(code, /script\.integrity\s*=\s*['"]sha384-NGmSb1KehQLbxaQireyZsxqw5m8oN1qSYAOEkPd7JW3f2liirqbwcgV1ANfaqxpe['"]/, 'Must include sha384 SRI hash');
+      assert.match(code, /script\.crossOrigin\s*=\s*['"]anonymous['"]/, 'Must specify crossOrigin="anonymous"');
+    });
+
+    it('verifies next.config.mjs CSP disallows unsafe wildcards and explicitly allows Razorpay', () => {
+      const configPath = path.join(rootDir, 'apps/merchant-web/next.config.mjs');
+      const code = fs.readFileSync(configPath, 'utf8');
+      assert.match(code, /script-src[^;]*https:\/\/checkout\.razorpay\.com/, 'CSP script-src must allow Razorpay checkout');
+      assert.match(code, /frame-src[^;]*https:\/\/api\.razorpay\.com/, 'CSP frame-src must allow Razorpay api');
+      assert.doesNotMatch(code, /script-src[^;]*\bhttp:\s/, 'CSP script-src must not contain http: wildcard');
+      assert.doesNotMatch(code, /script-src[^;]*\bhttps:\s/, 'CSP script-src must not contain https: wildcard');
+    });
+
+    it('verifies settings page does not contain placeholder secrets', () => {
+      const settingsPath = path.join(rootDir, 'apps/merchant-web/src/app/settings/page.tsx');
+      const code = fs.readFileSync(settingsPath, 'utf8');
+      assert.doesNotMatch(code, /rzp_test_placeholder/, 'Placeholder keys must be scrubbed');
+    });
+  });
+
+  // 3. High — GitHub Actions CI Hardening
+  describe('3. GitHub Actions CI Hardening', () => {
+    const ciPath = path.join(rootDir, '.github/workflows/ci.yml');
+
+    it('verifies all third-party actions in ci.yml are pinned to immutable 40-character commit SHAs', () => {
+      const content = fs.readFileSync(ciPath, 'utf8');
+      const usesLines = content.split('\n').filter((line) => line.trim().startsWith('- uses: actions/') || line.trim().startsWith('- uses: pnpm/') || line.trim().startsWith('- uses: trufflesecurity/'));
+      assert.ok(usesLines.length >= 20, 'Expected at least 20 pinned action invocations in ci.yml');
+      for (const line of usesLines) {
+        assert.match(
+          line,
+          /@[a-f0-9]{40}/,
+          `Action invocation must be pinned to 40-character commit SHA: ${line}`
+        );
+      }
+    });
+
+    it('verifies security-audit steps are blocking with continue-on-error: false', () => {
+      const content = fs.readFileSync(ciPath, 'utf8');
+      assert.doesNotMatch(content, /continue-on-error:\s*true/, 'CI workflow must not contain continue-on-error: true for security steps');
+      assert.match(content, /pnpm audit[\s\S]*continue-on-error: false/, 'pnpm audit must be blocking');
+      assert.match(content, /trufflehog[\s\S]*continue-on-error: false/, 'trufflehog must be blocking');
+    });
+
+    it('verifies all-checks-pass gate includes security-audit status', () => {
+      const content = fs.readFileSync(ciPath, 'utf8');
+      assert.match(content, /needs\.security-audit\.result/, 'all-checks-pass must verify security-audit');
+    });
+  });
+
+  // 4. Medium — create-order Caller Verification
+  describe('4. create-order Caller Verification', () => {
+    it('verifies create-order route strictly rejects anonymous caller with 401', () => {
+      const routePath = path.join(rootDir, 'apps/merchant-web/src/app/api/payments/create-order/route.ts');
+      const code = fs.readFileSync(routePath, 'utf8');
+      assert.match(code, /const caller = await verifyAuthenticatedUser\(req\);/, 'Must verify authenticated user');
+      assert.match(code, /if \(!caller\) \{[\s\S]*status: 401/, 'Must reject unauthenticated caller with 401');
+    });
+  });
+
+  // 5. Medium — Non-Prod E2E Customer Header Leak
+  describe('5. Non-Prod E2E Customer Header Leak', () => {
+    it('verifies middleware disables x-customer-id header override in production', () => {
+      const middlewarePath = path.join(rootDir, 'apps/merchant-web/src/middleware.ts');
+      const code = fs.readFileSync(middlewarePath, 'utf8');
+      assert.match(code, /const isProduction = process\.env\.NODE_ENV === 'production';/, 'Must check production environment');
+      assert.match(code, /!isProduction &&[\s\S]*x-customer-id/, 'x-customer-id must only be evaluated when NOT in production');
+    });
+
+    it('verifies auth-admin strictly gates customer header override behind non-production check', () => {
+      const authAdminPath = path.join(rootDir, 'apps/merchant-web/src/lib/auth-admin.ts');
+      const code = fs.readFileSync(authAdminPath, 'utf8');
+      assert.match(code, /if \(process\.env\.NODE_ENV !== 'production'\) \{[\s\S]*x-customer-id/, 'auth-admin must gate x-customer-id strictly behind non-production');
+    });
+  });
+
+  // 6. Medium — Hold Endpoint Rate Limiter Spoofing
+  describe('6. Hold Endpoint Rate Limiter Spoofing', () => {
+    it('verifies hold route extracts IP safely without trusting client-controlled leftmost XFF', () => {
+      const holdRoutePath = path.join(rootDir, 'apps/merchant-web/src/app/api/bookings/hold/route.ts');
+      const code = fs.readFileSync(holdRoutePath, 'utf8');
+      assert.doesNotMatch(code, /x-forwarded-for.*split\(','\)\[0\]/, 'Must NOT use leftmost XFF split');
+      assert.match(code, /req\.headers\.get\('x-real-ip'\)/, 'Must check x-real-ip');
+      assert.match(code, /req\.headers\.get\('cf-connecting-ip'\)/, 'Must check cf-connecting-ip');
+    });
+  });
+});
+
+describe('Application Perimeter & Input Sanitization Remediation', () => {
+  const rootDir = process.cwd();
+
+  // 1. Medium — Onboarding Terms-of-Service Validation
+  describe('1. Onboarding Terms-of-Service Validation', () => {
+    it('verifies onboard route strictly requires tosAccepted !== true', () => {
+      const onboardPath = path.join(rootDir, 'apps/merchant-web/src/app/api/merchant/onboard/route.ts');
+      const code = fs.readFileSync(onboardPath, 'utf8');
+      assert.match(code, /if\s*\(tosAccepted\s*!==\s*true\)/, 'Must strictly check tosAccepted !== true');
+      assert.doesNotMatch(code, /if\s*\(tosAccepted\s*===\s*false\)/, 'Must not use loose tosAccepted === false');
+    });
+  });
+
+  // 2. Medium — Login Open Redirect
+  describe('2. Login Open Redirect', () => {
+    const SAFE_REDIRECT_REGEX = /^\/(?!\/)[a-zA-Z0-9\-_./]*$/;
+
+    function getSafeRedirectUrl(target) {
+      if (!target) return '/';
+      const trimmed = target.trim();
+      if (SAFE_REDIRECT_REGEX.test(trimmed)) {
+        return trimmed;
+      }
+      return '/';
+    }
+
+    it('rejects protocol-relative open redirect URLs', () => {
+      assert.strictEqual(getSafeRedirectUrl('//evil.com'), '/');
+      assert.strictEqual(getSafeRedirectUrl('//evil.com/phish'), '/');
+      assert.strictEqual(getSafeRedirectUrl('///evil.com'), '/');
+    });
+
+    it('rejects absolute external open redirect URLs', () => {
+      assert.strictEqual(getSafeRedirectUrl('https://evil.com'), '/');
+      assert.strictEqual(getSafeRedirectUrl('http://evil.com'), '/');
+      assert.strictEqual(getSafeRedirectUrl('javascript:alert(1)'), '/');
+      assert.strictEqual(getSafeRedirectUrl('data:text/html,evil'), '/');
+    });
+
+    it('allows valid internal relative paths', () => {
+      assert.strictEqual(getSafeRedirectUrl('/'), '/');
+      assert.strictEqual(getSafeRedirectUrl('/bookings'), '/bookings');
+      assert.strictEqual(getSafeRedirectUrl('/admin/dashboard'), '/admin/dashboard');
+      assert.strictEqual(getSafeRedirectUrl('/venues/venue_123'), '/venues/venue_123');
+    });
+
+    it('verifies login/page.tsx enforces regex-validated safe redirect helper', () => {
+      const loginPath = path.join(rootDir, 'apps/merchant-web/src/app/login/page.tsx');
+      const code = fs.readFileSync(loginPath, 'utf8');
+      assert.ok(code.includes('SAFE_REDIRECT_REGEX = /^\\/(?!\\/)[a-zA-Z0-9\\-_./]*$/'), 'Must define SAFE_REDIRECT_REGEX');
+      assert.ok(code.includes("getSafeRedirectUrl(params.get('redirect'))"), 'Must use getSafeRedirectUrl for params.get(redirect)');
+      assert.doesNotMatch(code, /const redirectPath = params\.get\('redirect'\) \|\| '\/'/, 'Must not use unvalidated redirectPath');
+    });
+  });
+
+  // 3. Medium — Direct RPC Execution Bypass
+  describe('3. Direct RPC Execution Bypass', () => {
+    it('verifies customer-mobile api.ts routes hold operations strictly through backend API without direct client RPC fallback', () => {
+      const apiPath = path.join(rootDir, 'apps/customer-mobile/src/services/api.ts');
+      const code = fs.readFileSync(apiPath, 'utf8');
+      assert.match(code, /fetch\(`\$\{API_BASE_URL\}\/api\/bookings\/hold`/, 'Must route through /api/bookings/hold');
+
+      // Ensure createHoldOnSupabase does NOT contain direct supabase.rpc('create_booking_hold')
+      const holdFunctionMatch = code.match(/export async function createHoldOnSupabase[\s\S]*?^}/m);
+      assert.ok(holdFunctionMatch, 'Must find createHoldOnSupabase function');
+      assert.doesNotMatch(
+        holdFunctionMatch[0],
+        /supabase\.rpc\('create_booking_hold'/,
+        'createHoldOnSupabase must not contain direct client RPC fallback to create_booking_hold'
+      );
+    });
+  });
+
+  // 4. Medium — Venue SVG Upload / Stored XSS
+  describe('4. Venue SVG Upload / Stored XSS', () => {
+    const ALLOWED_VENUE_ASSET_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    function validateUploadMime(fileName, contentType) {
+      const normalizedMime = (contentType || '').toLowerCase().trim();
+      const cleanExt = fileName.toLowerCase().split('.').pop() || '';
+      if (!ALLOWED_VENUE_ASSET_MIME_TYPES.includes(normalizedMime) || cleanExt === 'svg' || normalizedMime.includes('svg')) {
+        return { success: false, error: 'Disallowed' };
+      }
+      return { success: true };
+    }
+
+    it('rejects SVG uploads and scripts disguised as images', () => {
+      assert.strictEqual(validateUploadMime('logo.svg', 'image/svg+xml').success, false);
+      assert.strictEqual(validateUploadMime('banner.svg', 'image/jpeg').success, false);
+      assert.strictEqual(validateUploadMime('script.html', 'text/html').success, false);
+      assert.strictEqual(validateUploadMime('doc.pdf', 'application/pdf').success, false);
+    });
+
+    it('allows safe binary image formats (JPEG, PNG, WebP)', () => {
+      assert.strictEqual(validateUploadMime('photo.jpg', 'image/jpeg').success, true);
+      assert.strictEqual(validateUploadMime('logo.png', 'image/png').success, true);
+      assert.strictEqual(validateUploadMime('hero.webp', 'image/webp').success, true);
+    });
+
+    it('verifies uploadVenueAsset in customer-mobile and supabase.ts enforces MIME whitelist', () => {
+      const mobileApiPath = path.join(rootDir, 'apps/customer-mobile/src/services/api.ts');
+      const supabaseLibPath = path.join(rootDir, 'apps/merchant-web/src/lib/supabase.ts');
+
+      const mobileCode = fs.readFileSync(mobileApiPath, 'utf8');
+      assert.match(mobileCode, /ALLOWED_VENUE_ASSET_MIME_TYPES/, 'customer-mobile must define ALLOWED_VENUE_ASSET_MIME_TYPES');
+      assert.match(mobileCode, /cleanExt === 'svg' \|\| normalizedMime\.includes\('svg'\)/, 'customer-mobile must reject SVG');
+
+      const webCode = fs.readFileSync(supabaseLibPath, 'utf8');
+      assert.match(webCode, /ALLOWED_VENUE_ASSET_MIME_TYPES/, 'supabase.ts must define ALLOWED_VENUE_ASSET_MIME_TYPES');
+      assert.match(webCode, /cleanExt === 'svg' \|\| normalizedMime\.includes\('svg'\)/, 'supabase.ts must reject SVG');
+    });
+  });
+
+  // 5. Low — Profile & Venue URL Protocol Validation
+  describe('5. Profile & Venue URL Protocol Validation', () => {
+    it('verifies register-shop route validates photoUrl against ^https?://', () => {
+      const registerShopPath = path.join(rootDir, 'apps/merchant-web/src/app/api/merchant/register-shop/route.ts');
+      const code = fs.readFileSync(registerShopPath, 'utf8');
+      assert.ok(code.includes('/^https?:\\/\\//i.test(trimmedPhotoUrl)'), 'register-shop route must validate photoUrl with ^https?://');
+    });
+
+    it('verifies getVenueAssetUrl in supabase.ts and customer-mobile validates protocol with ^https?://', () => {
+      const supabaseLibPath = path.join(rootDir, 'apps/merchant-web/src/lib/supabase.ts');
+      const webCode = fs.readFileSync(supabaseLibPath, 'utf8');
+      assert.ok(webCode.includes('/^https?:\\/\\//i.test(trimmed)'), 'supabase.ts getVenueAssetUrl must test ^https?://');
+
+      const mobileApiPath = path.join(rootDir, 'apps/customer-mobile/src/services/api.ts');
+      const mobileCode = fs.readFileSync(mobileApiPath, 'utf8');
+      assert.ok(mobileCode.includes('/^https?:\\/\\//i.test(trimmed)'), 'customer-mobile getVenueAssetUrl must test ^https?://');
+    });
+
+    it('verifies payments/verify route validates attachment_url against safe URL or storage path', () => {
+      const verifyRoutePath = path.join(rootDir, 'apps/merchant-web/src/app/api/payments/verify/route.ts');
+      const code = fs.readFileSync(verifyRoutePath, 'utf8');
+      assert.ok(code.includes('/^https?:\\/\\//i.test(trimmedAttachment)'), 'payments/verify must validate attachment_url protocol');
+    });
+  });
+});

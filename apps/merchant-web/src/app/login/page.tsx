@@ -13,6 +13,21 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
+/**
+ * Validates return URLs to prevent Open Redirect attacks.
+ * Disallows protocol-relative URLs (e.g. //evil.com) and absolute external origins.
+ */
+const SAFE_REDIRECT_REGEX = /^\/(?!\/)[a-zA-Z0-9\-_./]*$/;
+
+function getSafeRedirectUrl(target: string | null | undefined): string {
+  if (!target) return '/';
+  const trimmed = target.trim();
+  if (SAFE_REDIRECT_REGEX.test(trimmed)) {
+    return trimmed;
+  }
+  return '/';
+}
+
 export default function LoginPage() {
   // Mode: 'signin' by default, or 'register'
   const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
@@ -50,7 +65,7 @@ export default function LoginPage() {
           if (isAdmin) {
             setSuccessMsg('Session detected! Redirecting to Merchant Workspace...');
             const params = new URLSearchParams(window.location.search);
-            const redirectPath = params.get('redirect') || '/';
+            const redirectPath = getSafeRedirectUrl(params.get('redirect'));
             setTimeout(() => {
               window.location.href = redirectPath;
             }, 600);
@@ -72,7 +87,7 @@ export default function LoginPage() {
           } else {
             setSuccessMsg('Session detected! Redirecting to Merchant Workspace...');
             const params = new URLSearchParams(window.location.search);
-            const redirectPath = params.get('redirect') || '/';
+            const redirectPath = getSafeRedirectUrl(params.get('redirect'));
             setTimeout(() => {
               window.location.href = redirectPath;
             }, 600);
@@ -112,7 +127,7 @@ export default function LoginPage() {
         if (isAdmin) {
           setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
           const params = new URLSearchParams(window.location.search);
-          const redirectPath = params.get('redirect') || '/';
+          const redirectPath = getSafeRedirectUrl(params.get('redirect'));
           window.location.href = redirectPath;
           return;
         }
@@ -130,7 +145,7 @@ export default function LoginPage() {
         } else {
           setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
           const params = new URLSearchParams(window.location.search);
-          const redirectPath = params.get('redirect') || '/';
+          const redirectPath = getSafeRedirectUrl(params.get('redirect'));
           window.location.href = redirectPath;
         }
       }

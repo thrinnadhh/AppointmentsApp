@@ -83,6 +83,17 @@ export async function uploadMediaAsset(
   };
 }
 
+export const PUBLIC_BUCKETS = ['venue-assets'] as const;
+export const PRIVATE_BUCKETS = ['prescriptions-and-records'] as const;
+
+export function isPublicBucket(bucketName: string): boolean {
+  return (PUBLIC_BUCKETS as readonly string[]).includes(bucketName);
+}
+
+export function isPrivateBucket(bucketName: string): boolean {
+  return (PRIVATE_BUCKETS as readonly string[]).includes(bucketName);
+}
+
 /**
  * Diagnostic status for health check
  */
@@ -90,10 +101,78 @@ export function getStorageStatus(): {
   provider: 'cloudflare-r2' | 'supabase-storage';
   r2_configured: boolean;
   public_domain: string | null;
+  public_buckets: readonly string[];
+  private_buckets: readonly string[];
 } {
   return {
     provider: isR2Configured ? 'cloudflare-r2' : 'supabase-storage',
     r2_configured: isR2Configured,
     public_domain: R2_PUBLIC_DOMAIN || null,
+    public_buckets: PUBLIC_BUCKETS,
+    private_buckets: PRIVATE_BUCKETS,
   };
+}
+
+/**
+ * Generates a time-limited signed URL for private documents (prescriptions, clinical records).
+ * Strictly forbids public URL generation for private buckets.
+ */
+export async function getPrivateDocumentSignedUrl(
+  storagePath: string,
+  expiresInSeconds: number = 300,
+  bucket: string = 'prescriptions-and-records'
+): Promise<{ signedUrl: string | null; error?: string }> {
+  if (isPublicBucket(bucket)) {
+    return { signedUrl: null, error: `Bucket ${bucket} is public; use getPublicUrl instead` };
+  }
+
+  // Constrain expiry between 60 seconds and 1 hour
+  const boundedTtl = Math.max(60, Math.min(expiresInSeconds, 3600));
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(storagePath, boundedTtl);
+
+    if (error || !data?.signedUrl) {
+      return { signedUrl: null, error: error?.message || 'Failed to generate signed URL' };
+    }
+
+    return { signedUrl: data.signedUrl };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Storage signing error';
+    return { signedUrl: null, error: msg };
+  }
+}
+
+/**
+ * Upload a private document (e.g. medical prescription) scoped under owner ID
+ */
+export async function uploadPrivateDocument(
+  fileBytes: Uint8Array | Buffer,
+  fileName: string,
+  ownerId: string,
+  contentType: string = 'application/pdf',
+  bucket: string = 'prescriptions-and-records'
+): Promise<{ success: boolean; path?: string; error?: string }> {
+  try {
+    const sanitizedName = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const scopedPath = `${ownerId}/${sanitizedName}`;
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(scopedPath, fileBytes, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, path: data?.path || scopedPath };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Private upload failed';
+    return { success: false, error: msg };
+  }
 }

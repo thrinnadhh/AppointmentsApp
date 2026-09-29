@@ -24,6 +24,7 @@ DECLARE
   v_caller_id UUID := auth.uid();
   v_caller_role TEXT := auth.role();
   v_is_authorized BOOLEAN := FALSE;
+  v_target_status TEXT;
 BEGIN
   SELECT * INTO v_booking
   FROM public.bookings
@@ -55,11 +56,12 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Cannot reschedule a ' || lower(v_booking.status::text) || ' booking');
   END IF;
 
+  -- Range overlap check against other active bookings for the same resource
   SELECT id INTO v_conflict_id
   FROM public.bookings
   WHERE resource_id = v_booking.resource_id
-    AND slot_start = p_new_slot_start
-    AND status IN ('HELD', 'PENDING_PAYMENT', 'CONFIRMED')
+    AND tstzrange(slot_start, slot_end) && tstzrange(p_new_slot_start, p_new_slot_end)
+    AND status IN ('HELD', 'CONFIRMED')
     AND id != p_booking_id
   LIMIT 1;
 
@@ -67,21 +69,39 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'The requested new slot is already booked or held');
   END IF;
 
+  -- Financial State Machine: Prevent unauthorized transition from HELD to CONFIRMED without captured payment
+  IF v_booking.status = 'HELD' THEN
+    IF COALESCE(v_booking.deposit_amount, 0) > 0 AND (v_booking.payment_status != 'PAID' OR v_booking.gateway_payment_id IS NULL) THEN
+      v_target_status := 'HELD';
+    ELSE
+      v_target_status := 'CONFIRMED';
+    END IF;
+  ELSIF v_booking.status = 'CONFIRMED' THEN
+    v_target_status := 'CONFIRMED';
+  ELSE
+    RETURN jsonb_build_object('success', false, 'error', 'Cannot reschedule a ' || lower(v_booking.status::text) || ' booking');
+  END IF;
+
   PERFORM set_config('app.trusted_write', 'true', true);
 
-  UPDATE public.bookings
-  SET slot_start = p_new_slot_start,
-      slot_end = p_new_slot_end,
-      status = 'CONFIRMED',
-      updated_at = NOW()
-  WHERE id = p_booking_id;
+  BEGIN
+    UPDATE public.bookings
+    SET slot_start = p_new_slot_start,
+        slot_end = p_new_slot_end,
+        status = v_target_status,
+        updated_at = NOW()
+    WHERE id = p_booking_id;
+  EXCEPTION
+    WHEN exclusion_violation OR unique_violation THEN
+      RETURN jsonb_build_object('success', false, 'error', 'The requested new slot is already booked or held');
+  END;
 
   RETURN jsonb_build_object(
     'success', true,
     'booking_id', p_booking_id,
     'slot_start', p_new_slot_start,
     'slot_end', p_new_slot_end,
-    'status', 'CONFIRMED'
+    'status', v_target_status
   );
 END;
 $$;

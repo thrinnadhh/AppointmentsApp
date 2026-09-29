@@ -197,7 +197,7 @@ export default function ShopRegistrationPage() {
           categoryId: category,
           phone: phone.trim(),
           address: address.trim() || 'AIR Bypass Road, Tirupati',
-          photoUrl: photoUrl || null,
+          photoUrl: (photoUrl && /^https?:\/\//i.test(photoUrl.trim())) ? photoUrl.trim() : null,
           tosAccepted: true,
         }),
       });

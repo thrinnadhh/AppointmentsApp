@@ -575,8 +575,11 @@ export async function fetchTenantContextData(): Promise<{
   };
 }
 
+const ALLOWED_VENUE_ASSET_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
 /**
  * Upload a venue storefront photo, clinic logo, or resource image to 'venue-assets' public bucket.
+ * Restricts uploads strictly to safe binary MIME types (image/jpeg, image/png, image/webp) to prevent Stored XSS.
  */
 export async function uploadVenueAsset(
   providerId: string,
@@ -585,13 +588,23 @@ export async function uploadVenueAsset(
   contentType: string = 'image/jpeg'
 ): Promise<{ success: boolean; publicUrl?: string; path?: string; error?: string }> {
   try {
+    const normalizedMime = (contentType || '').toLowerCase().trim();
+    const cleanExt = fileName.toLowerCase().split('.').pop() || '';
+
+    if (!ALLOWED_VENUE_ASSET_MIME_TYPES.includes(normalizedMime) || cleanExt === 'svg' || normalizedMime.includes('svg')) {
+      return {
+        success: false,
+        error: 'Invalid file type: SVG and non-whitelisted formats are disallowed to prevent script execution and stored XSS.',
+      };
+    }
+
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storagePath = `${providerId}/${Date.now()}-${cleanFileName}`;
 
     const { data, error } = await supabase.storage
       .from('venue-assets')
       .upload(storagePath, file, {
-        contentType,
+        contentType: normalizedMime,
         upsert: true,
       });
 
@@ -623,8 +636,9 @@ export function getVenueAssetUrl(
   options?: { width?: number; height?: number; quality?: number }
 ): string {
   if (!pathOrUrl) return '';
-  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-    return pathOrUrl;
+  const trimmed = pathOrUrl.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
   }
   const { data } = supabase.storage.from('venue-assets').getPublicUrl(pathOrUrl, {
     transform: {

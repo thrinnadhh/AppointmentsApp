@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/auth-admin';
+import parsePhoneNumber from 'libphonenumber-js';
 
 /**
  * POST /api/auth/otp/send
@@ -17,13 +19,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 });
     }
 
-    // Normalise: strip non-digits, prepend +91 if 10-digit Indian number
-    const digits = phone.replace(/\D/g, '');
-    const e164 = phone.startsWith('+') ? phone : (digits.length === 10 ? `+91${digits}` : `+${digits}`);
-
-    if (digits.length < 10 || digits.length > 13) {
+    // Strict E.164 normalization using libphonenumber-js with default country IN
+    let parsedPhone;
+    try {
+      parsedPhone = parsePhoneNumber(phone.trim(), 'IN');
+    } catch {
       return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
+
+    if (!parsedPhone || !parsedPhone.isValid()) {
+      return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 });
+    }
+
+    const e164 = parsedPhone.format('E.164');
 
     // ── Phone-scoped rate limit: 3 OTPs per 5 minutes per number ─────────────
     const { allowed, remaining, reset } = await checkRateLimit(`otp:${e164}`, 3, 300);
@@ -41,9 +49,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── IP-level rate limit: 5 unique OTP attempts per IP per 10 minutes ─────
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-            ?? req.headers.get('x-real-ip')
-            ?? 'unknown';
+    // Bind to framework-verified IP, trusted edge headers, or rightmost trusted proxy
+    const ip = getClientIp(req);
     const ipLimit = await checkRateLimit(`otp-ip:${ip}`, 5, 600);
     if (!ipLimit.allowed) {
       return NextResponse.json(

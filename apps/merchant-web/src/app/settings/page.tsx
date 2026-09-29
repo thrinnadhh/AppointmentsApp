@@ -28,7 +28,7 @@ export default function SettingsPage() {
   const [gstin, setGstin] = useState('37AAAAA0000A1Z5');
 
   // Payment & Payout State
-  const [razorpayKeyId, setRazorpayKeyId] = useState('rzp_test_TirupatiAppointments');
+  const [razorpayKeyId, setRazorpayKeyId] = useState('');
   const [webhookSecretConfigured, setWebhookSecretConfigured] = useState(true);
   const [payoutUpi, setPayoutUpi] = useState('merchant.ops@upi');
   const [bankAccount, setBankAccount] = useState('•••• •••• 9821 (SBI Tirupati Main Branch)');

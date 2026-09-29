@@ -76,10 +76,6 @@ export async function PATCH(request: NextRequest) {
       if (!result.success) {
         return NextResponse.json({ error: result.error || 'Update failed' }, { status: 400 });
       }
-      if (status === 'ACTIVE') {
-        const { clearAllMemoryLocks } = await import('@/lib/redis');
-        clearAllMemoryLocks();
-      }
     }
 
     const updates: Record<string, unknown> = {};

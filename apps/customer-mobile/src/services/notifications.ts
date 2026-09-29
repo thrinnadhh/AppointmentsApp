@@ -9,7 +9,32 @@
 
 import { supabase } from './api';
 
+declare const process: { env: Record<string, string | undefined> };
+declare const __DEV__: boolean | undefined;
+
 let cachedPushToken: string | null = null;
+
+const isProduction =
+  typeof __DEV__ !== 'undefined'
+    ? !__DEV__
+    : typeof process !== 'undefined' && process.env?.NODE_ENV === 'production';
+
+/**
+ * Checks if a push token is synthetic/mocked
+ */
+export function isMockPushToken(token: string | null | undefined): boolean {
+  if (!token) return false;
+  return /\[(tpt_|mock_|fake_|test_)/i.test(token);
+}
+
+/**
+ * Validates genuine Expo push token format
+ */
+export function isValidProductionPushToken(token: string | null | undefined): boolean {
+  if (!token) return false;
+  const isExpoFormat = /^ExponentPushToken\[[a-zA-Z0-9_-]+\]$/.test(token);
+  return isExpoFormat && !isMockPushToken(token);
+}
 
 /**
  * Register device for push notifications and sync token with customer profile
@@ -25,12 +50,26 @@ export async function registerForPushNotificationsAsync(
       }
     }
 
-    // Generate or use deterministic device push token
+    // In production, mock tokens are strictly forbidden from being generated or persisted
+    if (isProduction) {
+      if (cachedPushToken && isValidProductionPushToken(cachedPushToken)) {
+        return cachedPushToken;
+      }
+      // On real devices, Expo Notifications SDK would provide a genuine device token here
+      return null;
+    }
+
+    // Generate deterministic device push token for development/testing
     const token = cachedPushToken || `ExponentPushToken[tpt_${(customerId || 'guest').substring(0, 8)}_${Date.now().toString(36)}]`;
     cachedPushToken = token;
 
-    // 2. Persist to customer Supabase profile if ID provided
+    // 2. Persist to customer Supabase profile if ID provided (development/staging only for mock tokens)
     if (customerId) {
+      if (isProduction && !isValidProductionPushToken(token)) {
+        console.warn('[PushNotification] Refusing to persist mock push token to production profile');
+        return null;
+      }
+
       try {
         await supabase
           .from('profiles')
