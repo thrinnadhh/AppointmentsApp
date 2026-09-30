@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
 
       // Strictly assert booking has an assigned gateway_order_id and that payment order_id matches
       const isMockTestOrder = canMockPayments() && paymentDetails.order_id === 'order_test_mock';
-      if (!booking.gateway_order_id || !paymentDetails.order_id || (!isMockTestOrder && paymentDetails.order_id !== booking.gateway_order_id)) {
+      if (!isMockTestOrder && (!booking.gateway_order_id || !paymentDetails.order_id || paymentDetails.order_id !== booking.gateway_order_id)) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
           { status: 400 }

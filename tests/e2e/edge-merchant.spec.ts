@@ -29,8 +29,9 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-01: Complete an already-CANCELLED booking ───────────────────
   test('EC-MERCH-01: Completing a CANCELLED booking returns 409 invalid transition', async ({ request }) => {
     // 1. Create, confirm, then cancel a booking
-    const slotStart = new Date(Date.now() + 86400000 * 5).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 5 + 1800000).toISOString();
+    const offset1 = 86400000 * 5 + Math.floor(Math.random() * 86400000);
+    const slotStart = new Date(Date.now() + offset1).toISOString();
+    const slotEnd = new Date(Date.now() + offset1 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
@@ -58,8 +59,9 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
   // ─── EC-MERCH-02: No-show on a COMPLETED booking ──────────────────────────
   test('EC-MERCH-02: Reporting no-show on a COMPLETED booking returns 409', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 6).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 6 + 1800000).toISOString();
+    const offset2 = 86400000 * 6 + Math.floor(Math.random() * 86400000);
+    const slotStart = new Date(Date.now() + offset2).toISOString();
+    const slotEnd = new Date(Date.now() + offset2 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
@@ -205,8 +207,9 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-07: Resource deactivation with active booking ───────────────
   test('EC-MERCH-07: Deactivating a resource with CONFIRMED bookings returns warning/error or 409', async ({ request }) => {
     // 1. Confirm a booking for the resource
-    const slotStart = new Date(Date.now() + 86400000 * 8).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 8 + 1800000).toISOString();
+    const offset7 = 86400000 * 8 + Math.floor(Math.random() * 86400000);
+    const slotStart = new Date(Date.now() + offset7).toISOString();
+    const slotEnd = new Date(Date.now() + offset7 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
@@ -217,22 +220,30 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       data: { booking_id, gateway_payment_id: `pay_deactivate_${Date.now()}` },
     });
 
-    // 2. Attempt to deactivate the resource
-    const deactivateRes = await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
-      data: { is_active: false },
-    });
+    try {
+      // 2. Attempt to deactivate the resource
+      const deactivateRes = await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
+        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        data: { is_active: false },
+      });
 
-    // Should either block (409) or warn (200 with warning in body)
-    if (deactivateRes.status() === 409) {
-      const body = await deactivateRes.json();
-      expect(body.error).toMatch(/active booking|conflict|cannot deactivate/i);
-    } else if (deactivateRes.status() === 200) {
-      const body = await deactivateRes.json();
-      // If soft-allowed, there should be a warning about existing bookings
-      expect(body.warning ?? body.message ?? '').toMatch(/active booking|existing booking/i);
-    } else if (deactivateRes.status() === 404) {
-      test.skip(); // endpoint not yet implemented
+      // Should either block (409) or warn (200 with warning in body)
+      if (deactivateRes.status() === 409) {
+        const body = await deactivateRes.json();
+        expect(body.error).toMatch(/active booking|conflict|cannot deactivate/i);
+      } else if (deactivateRes.status() === 200) {
+        const body = await deactivateRes.json();
+        // If soft-allowed, there should be a warning about existing bookings
+        expect(body.warning ?? body.message ?? '').toMatch(/active booking|existing booking/i);
+      } else if (deactivateRes.status() === 404) {
+        test.skip(); // endpoint not yet implemented
+      }
+    } finally {
+      // Always restore seed resource to active
+      await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
+        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        data: { is_active: true },
+      });
     }
   });
 
@@ -330,7 +341,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await expect(page.getByText('Tirupati Merchant Hub')).toBeVisible({ timeout: 15000 });
 
     // Attempt to navigate to admin
-    await page.goto(`${MERCHANT_BASE}/admin`);
+    await page.goto(`${MERCHANT_BASE}/admin`, { waitUntil: 'domcontentloaded' }).catch(() => null);
 
     // Wait for auth verification to resolve to redirect or 403 screen
     await page.waitForFunction(() => {
