@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { acquireSlotLock, releaseSlotLock, checkRateLimit } from '@/lib/redis';
-import { verifyAuthenticatedUser, getClientIp } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser, getClientIp, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 import { captureException } from '@/lib/sentry';
 import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
 
@@ -126,6 +126,31 @@ export async function POST(req: NextRequest) {
           {
             success: false,
             error: 'Forbidden: You cannot reserve appointments on behalf of another customer',
+          },
+          { status: 403 }
+        );
+      }
+
+      // Cross-Provider Guard: Verify calling merchant belongs to the target resource's provider
+      const { data: targetResource } = await supabaseAdmin
+        .from('resources')
+        .select('provider_id')
+        .eq('id', resource_id)
+        .maybeSingle();
+
+      if (!targetResource?.provider_id) {
+        return NextResponse.json<CreateHoldResponse>(
+          { success: false, error: 'Resource not found' },
+          { status: 404 }
+        );
+      }
+
+      const isAuthorized = await isCallerAuthorizedForProvider(caller.id, targetResource.provider_id);
+      if (!isAuthorized) {
+        return NextResponse.json<CreateHoldResponse>(
+          {
+            success: false,
+            error: 'Forbidden: Cannot create holds for external providers',
           },
           { status: 403 }
         );

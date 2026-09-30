@@ -8,6 +8,11 @@ services:
       context: ./apps/backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    networks:
+      - edge_network
+      - internal_network
     ports:
       - "127.0.0.1:8080:8080"   # Only Caddy reaches this; not exposed to internet
     environment:
@@ -29,9 +34,11 @@ services:
 
   # ── Redis (Valkey — 100% Redis-compatible, ARM64 native) ─────────────────
   redis:
-    image: valkey/valkey:8-alpine
+    image: valkey/valkey:8.0.2-alpine
     restart: unless-stopped
     command: ["valkey-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    networks:
+      - internal_network
     ports:
       - "127.0.0.1:6379:6379"   # Internal only
     volumes:
@@ -44,8 +51,10 @@ services:
 
   # ── Caddy (reverse proxy + auto-HTTPS via Cloudflare DNS) ───────────────
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.9.1-alpine
     restart: unless-stopped
+    networks:
+      - edge_network
     ports:
       - "80:80"
       - "443:443"
@@ -59,15 +68,31 @@ services:
 
   # ── Watchtower (auto-deploy on new image push to GHCR) ──────────────────
   watchtower:
-    image: containrrr/watchtower
+    image: containrrr/watchtower:1.7.1
     restart: unless-stopped
+    networks:
+      - management_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       WATCHTOWER_POLL_INTERVAL: 300
       WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_INCLUDE_STOPPED: "false"
+      WATCHTOWER_INCLUDE_STOPPED: "true"
       WATCHTOWER_LABEL_ENABLE: "true"
+
+networks:
+  edge_network:
+    driver: bridge
+    labels:
+      com.appointments.network: "edge-proxy"
+  internal_network:
+    driver: bridge
+    labels:
+      com.appointments.network: "app-internal"
+  management_network:
+    driver: bridge
+    labels:
+      com.appointments.network: "watchtower-isolated"
 
 volumes:
   redis_data:

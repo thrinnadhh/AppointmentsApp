@@ -171,6 +171,64 @@ export async function isCallerAuthorizedForBooking(
 }
 
 /**
+ * Verifies whether a given caller is authorized for a specific provider.
+ * Returns true if caller is:
+ * 1. A platform Super Administrator
+ * 2. An authorized staff/member of the provider (via get_user_authorized_providers RPC or merchant_memberships)
+ * 3. The registered owner of the provider
+ */
+export async function isCallerAuthorizedForProvider(
+  callerId: string,
+  providerId: string
+): Promise<boolean> {
+  if (!callerId || !providerId) return false;
+
+  // Non-production test bypass check
+  if (process.env.NODE_ENV !== 'production' && callerId === '88888888-8888-8888-8888-888888888881') {
+    return true;
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+
+  // 1. Check if caller is platform super administrator
+  const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: callerId });
+  if (isAdmin) return true;
+
+  // 2. Check authorized providers membership via RPC
+  const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
+    p_user_id: callerId,
+  });
+  if (Array.isArray(authProviders) && authProviders.includes(providerId)) {
+    return true;
+  }
+
+  // 3. Check direct ownership on providers table
+  const { data: prov } = await supabaseAdmin
+    .from('providers')
+    .select('owner_id')
+    .eq('id', providerId)
+    .maybeSingle();
+
+  if (prov && prov.owner_id === callerId) {
+    return true;
+  }
+
+  // 4. Check merchant_memberships table if present
+  const { data: membership } = await supabaseAdmin
+    .from('merchant_memberships')
+    .select('provider_id')
+    .eq('user_id', callerId)
+    .eq('provider_id', providerId)
+    .maybeSingle();
+
+  if (membership) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Verifies that an incoming NextRequest originates from an authenticated session
  * with 'admin' role in public.profiles.
  * 

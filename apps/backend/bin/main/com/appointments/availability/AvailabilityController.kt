@@ -5,8 +5,11 @@ import org.springframework.web.bind.annotation.*
 import java.time.LocalDate
 import java.util.UUID
 
+import com.appointments.common.errors.NotFoundException
+import org.springframework.security.access.prepost.PreAuthorize
+
 @RestController
-@RequestMapping("/api/v1/slots")
+@RequestMapping("/api/v1/slots", "/slots")
 class AvailabilityController(
     private val availabilityService: AvailabilityService,
     private val ruleRepository: AvailabilityRuleRepository,
@@ -24,9 +27,11 @@ class AvailabilityController(
 
     /** Merchant staff — set weekly schedule */
     @PutMapping("/rules")
+    @PreAuthorize("hasRole('ADMIN') or @securityService.isMerchantStaffForRules(authentication, #rules)")
     fun upsertRules(
         @RequestBody rules: List<UpsertRuleRequest>,
     ): List<AvailabilityRuleEntity> {
+        if (rules.isEmpty()) return emptyList()
         // Simple bulk save — validation left to DB constraint
         return ruleRepository.saveAll(rules.map {
             AvailabilityRuleEntity(
@@ -38,6 +43,28 @@ class AvailabilityController(
                 isClosed   = it.isClosed,
             )
         })
+    }
+
+    /** Merchant staff — update single rule */
+    @PutMapping("/rules/{ruleId}")
+    @PreAuthorize("hasRole('ADMIN') or @securityService.isRuleOwner(authentication, #ruleId)")
+    fun updateRule(
+        @PathVariable ruleId: UUID,
+        @RequestBody req: UpsertRuleRequest,
+    ): AvailabilityRuleEntity {
+        val existing = ruleRepository.findById(ruleId)
+            .orElseThrow { NotFoundException("Rule not found: $ruleId") }
+        return ruleRepository.save(
+            AvailabilityRuleEntity(
+                id = existing.id,
+                merchantId = existing.merchantId,
+                resourceId = req.resourceId ?: existing.resourceId,
+                dayOfWeek  = req.dayOfWeek,
+                openTime   = req.openTime,
+                closeTime  = req.closeTime,
+                isClosed   = req.isClosed,
+            )
+        )
     }
 }
 

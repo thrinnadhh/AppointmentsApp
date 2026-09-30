@@ -115,6 +115,9 @@ export const test = base.extend<AppTestFixtures>({
         const resourceId = params.resourceId || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
         const res = await request.post('http://localhost:3000/api/bookings/hold', {
+          headers: {
+            'x-customer-id': customerId,
+          },
           data: {
             customer_id: customerId,
             resource_id: resourceId,
@@ -140,10 +143,27 @@ export const test = base.extend<AppTestFixtures>({
       },
 
       async confirmBooking(bookingId) {
+        const orderRes = await request.post('http://localhost:3000/api/payments/create-order', {
+          headers: {
+            'x-customer-id': '99999999-9999-9999-9999-999999999991',
+          },
+          data: { booking_id: bookingId },
+        });
+        let orderId = 'order_mock_11000_rcpt_1';
+        if (orderRes.ok()) {
+          const orderJson = await orderRes.json();
+          orderId = orderJson.order_id || orderId;
+        }
+
         const res = await request.post('http://localhost:3000/api/bookings/confirm', {
+          headers: {
+            'x-customer-id': '99999999-9999-9999-9999-999999999991',
+          },
           data: {
             booking_id: bookingId,
             gateway_payment_id: `pay_fixture_${Date.now()}`,
+            razorpay_order_id: orderId,
+            razorpay_signature: 'mock_verified',
           },
         });
         if (!res.ok()) {

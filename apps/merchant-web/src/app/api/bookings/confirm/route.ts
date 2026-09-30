@@ -8,7 +8,8 @@ import { ConfirmPaymentResponse } from '@appointments/shared';
 
 interface ExtendedConfirmRequest {
   booking_id: string;
-  gateway_payment_id: string;
+  gateway_payment_id?: string;
+  razorpay_payment_id?: string;
   deposit_amount?: number;
   razorpay_order_id?: string;
   razorpay_signature?: string;
@@ -75,7 +76,8 @@ async function getAuthenticatedCaller(req: NextRequest): Promise<{ id: string; e
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Partial<ExtendedConfirmRequest>;
-    const { booking_id, gateway_payment_id, deposit_amount, razorpay_order_id, razorpay_signature } = body;
+    const { booking_id, deposit_amount, razorpay_order_id, razorpay_signature } = body;
+    const gateway_payment_id = (body.gateway_payment_id || body.razorpay_payment_id || '').trim();
 
     // 1. VALIDATE PARAMETERS
     if (!booking_id) {
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!gateway_payment_id || typeof gateway_payment_id !== 'string' || !gateway_payment_id.trim()) {
+    if (!gateway_payment_id) {
       return NextResponse.json<ConfirmPaymentResponse>(
         { success: false, error: 'Missing required parameter: gateway_payment_id' },
         { status: 400 }
@@ -241,15 +243,13 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // If booking was assigned a gateway_order_id, ensure order matches
+      // Strictly assert booking has an assigned gateway_order_id and that payment order_id matches
       const isMockTestOrder = canMockPayments() && paymentDetails.order_id === 'order_test_mock';
-      if (booking.gateway_order_id && paymentDetails.order_id && !isMockTestOrder) {
-        if (paymentDetails.order_id !== booking.gateway_order_id) {
-          return NextResponse.json<ConfirmPaymentResponse>(
-            { success: false, error: 'Payment order_id does not match booking order' },
-            { status: 400 }
-          );
-        }
+      if (!booking.gateway_order_id || !paymentDetails.order_id || (!isMockTestOrder && paymentDetails.order_id !== booking.gateway_order_id)) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
+          { status: 400 }
+        );
       }
 
       // Verify payment amount matches required booking amount in live mode

@@ -11,9 +11,19 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
+import com.appointments.identity.UserService
+import com.appointments.merchants.MerchantRepository
+import com.appointments.merchants.MerchantStaffRepository
+import com.appointments.common.errors.ForbiddenException
+
 @RestController
-@RequestMapping("/api/v1/bookings")
-class BookingController(private val bookingService: BookingService) {
+@RequestMapping("/api/v1/bookings", "/bookings")
+class BookingController(
+    private val bookingService: BookingService,
+    private val userService: UserService,
+    private val staffRepository: MerchantStaffRepository,
+    private val merchantRepository: MerchantRepository,
+) {
 
     /** Customer — create a new booking */
     @PostMapping
@@ -36,13 +46,27 @@ class BookingController(private val bookingService: BookingService) {
     fun myBookings(@AuthenticationPrincipal principal: AppPrincipal) =
         bookingService.listForCustomer(principal.authRef).map { it.toDto() }
 
-    /** Merchant — list bookings for their shop */
+    /** Merchant — list bookings for their shop (strictly tenant-authorized) */
     @GetMapping("/merchant/{merchantId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN') or @securityService.isMerchantStaff(authentication, #merchantId)")
     fun merchantBookings(
         @PathVariable merchantId: UUID,
         @RequestParam(defaultValue = "CONFIRMED") status: String,
     ) = bookingService.listForMerchant(merchantId, status).map { it.toDto() }
+
+    /** Merchant — list bookings for caller's own merchant */
+    @GetMapping("/merchant")
+    @PreAuthorize("hasAnyRole('MERCHANT_STAFF', 'MERCHANT', 'ADMIN')")
+    fun myMerchantBookings(
+        @AuthenticationPrincipal principal: AppPrincipal,
+        @RequestParam(defaultValue = "CONFIRMED") status: String,
+    ): List<BookingDto> {
+        val user = userService.requireByAuthRef(principal.authRef)
+        val merchantId = staffRepository.findByUserId(user.id).firstOrNull()?.merchantId
+            ?: merchantRepository.findByOwnerId(user.id).firstOrNull()?.id
+            ?: throw ForbiddenException("User is not associated with any merchant")
+        return bookingService.listForMerchant(merchantId, status).map { it.toDto() }
+    }
 
     /** Customer or admin — cancel */
     @PostMapping("/{id}/cancel")

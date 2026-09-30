@@ -4,6 +4,8 @@ spring:
 
   datasource:
     url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -58,6 +60,7 @@ logging:
 
 # Application-specific config
 app:
+  auth-webhook-secret: ${AUTH_WEBHOOK_SECRET:}
   auth:
     jwt-secret: ${JWT_SECRET}
     jwt-issuer: ${JWT_ISSUER:https://your-project.supabase.co/auth/v1}

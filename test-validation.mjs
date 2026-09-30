@@ -581,3 +581,155 @@ describe('26. NV Item 6: GHCR Image Deploy & Rootless Container User', () => {
   });
 });
 
+describe('27. Phase 1: High Severity Financial & Access Control BOLAs', () => {
+  const confirmPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/confirm/route.ts');
+  const verifyPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/payments/verify/route.ts');
+  const availabilityCtrlPath = path.join(ROOT_DIR, 'apps/backend/src/main/kotlin/com/appointments/availability/AvailabilityController.kt');
+  const bookingCtrlPath = path.join(ROOT_DIR, 'apps/backend/src/main/kotlin/com/appointments/bookings/BookingController.kt');
+  const securityServicePath = path.join(ROOT_DIR, 'apps/backend/src/main/kotlin/com/appointments/common/security/SecurityService.kt');
+
+  it('verifies /api/bookings/confirm and /api/payments/verify enforce strict order_id binding and amount match', () => {
+    const confirmCode = fs.readFileSync(confirmPath, 'utf8');
+    assert.match(confirmCode, /!booking\.gateway_order_id \|\| booking\.gateway_order_id !== razorpay_order_id/);
+    assert.match(confirmCode, /Tampered payment amount/);
+    assert.match(confirmCode, /!booking\.gateway_order_id \|\| !paymentDetails\.order_id/);
+
+    const verifyCode = fs.readFileSync(verifyPath, 'utf8');
+    assert.match(verifyCode, /!booking\.gateway_order_id \|\| booking\.gateway_order_id !== razorpay_order_id/);
+    assert.match(verifyCode, /Tampered payment amount/);
+  });
+
+  it('verifies Spring AvailabilityController enforces @PreAuthorize on /rules and /rules/{ruleId}', () => {
+    const code = fs.readFileSync(availabilityCtrlPath, 'utf8');
+    assert.match(code, /@PreAuthorize\("hasRole\('ADMIN'\) or @securityService\.isMerchantStaffForRules\(authentication, #rules\)"\)/);
+    assert.match(code, /@PutMapping\("\/rules\/\{ruleId\}"\)/);
+    assert.match(code, /@PreAuthorize\("hasRole\('ADMIN'\) or @securityService\.isRuleOwner\(authentication, #ruleId\)"\)/);
+  });
+
+  it('verifies Spring BookingController enforces @PreAuthorize on /merchant/{merchantId} and provides /merchant', () => {
+    const code = fs.readFileSync(bookingCtrlPath, 'utf8');
+    assert.match(code, /@PreAuthorize\("hasRole\('ADMIN'\) or @securityService\.isMerchantStaff\(authentication, #merchantId\)"\)/);
+    assert.match(code, /@GetMapping\("\/merchant"\)/);
+    assert.match(code, /myMerchantBookings/);
+  });
+
+  it('verifies Spring SecurityService provides tenant staff and rule ownership checks', () => {
+    const code = fs.readFileSync(securityServicePath, 'utf8');
+    assert.match(code, /fun isMerchantStaff\(authentication: Authentication\?, merchantId: UUID\): Boolean/);
+    assert.match(code, /fun isMerchantStaffForRules\(authentication: Authentication\?, rules: List<UpsertRuleRequest>\?\): Boolean/);
+    assert.match(code, /fun isRuleOwner\(authentication: Authentication\?, ruleId: UUID\): Boolean/);
+  });
+});
+
+describe('28. Phase 2: Tenant Isolation & Perimeter Defense', () => {
+  const holdPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/hold/route.ts');
+  const authAdminPath = path.join(ROOT_DIR, 'apps/merchant-web/src/lib/auth-admin.ts');
+  const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261001000001_harden_search_directory_and_permissions.sql');
+  const webhookCtrlPath = path.join(ROOT_DIR, 'apps/backend/src/main/kotlin/com/appointments/identity/AuthWebhookController.kt');
+  const backendAppYmlPath = path.join(ROOT_DIR, 'apps/backend/src/main/resources/application.yml');
+  const storageLibPath = path.join(ROOT_DIR, 'apps/merchant-web/src/lib/storage.ts');
+
+  it('verifies /api/bookings/hold enforces provider authorization for hold-on-behalf', () => {
+    const holdCode = fs.readFileSync(holdPath, 'utf8');
+    assert.match(holdCode, /isCallerAuthorizedForProvider\(caller\.id,\s*targetResource\.provider_id\)/);
+    assert.match(holdCode, /Forbidden: Cannot create holds for external providers/);
+
+    const authAdminCode = fs.readFileSync(authAdminPath, 'utf8');
+    assert.match(authAdminCode, /export async function isCallerAuthorizedForProvider/);
+  });
+
+  it('verifies migration 20261001000001 revokes anon on search_directory and introduces sanitized search_directory_public', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /REVOKE EXECUTE ON FUNCTION public\.search_directory\(text\) FROM anon;/);
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.search_directory_public/);
+    assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.search_directory_public\(text\) TO anon/);
+    // Ensure search_directory_public json projection does NOT expose phone or email
+    assert.doesNotMatch(sql, /'phone',\s*p\.phone/);
+    assert.doesNotMatch(sql, /'email',\s*p\.email/);
+  });
+
+  it('verifies backend AuthWebhookController enforces constant-time webhook secret authentication', () => {
+    const code = fs.readFileSync(webhookCtrlPath, 'utf8');
+    assert.match(code, /@Value\("\\\$\{app\.auth-webhook-secret:\}"\)/);
+    assert.match(code, /MessageDigest\.isEqual/);
+    assert.match(code, /HttpStatus\.UNAUTHORIZED/);
+
+    const appYml = fs.readFileSync(backendAppYmlPath, 'utf8');
+    assert.match(appYml, /auth-webhook-secret:\s*\$\{AUTH_WEBHOOK_SECRET:\}/);
+  });
+
+  it('verifies storage.ts enforces magic-byte verification, folder isolation, and upsert: false', () => {
+    const storageCode = fs.readFileSync(storageLibPath, 'utf8');
+    assert.match(storageCode, /export function detectFileTypeFromMagicBytes/);
+    assert.match(storageCode, /0x89.*0x50.*0x4e.*0x47/, 'Must inspect PNG magic bytes (89 50 4E 47)');
+    assert.match(storageCode, /0xff.*0xd8.*0xff/, 'Must inspect JPEG magic bytes (FF D8 FF)');
+    assert.match(storageCode, /0x25.*0x50.*0x44.*0x46/, 'Must inspect PDF magic bytes (25 50 44 46)');
+    assert.match(storageCode, /0x52[\s\S]*?0x49[\s\S]*?0x46[\s\S]*?0x46[\s\S]*?0x57[\s\S]*?0x42[\s\S]*?0x50/, 'Must inspect WebP magic bytes (RIFF/WEBP)');
+    assert.match(storageCode, /export const ALLOWED_BUCKETS/);
+    assert.match(storageCode, /export function isAllowedBucket/);
+    assert.match(storageCode, /upsert:\s*false/);
+    assert.match(storageCode, /\$\{providerId\}\/\$\{userId\}\/\$\{fileUuid\}/, 'Must enforce isolated path hierarchy');
+  });
+
+  it('verifies env.mjs detects extended placeholder variations and dummy secrets', async () => {
+    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+    const testPlaceholders = [
+      'change-me',
+      'change_me',
+      'dummy_secret',
+      'dummy-secret',
+      'test_secret',
+      'test-secret',
+      'rzp_test_placeholder',
+    ];
+
+    for (const ph of testPlaceholders) {
+      assert.throws(
+        () => {
+          validateEnv({ TEST_VAR: ph }, { throwOnError: true, isProduction: false });
+        },
+        /contains forbidden placeholder value/,
+        `Must throw when TEST_VAR is "${ph}"`
+      );
+    }
+  });
+});
+
+describe('29. Phase 3: Infrastructure Hardening & Watchtower Daemon Boundary', () => {
+  const composePath = path.join(ROOT_DIR, 'docker-compose.yml');
+
+  it('verifies docker-compose.yml pins image tags, enables watchtower label control, and isolates docker socket network', () => {
+    const yaml = fs.readFileSync(composePath, 'utf8');
+
+    // Tag pinning for api, redis, caddy, watchtower
+    assert.match(yaml, /image:\s*ghcr\.io\/\$\{GITHUB_REPO:-thrinnadhh\/appointments\}\/appointments-api:\$\{APP_VERSION:-1\.0\.0\}/, 'API service must pin version tag');
+    assert.match(yaml, /image:\s*caddy:2\.9\.1-alpine/, 'Caddy service must pin version tag');
+    assert.match(yaml, /image:\s*valkey\/valkey:8\.0\.2-alpine/, 'Redis service must pin version tag');
+    assert.match(yaml, /image:\s*containrrr\/watchtower:1\.7\.1/, 'Watchtower service must pin version tag');
+
+    // Label on API service
+    assert.match(yaml, /com\.centurylinklabs\.watchtower\.enable:\s*"true"/, 'API service must explicitly opt into Watchtower updates via label');
+
+    // Watchtower configuration
+    assert.match(yaml, /WATCHTOWER_CLEANUP:\s*"true"/, 'Watchtower must configure automatic image cleanup');
+    assert.match(yaml, /WATCHTOWER_INCLUDE_STOPPED:\s*"true"/, 'Watchtower must configure include stopped containers');
+    assert.match(yaml, /WATCHTOWER_LABEL_ENABLE:\s*"true"/, 'Watchtower must enforce label enable');
+
+    // Network isolation
+    assert.match(yaml, /edge_network:/, 'Must define edge_network for ingress');
+    assert.match(yaml, /internal_network:/, 'Must define internal_network for internal service communication');
+    assert.match(yaml, /management_network:/, 'Must define management_network for Watchtower docker.sock isolation');
+
+    // Ensure watchtower is NOT attached to edge_network and caddy is NOT attached to management_network
+    const caddyBlock = yaml.slice(yaml.indexOf('caddy:'), yaml.indexOf('watchtower:'));
+    assert.match(caddyBlock, /networks:\s*\n\s*-\s*edge_network/);
+    assert.doesNotMatch(caddyBlock, /management_network/);
+
+    const watchtowerBlock = yaml.slice(yaml.indexOf('watchtower:'), yaml.indexOf('\nnetworks:'));
+    assert.match(watchtowerBlock, /networks:\s*\n\s*-\s*management_network/);
+    assert.doesNotMatch(watchtowerBlock, /edge_network/);
+  });
+});
+
+
+

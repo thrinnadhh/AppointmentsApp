@@ -600,3 +600,81 @@ describe('Application Perimeter & Input Sanitization Remediation', () => {
     });
   });
 });
+
+describe('Priority 2 Security Remediation: Tenant Isolation & Perimeter Defense', () => {
+  const rootDir = process.cwd();
+
+  it('verifies /api/bookings/hold prevents cross-provider hold-on-behalf attacks', () => {
+    const holdRoutePath = path.join(rootDir, 'apps/merchant-web/src/app/api/bookings/hold/route.ts');
+    const code = fs.readFileSync(holdRoutePath, 'utf8');
+    assert.match(code, /isCallerAuthorizedForProvider\(caller\.id,\s*targetResource\.provider_id\)/);
+    assert.match(code, /Cannot create holds for external providers/);
+  });
+
+  it('verifies migration 20261001000001 denies anon execution on search_directory and prevents PII leakage', () => {
+    const migrationPath = path.join(rootDir, 'supabase/migrations/20261001000001_harden_search_directory_and_permissions.sql');
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /REVOKE EXECUTE ON FUNCTION public\.search_directory\(text\) FROM anon;/);
+    assert.match(sql, /search_directory_public/);
+    assert.doesNotMatch(sql, /'phone',\s*p\.phone/);
+    assert.doesNotMatch(sql, /'email',\s*p\.email/);
+  });
+
+  it('verifies Spring backend protects auth webhook with constant-time secret comparison', () => {
+    const ctrlPath = path.join(rootDir, 'apps/backend/src/main/kotlin/com/appointments/identity/AuthWebhookController.kt');
+    const code = fs.readFileSync(ctrlPath, 'utf8');
+    assert.match(code, /@RequestHeader\(value = "X-Webhook-Secret"/);
+    assert.match(code, /MessageDigest\.isEqual/);
+    assert.match(code, /HttpStatus\.UNAUTHORIZED/);
+  });
+
+  it('verifies storage.ts enforces magic byte validation, bucket boundaries, and non-upsert', () => {
+    const storagePath = path.join(rootDir, 'apps/merchant-web/src/lib/storage.ts');
+    const code = fs.readFileSync(storagePath, 'utf8');
+    assert.match(code, /detectFileTypeFromMagicBytes/);
+    assert.match(code, /0x89[\s\S]*?0x50[\s\S]*?0x4e[\s\S]*?0x47/);
+    assert.match(code, /0xff[\s\S]*?0xd8[\s\S]*?0xff/);
+    assert.match(code, /0x25[\s\S]*?0x50[\s\S]*?0x44[\s\S]*?0x46/);
+    assert.match(code, /upsert:\s*false/);
+    assert.match(code, /ALLOWED_BUCKETS/);
+  });
+
+  it('verifies env.mjs denies extended placeholder patterns and dummy secrets', () => {
+    const envPath = path.join(rootDir, 'apps/merchant-web/src/env.mjs');
+    const code = fs.readFileSync(envPath, 'utf8');
+    assert.match(code, /change\[_-\]\?me/);
+    assert.match(code, /test\[_-\]secret/);
+    assert.match(code, /rzp\[_-\]test\[_-\]placeholder/);
+    assert.match(code, /dummy_secret/);
+    assert.match(code, /dummy-secret/);
+  });
+});
+
+describe('Priority 3 Security Remediation: Infrastructure Hardening & Container Boundary', () => {
+  const rootDir = process.cwd();
+
+  it('verifies docker-compose implements tag pinning, label-based auto-updates, and network isolation for docker socket', () => {
+    const composePath = path.join(rootDir, 'docker-compose.yml');
+    const yaml = fs.readFileSync(composePath, 'utf8');
+
+    assert.match(yaml, /appointments-api:\$\{APP_VERSION:-1\.0\.0\}/);
+    assert.match(yaml, /caddy:2\.9\.1-alpine/);
+    assert.match(yaml, /valkey\/valkey:8\.0\.2-alpine/);
+    assert.match(yaml, /containrrr\/watchtower:1\.7\.1/);
+
+    assert.match(yaml, /com\.centurylinklabs\.watchtower\.enable:\s*"true"/);
+    assert.match(yaml, /WATCHTOWER_CLEANUP:\s*"true"/);
+    assert.match(yaml, /WATCHTOWER_INCLUDE_STOPPED:\s*"true"/);
+    assert.match(yaml, /WATCHTOWER_LABEL_ENABLE:\s*"true"/);
+
+    assert.match(yaml, /edge_network:/);
+    assert.match(yaml, /internal_network:/);
+    assert.match(yaml, /management_network:/);
+
+    // Watchtower should be isolated on management_network
+    const watchtowerBlock = yaml.slice(yaml.indexOf('watchtower:'), yaml.indexOf('\nnetworks:'));
+    assert.match(watchtowerBlock, /networks:\s*\n\s*-\s*management_network/);
+    assert.doesNotMatch(watchtowerBlock, /edge_network/);
+  });
+});
+

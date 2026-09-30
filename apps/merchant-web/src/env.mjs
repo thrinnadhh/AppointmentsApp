@@ -6,26 +6,39 @@
  */
 
 export const PLACEHOLDER_PATTERNS = [
-  /^CHANGE_ME$/i,
-  /^xxx+$/i,
-  /^placeholder(-[a-z0-9]+)?$/i,
+  /^(xxx+|change[_-]?me|your[_-].*|placeholder.*|dummy.*|test[_-]secret|rzp[_-]test[_-]placeholder)$/i,
   /^TODO$/i,
-  /^replace_me$/i,
-  /^your[-_].*$/i,
+  /^replace[_-]?me$/i,
   /^<.*>$/,
 ];
 
 export const FORBIDDEN_SUBSTRINGS = [
   'CHANGE_ME',
+  'change_me',
+  'change-me',
   'replace_me',
+  'replace-me',
+  'dummy_secret',
+  'dummy-secret',
+  'test_secret',
+  'test-secret',
+  'rzp_test_placeholder',
   'your-supabase-publishable-key',
+  'your_supabase_publishable_key',
   'your-supabase-service-role-key',
+  'your_supabase_service_role_key',
   'your_razorpay_key_secret',
+  'your-razorpay-key-secret',
   'your-razorpay-webhook-secret',
+  'your_razorpay_webhook_secret',
   'your-admin-secret-here',
+  'your_admin_secret_here',
   'your-cron-secret-token-here',
+  'your_cron_secret_token_here',
   'your-superadmin-e2e-token-here',
+  'your_superadmin_e2e_token_here',
   'your-project-ref.supabase.co',
+  'your_project_ref.supabase.co',
 ];
 
 export const REQUIRED_PRODUCTION_VARS = [
