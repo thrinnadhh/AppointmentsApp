@@ -300,11 +300,27 @@ describe('17. Wave-3: Booking Confirmation & Mock Order Guard', () => {
     assert.match(code, /allowMockOrder = canMockPayments\(\) && razorpay_order_id\.startsWith/, 'Must not allow order_mock_ bypass unless canMockPayments is true');
   });
 
+  it('verifies /api/bookings/confirm strictly asserts gateway_order_id binding and order amount', () => {
+    const code = fs.readFileSync(confirmRoutePath, 'utf8');
+    assert.match(code, /!booking\.gateway_order_id \|\| booking\.gateway_order_id !== razorpay_order_id/, 'Must strictly assert gateway_order_id is non-null and strictly equals razorpay_order_id');
+    assert.match(code, /Order ID mismatch or unlinked booking/, 'Must return 400 with Order ID mismatch or unlinked booking error');
+    assert.match(code, /fetchRazorpayOrder/, 'Must fetch order from Razorpay');
+    assert.match(code, /Tampered payment amount/, 'Must return 400 with Tampered payment amount error');
+  });
+
   it('verifies /api/payments/verify strictly rejects mock payment and order IDs when mock payments are disabled', () => {
     const code = fs.readFileSync(verifyRoutePath, 'utf8');
     assert.match(code, /canMockPayments/, 'Must import and check canMockPayments');
     assert.match(code, /isMockPayment \|\| isMockOrder/, 'Must detect mock payment or mock order IDs');
     assert.match(code, /Mock payments and mock orders are disabled/, 'Must return 400 when mock payment is attempted without permission');
+  });
+
+  it('verifies /api/payments/verify strictly asserts gateway_order_id binding and order amount', () => {
+    const code = fs.readFileSync(verifyRoutePath, 'utf8');
+    assert.match(code, /!booking\.gateway_order_id \|\| booking\.gateway_order_id !== razorpay_order_id/, 'Must strictly assert gateway_order_id is non-null and strictly equals razorpay_order_id');
+    assert.match(code, /Order ID mismatch or unlinked booking/, 'Must return 400 with Order ID mismatch or unlinked booking error');
+    assert.match(code, /fetchRazorpayOrder/, 'Must fetch order from Razorpay');
+    assert.match(code, /Tampered payment amount/, 'Must return 400 with Tampered payment amount error');
   });
 });
 

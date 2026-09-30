@@ -294,8 +294,8 @@ function verifyPaymentIntegrity({ booking, paymentId, orderId, existingPayments 
     return { status: 410, error: 'Slot hold has expired and is no longer held' };
   }
 
-  if (booking.gateway_order_id && orderId !== booking.gateway_order_id && !orderId.startsWith('order_mock_')) {
-    return { status: 400, error: 'Payment order ID does not match booking reservation' };
+  if (!booking.gateway_order_id || booking.gateway_order_id !== orderId) {
+    return { status: 400, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' };
   }
 
   const isReplayed = existingPayments.some(p => p.gateway_payment_id === paymentId && p.booking_id !== booking.id);
@@ -691,6 +691,17 @@ describe('7. Payment Verification & Anti-Tampering Guards (/api/payments/verify)
     const res = verifyPaymentIntegrity({ booking: expiredBooking, paymentId: 'pay_123', orderId: 'order_legit_555' });
     assert.strictEqual(res.status, 410);
     assert.match(res.error, /hold has expired/);
+  });
+
+  it('rejects unlinked booking where gateway_order_id is null or missing (400)', () => {
+    const unlinkedBooking = { ...mockBooking, gateway_order_id: null };
+    const res = verifyPaymentIntegrity({
+      booking: unlinkedBooking,
+      paymentId: 'pay_123',
+      orderId: 'order_legit_555',
+    });
+    assert.strictEqual(res.status, 400);
+    assert.match(res.error, /Order ID mismatch or unlinked booking/);
   });
 
   it('rejects payment if razorpay_order_id does not match booking reservation (400)', () => {

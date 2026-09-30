@@ -117,7 +117,7 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<Ra
   }
 
   const sanitizedReceipt = (receipt || 'rcpt').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
-  const mockId = `order_mock_${sanitizedReceipt}_${Date.now().toString(36)}`;
+  const mockId = `order_mock_${amount}_${sanitizedReceipt}_${Date.now().toString(36)}`;
   return {
     id: mockId,
     amount,
@@ -266,6 +266,88 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
       };
     } catch (err) {
       console.error('[Razorpay] fetch payment failed:', err);
+      return null;
+    }
+  }
+
+  return null;
+}
+
+export interface RazorpayOrderDetails {
+  id: string;
+  amount: number; // in paise
+  amount_paid?: number;
+  currency: string;
+  receipt?: string;
+  status: string;
+  notes?: Record<string, string>;
+  is_mock?: boolean;
+}
+
+/**
+ * Fetches order details from the Razorpay API to verify status and amount.
+ */
+export async function fetchRazorpayOrder(orderId: string): Promise<RazorpayOrderDetails | null> {
+  if (!orderId || !orderId.trim()) return null;
+
+  // 1. Mock order response ONLY if explicitly enabled AND strictly in non-production
+  if (canMockPayments()) {
+    if (
+      orderId.includes('invalid') ||
+      orderId.includes('fake') ||
+      orderId.includes('nonexistent')
+    ) {
+      return null;
+    }
+    if (orderId.includes('tampered')) {
+      return {
+        id: orderId,
+        amount: 100, // 1 INR tampered amount (mismatched with booking deposit/total)
+        currency: 'INR',
+        status: 'created',
+        is_mock: true,
+      };
+    }
+    const mockAmountMatch = orderId.match(/^order_mock_(\d+)_/);
+    const mockAmount = mockAmountMatch ? parseInt(mockAmountMatch[1], 10) : 11000;
+    return {
+      id: orderId,
+      amount: mockAmount,
+      currency: 'INR',
+      status: 'created',
+      is_mock: true,
+    };
+  }
+
+  // 2. Query live Razorpay REST API when credentials are configured
+  if (isRazorpayConfigured()) {
+    try {
+      const keyId = process.env.RAZORPAY_KEY_ID!;
+      const keySecret = process.env.RAZORPAY_KEY_SECRET!;
+      const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+      const res = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`, {
+        method: 'GET',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) {
+        return null;
+      }
+      const data = await res.json();
+      return {
+        id: data.id,
+        amount: data.amount,
+        amount_paid: data.amount_paid,
+        currency: data.currency,
+        receipt: data.receipt,
+        status: data.status,
+        notes: data.notes,
+        is_mock: false,
+      };
+    } catch (err) {
+      console.error('[Razorpay] fetch order failed:', err);
       return null;
     }
   }

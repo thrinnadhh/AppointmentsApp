@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { verifyRazorpaySignature, fetchRazorpayPayment, isRazorpayConfigured, canMockPayments } from '@/lib/razorpay';
+import { verifyRazorpaySignature, fetchRazorpayPayment, fetchRazorpayOrder, isRazorpayConfigured, canMockPayments } from '@/lib/razorpay';
 import { ConfirmPaymentResponse } from '@appointments/shared';
 
 interface ExtendedConfirmRequest {
@@ -197,12 +197,30 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Verify order ID matches booking order
-      const orderMatches = booking.gateway_order_id ? razorpay_order_id === booking.gateway_order_id : true;
+      // Strictly assert booking.gateway_order_id is non-null and strictly equals the incoming razorpay_order_id
       const allowMockOrder = canMockPayments() && razorpay_order_id.startsWith('order_mock_');
-      if (booking.gateway_order_id && !orderMatches && !allowMockOrder) {
+      if (!booking.gateway_order_id || booking.gateway_order_id !== razorpay_order_id) {
         return NextResponse.json<ConfirmPaymentResponse>(
-          { success: false, error: 'Payment order_id does not match booking order' },
+          { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
+          { status: 400 }
+        );
+      }
+
+      // Fetch order details from Razorpay to verify expected amount
+      const razorpayOrder = await fetchRazorpayOrder(razorpay_order_id);
+      if (!razorpayOrder) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Payment order not found on gateway' },
+          { status: 400 }
+        );
+      }
+
+      const expectedDepositPaise = Math.round(Number(booking.deposit_amount || 0) * 100);
+      const expectedTotalPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 0) * 100);
+
+      if (razorpayOrder.amount !== expectedDepositPaise && razorpayOrder.amount !== expectedTotalPaise) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Tampered payment amount' },
           { status: 400 }
         );
       }

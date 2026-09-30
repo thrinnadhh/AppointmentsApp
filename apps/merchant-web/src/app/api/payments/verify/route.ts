@@ -113,12 +113,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Verify order ID matches booking gateway_order_id
-    const orderMatches = booking.gateway_order_id ? razorpay_order_id === booking.gateway_order_id : true;
+    // Strictly assert booking.gateway_order_id is non-null and strictly equals the incoming razorpay_order_id
     const allowMockOrder = canMockPayments() && razorpay_order_id.startsWith('order_mock_');
-    if (booking.gateway_order_id && !orderMatches && !allowMockOrder) {
+    if (!booking.gateway_order_id || booking.gateway_order_id !== razorpay_order_id) {
       return NextResponse.json<VerifyRazorpayPaymentResponse>(
-        { success: false, error: 'Payment order ID does not match booking reservation' },
+        { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
+        { status: 400 }
+      );
+    }
+
+    // Fetch order from Razorpay to assert that expected deposit matches razorpayOrder.amount
+    const { fetchRazorpayOrder } = await import('@/lib/razorpay');
+    const razorpayOrder = await fetchRazorpayOrder(razorpay_order_id);
+    if (!razorpayOrder) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Payment order not found on gateway' },
+        { status: 400 }
+      );
+    }
+
+    const expectedDepositPaise = Math.round(Number(booking.deposit_amount || 0) * 100);
+    const expectedTotalPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 0) * 100);
+
+    if (razorpayOrder.amount !== expectedDepositPaise && razorpayOrder.amount !== expectedTotalPaise) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Tampered payment amount' },
         { status: 400 }
       );
     }
