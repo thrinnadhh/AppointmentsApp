@@ -216,6 +216,7 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
 
   // 1. Mock payment response ONLY if explicitly enabled AND strictly in non-production
   if (canMockPayments()) {
+    // Explicit failure simulation — always return null regardless of config
     if (
       paymentId.includes('fake') ||
       paymentId.includes('invalid') ||
@@ -226,11 +227,24 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
     ) {
       return null;
     }
+    // Known mock/test prefixes always get a captured mock response
     if (
       paymentId.startsWith('sim_') ||
       paymentId.startsWith('mock_') ||
-      paymentId.startsWith('pay_mock_')
+      paymentId.startsWith('pay_mock_') ||
+      paymentId.startsWith('pay_test_')
     ) {
+      return {
+        id: paymentId,
+        status: 'captured',
+        order_id: 'order_test_mock',
+        amount: 11000,
+        currency: 'INR',
+      };
+    }
+    // When Razorpay credentials are not configured (CI), treat any pay_ prefix as
+    // a captured mock to avoid live API calls with synthetic E2E payment IDs.
+    if (!isRazorpayConfigured() && paymentId.startsWith('pay_')) {
       return {
         id: paymentId,
         status: 'captured',
