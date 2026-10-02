@@ -8,6 +8,7 @@
 --    Set search_path = public, pg_temp on public.mask_customer_phone.
 -- 3. Fix Public Can Execute SECURITY DEFINER Function (0028_anon_security_definer_function_executable):
 --    Revoke anon execution on trigger functions and internal security definer helpers.
+-- 4. Aligned remote schema_migrations tracking table with canonical repository timestamps.
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. MASKED PHONE FUNCTION SEARCH PATH FIX
