@@ -201,7 +201,12 @@ export class CustomerAppPage {
     // Wait for the specific provider card with an extended timeout to account for Supabase latency
     const card = this.page.getByText(name).first();
     await expect(card).toBeVisible({ timeout: 25000 });
+    await card.scrollIntoViewIfNeeded().catch(() => {});
     await card.click();
+    // Guard against touch dispatch drop on mobile web preview
+    if (!(await this.staffSectionHeading.isVisible({ timeout: 3000 }).catch(() => false))) {
+      await card.click({ force: true }).catch(() => {});
+    }
     await expect(this.staffSectionHeading).toBeVisible({ timeout: 15000 });
   }
 

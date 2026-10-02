@@ -72,6 +72,9 @@ export function clearProvidersCache(): void {
   categoryProvidersCache.clear();
 }
 
+export const PUBLIC_PROVIDER_FIELDS =
+  'id, owner_id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, cooling_period_days, weekly_hours, created_at, updated_at, resources(*)';
+
 // Enhanced Supabase Service for Customer Mobile Application
 export async function fetchProvidersByCategory(categoryId?: string): Promise<ProviderWithDetails[]> {
   const cacheKey = categoryId || 'all';
@@ -83,7 +86,7 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
   try {
     let query = supabase
       .from('providers')
-      .select('*, resources(*)')
+      .select(PUBLIC_PROVIDER_FIELDS)
       .eq('status', 'ACTIVE');
 
     const dbCat = categoryId && categoryId !== 'all' ? resolveCategoryId(categoryId) : null;
@@ -239,11 +242,15 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
   try {
     const { data, error } = await supabase
       .from('providers')
-      .select('*, resources(*)')
+      .select(PUBLIC_PROVIDER_FIELDS)
       .eq('id', providerId)
       .single();
 
     if (error || !data) {
+      console.warn('Supabase fetchProviderById error, checking category cache:', error);
+      const allCached = getCachedProvidersByCategory('all') || [];
+      const found = allCached.find((p) => p.id === providerId);
+      if (found) return found;
       return null;
     }
 

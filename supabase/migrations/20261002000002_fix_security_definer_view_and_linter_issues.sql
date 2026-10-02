@@ -138,3 +138,14 @@ GRANT EXECUTE ON FUNCTION public.admin_update_merchant_status(uuid, text, text) 
 
 REVOKE EXECUTE ON FUNCTION public.admin_update_resource_status(uuid, boolean, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_update_resource_status(uuid, boolean, text) TO authenticated, service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5. GRANT EXPLICIT PUBLIC DIRECTORY COLUMNS TO ANON
+-- ─────────────────────────────────────────────────────────────────────────────
+GRANT SELECT (
+  id, owner_id, category_id, sub_category_id, name, description,
+  address, city, latitude, longitude, phone, email,
+  opening_time, closing_time, photos, status, is_active,
+  cooling_period_days, weekly_hours, created_at, updated_at
+) ON public.providers TO anon;
+
