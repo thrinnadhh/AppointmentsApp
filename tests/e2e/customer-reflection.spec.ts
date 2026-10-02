@@ -16,11 +16,14 @@ const serviceSupabase = SUPABASE_SERVICE_ROLE_KEY
 const ADMIN_BYPASS_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
 const ADMIN_HEADERS = { 'x-admin-bypass-key': ADMIN_BYPASS_TOKEN };
 
+const PUBLIC_PROVIDER_FIELDS =
+  'id, owner_id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, cooling_period_days, weekly_hours, created_at, updated_at, resources(*)';
+
 // Customer Mobile App data fetching engine (mirroring apps/customer-mobile/src/services/api.ts)
 async function customerFetchProvidersByCategory(categoryId?: string) {
   let query = customerSupabase
     .from('providers')
-    .select('*, resources(*)')
+    .select(PUBLIC_PROVIDER_FIELDS)
     .eq('status', 'ACTIVE');
 
   const CATEGORY_MAP: Record<string, string> = {
