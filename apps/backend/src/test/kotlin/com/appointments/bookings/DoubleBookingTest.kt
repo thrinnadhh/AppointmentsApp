@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 
 @SpringBootTest
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class DoubleBookingTest {
 

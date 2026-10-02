@@ -69,7 +69,7 @@ export default function BookingsManagementPage() {
       setSelectedProviderId(activeProvider.id);
       setProviders([activeProvider]);
     }
-  }, [activeProvider?.id, isSuperAdmin]);
+  }, [activeProvider, isSuperAdmin]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -628,6 +628,11 @@ export default function BookingsManagementPage() {
                       }`}>
                         {booking.status.replace('_', ' ')}
                       </span>
+                      {booking.is_followup && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
+                          🔄 Free Follow-up
+                        </span>
+                      )}
                       {(booking.no_show_count ?? 0) >= 3 && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
                           ⚠️ {booking.no_show_count} Strikes
@@ -653,7 +658,7 @@ export default function BookingsManagementPage() {
                         />
                       )}
                       <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
-                        Deposit: ₹{booking.deposit_amount} ({booking.payment_status})
+                        {booking.is_followup ? 'Deposit: ₹0 (Free Follow-up Consultation)' : `Deposit: ₹${booking.deposit_amount} (${booking.payment_status})`}
                       </span>
                       {booking.customer_arrived_at && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">

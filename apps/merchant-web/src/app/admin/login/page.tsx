@@ -22,10 +22,25 @@ import { supabase } from '@/lib/supabase';
 
 type LoginStep = 'CREDENTIALS' | 'MFA_CHALLENGE' | 'MFA_ENROLL';
 
+/**
+ * Validates return URLs to prevent Open Redirect attacks (vuln-0024).
+ * Disallows protocol-relative URLs (e.g. //evil.com) and absolute external origins.
+ */
+const SAFE_REDIRECT_REGEX = /^\/(?!\/)[a-zA-Z0-9\-_./?=&%]*$/;
+
+function getSafeRedirectUrl(target: string | null | undefined, fallback = '/admin'): string {
+  if (!target) return fallback;
+  const trimmed = target.trim();
+  if (SAFE_REDIRECT_REGEX.test(trimmed)) {
+    return trimmed;
+  }
+  return fallback;
+}
+
 function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect') || '/admin';
+  const redirectTarget = getSafeRedirectUrl(searchParams.get('redirect'), '/admin');
 
   // State Machine
   const [step, setStep] = useState<LoginStep>('CREDENTIALS');

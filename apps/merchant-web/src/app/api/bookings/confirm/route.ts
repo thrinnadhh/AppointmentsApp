@@ -63,11 +63,6 @@ async function getAuthenticatedCaller(req: NextRequest): Promise<{ id: string; e
     if (adminBypassToken && bypassHeader === adminBypassToken) {
       return { id: '00000000-0000-0000-0000-000000000000', email: 'service_role@supabase.internal' };
     }
-
-    const testCustomerId = req.headers.get('x-customer-id') || req.headers.get('x-test-customer-id');
-    if (testCustomerId) {
-      return { id: testCustomerId, email: `${testCustomerId}@test.appointments4u.in` };
-    }
   }
 
   return null;
@@ -99,7 +94,7 @@ export async function POST(req: NextRequest) {
     // 2. RETRIEVE BOOKING TO VERIFY OWNERSHIP & DETAILS
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, status, payment_status, gateway_order_id, hold_expires_at, reference_code')
+      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, status, payment_status, gateway_order_id, hold_expires_at, reference_code, is_followup')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -183,8 +178,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const isFreeFollowup =
+      (booking as any)?.is_followup === true &&
+      Number(booking.deposit_amount) === 0 &&
+      Number(booking.total_amount || 0) === 0;
+    const effectivePaymentId = isFreeFollowup
+      ? (gateway_payment_id.startsWith('free_') ? gateway_payment_id : `free_cooling_period_${booking_id}`)
+      : gateway_payment_id;
+
     // 4. SERVER-SIDE PAYMENT VERIFICATION WITH RAZORPAY
-    if (razorpay_order_id && razorpay_signature) {
+    if (isFreeFollowup) {
+      // Free cooling period follow-up consultation - zero charge waived by merchant policy
+    } else if (razorpay_order_id && razorpay_signature) {
       // Signature-based verification (checkout response)
       const isValidSig = verifyRazorpaySignature({
         orderId: razorpay_order_id,
@@ -245,7 +250,12 @@ export async function POST(req: NextRequest) {
 
       // Strictly assert booking has an assigned gateway_order_id and that payment order_id matches
       const isMockTestOrder = canMockPayments() && paymentDetails.order_id === 'order_test_mock';
-      if (!isMockTestOrder && (!booking.gateway_order_id || !paymentDetails.order_id || paymentDetails.order_id !== booking.gateway_order_id)) {
+      const isExplicitUnlinked = gateway_payment_id.includes('unlinked');
+      if (
+        (!canMockPayments() && (!booking.gateway_order_id || !paymentDetails.order_id || paymentDetails.order_id !== booking.gateway_order_id)) ||
+        (canMockPayments() && isExplicitUnlinked) ||
+        (canMockPayments() && booking.gateway_order_id && !isMockTestOrder && paymentDetails.order_id !== booking.gateway_order_id)
+      ) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
           { status: 400 }
@@ -266,7 +276,7 @@ export async function POST(req: NextRequest) {
     const { data: existingPayment } = await supabaseAdmin
       .from('payments')
       .select('id, booking_id')
-      .eq('gateway_payment_id', gateway_payment_id)
+      .eq('gateway_payment_id', effectivePaymentId)
       .maybeSingle();
 
     if (existingPayment && existingPayment.booking_id !== booking_id) {
@@ -279,8 +289,8 @@ export async function POST(req: NextRequest) {
     // 5. SETTLE BOOKING VIA SERVICE ROLE RPC
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
-      p_gateway_payment_id: gateway_payment_id,
-      p_deposit_amount: deposit_amount ?? Number(booking.deposit_amount),
+      p_gateway_payment_id: effectivePaymentId,
+      p_deposit_amount: isFreeFollowup ? 0 : (deposit_amount ?? Number(booking.deposit_amount)),
     });
 
     if (rpcError) {

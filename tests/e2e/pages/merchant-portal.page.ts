@@ -128,6 +128,9 @@ export class MerchantPortalPage {
     this.cancelStaffBtn = page.getByRole('button', { name: /Cancel/i, exact: true });
     this.staffCards = page.locator('h3:has-text("Dr.")');
     this.staffSuccessBanner = page.locator('text=/Staff account created for/i');
+
+    page.on('console', (msg) => console.log('[BROWSER CONSOLE]', msg.type(), msg.text()));
+    page.on('pageerror', (err) => console.error('[BROWSER ERROR]', err.message));
   }
 
   // Navigation Methods
@@ -451,4 +454,31 @@ export class MerchantPortalPage {
     await this.diagnosticButton.click();
     await expect(this.diagnosticResultBanner).toBeVisible({ timeout: 10000 });
   }
+
+  async gotoSettings() {
+    await this.page.goto('http://localhost:3000/settings', { waitUntil: 'domcontentloaded' });
+    await this.ensureAuthenticated();
+    await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
+    await expect(this.page.getByRole('heading', { name: /Settings & Profile/i })).toBeVisible({ timeout: 15000 });
+  }
+
+  async setCoolingPeriod(days: number) {
+    await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
+    const policiesTab = this.page.getByRole('button', { name: /Policies|Terms|Deposit & Refund/i });
+    if (await policiesTab.isVisible().catch(() => false)) {
+      await policiesTab.click();
+    }
+
+    const presetBtn = this.page.getByRole('button', { name: new RegExp(`^${days} Days`, 'i') });
+    await presetBtn.scrollIntoViewIfNeeded().catch(() => {});
+    await expect(presetBtn).toBeVisible({ timeout: 10000 });
+    await presetBtn.click();
+
+    const saveBtn = this.page.getByTestId('settings-save-button').or(this.page.getByRole('button', { name: /Save Changes|Save Settings/i }));
+    await expect(saveBtn).toBeVisible({ timeout: 10000 });
+    await saveBtn.scrollIntoViewIfNeeded().catch(() => {});
+    await saveBtn.click();
+    await expect(this.page.getByText(/Settings Saved!|Configurations successfully persisted|Settings updated/i).first()).toBeVisible({ timeout: 15000 });
+  }
 }
+

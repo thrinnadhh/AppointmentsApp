@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation Cutoff', () => {
   const BASE_URL = 'http://localhost:3000';
@@ -12,8 +13,10 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
   const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
   const CUSTOMER_HEADERS = { 'x-customer-id': testCustomerId };
   const ADMIN_HEADERS = { 'x-admin-bypass-key': adminBypassToken };
+  const testProviderId = '11111111-1111-1111-1111-111111111111';
   let originalStrikeCount = 0;
   let originalIsFlagged = false;
+  let originalCoolingPeriod = 0;
 
   test.beforeAll(async () => {
     // Read and save original strikes
@@ -31,6 +34,38 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       p_customer_id: testCustomerId,
       p_count: 0,
     });
+
+    // Clean up any stray active bookings for test customer to avoid slot range collisions
+    const { data: activeTestBookings } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('customer_id', testCustomerId)
+      .in('status', ['HELD', 'CONFIRMED']);
+
+    if (activeTestBookings && activeTestBookings.length > 0) {
+      for (const b of activeTestBookings) {
+        await supabase.rpc('cancel_booking', {
+          p_booking_id: b.id,
+          p_initiated_by: 'MERCHANT',
+          p_reason: 'e2e_test_cleanup',
+        });
+      }
+    }
+
+    // Check and disable cooling period so test bookings are full paid reservations
+    const { data: prov } = await supabase
+      .from('providers')
+      .select('cooling_period_days')
+      .eq('id', testProviderId)
+      .single();
+
+    originalCoolingPeriod = prov?.cooling_period_days ?? 0;
+    if (originalCoolingPeriod > 0) {
+      await supabase
+        .from('providers')
+        .update({ cooling_period_days: 0 })
+        .eq('id', testProviderId);
+    }
   });
 
   test.afterAll(async () => {
@@ -39,12 +74,21 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       p_customer_id: testCustomerId,
       p_count: originalStrikeCount,
     });
+
+    // Restore original cooling period
+    if (originalCoolingPeriod > 0) {
+      await supabase
+        .from('providers')
+        .update({ cooling_period_days: originalCoolingPeriod })
+        .eq('id', testProviderId);
+    }
   });
 
   test('1. Strike 1: First missed appointment gets full courtesy refund (Grace Period)', async ({ request }) => {
     // 1. Create future slot hold
-    const slotStart = new Date(Date.now() + 86400000 * 5).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 5 + 1800000).toISOString();
+    const baseOffset1 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset1).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset1 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: {
@@ -63,10 +107,14 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       p_gateway_payment_id: `pay_mock_strike1_${Date.now()}`,
     });
 
-    // 3. Backdate slot_start to past so premature no-show check passes
+    // 3. Backdate slot_start and slot_end to past so premature no-show check passes
+    const pastOffset1 = 3600000 * 24 * (30 + Math.floor(Math.random() * 50));
     await supabase
       .from('bookings')
-      .update({ slot_start: new Date(Date.now() - 3600000).toISOString() })
+      .update({
+        slot_start: new Date(Date.now() - pastOffset1).toISOString(),
+        slot_end: new Date(Date.now() - pastOffset1 + 1800000).toISOString(),
+      })
       .eq('id', booking_id);
 
     // 4. Mark No-Show
@@ -74,6 +122,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       headers: ADMIN_HEADERS,
       data: { booking_id },
     });
+    if (noShowRes.status() !== 200) {
+      console.log('NO SHOW ERROR RESPONSE:', noShowRes.status(), await noShowRes.text());
+    }
     expect(noShowRes.status()).toBe(200);
     const data = await noShowRes.json();
     expect(data.success).toBe(true);
@@ -89,8 +140,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
   });
 
   test('2. Strike 2: Second missed appointment gets full courtesy refund (Grace Period)', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 6).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 6 + 1800000).toISOString();
+    const baseOffset2 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset2).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset2 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: {
@@ -108,10 +160,14 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       p_gateway_payment_id: `pay_mock_strike2_${Date.now()}`,
     });
 
-    // Backdate slot_start
+    // Backdate slot_start and slot_end
+    const pastOffset2 = 3600000 * 24 * (100 + Math.floor(Math.random() * 50));
     await supabase
       .from('bookings')
-      .update({ slot_start: new Date(Date.now() - 3600000).toISOString() })
+      .update({
+        slot_start: new Date(Date.now() - pastOffset2).toISOString(),
+        slot_end: new Date(Date.now() - pastOffset2 + 1800000).toISOString(),
+      })
       .eq('id', booking_id);
 
     // Mark No-Show
@@ -132,8 +188,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
   });
 
   test('3. Strike 3: Third missed appointment forfeits ₹100 deposit to merchant', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 7).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 7 + 1800000).toISOString();
+    const baseOffset3 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset3).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset3 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: {
@@ -151,10 +208,14 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       p_gateway_payment_id: `pay_mock_strike3_${Date.now()}`,
     });
 
-    // Backdate slot_start
+    // Backdate slot_start and slot_end
+    const pastOffset3 = 3600000 * 24 * (200 + Math.floor(Math.random() * 50));
     await supabase
       .from('bookings')
-      .update({ slot_start: new Date(Date.now() - 3600000).toISOString() })
+      .update({
+        slot_start: new Date(Date.now() - pastOffset3).toISOString(),
+        slot_end: new Date(Date.now() - pastOffset3 + 1800000).toISOString(),
+      })
       .eq('id', booking_id);
 
     // Mark No-Show
@@ -177,8 +238,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
   test('4. Cancellation at 45 minutes before slot yields 100% full refund', async ({ request }) => {
     // 1. Create a future slot
-    const slotStart = new Date(Date.now() + 86400000 * 8).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 8 + 1800000).toISOString();
+    const baseOffset4 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset4).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset4 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: {
@@ -198,9 +260,10 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
     // Set slot_start to exactly 45 minutes from now (> 30m policy cutoff)
     const slot45Min = new Date(Date.now() + 45 * 60 * 1000).toISOString();
+    const slot75Min = new Date(Date.now() + 75 * 60 * 1000).toISOString();
     await supabase
       .from('bookings')
-      .update({ slot_start: slot45Min })
+      .update({ slot_start: slot45Min, slot_end: slot75Min })
       .eq('id', booking_id);
 
     // Cancel booking via API as customer
@@ -222,8 +285,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
   test('5. Late cancellation at 15 minutes (<= 30m) forfeits deposit to merchant', async ({ request }) => {
     // 1. Create future slot
-    const slotStart = new Date(Date.now() + 86400000 * 9).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 9 + 1800000).toISOString();
+    const baseOffset5 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset5).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset5 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: {
@@ -243,9 +307,10 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
 
     // Set slot_start to exactly 15 minutes from now (inside 30-min cutoff)
     const slot15Min = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const slot45Min = new Date(Date.now() + 45 * 60 * 1000).toISOString();
     await supabase
       .from('bookings')
-      .update({ slot_start: slot15Min })
+      .update({ slot_start: slot15Min, slot_end: slot45Min })
       .eq('id', booking_id);
 
     // Cancel booking via API
@@ -266,8 +331,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
   });
 
   test('6. Merchant cancellation refunds deposit + platform_fee + platform_fee_gst', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 10).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 10 + 1800000).toISOString();
+    const baseOffset6 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset6).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset6 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: {
@@ -326,8 +392,9 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
   });
 
   test('7. Razorpay refund failure sets REFUND_FAILED and creates admin_audit_logs record', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 11).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 11 + 1800000).toISOString();
+    const baseOffset7 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset7).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset7 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: {
@@ -347,9 +414,11 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     });
 
     // Set slot_start to 75m from now so cancellation is eligible for refund
+    const slot75Min = new Date(Date.now() + 75 * 60 * 1000).toISOString();
+    const slot105Min = new Date(Date.now() + 105 * 60 * 1000).toISOString();
     await supabase
       .from('bookings')
-      .update({ slot_start: new Date(Date.now() + 75 * 60 * 1000).toISOString() })
+      .update({ slot_start: slot75Min, slot_end: slot105Min })
       .eq('id', booking_id);
 
     const cancelRes = await request.post(`${BASE_URL}/api/bookings/cancel`, {

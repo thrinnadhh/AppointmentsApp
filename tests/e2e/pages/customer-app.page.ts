@@ -108,7 +108,9 @@ export class CustomerAppPage {
     this.staffSectionHeading = page.getByText('1. Select Staff / Unit');
     this.dateSectionHeading = page.getByText('2. Choose Date');
     this.slotSectionHeading = page.getByText('3. Available Slots');
-    this.holdDepositBtn = page.getByText('Hold Slot & Pay Deposit →').or(page.getByText('Confirm & Pay Total Cash →'));
+    this.holdDepositBtn = page.getByText('Hold Slot & Pay Deposit →')
+      .or(page.getByText('Confirm & Pay Total Cash →'))
+      .or(page.getByText(/Confirm Free Appointment/i));
     this.selectTimeSlotBtn = page.getByText('Select a Time Slot');
     this.stickyFooterPrice = page.locator('text=Deposit to hold:').or(page.locator('text=Total fee:')).locator('..');
 
@@ -117,7 +119,7 @@ export class CustomerAppPage {
     this.timerCard = page.getByText('Slot Held for You').locator('..');
     this.paymentDetailsCard = page.getByText('Payment Details');
     this.cancelModalBtn = page.getByText('✕ Cancel');
-    this.payDepositBtn = page.locator('text=/Pay ₹[0-9]+ via Razorpay/i');
+    this.payDepositBtn = page.locator('text=/Pay ₹[0-9]+ via Razorpay|Confirm Free Follow-up Appointment/i');
 
     // My Bookings Screen
     this.myBookingsTitle = page.getByText('My Appointments');

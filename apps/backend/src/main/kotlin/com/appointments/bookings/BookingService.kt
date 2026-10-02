@@ -1,10 +1,12 @@
 package com.appointments.bookings
 
+import com.appointments.catalog.ResourceRepository
 import com.appointments.catalog.ServiceRepository
 import com.appointments.common.errors.ConflictException
 import com.appointments.common.errors.ForbiddenException
 import com.appointments.common.errors.NotFoundException
 import com.appointments.identity.UserService
+import com.appointments.merchants.MerchantStaffRepository
 import com.appointments.notifications.OutboxEventRepository
 import com.appointments.notifications.OutboxEventEntity
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -19,6 +21,8 @@ import java.util.UUID
 class BookingService(
     private val bookingRepository: BookingRepository,
     private val serviceRepository: ServiceRepository,
+    private val resourceRepository: ResourceRepository,
+    private val staffRepository: MerchantStaffRepository,
     private val userService: UserService,
     private val outboxRepository: OutboxEventRepository,
     private val objectMapper: ObjectMapper,
@@ -36,6 +40,16 @@ class BookingService(
         val customer = userService.requireByAuthRef(authRef)
         val svc = serviceRepository.findById(serviceId)
             .orElseThrow { NotFoundException("Service not found: $serviceId") }
+        if (svc.merchantId != merchantId) {
+            throw ForbiddenException("Service $serviceId does not belong to merchant $merchantId")
+        }
+        if (resourceId != null) {
+            val res = resourceRepository.findById(resourceId)
+                .orElseThrow { NotFoundException("Resource not found: $resourceId") }
+            if (res.merchantId != merchantId) {
+                throw ForbiddenException("Resource $resourceId does not belong to merchant $merchantId")
+            }
+        }
         val slotEnd = slotStart.plusSeconds(svc.durationMin * 60L)
 
         val booking = BookingEntity(
@@ -96,8 +110,10 @@ class BookingService(
     fun complete(bookingId: UUID, authRef: String): BookingEntity {
         val booking = getById(bookingId)
         val user = userService.requireByAuthRef(authRef)
-        if (user.role != "admin" && user.role != "merchant_staff")
-            throw ForbiddenException("Only merchant staff can mark complete")
+        val isStaff = staffRepository.findByUserId(user.id).any { it.merchantId == booking.merchantId }
+        val isAdmin = user.role == "admin"
+        if (!isStaff && !isAdmin)
+            throw ForbiddenException("Only merchant staff for merchant ${booking.merchantId} can mark complete")
         booking.status = "COMPLETED"
         return bookingRepository.save(booking)
     }

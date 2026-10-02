@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   Building2, 
   Plus, 
@@ -79,7 +80,7 @@ export default function VenuesPage() {
     }
   };
 
-  const loadVenues = async () => {
+  const loadVenues = useCallback(async () => {
     setLoading(true);
     try {
       if (isSuperAdmin) {
@@ -100,11 +101,11 @@ export default function VenuesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeProvider, isSuperAdmin]);
 
   useEffect(() => {
     loadVenues();
-  }, [activeProvider, isSuperAdmin]);
+  }, [loadVenues]);
 
   const handleCreateVenue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -342,10 +343,13 @@ export default function VenuesPage() {
                 className="bg-white rounded-xl border border-slate-200 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between overflow-hidden"
               >
                 {venue.photos && venue.photos[0] && (
-                  <img
+                  <Image
                     src={getVenueAssetUrl(venue.photos[0], { width: 400, quality: 80 })}
                     alt={venue.name}
+                    width={400}
+                    height={144}
                     className="w-full h-36 object-cover border-b border-slate-100"
+                    unoptimized
                   />
                 )}
                 <div className="p-5 space-y-4">
@@ -359,6 +363,19 @@ export default function VenuesPage() {
                       <h3 className="text-lg font-bold text-slate-900 mt-2 line-clamp-1">
                         {venue.name}
                       </h3>
+                      {(venue.cooling_period_days ?? 0) > 0 ? (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            🔄 {venue.cooling_period_days}-Day Free Follow-up
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-50 text-slate-500 border border-slate-200">
+                            ⚡ No Cooling Period (0 Days)
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {venue.status}

@@ -47,10 +47,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Enforce initiated_by integrity based on caller identity
-    const effectiveInitiatedBy = (caller.id === booking.customer_id)
-      ? 'CUSTOMER'
-      : 'MERCHANT';
+    let isAdmin = false;
+    if (caller.id !== booking.customer_id) {
+      const { data } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+      isAdmin = !!data;
+    }
+
+    // Enforce initiated_by integrity based on caller identity (vuln-0009)
+    const effectiveInitiatedBy = isAdmin
+      ? (initiated_by || 'MERCHANT')
+      : (caller.id === booking.customer_id ? 'CUSTOMER' : 'MERCHANT');
 
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('cancel_booking', {
       p_booking_id: booking_id,
@@ -99,6 +105,38 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (bkg?.gateway_payment_id) {
+        // Single-winner atomic claim to prevent concurrent duplicate refunds (TOCTOU)
+        const { data: claimed } = await supabaseAdmin
+          .from('payments')
+          .update({
+            status: 'REFUND_PENDING',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('booking_id', booking_id)
+          .eq('status', 'CAPTURED')
+          .select('id, amount');
+
+        if (!claimed || claimed.length === 0) {
+          // Check if payment was already refunded by a previous concurrent request
+          const { data: existingPayment } = await supabaseAdmin
+            .from('payments')
+            .select('status')
+            .eq('booking_id', booking_id)
+            .maybeSingle();
+
+          if (existingPayment?.status === 'REFUNDED') {
+            finalPaymentStatus = 'REFUNDED';
+          }
+
+          // Another concurrent request already claimed the refund or booking is already refunded
+          return NextResponse.json<CancelBookingResponse>({
+            success: true,
+            status: 'CANCELLED',
+            payment_status: finalPaymentStatus,
+            refund_amount: Number(result.refund_amount || 0),
+          });
+        }
+
         try {
           const refundResult = await initiateRazorpayRefund({
             paymentId: bkg.gateway_payment_id,

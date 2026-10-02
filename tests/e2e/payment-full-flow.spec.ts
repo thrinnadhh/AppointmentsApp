@@ -11,12 +11,15 @@ test.describe('Comprehensive Razorpay Payment Gateway Full-Flow Suite', () => {
   const testCustomerId = '99999999-9999-9999-9999-999999999991'; // Kalyan Chakravarthy seed account
 
   test.beforeEach(async () => {
-    // Cancel any stale active holds or bookings for the test customer on this resource to prevent slot collision
+    // Cancel any stale active holds or bookings for the test customer on clinic resources to prevent slot collision
     await supabase
       .from('bookings')
       .update({ status: 'CANCELLED' })
       .eq('customer_id', testCustomerId)
-      .eq('resource_id', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+      .in('resource_id', [
+        'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        'aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      ])
       .in('status', ['HELD', 'CONFIRMED', 'PENDING_PAYMENT']);
   });
 

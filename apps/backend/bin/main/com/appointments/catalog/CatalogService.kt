@@ -1,6 +1,7 @@
 package com.appointments.catalog
 
 import com.appointments.common.errors.NotFoundException
+import com.appointments.common.errors.ForbiddenException
 import com.appointments.merchants.MerchantService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -45,6 +46,9 @@ class CatalogService(
         val merchant = merchantService.getById(merchantId)
         merchantService.requireOwnerOrAdmin(merchant, authRef)
         val svc = getService(id)
+        if (svc.merchantId != merchantId) {
+            throw ForbiddenException("Service $id does not belong to merchant $merchantId")
+        }
         svc.isActive = active
         return serviceRepository.save(svc)
     }

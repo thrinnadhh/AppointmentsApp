@@ -64,6 +64,7 @@ export interface Provider {
   strike_reset_date?: string;
   penalty_balance?: number;
   is_booking_frozen?: boolean;
+  cooling_period_days?: number;
   created_at: string;
   updated_at: string;
 }
@@ -116,6 +117,8 @@ export interface Booking {
   platform_fee?: number | null;
   total_amount?: number | null;
   hold_expires_at?: string | null;
+  is_followup?: boolean;
+  followup_original_booking_id?: string | null;
 
   gateway_payment_id?: string | null;
   created_at: string;
@@ -158,7 +161,11 @@ export interface CreateHoldResult {
   booking_id?: string;
   reference_code?: string;
   deposit_amount?: number;
+  platform_fee?: number;
+  total_amount?: number;
   hold_expires_at?: string;
+  is_followup?: boolean;
+  followup_original_booking_id?: string | null;
   error?: string;
 }
 
@@ -340,4 +347,17 @@ export interface VerifyRazorpayPaymentResponse {
   status?: string;
   payment_status?: string;
   error?: string;
+}
+
+export interface CoolingPeriodEligibilityResult {
+  eligible: boolean;
+  cooling_period_days?: number;
+  original_booking_id?: string;
+  original_slot_start?: string;
+  valid_until?: string;
+  days_remaining?: number;
+  prior_booking_id?: string;
+  prior_slot_start?: string;
+  prior_valid_until?: string;
+  reason?: string;
 }

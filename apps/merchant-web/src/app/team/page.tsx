@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   UserCheck, 
@@ -52,7 +52,7 @@ export default function TeamManagementPage() {
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const loadTeam = async () => {
+  const loadTeam = useCallback(async () => {
     setLoading(true);
     try {
       if (isSuperAdmin) {
@@ -78,11 +78,11 @@ export default function TeamManagementPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeProvider?.id, isSuperAdmin]);
 
   useEffect(() => {
     loadTeam();
-  }, [activeProvider?.id, isSuperAdmin]);
+  }, [loadTeam]);
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -54,6 +54,8 @@ export default function App() {
   const [activeResource, setActiveResource] = useState<Resource | null>(null);
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
   const [activeProviderName, setActiveProviderName] = useState<string>('Sri Venkateswara Dental & Implant Care');
+  const [activeProviderCoolingDays, setActiveProviderCoolingDays] = useState<number | undefined>(undefined);
+  const [activeProviderId, setActiveProviderId] = useState<string | undefined>(undefined);
 
   // Authentication & Active Customer State
   const [activeCustomerId, setActiveCustomerId] = useState<string>(DEMO_CUSTOMER_ID);
@@ -319,24 +321,36 @@ export default function App() {
     ]);
   }, [selectedProviderId, activeCategoryId, loadBookings]);
 
-  const handleProceedToHold = (resource: Resource, slot: Slot, providerName?: string) => {
+  const handleProceedToHold = (
+    resource: Resource,
+    slot: Slot,
+    providerName?: string,
+    coolingPeriodDays?: number,
+    providerId?: string
+  ) => {
     setActiveResource(resource);
     setActiveSlot(slot);
     if (providerName) setActiveProviderName(providerName);
+    setActiveProviderCoolingDays(coolingPeriodDays);
+    setActiveProviderId(providerId || selectedProviderId);
     setCheckoutVisible(true);
   };
 
-  const handlePaymentSuccess = (bookingId: string, referenceCode?: string) => {
+  const handlePaymentSuccess = (bookingId: string, referenceCode?: string, isFollowup?: boolean) => {
     setCheckoutVisible(false);
-    const fee = getPlatformFee(activeCategoryId);
-    const deposit = Number(activeResource?.deposit_amount) || 100;
+    const fee = isFollowup ? 0 : getPlatformFee(activeCategoryId);
+    const deposit = isFollowup ? 0 : (Number(activeResource?.deposit_amount) || 100);
     const total = deposit + fee;
-    setConfirmationToast(`Booking Confirmed! Paid ₹${total} (Deposit ₹${deposit} + Platform Fee ₹${fee}).`);
+    if (isFollowup) {
+      setConfirmationToast(`Booking Confirmed! Free Follow-up Consultation (₹0 fee waived within cooling period).`);
+    } else {
+      setConfirmationToast(`Booking Confirmed! Paid ₹${total} (Deposit ₹${deposit} + Platform Fee ₹${fee}).`);
+    }
 
     const newBooking: Booking & { provider_name?: string; resource_name?: string } = {
       id: bookingId,
       customer_id: activeCustomerId,
-      provider_id: selectedProviderId || '',
+      provider_id: activeProviderId || selectedProviderId || '',
       resource_id: activeResource?.id || '',
       slot_start: activeSlot?.start_time || new Date().toISOString(),
       slot_end: activeSlot?.end_time || new Date().toISOString(),
@@ -345,6 +359,7 @@ export default function App() {
       deposit_amount: deposit,
       platform_fee: fee,
       total_amount: total,
+      is_followup: Boolean(isFollowup),
       reference_code: referenceCode || `TPT-${bookingId.slice(0, 6).toUpperCase()}`,
       provider_name: activeProviderName || 'Sri Venkateswara Dental & Implant Care',
       resource_name: activeResource?.name || 'Assigned Staff / Unit',
@@ -451,6 +466,7 @@ export default function App() {
       {currentScreen === 'PROVIDER_DETAIL' && (
         <ProviderDetailScreen
           providerId={selectedProviderId}
+          customerId={activeCustomerId}
           onBack={handleGoBack}
           onProceedToHold={handleProceedToHold}
         />
@@ -473,6 +489,8 @@ export default function App() {
         slot={activeSlot}
         categoryId={activeCategoryId}
         customerId={activeCustomerId}
+        providerId={activeProviderId || selectedProviderId}
+        coolingPeriodDays={activeProviderCoolingDays}
         onClose={() => setCheckoutVisible(false)}
         onPaymentSuccess={handlePaymentSuccess}
       />

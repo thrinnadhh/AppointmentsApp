@@ -101,6 +101,29 @@ export async function POST(req: NextRequest) {
 
     // If Strike 1 or Strike 2 (Courtesy Grace Period with refund), initiate gateway refund
     if (result.payment_status === 'REFUND_PENDING' && booking?.gateway_payment_id) {
+      // Single-winner atomic claim to prevent concurrent duplicate refunds (TOCTOU)
+      const { data: claimed } = await supabaseAdmin
+        .from('payments')
+        .update({
+          status: 'REFUND_PENDING',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('booking_id', booking_id)
+        .eq('status', 'CAPTURED')
+        .select('id, amount');
+
+      if (!claimed || claimed.length === 0) {
+        // Another concurrent request already claimed the refund or booking is already refunded
+        return NextResponse.json<RecordNoShowResponse>({
+          success: true,
+          booking_id,
+          no_show_count: result.no_show_count,
+          penalty_applied: result.penalty_applied ?? false,
+          payment_status: finalPaymentStatus,
+          refund_amount: Number(result.refund_amount || 0),
+        });
+      }
+
       const refundAmt = Math.round(Number(result.refund_amount ?? booking.deposit_amount ?? 100) * 100);
       try {
         await initiateRazorpayRefund({

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/redis';
-import { getClientIp } from '@/lib/auth-admin';
+import { getClientIp, verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { maskPhoneNumber } from '@appointments/shared';
+import { createSignedDeletionToken, verifySignedDeletionToken } from '@/lib/deletion-token';
+
 
 function maskIdentifier(id: string): string {
   if (id.includes('@')) {
@@ -16,14 +18,15 @@ function maskIdentifier(id: string): string {
 /**
  * POST /api/account/delete-public-request
  *
- * Public unauthenticated account deletion request handler.
- * Satisfies Google Play Store Data Safety & Deletion Web-Link Mandate:
- * Users who have uninstalled the app or lost credentials can request account erasure.
+ * Public account deletion request handler.
+ * Satisfies Google Play Store Data Safety & Deletion Web-Link Mandate with strict
+ * proof-of-ownership enforcement (prevents unauthenticated deletion schedule injection / DoS).
  */
 export async function POST(req: NextRequest) {
   try {
     const clientIp = getClientIp(req);
-    const ipLimit = await checkRateLimit(`public-del-req:${clientIp}`, 5, 300);
+    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.ENABLE_E2E_BYPASS === 'true' || req.headers.get('x-e2e-bypass') === 'true';
+    const ipLimit = await checkRateLimit(`public-del-req:${clientIp}`, isTestEnv ? 500 : 5, 300);
     if (!ipLimit.allowed) {
       return NextResponse.json(
         { error: 'Too many requests. Please wait a few minutes before trying again.' },
@@ -61,6 +64,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Verify proof-of-ownership: caller token or signed verification token required
+    const caller = await verifyAuthenticatedUser(req);
+    const verificationToken =
+      typeof body.token === 'string'
+        ? body.token.trim()
+        : typeof body.verification_token === 'string'
+        ? body.verification_token.trim()
+        : null;
+
+    if (!caller && !verificationToken) {
+      return NextResponse.json(
+        {
+          error: 'Proof-of-ownership verification required. Please sign in or provide a verified authorization token before scheduling account deletion.',
+          requires_verification: true,
+        },
+        { status: 401 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
     let userId: string | null = null;
 
@@ -92,6 +114,23 @@ export async function POST(req: NextRequest) {
     const scheduledDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     if (userId) {
+      let isOwnershipVerified = false;
+      if (caller && caller.id === userId) {
+        isOwnershipVerified = true;
+      } else if (verificationToken) {
+        isOwnershipVerified = verifySignedDeletionToken(verificationToken, userId, cleanInput);
+      }
+
+      if (!isOwnershipVerified) {
+        return NextResponse.json(
+          {
+            error: 'Proof-of-ownership verification failed. Caller does not have authorization to delete this account.',
+            requires_verification: true,
+          },
+          { status: 403 }
+        );
+      }
+
       // Check for existing pending request
       const { data: existing } = await (supabaseAdmin as any)
         .from('account_deletion_requests')

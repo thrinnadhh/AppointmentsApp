@@ -90,6 +90,10 @@ export interface MerchantBookingWithDetails {
   status: Database['public']['Enums']['booking_status'];
   payment_status: Database['public']['Enums']['payment_status'];
   deposit_amount: number;
+  platform_fee?: number | null;
+  total_amount?: number | null;
+  is_followup?: boolean;
+  followup_original_booking_id?: string | null;
   gateway_payment_id: string | null;
   hold_expires_at: string | null;
   created_at: string;
@@ -175,6 +179,51 @@ export async function revealCustomerContact(bookingId: string): Promise<{
     return { success: false, error: error.message };
   }
   return data as { success: boolean; phone?: string; full_name?: string; error?: string };
+}
+
+export async function updateProviderCoolingPeriod(
+  providerId: string,
+  coolingPeriodDays: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await (supabase.rpc as any)('merchant_update_cooling_period', {
+      p_provider_id: providerId,
+      p_cooling_period_days: coolingPeriodDays,
+    });
+    if (!error && data?.success) {
+      return { success: true };
+    }
+
+    // Fallback to server API route
+    try {
+      const resp = await fetch('/api/merchant/provider', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: providerId,
+          cooling_period_days: coolingPeriodDays,
+        }),
+      });
+      if (resp.ok) {
+        return { success: true };
+      }
+    } catch {}
+
+    if (error) {
+      const { error: directErr } = await (supabase as any)
+        .from('providers')
+        .update({ cooling_period_days: coolingPeriodDays, updated_at: new Date().toISOString() })
+        .eq('id', providerId);
+      if (directErr) {
+        return { success: false, error: directErr.message || error.message };
+      }
+      return { success: true };
+    }
+    return { success: data?.success ?? true, error: data?.error };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to update cooling period';
+    return { success: false, error: msg };
+  }
 }
 
 export async function fetchProviderResources(providerId: string) {

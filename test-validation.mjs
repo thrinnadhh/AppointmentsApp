@@ -731,5 +731,472 @@ describe('29. Phase 3: Infrastructure Hardening & Watchtower Daemon Boundary', (
   });
 });
 
+describe('30. Step 1: reassign_booking_resource In-Function Auth & BOLA Hardening', () => {
+  const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261001000002_reassign_auth_and_permission_lockdown.sql');
+
+  it('verifies migration 20261001000002 defines in-function auth guards for reassign_booking_resource', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.reassign_booking_resource/);
+    assert.match(sql, /v_caller_id UUID := auth\.uid\(\);/);
+    assert.match(sql, /public\.get_user_authorized_providers\(v_caller_id\)/);
+    assert.match(sql, /public\.is_admin\(v_caller_id\)/);
+    assert.match(sql, /Unauthorized: Caller is not permitted to reassign resources for this booking/);
+  });
+
+  it('verifies migration 20261001000002 restricts execute grants to authenticated and service_role', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /REVOKE ALL ON FUNCTION public\.reassign_booking_resource\(UUID, UUID, TEXT\) FROM PUBLIC, anon;/);
+    assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.reassign_booking_resource\(UUID, UUID, TEXT\) TO authenticated, service_role;/);
+  });
+
+  it('verifies reassign_booking_resource RPC rejects unauthorized caller with proper error', async () => {
+    const envPath = path.join(ROOT_DIR, 'apps/merchant-web/.env.local');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const anonKey = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=["']?([^"'\n]+)/)?.[1];
+      const url = envContent.match(/NEXT_PUBLIC_SUPABASE_URL=["']?([^"'\n]+)/)?.[1];
+      if (url && anonKey) {
+        const res = await fetch(`${url}/rest/v1/rpc/reassign_booking_resource`, {
+          method: 'POST',
+          headers: {
+            'apikey': anonKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            p_booking_id: '00000000-0000-0000-0000-000000000001',
+            p_new_resource_id: '00000000-0000-0000-0000-000000000002',
+          }),
+        });
+        assert.ok(res.status === 401 || res.status === 403 || res.status === 404, 'Anon caller must be rejected from reassign_booking_resource');
+      }
+    }
+  });
+});
+
+describe('31. Step 2: Unanchored /placeholder/i Regex & Live Credential Hardening (R5-C02)', () => {
+  it('verifies env.mjs detects isolated placeholder substrings in sensitive environment variables', async () => {
+    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+
+    const invalidPlaceholders = [
+      'rzp_live_placeholder',
+      'placeholder_production_anon_key',
+      'prefix_placeholder_suffix',
+      'MY_PLACEHOLDER_TOKEN',
+      'standalone-placeholder-123',
+    ];
+
+    for (const ph of invalidPlaceholders) {
+      assert.throws(
+        () => {
+          validateEnv({ TEST_VAR: ph }, { throwOnError: true, isProduction: false });
+        },
+        /contains forbidden placeholder value/,
+        `env.mjs must reject placeholder variation "${ph}"`
+      );
+    }
+  });
+
+  it('verifies env.mjs explicitly guards live Razorpay keys and production Supabase keys against placeholder contamination', async () => {
+    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+
+    assert.throws(
+      () => {
+        validateEnv({ RAZORPAY_KEY_ID: 'rzp_live_placeholder' }, { throwOnError: true, isProduction: false });
+      },
+      /contains forbidden placeholder value/,
+      'Must reject live Razorpay placeholder key'
+    );
+
+    assert.throws(
+      () => {
+        validateEnv({ NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder_production_anon_key' }, { throwOnError: true, isProduction: false });
+      },
+      /contains forbidden placeholder value/,
+      'Must reject production Supabase anon placeholder key'
+    );
+  });
+});
+
+describe('32. Step 3: Triage Findings (search-directory-anon-pii-oracle & Watchtower SHA256 Pinning)', () => {
+  const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261001000002_reassign_auth_and_permission_lockdown.sql');
+  const composePath = path.join(ROOT_DIR, 'docker-compose.yml');
+
+  it('verifies migration 20261001000002 revokes anon direct SELECT on public.providers and enforces ABAC on search_directory', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /REVOKE SELECT ON public\.providers FROM anon;/, 'Must revoke anon SELECT on providers table');
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.search_directory/, 'Must define search_directory with ABAC');
+    assert.match(sql, /mp\.id\s+IN\s+\(SELECT\s+public\.get_user_authorized_providers/, 'Must restrict phone/email to authorized provider members or admins');
+    assert.match(sql, /REVOKE EXECUTE ON FUNCTION public\.search_directory\(text\) FROM anon, PUBLIC;/, 'Must revoke anon execute on search_directory');
+  });
+
+  it('verifies docker-compose.yml pins Watchtower container to immutable SHA256 digest and mounts socket read-only', () => {
+    const yaml = fs.readFileSync(composePath, 'utf8');
+    assert.match(yaml, /containrrr\/watchtower:1\.7\.1@sha256:[a-f0-9]{64}/, 'Must pin immutable sha256 digest on watchtower');
+    assert.match(yaml, /\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/, 'Docker socket must be mounted read-only');
+    assert.match(yaml, /no-new-privileges:true/, 'Watchtower must declare no-new-privileges');
+  });
+});
+
+describe('33. Step 3: Triage Findings (public-deletion-unauth-schedule & reschedule-anon-execute-regression)', () => {
+  const routePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/account/delete-public-request/route.ts');
+  const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261001000002_reassign_auth_and_permission_lockdown.sql');
+
+  it('verifies /api/account/delete-public-request requires caller proof-of-ownership before scheduling deletion', () => {
+    const code = fs.readFileSync(routePath, 'utf8');
+    assert.match(code, /verifyAuthenticatedUser/, 'Must verify authenticated caller session');
+    assert.match(code, /verifySignedDeletionToken/, 'Must verify signed deletion token for unauthenticated callers');
+    assert.match(code, /Proof-of-ownership verification required/, 'Must reject requests lacking ownership proof');
+  });
+
+  it('verifies signed deletion token generation and cryptographic verification', async () => {
+    const { createSignedDeletionToken, verifySignedDeletionToken } = await import('./apps/merchant-web/src/lib/deletion-token.ts');
+    const userId = '11111111-2222-3333-4444-555555555555';
+    const email = 'user@example.com';
+
+    const token = createSignedDeletionToken(userId, email);
+    assert.ok(typeof token === 'string' && token.includes('.'), 'Token must be delimited base64/hex');
+
+    // Valid verification
+    assert.strictEqual(verifySignedDeletionToken(token, userId, email), true, 'Valid token must verify');
+
+    // Tampered user ID
+    assert.strictEqual(verifySignedDeletionToken(token, '99999999-9999-9999-9999-999999999999', email), false, 'Tampered user ID must fail');
+
+    // Tampered email
+    assert.strictEqual(verifySignedDeletionToken(token, userId, 'other@example.com'), false, 'Tampered email must fail');
+
+    // Tampered signature
+    assert.strictEqual(verifySignedDeletionToken(token + 'x', userId, email), false, 'Tampered signature must fail');
+  });
+
+  it('verifies migration 20261001000002 revokes anon execute regression on reschedule_booking_slot', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /REVOKE EXECUTE ON FUNCTION public\.reschedule_booking_slot\(UUID, TIMESTAMPTZ, TIMESTAMPTZ\) FROM anon, PUBLIC;/, 'Must revoke anon execute on reschedule RPC');
+    assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.reschedule_booking_slot\(UUID, TIMESTAMPTZ, TIMESTAMPTZ\) TO authenticated, service_role;/, 'Grant execute only to authenticated and service_role');
+  });
+});
+
+describe('34. Hospital & Clinic Cooling Period (Free Follow-up Policy)', () => {
+  const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261001000003_cooling_period_followup.sql');
+  const holdRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/hold/route.ts');
+  const confirmRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/confirm/route.ts');
+  const orderRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/payments/create-order/route.ts');
+  const settingsPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/settings/page.tsx');
+  const mobileCheckoutPath = path.join(ROOT_DIR, 'apps/customer-mobile/src/screens/CheckoutModal.tsx');
+  const mobileDetailPath = path.join(ROOT_DIR, 'apps/customer-mobile/src/screens/ProviderDetailScreen.tsx');
+  const mobileBookingsPath = path.join(ROOT_DIR, 'apps/customer-mobile/src/screens/MyBookingsScreen.tsx');
+
+  it('verifies database migration defines cooling period columns and RPCs', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /cooling_period_days INTEGER NOT NULL DEFAULT 0/, 'Must add cooling_period_days to providers');
+    assert.match(sql, /is_followup BOOLEAN NOT NULL DEFAULT FALSE/, 'Must add is_followup to bookings');
+    assert.match(sql, /followup_original_booking_id UUID REFERENCES public\.bookings/, 'Must link followup_original_booking_id');
+    assert.match(sql, /idx_bookings_cooling_lookup/, 'Must create cooling lookup index');
+    assert.match(sql, /FUNCTION public\.check_cooling_period_eligibility/, 'Must create check_cooling_period_eligibility RPC');
+    assert.match(sql, /FUNCTION public\.merchant_update_cooling_period/, 'Must create merchant_update_cooling_period RPC');
+  });
+
+  it('verifies backend API routes waive fees and bypass Razorpay for zero-cost follow-ups', () => {
+    const holdCode = fs.readFileSync(holdRoutePath, 'utf8');
+    assert.match(holdCode, /is_followup:/, 'Hold route must return is_followup flag');
+
+    const confirmCode = fs.readFileSync(confirmRoutePath, 'utf8');
+    assert.match(confirmCode, /isFreeFollowup/, 'Confirm route must detect free follow-up');
+    assert.match(confirmCode, /free_cooling_period_/, 'Must support free cooling period payment ID');
+
+    const orderCode = fs.readFileSync(orderRoutePath, 'utf8');
+    assert.match(orderCode, /order_free_followup_/, 'Create order route must bypass Razorpay gateway for free follow-up');
+  });
+
+  it('verifies merchant settings UI provides cooling period configuration with presets, 0 days option, and custom input', () => {
+    const code = fs.readFileSync(settingsPath, 'utf8');
+    assert.match(code, /Hospital & Clinic Cooling Period/, 'Must render cooling period configuration card');
+    assert.match(code, /updateProviderCoolingPeriod/, 'Must call updateProviderCoolingPeriod on save');
+    assert.match(code, /0 Days \(Disabled\)/, 'Must include 0 Days preset pill to turn off cooling period');
+    assert.match(code, /20 Days/, 'Must include 20 Days preset pill');
+    assert.match(code, /Cooling Period Disabled \(0 Days\)/, 'Must explain 0 days disables free follow-ups');
+    assert.match(code, /Enter any number of days/, 'Must instruct that any number can be entered');
+  });
+
+  it('verifies customer mobile UI reflects cooling period condition, zero fee breakdown, and free follow-up badge', () => {
+    const detailCode = fs.readFileSync(mobileDetailPath, 'utf8');
+    assert.match(detailCode, /coolingPeriodCard/, 'Provider detail must display cooling period policy');
+    assert.match(detailCode, /coolingPeriodCardEligible/, 'Provider detail must support eligible cooling status');
+    assert.match(detailCode, /Free Appointment Applied!/, 'Provider detail must show free appointment title');
+    assert.match(detailCode, /As appointment date is within the/, 'Provider detail must explain appointment date condition');
+    assert.match(detailCode, /Confirm Free Appointment \(₹0\)/, 'Provider detail footer must show free confirmation button');
+
+    const checkoutCode = fs.readFileSync(mobileCheckoutPath, 'utf8');
+    assert.match(checkoutCode, /checkCoolingPeriodEligibility/, 'Checkout must check cooling period eligibility');
+    assert.match(checkoutCode, /cooling-period-banner/, 'Checkout must render cooling period banner');
+    assert.match(checkoutCode, /As appointment date.*within.*cooling period/, 'Checkout must display cooling period condition');
+    assert.match(checkoutCode, /Confirm Free Follow-up Appointment/, 'Checkout must show free appointment confirmation button');
+
+    const bookingsCode = fs.readFileSync(mobileBookingsPath, 'utf8');
+    assert.match(bookingsCode, /followupBadge/, 'MyBookingsScreen must render Free Follow-up badge');
+  });
+});
+
+describe('35. Strix Residual Findings (vuln-0022 & vuln-0023 Hardening)', () => {
+  const rescheduleRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/reschedule/route.ts');
+  const deleteRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/account/delete-public-request/route.ts');
+  const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261002000001_strix_security_hardening.sql');
+
+  it('verifies vuln-0022: migration 20261002000001 rejects past slots and customer late-window reschedules', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /IF p_new_slot_start < NOW\(\) THEN/, 'Migration must reject target slots in the past');
+    assert.match(sql, /Cannot reschedule to a slot in the past/, 'Must return error on past slot');
+    assert.match(
+      sql,
+      /v_caller_role <> 'service_role'[\s\S]*?v_caller_id = v_booking\.customer_id[\s\S]*?v_booking\.slot_start < NOW\(\) \+ INTERVAL '30 minutes'/,
+      'Migration must enforce 30-minute late window on customer reschedules'
+    );
+  });
+
+  it('verifies vuln-0022: reschedule API route enforces past slot rejection and 30-minute customer cutoff', () => {
+    const code = fs.readFileSync(rescheduleRoutePath, 'utf8');
+    assert.match(code, /newSlotTime < Date\.now\(\)/, 'Route must reject past slot times');
+    assert.match(code, /Cannot reschedule to a slot in the past/, 'Route must return past slot error message');
+    assert.match(code, /caller\.id === booking\.customer_id/, 'Route must detect customer caller');
+    assert.match(code, /minutesToSlot <= 30/, 'Route must enforce 30 minute late reschedule boundary');
+    assert.match(code, /Late reschedule: appointments within 30 minutes of their slot cannot be rescheduled\./);
+  });
+
+  it('verifies vuln-0023: deletion token strictly isolates DELETION_TOKEN_SECRET and rejects admin/cron forge attempts', async () => {
+    const crypto = await import('crypto');
+    const { createSignedDeletionToken, verifySignedDeletionToken } = await import(
+      './apps/merchant-web/src/lib/deletion-token.ts'
+    );
+
+    const userId = '5cb448e4-4df9-4f95-b13c-b95a72aa8766';
+    const email = 'victim@example.test';
+    const exp = Date.now() + 3600000;
+
+    // Helper to forge token with an arbitrary key
+    const forgeToken = (key, uId, ident, expiration) => {
+      const payload = { userId: uId, identifier: ident.toLowerCase().trim(), exp: expiration };
+      const p = Buffer.from(JSON.stringify(payload)).toString('base64url');
+      const sig = crypto.createHmac('sha256', key).update(p).digest('hex');
+      return `${p}.${sig}`;
+    };
+
+    // Attempt forge with ADMIN_SECRET
+    const adminForged = forgeToken('tirupati-superadmin-e2e-2026', userId, email, exp);
+    assert.strictEqual(
+      verifySignedDeletionToken(adminForged, userId, email),
+      false,
+      'Token forged with ADMIN_SECRET must be rejected'
+    );
+
+    // Attempt forge with legacy fallback constant
+    const fallbackForged = forgeToken('deletion-fallback-secret-key-2026', userId, email, exp);
+    assert.strictEqual(
+      verifySignedDeletionToken(fallbackForged, userId, email),
+      false,
+      'Token forged with legacy fallback constant must be rejected'
+    );
+
+    // Attempt forge with CRON_SECRET
+    const cronForged = forgeToken('test_cron_secret_2026', userId, email, exp);
+    assert.strictEqual(
+      verifySignedDeletionToken(cronForged, userId, email),
+      false,
+      'Token forged with CRON_SECRET must be rejected'
+    );
+
+    // Legitimate token created with DELETION_TOKEN_SECRET must succeed
+    const validToken = createSignedDeletionToken(userId, email);
+    assert.strictEqual(
+      verifySignedDeletionToken(validToken, userId, email),
+      true,
+      'Valid token minted with DELETION_TOKEN_SECRET must verify successfully'
+    );
+  });
+
+  it('verifies vuln-0023: public deletion route removes dead caller.role === admin shortcut', () => {
+    const code = fs.readFileSync(deleteRoutePath, 'utf8');
+    assert.doesNotMatch(
+      code,
+      /\(caller as any\)\.role === 'admin'/,
+      'Route must not contain dead caller.role admin bypass'
+    );
+  });
+
+  it('verifies vuln-0024: admin login page and OAuth callback sanitize redirect parameters to prevent open redirects', () => {
+    const adminLoginPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/admin/login/page.tsx');
+    const authCallbackPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/auth/callback/route.ts');
+
+    const adminLoginCode = fs.readFileSync(adminLoginPath, 'utf8');
+    assert.match(adminLoginCode, /SAFE_REDIRECT_REGEX/, 'Admin login must define SAFE_REDIRECT_REGEX');
+    assert.match(adminLoginCode, /getSafeRedirectUrl/, 'Admin login must sanitize redirect via getSafeRedirectUrl');
+
+    const authCallbackCode = fs.readFileSync(authCallbackPath, 'utf8');
+    assert.match(authCallbackCode, /SAFE_REDIRECT_REGEX/, 'Auth callback must define SAFE_REDIRECT_REGEX');
+
+    // Test regex rejection logic
+    const SAFE_REDIRECT_REGEX = /^\/(?!\/)[a-zA-Z0-9\-_./?=&%]*$/;
+    assert.strictEqual(SAFE_REDIRECT_REGEX.test('https://evil.example/pwn'), false, 'Absolute URL must fail');
+    assert.strictEqual(SAFE_REDIRECT_REGEX.test('//evil.example'), false, 'Protocol-relative URL must fail');
+    assert.strictEqual(SAFE_REDIRECT_REGEX.test('/\\evil.example'), false, 'Backslash variant must fail');
+    assert.strictEqual(SAFE_REDIRECT_REGEX.test('/admin'), true, 'Internal /admin route must pass');
+    assert.strictEqual(SAFE_REDIRECT_REGEX.test('/admin/bookings?status=confirmed'), true, 'Internal route with query must pass');
+  });
+
+  it('verifies vuln-0025: cooling period anchor lookup requires is_followup = FALSE and confirm route verifies is_followup flag', () => {
+    const confirmRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/confirm/route.ts');
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
+    // In create_booking_hold
+    assert.match(
+      sql,
+      /v_cooling_period_days[\s\S]*?AND is_followup = FALSE[\s\S]*?ORDER BY slot_start DESC/,
+      'create_booking_hold must restrict anchor to is_followup = FALSE'
+    );
+
+    // In check_cooling_period_eligibility
+    assert.match(
+      sql,
+      /check_cooling_period_eligibility[\s\S]*?AND is_followup = FALSE[\s\S]*?LIMIT 1/,
+      'check_cooling_period_eligibility must restrict anchor to is_followup = FALSE'
+    );
+
+    // In /api/bookings/confirm
+    const confirmCode = fs.readFileSync(confirmRoutePath, 'utf8');
+    assert.match(
+      confirmCode,
+      /is_followup === true/,
+      'Confirm route must strictly verify booking is_followup === true for free follow-up bypass'
+    );
+  });
+});
+
+describe('36. Strix Run 2 Findings (Spring Boot & Auth Hardening)', () => {
+  it('verifies vuln-0008: auth-admin.ts gates x-customer-id behind ENABLE_E2E_BYPASS flag', () => {
+    const authAdminPath = path.join(ROOT_DIR, 'apps/merchant-web/src/lib/auth-admin.ts');
+    const authCode = fs.readFileSync(authAdminPath, 'utf8');
+    assert.match(
+      authCode,
+      /if\s*\(\s*process\.env\.ENABLE_E2E_BYPASS === 'true'\s*\)\s*\{[\s\S]*?request\.headers\.get\('x-customer-id'\)/,
+      'x-customer-id must be strictly gated by ENABLE_E2E_BYPASS === true'
+    );
+  });
+
+  it('verifies vuln-0001: CatalogService.toggleService enforces merchant tenant isolation', () => {
+    const catalogPath = path.join(ROOT_DIR, 'apps/backend/src/main/kotlin/com/appointments/catalog/CatalogService.kt');
+    const catalogCode = fs.readFileSync(catalogPath, 'utf8');
+    assert.match(
+      catalogCode,
+      /if\s*\(\s*svc\.merchantId\s*!=\s*merchantId\s*\)\s*\{[\s\S]*?throw ForbiddenException/,
+      'CatalogService.toggleService must reject cross-tenant service modification'
+    );
+  });
+
+  it('verifies vuln-0003 & vuln-0007: BookingService enforces tenant staff check on complete and service/resource check on create', () => {
+    const bookingPath = path.join(ROOT_DIR, 'apps/backend/src/main/kotlin/com/appointments/bookings/BookingService.kt');
+    const bookingCode = fs.readFileSync(bookingPath, 'utf8');
+    assert.match(
+      bookingCode,
+      /if\s*\(\s*svc\.merchantId\s*!=\s*merchantId\s*\)\s*\{[\s\S]*?throw ForbiddenException/,
+      'BookingService.create must reject service from another merchant'
+    );
+    assert.match(
+      bookingCode,
+      /if\s*\(\s*res\.merchantId\s*!=\s*merchantId\s*\)\s*\{[\s\S]*?throw ForbiddenException/,
+      'BookingService.create must reject resource from another merchant'
+    );
+    assert.match(
+      bookingCode,
+      /val isStaff = staffRepository\.findByUserId\(user\.id\)\.any\s*\{\s*it\.merchantId == booking\.merchantId\s*\}/,
+      'BookingService.complete must verify staff member belongs to booking merchant'
+    );
+  });
+
+  it('verifies vuln-0006: AvailabilityService.getSlots validates serviceMin against infinite loop DoS', () => {
+    const availPath = path.join(ROOT_DIR, 'apps/backend/src/main/kotlin/com/appointments/availability/AvailabilityService.kt');
+    const availCode = fs.readFileSync(availPath, 'utf8');
+    assert.match(
+      availCode,
+      /if\s*\(\s*serviceMin <= 0\s*\|\|\s*serviceMin > 720\s*\)\s*\{[\s\S]*?throw BadRequestException/,
+      'AvailabilityService.getSlots must reject non-positive serviceMin to prevent infinite while loop'
+    );
+  });
+
+  it('verifies vuln-0005: ci.yml removes hardcoded admin secret fallback literals', () => {
+    const ciPath = path.join(ROOT_DIR, '.github/workflows/ci.yml');
+    const ciCode = fs.readFileSync(ciPath, 'utf8');
+    assert.doesNotMatch(
+      ciCode,
+      /tirupati-superadmin-e2e-2026/,
+      'ci.yml must not contain hardcoded secret fallback literals'
+    );
+  });
+});
+
+describe('37. Strix Run 2 Residual Findings (vuln-0009 & vuln-0010 Cancellation Hardening)', () => {
+  it('verifies vuln-0009: migration 20261002000001 enforces initiator integrity in cancel_booking', () => {
+    const migPath = path.join(ROOT_DIR, 'supabase/migrations/20261002000001_strix_security_hardening.sql');
+    const migCode = fs.readFileSync(migPath, 'utf8');
+    assert.match(
+      migCode,
+      /CREATE OR REPLACE FUNCTION public\.cancel_booking/,
+      'Migration must define hardened cancel_booking'
+    );
+    assert.match(
+      migCode,
+      /ELSIF auth\.uid\(\)\s*=\s*v_booking\.customer_id\s*THEN[\s\S]*?v_is_merchant\s*:=\s*FALSE;/,
+      'Customer must never be permitted to claim merchant cancellation'
+    );
+    assert.match(
+      migCode,
+      /REVOKE ALL ON FUNCTION public\.cancel_booking\(UUID, TEXT, TEXT\) FROM PUBLIC, anon;/,
+      'cancel_booking must be revoked from public and anon'
+    );
+  });
+
+  it('verifies vuln-0009: process-cancellation edge function derives initiator from verified caller', () => {
+    const fnPath = path.join(ROOT_DIR, 'supabase/functions/process-cancellation/index.ts');
+    const fnCode = fs.readFileSync(fnPath, 'utf8');
+    assert.match(
+      fnCode,
+      /effectiveInitiatedBy\s*=\s*'CUSTOMER'/,
+      'Edge function must force CUSTOMER initiator when caller is booking customer'
+    );
+    assert.match(
+      fnCode,
+      /p_initiated_by:\s*effectiveInitiatedBy/,
+      'RPC call must use server-derived effectiveInitiatedBy'
+    );
+  });
+
+  it('verifies vuln-0009 & vuln-0010: cancel API route enforces initiator and claims CAPTURED payments', () => {
+    const routePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/cancel/route.ts');
+    const routeCode = fs.readFileSync(routePath, 'utf8');
+    assert.match(
+      routeCode,
+      /const effectiveInitiatedBy\s*=/,
+      'Cancel route must compute effectiveInitiatedBy from verified session'
+    );
+    assert.match(
+      routeCode,
+      /\.eq\('status',\s*'CAPTURED'\)/,
+      'Cancel route must execute atomic claim against CAPTURED payment row'
+    );
+  });
+
+  it('verifies vuln-0010: cancel_booking does not pre-mutate payments for refund-eligible bookings', () => {
+    const migPath = path.join(ROOT_DIR, 'supabase/migrations/20261002000001_strix_security_hardening.sql');
+    const migCode = fs.readFileSync(migPath, 'utf8');
+    assert.match(
+      migCode,
+      /IF v_booking\.gateway_payment_id IS NOT NULL AND v_payment_status\s*<>\s*'REFUND_PENDING'\s*THEN/,
+      'cancel_booking must leave refund-eligible payments in CAPTURED so route atomic claim can own transition'
+    );
+  });
+});
+
+
+
+
+
 
 

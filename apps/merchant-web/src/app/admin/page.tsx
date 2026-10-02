@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useTransition } from 'react';
+import React, { useEffect, useState, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   MapPin,
@@ -135,7 +135,7 @@ export default function AdminDashboardPage() {
   };
 
   // Load All Dashboard Intel
-  const loadDashboardData = async (windowFilter = selectedWindow, cityFilter = selectedCityFilter) => {
+  const loadDashboardData = useCallback(async (windowFilter = selectedWindow, cityFilter = selectedCityFilter) => {
     try {
       setRefreshing(true);
       const headers = await getAdminAuthHeaders(false);
@@ -175,10 +175,11 @@ export default function AdminDashboardPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [selectedWindow, selectedCityFilter]);
 
   // Check Admin Authentication on Mount
   useEffect(() => {
+    let mounted = true;
     const verifyAccess = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -186,27 +187,28 @@ export default function AdminDashboardPage() {
         if (!session?.user) {
           // In local preview without session, allow dev fallback or redirect
           if (process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.location.search.includes('bypass=true'))) {
-            setAdminUser({
-              email: 'admin@appointments-tirupati.com',
-              fullName: 'Platform Owner (Super Admin)',
-              role: 'admin',
-            });
-            setMfaStatus({
-              hasMfa: true,
-              currentLevel: 'aal2',
-              nextLevel: 'aal2',
-              enrolledFactors: [
-                {
-                  id: 'factor-dev-e2e',
-                  friendly_name: 'Super Admin Key (Hardware/App)',
-                  factor_type: 'totp',
-                  status: 'verified',
-                  created_at: new Date().toISOString(),
-                },
-              ],
-            });
-            setAuthChecking(false);
-            loadDashboardData(selectedWindow, selectedCityFilter);
+            if (mounted) {
+              setAdminUser({
+                email: 'admin@appointments-tirupati.com',
+                fullName: 'Platform Owner (Super Admin)',
+                role: 'admin',
+              });
+              setMfaStatus({
+                hasMfa: true,
+                currentLevel: 'aal2',
+                nextLevel: 'aal2',
+                enrolledFactors: [
+                  {
+                    id: 'factor-dev-e2e',
+                    friendly_name: 'Super Admin Key (Hardware/App)',
+                    factor_type: 'totp',
+                    status: 'verified',
+                    created_at: new Date().toISOString(),
+                  },
+                ],
+              });
+              setAuthChecking(false);
+            }
             return;
           }
           router.push('/admin/login?redirect=/admin');
@@ -220,27 +222,34 @@ export default function AdminDashboardPage() {
           .single();
 
         if (error || !profile || profile.role !== 'admin') {
-          setUnauthorizedRole(profile?.role || 'unauthorized');
-          setAuthChecking(false);
+          if (mounted) {
+            setUnauthorizedRole(profile?.role || 'unauthorized');
+            setAuthChecking(false);
+          }
           return;
         }
 
-        setAdminUser({
-          email: profile.email || session.user.email || 'admin@appointments-tirupati.com',
-          fullName: profile.full_name || 'Platform Owner',
-          role: profile.role,
-        });
+        if (mounted) {
+          setAdminUser({
+            email: profile.email || session.user.email || 'admin@appointments-tirupati.com',
+            fullName: profile.full_name || 'Platform Owner',
+            role: profile.role,
+          });
+        }
 
         // Query Live MFA Status
         try {
           const mfa = await checkAdminMfaStatus();
-          setMfaStatus(mfa);
+          if (mounted) {
+            setMfaStatus(mfa);
+          }
         } catch (mfaErr) {
           console.warn('[Admin] Failed to check MFA status:', mfaErr);
         }
 
-        setAuthChecking(false);
-        loadDashboardData(selectedWindow, selectedCityFilter);
+        if (mounted) {
+          setAuthChecking(false);
+        }
       } catch (err) {
         console.error('Admin authentication verification exception:', err);
         router.push('/admin/login?redirect=/admin');
@@ -248,7 +257,17 @@ export default function AdminDashboardPage() {
     };
 
     verifyAccess();
-  }, []);
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
+
+  // Synchronize dashboard intel when authenticated or filters change
+  useEffect(() => {
+    if (!authChecking && adminUser) {
+      loadDashboardData(selectedWindow, selectedCityFilter);
+    }
+  }, [authChecking, adminUser, selectedWindow, selectedCityFilter, loadDashboardData]);
 
   const handleAdminSignOut = async () => {
     await supabase.auth.signOut();

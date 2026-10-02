@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   Building2, 
   CheckCircle2, 
@@ -429,10 +430,12 @@ export default function ShopRegistrationPage() {
             {photoPreview ? (
               <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 p-2 group shadow-xs">
                 <div className="relative h-44 w-full rounded-xl overflow-hidden bg-slate-900">
-                  <img
+                  <Image
                     src={photoPreview}
                     alt="Shop storefront preview"
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    unoptimized
                   />
                   <div className="absolute top-2.5 left-2.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-bold text-white flex items-center gap-1.5 border border-white/20">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />

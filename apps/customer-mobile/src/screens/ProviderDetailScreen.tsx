@@ -9,17 +9,31 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { Resource, Slot, DayOfWeek } from '@appointments/shared';
-import { generateAvailableSlots, fetchProviderById, fetchBookedSlots, ProviderWithDetails } from '../services/api';
+import { Resource, Slot, DayOfWeek, CoolingPeriodEligibilityResult } from '@appointments/shared';
+import {
+  generateAvailableSlots,
+  fetchProviderById,
+  fetchBookedSlots,
+  checkCoolingPeriodEligibility,
+  ProviderWithDetails,
+} from '../services/api';
 
 interface ProviderDetailScreenProps {
   providerId: string;
+  customerId?: string;
   onBack: () => void;
-  onProceedToHold: (resource: Resource, slot: Slot, providerName?: string) => void;
+  onProceedToHold: (
+    resource: Resource,
+    slot: Slot,
+    providerName?: string,
+    coolingPeriodDays?: number,
+    providerId?: string
+  ) => void;
 }
 
 export default function ProviderDetailScreen({
   providerId,
+  customerId = '99999999-9999-9999-9999-999999999991',
   onBack,
   onProceedToHold,
 }: ProviderDetailScreenProps) {
@@ -30,6 +44,8 @@ export default function ProviderDetailScreen({
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
+  const [checkingCooling, setCheckingCooling] = useState<boolean>(false);
   const lastBookedQueryId = useRef(0);
 
   // Generate 3 date options (Today, Tomorrow, Day after)
@@ -116,6 +132,33 @@ export default function ProviderDetailScreen({
     ? generateAvailableSlots(selectedResource, dates[selectedDateIndex], provider, bookedSlots)
     : [];
 
+  useEffect(() => {
+    let isMounted = true;
+    const coolingDays = provider?.cooling_period_days ?? 0;
+    if (coolingDays > 0 && customerId && providerId) {
+      setCheckingCooling(true);
+      const targetTime = selectedSlot ? selectedSlot.start_time : dates[selectedDateIndex]?.toISOString();
+      checkCoolingPeriodEligibility(customerId, providerId, targetTime)
+        .then((res) => {
+          if (isMounted) setCoolingEligibility(res);
+        })
+        .catch(() => {
+          if (isMounted) setCoolingEligibility(null);
+        })
+        .finally(() => {
+          if (isMounted) setCheckingCooling(false);
+        });
+    } else {
+      setCoolingEligibility(null);
+      setCheckingCooling(false);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [customerId, providerId, provider?.cooling_period_days, selectedDateIndex, selectedSlot?.start_time]);
+
+  const isFreeAppointment = Boolean(coolingEligibility?.eligible);
+
   // Loading state — show spinner while fetching real data
   if (loading || !provider) {
     return (
@@ -168,6 +211,68 @@ export default function ProviderDetailScreen({
           </Text>
           <Text style={styles.description}>{provider.description}</Text>
         </View>
+
+        {/* Cooling Period / Hospital Free Follow-up Policy Banner */}
+        {Boolean(provider.cooling_period_days && provider.cooling_period_days > 0) && (
+          coolingEligibility?.eligible ? (
+            <View style={styles.coolingPeriodCardEligible} testID="customer-provider-cooling-period-banner">
+              <View style={styles.coolingPeriodHeader}>
+                <Text style={styles.coolingPeriodIcon}>🎁</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.coolingPeriodTitleRow}>
+                    <Text style={styles.coolingPeriodTitleEligible}>
+                      Free Appointment Applied!
+                    </Text>
+                    <View style={styles.coolingPeriodBadgeEligible}>
+                      <Text style={styles.coolingPeriodBadgeTextEligible}>₹0 FREE</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.coolingPeriodSubtitleEligible}>
+                    As your appointment date is within the {provider.cooling_period_days}-day cooling period (&lt; {coolingEligibility.days_remaining ?? provider.cooling_period_days} days remaining from your previous consultation on {new Date(coolingEligibility.original_slot_start || '').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}), this appointment is completely FREE!
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : coolingEligibility?.prior_slot_start ? (
+            <View style={styles.coolingPeriodCardExpired} testID="customer-provider-cooling-period-banner">
+              <View style={styles.coolingPeriodHeader}>
+                <Text style={styles.coolingPeriodIcon}>ℹ️</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.coolingPeriodTitleRow}>
+                    <Text style={styles.coolingPeriodTitleExpired}>
+                      {provider.cooling_period_days}-Day Cooling Period Expired
+                    </Text>
+                    <View style={styles.coolingPeriodBadgeExpired}>
+                      <Text style={styles.coolingPeriodBadgeTextExpired}>STANDARD FEE</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.coolingPeriodSubtitleExpired}>
+                    Previous visit was on {new Date(coolingEligibility.prior_slot_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}. As your appointment date exceeds the {provider.cooling_period_days}-day cooling window, standard booking charges apply.
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.coolingPeriodCard} testID="customer-provider-cooling-period-banner">
+              <View style={styles.coolingPeriodHeader}>
+                <Text style={styles.coolingPeriodIcon}>🏥</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.coolingPeriodTitleRow}>
+                    <Text style={styles.coolingPeriodTitle}>
+                      {provider.cooling_period_days}-Day Free Follow-up Policy
+                    </Text>
+                    <View style={styles.coolingPeriodBadge}>
+                      <Text style={styles.coolingPeriodBadgeText}>₹0 RE-VISIT</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.coolingPeriodSubtitle}>
+                    Patients who book within {provider.cooling_period_days} days of any consultation here pay ₹0 deposit and ₹0 platform fee.
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )
+        )}
 
         {/* Suspended Venue Warning */}
         {provider.status === 'SUSPENDED' && (
@@ -310,6 +415,15 @@ export default function ProviderDetailScreen({
               })}
             </View>
           )}
+
+          {/* Free appointment indicator if slot is selected and within cooling period */}
+          {Boolean(selectedSlot && isFreeAppointment) && (
+            <View style={styles.freeSlotNoticeBox} testID="customer-free-slot-notice">
+              <Text style={styles.freeSlotNoticeText}>
+                🎁 As appointment date is within the {provider.cooling_period_days}-day cooling period &rarr; Free Appointment (₹0 Fee)
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -317,27 +431,50 @@ export default function ProviderDetailScreen({
       <View style={styles.stickyFooter}>
         <View style={styles.footerSummary}>
           <Text style={styles.footerLabel}>Deposit to hold:</Text>
-          <Text style={styles.footerPrice}>₹{selectedResource?.deposit_amount || 0}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={[styles.footerPrice, isFreeAppointment && { color: '#047857' }]}>
+              {isFreeAppointment ? '₹0' : `₹${selectedResource?.deposit_amount || 0}`}
+            </Text>
+            {isFreeAppointment && (
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#047857' }}>
+                (Free Appointment)
+              </Text>
+            )}
+          </View>
+          {isFreeAppointment && (
+            <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600', marginTop: 1 }}>
+              As appointment date &lt; cooling period time
+            </Text>
+          )}
         </View>
 
         <TouchableOpacity
           style={[
             styles.holdButton,
+            isFreeAppointment && styles.holdButtonFree,
             (!selectedSlot || provider.status === 'SUSPENDED') && styles.holdButtonDisabled,
           ]}
           disabled={!selectedSlot || !selectedResource || provider.status === 'SUSPENDED'}
           onPress={() => {
             if (selectedSlot && selectedResource && provider.status !== 'SUSPENDED') {
-              onProceedToHold(selectedResource, selectedSlot, provider.name);
+              onProceedToHold(
+                selectedResource,
+                selectedSlot,
+                provider.name,
+                provider.cooling_period_days,
+                provider.id
+              );
             }
           }}
         >
           <Text style={styles.holdButtonText}>
             {provider.status === 'SUSPENDED'
               ? 'Bookings Suspended'
-              : selectedSlot
-              ? 'Hold Slot & Pay Deposit →'
-              : 'Select a Time Slot'}
+              : !selectedSlot
+              ? 'Select a Time Slot'
+              : isFreeAppointment
+              ? 'Confirm Free Appointment (₹0) →'
+              : 'Hold Slot & Pay Deposit →'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -633,5 +770,136 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#b45309',
     lineHeight: 18,
+  },
+  coolingPeriodCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
+  },
+  coolingPeriodCardEligible: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 2,
+    borderColor: '#059669',
+  },
+  coolingPeriodCardExpired: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+  },
+  coolingPeriodHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  coolingPeriodIcon: {
+    fontSize: 18,
+    marginTop: 1,
+  },
+  coolingPeriodTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  coolingPeriodTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#065f46',
+  },
+  coolingPeriodTitleEligible: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  coolingPeriodTitleExpired: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  coolingPeriodBadge: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  coolingPeriodBadgeEligible: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  coolingPeriodBadgeExpired: {
+    backgroundColor: '#64748b',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  coolingPeriodBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  coolingPeriodBadgeTextEligible: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  coolingPeriodBadgeTextExpired: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  coolingPeriodSubtitle: {
+    fontSize: 11,
+    color: '#047857',
+    marginTop: 3,
+    lineHeight: 15,
+  },
+  coolingPeriodSubtitleEligible: {
+    fontSize: 11,
+    color: '#047857',
+    marginTop: 3,
+    lineHeight: 15,
+  },
+  coolingPeriodSubtitleExpired: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 3,
+    lineHeight: 15,
+  },
+  freeSlotNoticeBox: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  freeSlotNoticeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065f46',
+    textAlign: 'center',
+  },
+  holdButtonFree: {
+    backgroundColor: '#047857',
   },
 });

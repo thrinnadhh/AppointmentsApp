@@ -1,6 +1,7 @@
 package com.appointments.availability
 
 import com.appointments.bookings.BookingRepository
+import com.appointments.common.errors.BadRequestException
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.time.LocalDate
@@ -37,6 +38,9 @@ class AvailabilityService(
         date: LocalDate,
         tz: String,
     ): List<SlotDto> {
+        if (serviceMin <= 0 || serviceMin > 720) {
+            throw BadRequestException("serviceMin must be between 1 and 720 minutes")
+        }
         val zone = ZoneId.of(tz)
         val dow  = date.dayOfWeek.value % 7   // Java DayOfWeek: MON=1…SUN=7, we need 0=Sun..6=Sat
 

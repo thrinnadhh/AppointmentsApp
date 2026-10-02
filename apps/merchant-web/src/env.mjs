@@ -6,13 +6,17 @@
  */
 
 export const PLACEHOLDER_PATTERNS = [
-  /^(xxx+|change[_-]?me|your[_-].*|placeholder.*|dummy.*|test[_-]secret|rzp[_-]test[_-]placeholder)$/i,
+  /placeholder/i,
+  /^(xxx+|change[_-]?me|your[_-].*|dummy.*|test[_-]secret|rzp[_-]test[_-]placeholder)$/i,
   /^TODO$/i,
   /^replace[_-]?me$/i,
   /^<.*>$/,
 ];
 
 export const FORBIDDEN_SUBSTRINGS = [
+  'placeholder',
+  'rzp_live_placeholder',
+  'placeholder_production_anon_key',
   'CHANGE_ME',
   'change_me',
   'change-me',
@@ -37,6 +41,8 @@ export const FORBIDDEN_SUBSTRINGS = [
   'your_cron_secret_token_here',
   'your-superadmin-e2e-token-here',
   'your_superadmin_e2e_token_here',
+  'your-dedicated-deletion-token-secret-here',
+  'your_dedicated_deletion_token_secret_here',
   'your-project-ref.supabase.co',
   'your_project_ref.supabase.co',
 ];
@@ -50,6 +56,7 @@ export const REQUIRED_PRODUCTION_VARS = [
   'RAZORPAY_WEBHOOK_SECRET',
   'ADMIN_SECRET',
   'CRON_SECRET',
+  'DELETION_TOKEN_SECRET',
 ];
 
 export const APP_KEY_PREFIXES = [
@@ -60,6 +67,7 @@ export const APP_KEY_PREFIXES = [
   'UPSTASH_',
   'CRON_',
   'ADMIN_',
+  'DELETION_',
   'SENTRY_',
   'ALLOW_MOCK_PAYMENTS',
   'SUPERADMIN_',
@@ -97,7 +105,14 @@ export function validateEnv(env = process.env, options = {}) {
       trimmed.toLowerCase().includes(sub.toLowerCase())
     );
 
-    if (matchesPattern || containsForbiddenSubstring) {
+    // Explicit guards for live credential variations (Razorpay live keys and production Supabase anon/service keys)
+    const isLiveRazorpayKey = key === 'RAZORPAY_KEY_ID' || key.startsWith('RAZORPAY_');
+    const isLiveSupabaseKey = key === 'NEXT_PUBLIC_SUPABASE_ANON_KEY' || key === 'SUPABASE_SERVICE_ROLE_KEY';
+    const isLivePlaceholder =
+      (isLiveRazorpayKey && (/placeholder/i.test(trimmed) || trimmed === 'rzp_live_placeholder')) ||
+      (isLiveSupabaseKey && (/placeholder/i.test(trimmed) || trimmed.includes('placeholder_production_anon_key')));
+
+    if (matchesPattern || containsForbiddenSubstring || isLivePlaceholder) {
       errors.push(
         `Environment variable "${key}" contains forbidden placeholder value: "${trimmed}". Please provide an authentic secret or configuration value.`
       );

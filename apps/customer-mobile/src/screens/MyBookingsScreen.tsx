@@ -203,6 +203,11 @@ export default function MyBookingsScreen({
                         <Text style={styles.presentBadgeText}>📍 Present in Lobby</Text>
                       </View>
                     )}
+                    {booking.is_followup && (
+                      <View style={styles.followupBadge} testID={`followup-badge-${booking.id}`}>
+                        <Text style={styles.followupBadgeText}>🔄 Free Follow-up</Text>
+                      </View>
+                    )}
                     <View
                       style={[
                         styles.statusBadge,
@@ -257,7 +262,9 @@ export default function MyBookingsScreen({
                 <View style={styles.cardFooter}>
                   <View style={styles.depositInfo}>
                     <Text style={styles.depositLabel}>Deposit Paid:</Text>
-                    <Text style={styles.depositValue}>₹{booking.deposit_amount}</Text>
+                    <Text style={[styles.depositValue, booking.is_followup && { color: '#047857' }]}>
+                      {booking.is_followup ? '₹0 (Free Follow-up)' : `₹${booking.deposit_amount}`}
+                    </Text>
                   </View>
 
                   {booking.status === 'CONFIRMED' && (
@@ -844,5 +851,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#92400e',
     lineHeight: 15,
+  },
+  followupBadge: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  followupBadgeText: {
+    color: '#047857',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

@@ -205,14 +205,7 @@ export default function MerchantOverviewPage() {
         });
       }
     }
-  }, [
-    activeProvider?.id, 
-    activeProvider?.auto_accept_bookings, 
-    activeProvider?.daily_booking_limit, 
-    activeProvider?.opening_time, 
-    activeProvider?.closing_time,
-    activeProvider?.weekly_hours
-  ]);
+  }, [activeProvider]);
 
   const handleApplyToEntireWeek = () => {
     const updated: WeeklyHours = {
@@ -1122,6 +1115,11 @@ export default function MerchantOverviewPage() {
                           }`}>
                             {booking.status}
                           </span>
+                          {booking.is_followup && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
+                              🔄 Free Follow-up
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-500 flex items-center gap-3 mt-1">
                           <span className="flex items-center gap-1">
@@ -1152,7 +1150,9 @@ export default function MerchantOverviewPage() {
 
                     <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                       <div className="text-right sm:mr-2">
-                        <p className="text-xs font-semibold text-slate-900">₹{booking.deposit_amount}</p>
+                        <p className="text-xs font-semibold text-slate-900">
+                          {booking.is_followup ? '₹0 (Free Follow-up)' : `₹${booking.deposit_amount}`}
+                        </p>
                         <p className={`text-[10px] font-medium ${
                           booking.payment_status === 'CAPTURED' ? 'text-emerald-600' : 'text-amber-600'
                         }`}>

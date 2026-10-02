@@ -80,3 +80,84 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const caller = await verifyAuthenticatedUser(request);
+    if (!caller) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { provider_id, cooling_period_days } = body;
+
+    if (!provider_id) {
+      return NextResponse.json({ error: 'Missing provider_id' }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Verify tenant authorization
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', caller.id)
+      .maybeSingle();
+
+    const isSuperAdmin = profile?.role === 'admin';
+    if (!isSuperAdmin) {
+      const { data: memberships } = await supabaseAdmin
+        .from('merchant_memberships')
+        .select('provider_id')
+        .eq('user_id', caller.id);
+
+      const isMember = memberships?.some((m) => m.provider_id === provider_id);
+      if (!isMember) {
+        const { data: prov } = await supabaseAdmin
+          .from('providers')
+          .select('owner_id')
+          .eq('id', provider_id)
+          .maybeSingle();
+
+        if (!prov || prov.owner_id !== caller.id) {
+          return NextResponse.json(
+            { error: 'Forbidden: You are not authorized to update this provider' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
+    const updatePayload: {
+      cooling_period_days?: number;
+      updated_at?: string;
+    } = { updated_at: new Date().toISOString() };
+    if (cooling_period_days !== undefined) {
+      const days = Number(cooling_period_days);
+      if (isNaN(days) || days < 0 || days > 365) {
+        return NextResponse.json({ error: 'Cooling period must be between 0 and 365 days' }, { status: 400 });
+      }
+      updatePayload.cooling_period_days = days;
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('providers')
+      .update(updatePayload)
+      .eq('id', provider_id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, provider: updated });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to update merchant provider';
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+

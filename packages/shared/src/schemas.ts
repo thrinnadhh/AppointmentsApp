@@ -14,7 +14,11 @@ export interface CreateHoldResponse {
   booking_id?: string;
   reference_code?: string;
   deposit_amount?: number;
+  platform_fee?: number;
+  total_amount?: number;
   hold_expires_at?: string;
+  is_followup?: boolean;
+  followup_original_booking_id?: string | null;
   error?: string;
 }
 

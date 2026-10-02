@@ -77,6 +77,20 @@ export function getRazorpayKeyId(): string {
 export async function createRazorpayOrder(params: CreateOrderParams): Promise<RazorpayOrderResult> {
   const { amount, currency = 'INR', receipt, notes } = params;
 
+  // Sandbox / Mock mode — generate deterministic synthetic mock order when explicitly opted in non-production
+  if (canMockPayments()) {
+    const sanitizedReceipt = (receipt || 'rcpt').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
+    const mockId = `order_mock_${amount}_${sanitizedReceipt}_${Date.now().toString(36)}`;
+    return {
+      id: mockId,
+      amount,
+      currency,
+      receipt: sanitizedReceipt,
+      status: 'created',
+      is_mock: true,
+    };
+  }
+
   if (isRazorpayConfigured()) {
     const keyId = process.env.RAZORPAY_KEY_ID!;
     const keySecret = process.env.RAZORPAY_KEY_SECRET!;
@@ -111,21 +125,7 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<Ra
     };
   }
 
-  // Sandbox / Mock mode fallback — permitted only when explicitly opted in during non-production
-  if (!canMockPayments()) {
-    throw new Error('Razorpay credentials are not configured and mock payments are disabled.');
-  }
-
-  const sanitizedReceipt = (receipt || 'rcpt').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
-  const mockId = `order_mock_${amount}_${sanitizedReceipt}_${Date.now().toString(36)}`;
-  return {
-    id: mockId,
-    amount,
-    currency,
-    receipt,
-    status: 'created',
-    is_mock: true,
-  };
+  throw new Error('Razorpay credentials are not configured and mock payments are disabled.');
 }
 
 /**
@@ -185,13 +185,14 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
   }
 
   // 3. Mock verification ONLY when explicitly enabled in non-production environments
+  // AND the order was specifically created in mock mode (starts with order_mock_)
   if (
     canMockPayments() &&
+    orderId.startsWith('order_mock_') &&
     (signature.startsWith('mock_sig_') ||
       signature === 'mock_verified' ||
       signature === 'sim_signature' ||
-      signature.startsWith('test_sig_') ||
-      orderId.startsWith('order_mock_'))
+      signature.startsWith('test_sig_'))
   ) {
     return true;
   }
@@ -228,7 +229,7 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
     if (
       paymentId.startsWith('sim_') ||
       paymentId.startsWith('mock_') ||
-      paymentId.startsWith('pay_')
+      paymentId.startsWith('pay_mock_')
     ) {
       return {
         id: paymentId,
@@ -290,8 +291,8 @@ export interface RazorpayOrderDetails {
 export async function fetchRazorpayOrder(orderId: string): Promise<RazorpayOrderDetails | null> {
   if (!orderId || !orderId.trim()) return null;
 
-  // 1. Mock order response ONLY if explicitly enabled AND strictly in non-production
-  if (canMockPayments()) {
+  // 1. Mock order response ONLY if explicitly enabled AND the order was created in mock mode
+  if (canMockPayments() && (orderId.startsWith('order_mock_') || orderId.startsWith('mock_'))) {
     if (
       orderId.includes('invalid') ||
       orderId.includes('fake') ||

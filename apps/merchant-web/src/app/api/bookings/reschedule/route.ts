@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, status')
+      .select('id, customer_id, provider_id, status, slot_start')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -44,6 +44,28 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Unauthorized: Caller is not authorized to reschedule this booking' },
         { status: 403 }
       );
+    }
+
+    // Reject rescheduling to past slots (vuln-0022)
+    const newSlotTime = new Date(new_slot_start).getTime();
+    if (isNaN(newSlotTime) || newSlotTime < Date.now()) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: 'Cannot reschedule to a slot in the past' },
+        { status: 400 }
+      );
+    }
+
+    // Late-window enforcement: customer cannot reset cancellation cutoff by rescheduling (vuln-0022)
+    if (caller.id === booking.customer_id && booking.slot_start) {
+      const currentSlotTime = new Date(booking.slot_start).getTime();
+      const now = Date.now();
+      const minutesToSlot = (currentSlotTime - now) / (60 * 1000);
+      if (minutesToSlot <= 30) {
+        return NextResponse.json<RescheduleBookingResponse>(
+          { success: false, error: 'Late reschedule: appointments within 30 minutes of their slot cannot be rescheduled.' },
+          { status: 400 }
+        );
+      }
     }
 
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('reschedule_booking_slot', {

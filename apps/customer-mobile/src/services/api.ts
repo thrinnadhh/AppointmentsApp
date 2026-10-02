@@ -13,7 +13,8 @@ import {
   normCategory,
   City,
   WeeklyHours,
-  DayOfWeek
+  DayOfWeek,
+  CoolingPeriodEligibilityResult
 } from '@appointments/shared';
 
 declare const process: { env: Record<string, string | undefined> };
@@ -138,6 +139,7 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
         closing_time: prov.closing_time,
         photos: prov.photos,
         status: prov.status,
+        cooling_period_days: prov.cooling_period_days ? Number(prov.cooling_period_days) : 0,
         weekly_hours: (prov.weekly_hours as unknown as WeeklyHours) || null,
         created_at: prov.created_at,
         updated_at: prov.updated_at,
@@ -278,6 +280,7 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
       closing_time: data.closing_time,
       photos: data.photos,
       status: data.status,
+      cooling_period_days: data.cooling_period_days ? Number(data.cooling_period_days) : 0,
       weekly_hours: (data.weekly_hours as unknown as WeeklyHours) || null,
       created_at: data.created_at,
       updated_at: data.updated_at,
@@ -410,12 +413,24 @@ export async function searchDirectoryOnSupabase(query: string): Promise<Provider
   }
 }
 
+export interface CreateHoldSupabaseResult {
+  success: boolean;
+  booking_id?: string;
+  reference_code?: string;
+  deposit_amount?: number;
+  platform_fee?: number;
+  total_amount?: number;
+  is_followup?: boolean;
+  followup_original_booking_id?: string | null;
+  error?: string;
+}
+
 export async function createHoldOnSupabase(
   customerId: string,
   resourceId: string,
   slotStart: string,
   slotEnd: string
-): Promise<{ success: boolean; booking_id?: string; reference_code?: string; deposit_amount?: number; error?: string }> {
+): Promise<CreateHoldSupabaseResult> {
   // Route all resource hold operations strictly through backend API routes.
   // Direct client-side unmetered RPC access is disallowed to enforce Redis concurrency locks, rate limits, and business logic.
   try {
@@ -438,6 +453,10 @@ export async function createHoldOnSupabase(
         booking_id: json.booking_id,
         reference_code: json.reference_code,
         deposit_amount: json.deposit_amount,
+        platform_fee: json.platform_fee,
+        total_amount: json.total_amount,
+        is_followup: json.is_followup,
+        followup_original_booking_id: json.followup_original_booking_id,
       };
     }
 
@@ -452,6 +471,28 @@ export async function createHoldOnSupabase(
       success: false,
       error: `Unable to reserve slot: ${msg}`,
     };
+  }
+}
+
+export async function checkCoolingPeriodEligibility(
+  customerId: string,
+  providerId: string,
+  targetSlot?: string
+): Promise<CoolingPeriodEligibilityResult> {
+  try {
+    const { data, error } = await (supabase.rpc as any)('check_cooling_period_eligibility', {
+      p_customer_id: customerId,
+      p_provider_id: providerId,
+      p_target_slot: targetSlot || new Date().toISOString(),
+    });
+    if (error) {
+      console.warn('check_cooling_period_eligibility error:', error);
+      return { eligible: false, reason: error.message };
+    }
+    return (data || { eligible: false }) as CoolingPeriodEligibilityResult;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error checking cooling period';
+    return { eligible: false, reason: msg };
   }
 }
 

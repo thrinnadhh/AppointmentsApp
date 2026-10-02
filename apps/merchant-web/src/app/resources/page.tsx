@@ -91,7 +91,7 @@ function ResourcesManagementContent() {
         duration_minutes: verticalConfig.defaultDurationMinutes,
       }));
     }
-  }, [tenantProvider?.id, isSuperAdmin, verticalConfig, defaultResourceType]);
+  }, [tenantProvider, isSuperAdmin, verticalConfig, defaultResourceType]);
 
   const loadData = useCallback(async () => {
     if (!selectedProviderId && !isSuperAdmin) {

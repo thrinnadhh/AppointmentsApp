@@ -122,10 +122,21 @@ serve(async (req: Request) => {
     }
 
     // 2. Delegate to cancel_booking RPC for atomic strike tracking and policy compliance
+    // vuln-0009: Derive initiator authority from verified caller identity; the request body
+    // is client-controlled and must never select the merchant code path for a customer.
+    let effectiveInitiatedBy = initiated_by;
+    if (!isInternalServiceRole && callerUserId) {
+      if (callerUserId === booking.customer_id) {
+        effectiveInitiatedBy = 'CUSTOMER';
+      } else {
+        effectiveInitiatedBy = 'MERCHANT';
+      }
+    }
+
     const { data: rpcResult, error: rpcError } = await supabase.rpc('cancel_booking', {
       p_booking_id: booking_id,
       p_reason: reason || 'Processed by Edge Function',
-      p_initiated_by: initiated_by,
+      p_initiated_by: effectiveInitiatedBy,
     });
 
     if (rpcError) {

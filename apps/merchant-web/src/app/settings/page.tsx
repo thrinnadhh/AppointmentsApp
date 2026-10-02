@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Building2,
   CreditCard,
@@ -12,13 +12,25 @@ import {
   Smartphone,
   MapPin,
   Key,
+  Clock3,
+  CalendarCheck,
+  AlertCircle,
 } from 'lucide-react';
+import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { updateProviderCoolingPeriod } from '@/lib/supabase';
 
 type SettingsTab = 'profile' | 'payments' | 'notifications' | 'policies';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+  const { activeProvider, refreshTenant, isLoading } = useMerchantTenant();
+  const [mounted, setMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('policies');
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Profile State
   const [businessName, setBusinessName] = useState('Tirupati Appointments Operations Hub');
@@ -43,18 +55,55 @@ export default function SettingsPage() {
   // Policy State
   const [cancellationWindowHours, setCancellationWindowHours] = useState('1');
   const [forfeitOnNoShow, setForfeitOnNoShow] = useState(true);
+  const [coolingPeriodDays, setCoolingPeriodDays] = useState<number>(0);
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    // NOTE: Settings persistence is not yet connected to Supabase.
-    // This shows a preview toast only. Wire up to a platform_settings
-    // table when ready for production.
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  useEffect(() => {
+    if (activeProvider) {
+      if (activeProvider.name) setBusinessName(activeProvider.name);
+      if (activeProvider.phone) setSupportPhone(activeProvider.phone);
+      if (activeProvider.email) setSupportEmail(activeProvider.email);
+      if (activeProvider.address) setJurisdiction(activeProvider.address);
+      if (activeProvider.cooling_period_days !== undefined) {
+        setCoolingPeriodDays(activeProvider.cooling_period_days);
+      }
+    }
+  }, [activeProvider]);
+
+  const handleSave = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && 'preventDefault' in e) e.preventDefault();
+    setSaveError(null);
+
+    if (!activeProvider?.id) {
+      setSaveError('No active provider loaded. Please wait for provider data to load.');
+      return;
+    }
+
+    try {
+      console.log(`[handleSave] Updating cooling_period_days to ${coolingPeriodDays} for provider ${activeProvider.id}`);
+      const res = await updateProviderCoolingPeriod(activeProvider.id, coolingPeriodDays);
+      console.log('[handleSave] update result:', res);
+      if (!res.success) {
+        setSaveError(res.error || 'Failed to update cooling period settings');
+        return;
+      }
+      await refreshTenant();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error saving settings';
+      console.error('[handleSave] caught exception:', msg);
+      setSaveError(msg);
+    }
   };
 
+  const isFullyHydrated = mounted && !isLoading && !!activeProvider?.id;
+
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div
+      data-hydrated={isFullyHydrated ? 'true' : 'false'}
+      data-provider-id={activeProvider?.id || ''}
+      className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8"
+    >
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
@@ -73,8 +122,11 @@ export default function SettingsPage() {
         </div>
 
         <button
+          type="submit"
+          form="settings-form"
+          data-testid="settings-save-button"
           onClick={handleSave}
-          className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-xs"
+          className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-xs cursor-pointer"
         >
           {saved ? (
             <>
@@ -100,6 +152,19 @@ export default function SettingsPage() {
           <span className="text-xs font-mono bg-emerald-100 px-2 py-0.5 rounded text-emerald-800">
             SYNCED
           </span>
+        </div>
+      )}
+
+      {/* Error Toast */}
+      {saveError && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-center justify-between text-sm shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-rose-600" />
+            <span className="font-semibold">{saveError}</span>
+          </div>
+          <button onClick={() => setSaveError(null)} className="text-rose-600 hover:text-rose-800 text-xs font-bold">
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -152,7 +217,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Form Content */}
-      <form onSubmit={handleSave} className="space-y-6">
+      <form id="settings-form" onSubmit={handleSave} className="space-y-6">
         {/* TAB 1: BUSINESS PROFILE */}
         {activeTab === 'profile' && (
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
@@ -461,6 +526,97 @@ export default function SettingsPage() {
                   onChange={(e) => setForfeitOnNoShow(e.target.checked)}
                   className="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
                 />
+              </div>
+
+              {/* Cooling Period / Hospital Free Follow-up Policy */}
+              <div className="p-5 rounded-xl border-2 border-emerald-100 bg-emerald-50/40 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <CalendarCheck className="w-5 h-5 text-emerald-600" />
+                      <h3 className="text-sm font-bold text-slate-900">
+                        Hospital & Clinic Cooling Period (Free Follow-up)
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        ₹0 Charge Window
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                      Merchants can set any cooling period in days, or set it to <strong>0</strong> to disable free follow-ups completely. When enabled, any appointment where the scheduled date is within the cooling period from the patient&apos;s previous consultation is 100% free (₹0 deposit + ₹0 platform fee).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-emerald-100/80 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <label htmlFor="cooling-period-input" className="text-xs font-bold text-slate-800 block">
+                        Cooling Period Duration:
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        Enter any number of days (e.g. 5, 10, 15, 20) or enter <strong>0</strong> to disable.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="cooling-period-input"
+                        name="coolingPeriodDays"
+                        aria-label="Cooling Period Duration in Days"
+                        type="number"
+                        min="0"
+                        max="365"
+                        value={coolingPeriodDays}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCoolingPeriodDays(val === '' ? 0 : Math.max(0, parseInt(val, 10) || 0));
+                        }}
+                        className="w-28 px-3 py-2 rounded-lg border border-slate-300 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">Days</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-xs text-slate-500 font-medium">Quick Select:</span>
+                    {[
+                      { label: '0 Days (Disabled)', days: 0 },
+                      { label: '5 Days', days: 5 },
+                      { label: '7 Days', days: 7 },
+                      { label: '10 Days', days: 10 },
+                      { label: '15 Days', days: 15 },
+                      { label: '20 Days (Standard)', days: 20 },
+                      { label: '30 Days', days: 30 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.days}
+                        type="button"
+                        onClick={() => setCoolingPeriodDays(preset.days)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${
+                          coolingPeriodDays === preset.days
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="text-[11px] text-slate-600 bg-white/90 p-3 rounded-lg border border-emerald-100 flex items-start gap-2.5">
+                    <Clock3 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      {coolingPeriodDays > 0 ? (
+                        <span>
+                          <strong className="text-emerald-800">{coolingPeriodDays}-Day Cooling Period Active:</strong> On the customer app, when a patient selects a slot where the scheduled appointment date is less than {coolingPeriodDays} days from their previous consultation, the app will explicitly show: <em className="text-emerald-700 font-semibold">&ldquo;As appointment date is within cooling period &rarr; Free Appointment (₹0 Fee)&rdquo;</em>. Both the deposit and convenience fee are completely waived.
+                        </span>
+                      ) : (
+                        <span>
+                          <strong className="text-slate-700">Cooling Period Disabled (0 Days):</strong> All bookings require the standard ₹100 hold deposit and platform convenience fee. No free follow-up appointment banners will appear on the customer app.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

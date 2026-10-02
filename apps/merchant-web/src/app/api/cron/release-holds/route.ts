@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import crypto from 'crypto';
 
 interface RpcReleaseResult {
   success: boolean;
@@ -17,7 +18,17 @@ function verifyCronAuth(req: NextRequest): boolean {
   }
 
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
-  return authHeader === `Bearer ${cronSecret}`;
+  if (!authHeader) return false;
+
+  const expected = `Bearer ${cronSecret}`;
+  const authBuffer = Buffer.from(authHeader);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (authBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(authBuffer, expectedBuffer);
 }
 
 export async function GET(req: NextRequest) {

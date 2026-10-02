@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/privacy',
   '/terms',
   '/refund-policy',
+  '/account/delete',
 ];
 
 // Strictly public API endpoints (webhook listeners, auth callbacks, customer checkout, and territory endpoints)
@@ -24,6 +25,7 @@ const PUBLIC_API_ROUTES = [
   '/api/cities/',
   '/api/merchant/onboard',
   '/api/merchant/register-shop',
+  '/api/account/delete-public-request',
 ];
 
 export function isAllowedOrigin(origin: string | null): boolean {
@@ -88,7 +90,7 @@ export function middleware(req: NextRequest) {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': isProduction
       ? 'Content-Type, Authorization'
-      : 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key, x-customer-id, x-test-customer-id',
+      : 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key, x-customer-id',
   };
 
   if (originAllowed && reqOrigin) {
@@ -105,14 +107,13 @@ export function middleware(req: NextRequest) {
   }
 
   // Non-production E2E test bypass header verification using environment variable.
-  // In production, NEVER allow x-customer-id or test header overrides under any circumstance.
+  // In production, NEVER allow test header overrides under any circumstance.
   const adminBypassToken = !isProduction ? (process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET) : null;
   const isE2EBypass =
     !isProduction &&
     Boolean(adminBypassToken) &&
     (req.headers.get('x-merchant-bypass-key') === adminBypassToken ||
-      req.headers.get('x-admin-bypass-key') === adminBypassToken ||
-      Boolean(req.headers.get('x-customer-id')));
+      req.headers.get('x-admin-bypass-key') === adminBypassToken);
 
   // Check for Supabase session cookies
   const cookies = req.cookies;

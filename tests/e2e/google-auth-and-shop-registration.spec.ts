@@ -103,11 +103,20 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     const testPhotoUrl = `https://ynkdnwhubfknnnzjtpeg.supabase.co/storage/v1/object/public/venue-assets/test-shop-${uniqueSuffix}.webp`;
 
     const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+    // Provision a clean unlinked test user to avoid email collision with existing merchants
+    const testEmail = `dr.tester.${uniqueSuffix}@tirupati-test.com`;
+    const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
+      email: testEmail,
+      email_confirm: true,
+      user_metadata: { full_name: `Dr. Tester ${uniqueSuffix}` },
+    });
+    const targetUserId = newUser?.user?.id || '88888888-8888-8888-8888-888888888883';
+
     // 1. Register a shop with the photo URL using a valid user ID (provisioned by admin)
     const regRes = await request.post('http://localhost:3000/api/merchant/register-shop', {
       headers: { 'x-admin-bypass-key': adminBypass },
       data: {
-        userId: '88888888-8888-8888-8888-888888888883',
+        userId: targetUserId,
         fullName: `Dr. Tester ${uniqueSuffix}`,
         shopName: `Storefront Photo Test Clinic ${uniqueSuffix}`,
         categoryId: 'clinics',
@@ -126,6 +135,9 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     const providerId = regData.data?.provider_id || regData.data?.id;
     if (providerId) {
       await supabaseAdmin.from('providers').delete().eq('id', providerId);
+    }
+    if (newUser?.user?.id) {
+      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
     }
   });
 });

@@ -24,6 +24,10 @@ class GlobalExceptionHandler {
     fun handleConflict(ex: ConflictException): ProblemDetail =
         problem(HttpStatus.CONFLICT, ex.message ?: "Conflict")
 
+    @ExceptionHandler(BadRequestException::class)
+    fun handleBadRequest(ex: BadRequestException): ProblemDetail =
+        problem(HttpStatus.BAD_REQUEST, ex.message ?: "Bad request")
+
     /** Catches the DB exclusion constraint violation and returns a clean 409 */
     @ExceptionHandler(DataIntegrityViolationException::class)
     fun handleDbConflict(ex: DataIntegrityViolationException): ProblemDetail {
@@ -56,3 +60,4 @@ class GlobalExceptionHandler {
 class NotFoundException(message: String) : RuntimeException(message)
 class ForbiddenException(message: String) : RuntimeException(message)
 class ConflictException(message: String) : RuntimeException(message)
+class BadRequestException(message: String) : RuntimeException(message)

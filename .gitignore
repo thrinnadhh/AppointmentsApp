@@ -52,3 +52,13 @@ opencode*.json
 .vercel
 .env*
 .gradle/
+audit/
+strix_runs/
+poc_*.py
+strix-findings-plan.md
+__pycache__/
+__agent__/
+.planning/
+.source-aware/
+.agents/preview.pid
+

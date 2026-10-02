@@ -36,7 +36,7 @@ test.describe.serial('Phase 1: High Severity Financial & Access Control BOLA Def
     let orderIdB = '';
 
     await test.step('Arrange: Create two independent booking holds (Booking A and Booking B)', async () => {
-      const baseA = 100000000 + Math.floor(Math.random() * 500000000);
+      const baseA = 1000000000 + Math.floor(Math.random() * 5000000000);
       const slotStartA = new Date(Date.now() + baseA).toISOString();
       const slotEndA = new Date(Date.now() + baseA + 1800000).toISOString();
       const holdA = await bookingApi.createHold({ slotStart: slotStartA, slotEnd: slotEndA });
@@ -88,7 +88,7 @@ test.describe.serial('Phase 1: High Severity Financial & Access Control BOLA Def
     let bookingId = '';
 
     await test.step('Arrange: Create high-value reservation hold for customer', async () => {
-      const base12 = 200000000 + Math.floor(Math.random() * 500000000);
+      const base12 = 2000000000 + Math.floor(Math.random() * 5000000000);
       const slotStart = new Date(Date.now() + base12).toISOString();
       const slotEnd = new Date(Date.now() + base12 + 1800000).toISOString();
       const hold = await bookingApi.createHold({
@@ -132,7 +132,7 @@ test.describe.serial('Phase 1: High Severity Financial & Access Control BOLA Def
     let unlinkedBookingId = '';
 
     await test.step('Arrange: Create hold without invoking payment order creation', async () => {
-      const base13 = 300000000 + Math.floor(Math.random() * 500000000);
+      const base13 = 3000000000 + Math.floor(Math.random() * 5000000000);
       const slotStart = new Date(Date.now() + base13).toISOString();
       const slotEnd = new Date(Date.now() + base13 + 1800000).toISOString();
       const hold = await bookingApi.createHold({ slotStart, slotEnd });
@@ -167,7 +167,7 @@ test.describe.serial('Phase 1: High Severity Financial & Access Control BOLA Def
     let testRefCode = '';
 
     await test.step('Arrange: Create booking hold and bind legitimate gateway order', async () => {
-      const baseHP = 400000000 + Math.floor(Math.random() * 500000000);
+      const baseHP = 4000000000 + Math.floor(Math.random() * 5000000000);
       const slotStart = new Date(Date.now() + baseHP).toISOString();
       const slotEnd = new Date(Date.now() + baseHP + 1800000).toISOString();
       const hold = await bookingApi.createHold({ slotStart, slotEnd });

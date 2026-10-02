@@ -434,19 +434,20 @@ describe('Authentication, Toll-Fraud & Gateway Defense Remediation', () => {
     });
   });
 
-  // 5. Medium — Non-Prod E2E Customer Header Leak
+  // 5. Critical — E2E Customer Header Bypass Eliminated
   describe('5. Non-Prod E2E Customer Header Leak', () => {
-    it('verifies middleware disables x-customer-id header override in production', () => {
+    it('verifies middleware disables x-customer-id header override in production and development', () => {
       const middlewarePath = path.join(rootDir, 'apps/merchant-web/src/middleware.ts');
       const code = fs.readFileSync(middlewarePath, 'utf8');
       assert.match(code, /const isProduction = process\.env\.NODE_ENV === 'production';/, 'Must check production environment');
-      assert.match(code, /!isProduction &&[\s\S]*x-customer-id/, 'x-customer-id must only be evaluated when NOT in production');
+      assert.doesNotMatch(code, /Boolean\(req\.headers\.get\('x-customer-id'\)\)/, 'x-customer-id must never bypass middleware');
     });
 
-    it('verifies auth-admin strictly gates customer header override behind non-production check', () => {
+    it('verifies auth-admin strictly gates customer header override behind non-production and blocks admin escalation', () => {
       const authAdminPath = path.join(rootDir, 'apps/merchant-web/src/lib/auth-admin.ts');
       const code = fs.readFileSync(authAdminPath, 'utf8');
       assert.match(code, /if \(process\.env\.NODE_ENV !== 'production'\) \{[\s\S]*x-customer-id/, 'auth-admin must gate x-customer-id strictly behind non-production');
+      assert.match(code, /testCustomerId !== '88888888-8888-8888-8888-888888888881'/, 'Must prevent admin UUID impersonation');
     });
   });
 
@@ -677,4 +678,69 @@ describe('Priority 3 Security Remediation: Infrastructure Hardening & Container 
     assert.doesNotMatch(watchtowerBlock, /edge_network/);
   });
 });
+
+describe('Priority 4 Security Remediation: RPC In-Function Auth, Placeholder Regex, and Triage Lockdown', () => {
+  const rootDir = process.cwd();
+
+  it('verifies reassign_booking_resource implements in-function authorization guarding BOLA and restricts grants', () => {
+    const migrationPath = path.join(rootDir, 'supabase/migrations/20261001000002_reassign_auth_and_permission_lockdown.sql');
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.reassign_booking_resource/);
+    assert.match(sql, /v_caller_id UUID := auth\.uid\(\);/);
+    assert.match(sql, /public\.get_user_authorized_providers\(v_caller_id\)/);
+    assert.match(sql, /public\.is_admin\(v_caller_id\)/);
+    assert.match(sql, /Unauthorized: Caller is not permitted to reassign resources for this booking/);
+    assert.match(sql, /REVOKE ALL ON FUNCTION public\.reassign_booking_resource\(UUID, UUID, TEXT\) FROM PUBLIC, anon;/);
+    assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.reassign_booking_resource\(UUID, UUID, TEXT\) TO authenticated, service_role;/);
+  });
+
+  it('verifies env.mjs contains unanchored /placeholder/i regex and denies live credential variations', () => {
+    const envPath = path.join(rootDir, 'apps/merchant-web/src/env.mjs');
+    const code = fs.readFileSync(envPath, 'utf8');
+
+    assert.match(code, /\/placeholder\/i/);
+    assert.match(code, /'rzp_live_placeholder'/);
+    assert.match(code, /'placeholder_production_anon_key'/);
+    assert.match(code, /isLiveRazorpayKey/);
+    assert.match(code, /isLiveSupabaseKey/);
+  });
+
+  it('verifies search_directory locks down PII via ABAC and providers table revokes direct anon SELECT', () => {
+    const migrationPath = path.join(rootDir, 'supabase/migrations/20261001000002_reassign_auth_and_permission_lockdown.sql');
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
+    assert.match(sql, /REVOKE SELECT ON public\.providers FROM anon;/);
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.search_directory/);
+    assert.match(sql, /v_is_admin OR \(v_caller_id IS NOT NULL AND mp\.id IN \(SELECT public\.get_user_authorized_providers/);
+    assert.match(sql, /REVOKE EXECUTE ON FUNCTION public\.search_directory\(text\) FROM anon, PUBLIC;/);
+  });
+
+  it('verifies docker-compose pins Watchtower with immutable SHA256 digest and read-only socket mount', () => {
+    const composePath = path.join(rootDir, 'docker-compose.yml');
+    const yaml = fs.readFileSync(composePath, 'utf8');
+
+    assert.match(yaml, /containrrr\/watchtower:1\.7\.1@sha256:[a-f0-9]{64}/);
+    assert.match(yaml, /\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/);
+    assert.match(yaml, /no-new-privileges:true/);
+  });
+
+  it('verifies public account deletion requires proof-of-ownership and validates signed tokens', () => {
+    const routePath = path.join(rootDir, 'apps/merchant-web/src/app/api/account/delete-public-request/route.ts');
+    const code = fs.readFileSync(routePath, 'utf8');
+
+    assert.match(code, /verifyAuthenticatedUser/);
+    assert.match(code, /verifySignedDeletionToken/);
+    assert.match(code, /Proof-of-ownership verification required/);
+  });
+
+  it('verifies reschedule_booking_slot permission regression is fixed by revoking anon execute', () => {
+    const migrationPath = path.join(rootDir, 'supabase/migrations/20261001000002_reassign_auth_and_permission_lockdown.sql');
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
+    assert.match(sql, /REVOKE EXECUTE ON FUNCTION public\.reschedule_booking_slot\(UUID, TIMESTAMPTZ, TIMESTAMPTZ\) FROM anon, PUBLIC;/);
+    assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.reschedule_booking_slot\(UUID, TIMESTAMPTZ, TIMESTAMPTZ\) TO authenticated, service_role;/);
+  });
+});
+
 

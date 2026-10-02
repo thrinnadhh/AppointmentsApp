@@ -59,7 +59,7 @@ export function getClientIp(req: Request | NextRequest): string {
  */
 export async function verifyAuthenticatedUser(
   request: NextRequest
-): Promise<{ id: string; email?: string } | null> {
+): Promise<{ id: string; email?: string; isTestCustomer?: boolean } | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -80,13 +80,17 @@ export async function verifyAuthenticatedUser(
       }
     }
 
-    // Only allow customer header override in non-production environments
-    const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
-    if (testCustomerId) {
-      return {
-        id: testCustomerId,
-        email: `${testCustomerId}@test.appointments4u.in`,
-      };
+    // Only allow customer header override in non-production environments when explicitly opted-in for E2E testing
+    // Strictly prevent privilege escalation: test customer header can NEVER impersonate admin UUID
+    if (process.env.ENABLE_E2E_BYPASS === 'true') {
+      const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
+      if (testCustomerId && testCustomerId !== '88888888-8888-8888-8888-888888888881') {
+        return {
+          id: testCustomerId,
+          email: `${testCustomerId}@test.appointments4u.in`,
+          isTestCustomer: true,
+        };
+      }
     }
   }
 
@@ -271,6 +275,14 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
     return {
       error: 'Unauthorized: Authentication required to access administrative resources.',
       status: 401,
+    };
+  }
+
+  // Strictly block test customer headers from administrative access
+  if ((user as any)?.isTestCustomer) {
+    return {
+      error: 'Forbidden: Test customer header cannot access administrative resources.',
+      status: 403,
     };
   }
 

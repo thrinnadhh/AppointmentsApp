@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
 
 test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', () => {
@@ -15,22 +16,32 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
   const ADMIN_HEADERS = { 'x-admin-bypass-key': adminBypassToken };
 
   let originalStrikes = 0;
+  let originalCoolingPeriod = 0;
 
   test.beforeAll(async () => {
-    // Read original strikes
+    // Read original strikes and cooling period
     const { data: prov } = await supabase
       .from('providers')
-      .select('cancellation_strikes')
+      .select('cancellation_strikes, cooling_period_days')
       .eq('id', testProviderId)
       .single();
 
     originalStrikes = prov?.cancellation_strikes ?? 0;
+    originalCoolingPeriod = prov?.cooling_period_days ?? 0;
 
     // Reset merchant strikes to 0 for deterministic testing
     await supabase.rpc('reset_test_provider_strikes', {
       p_provider_id: testProviderId,
       p_count: 0,
     });
+
+    // Ensure cooling period is disabled during strike tests so test bookings are full paid reservations
+    if (originalCoolingPeriod > 0) {
+      await supabase
+        .from('providers')
+        .update({ cooling_period_days: 0 })
+        .eq('id', testProviderId);
+    }
   });
 
   test.afterAll(async () => {
@@ -39,12 +50,28 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
       p_provider_id: testProviderId,
       p_count: originalStrikes,
     });
+
+    // Restore original cooling period
+    if (originalCoolingPeriod > 0) {
+      await supabase
+        .from('providers')
+        .update({ cooling_period_days: originalCoolingPeriod })
+        .eq('id', testProviderId);
+    }
   });
+
+  async function confirmBooking(bookingId: string, prefix = 'pay') {
+    await supabase.rpc('confirm_booking_payment', {
+      p_booking_id: bookingId,
+      p_gateway_payment_id: `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+    });
+  }
 
   test('1. Emergency Staff Reassignment: transfers booking to substitute specialist without penalty', async ({ request }) => {
     // 1. Create a confirmed booking for Resource A
-    const slotStart = new Date(Date.now() + 86400000 * 12).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 12 + 1800000).toISOString();
+    const baseOffset = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: {
@@ -57,13 +84,7 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
-    const confirmRes = await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_reassign_${Date.now()}`,
-      },
-    });
-    expect(confirmRes.status()).toBe(200);
+    await confirmBooking(booking_id, 'pay_reassign');
 
     // 2. Call emergency reassignment API to switch from Dr. Murthy (A) to Dr. Reddy (B)
     const reassignRes = await request.post(`${BASE_URL}/api/bookings/reassign`, {
@@ -74,6 +95,9 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
         reason: 'Dr. Murthy emergency surgery delay',
       },
     });
+    if (reassignRes.status() !== 200) {
+      console.log('REASSIGN FAILED STATUS:', reassignRes.status(), await reassignRes.text());
+    }
     expect(reassignRes.status()).toBe(200);
     const reassignData = await reassignRes.json();
     expect(reassignData.success).toBe(true);
@@ -99,8 +123,9 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
   });
 
   test('2. Reassignment Conflict Prevention: rejects reassignment if target staff is already booked (409)', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 13).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 13 + 1800000).toISOString();
+    const baseOffset = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset + 1800000).toISOString();
 
     // 1. Create booking for Resource A
     const holdA = await request.post(`${BASE_URL}/api/bookings/hold`, {
@@ -112,9 +137,7 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
       },
     });
     const { booking_id: bookingAId } = await holdA.json();
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: { booking_id: bookingAId, gateway_payment_id: `pay_conf_a_${Date.now()}` },
-    });
+    await confirmBooking(bookingAId, 'pay_conf_a');
 
     // 2. Create conflicting booking for Resource B at the SAME slot
     const holdB = await request.post(`${BASE_URL}/api/bookings/hold`, {
@@ -126,9 +149,7 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
       },
     });
     const { booking_id: bookingBId } = await holdB.json();
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: { booking_id: bookingBId, gateway_payment_id: `pay_conf_b_${Date.now()}` },
-    });
+    await confirmBooking(bookingBId, 'pay_conf_b');
 
     // 3. Attempt to reassign booking A to Resource B -> MUST return 409
     const conflictRes = await request.post(`${BASE_URL}/api/bookings/reassign`, {
@@ -150,15 +171,14 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     await supabase.rpc('reset_test_provider_strikes', { p_provider_id: testProviderId, p_count: 0 });
 
     // --- STRIKE 1 ---
-    const slot1Start = new Date(Date.now() + 86400000 * 14).toISOString();
-    const slot1End = new Date(Date.now() + 86400000 * 14 + 1800000).toISOString();
+    const baseOffset1 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slot1Start = new Date(Date.now() + baseOffset1).toISOString();
+    const slot1End = new Date(Date.now() + baseOffset1 + 1800000).toISOString();
     const hold1 = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: { customer_id: testCustomerId, resource_id: resourceAId, slot_start: slot1Start, slot_end: slot1End },
     });
     const { booking_id: b1Id } = await hold1.json();
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: { booking_id: b1Id, gateway_payment_id: `pay_m1_${Date.now()}` },
-    });
+    await confirmBooking(b1Id, 'pay_m1');
 
     // Merchant cancels > 30m in advance
     const cancel1Res = await request.post(`${BASE_URL}/api/bookings/cancel`, {
@@ -179,15 +199,14 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     expect(cancel1Data.penalty_amount).toBe(0);
 
     // --- STRIKE 2 ---
-    const slot2Start = new Date(Date.now() + 86400000 * 15).toISOString();
-    const slot2End = new Date(Date.now() + 86400000 * 15 + 1800000).toISOString();
+    const baseOffset2 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slot2Start = new Date(Date.now() + baseOffset2).toISOString();
+    const slot2End = new Date(Date.now() + baseOffset2 + 1800000).toISOString();
     const hold2 = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: { customer_id: testCustomerId, resource_id: resourceAId, slot_start: slot2Start, slot_end: slot2End },
     });
     const { booking_id: b2Id } = await hold2.json();
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: { booking_id: b2Id, gateway_payment_id: `pay_m2_${Date.now()}` },
-    });
+    await confirmBooking(b2Id, 'pay_m2');
 
     const cancel2Res = await request.post(`${BASE_URL}/api/bookings/cancel`, {
       headers: ADMIN_HEADERS,
@@ -208,15 +227,14 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
 
   test('4. Merchant Strike 3: 3rd cancellation incurs ₹100 penalty debited to venue balance', async ({ request }) => {
     // Current strikes is 2 from test 3
-    const slot3Start = new Date(Date.now() + 86400000 * 16).toISOString();
-    const slot3End = new Date(Date.now() + 86400000 * 16 + 1800000).toISOString();
+    const baseOffset3 = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slot3Start = new Date(Date.now() + baseOffset3).toISOString();
+    const slot3End = new Date(Date.now() + baseOffset3 + 1800000).toISOString();
     const hold3 = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: { customer_id: testCustomerId, resource_id: resourceAId, slot_start: slot3Start, slot_end: slot3End },
     });
     const { booking_id: b3Id } = await hold3.json();
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: { booking_id: b3Id, gateway_payment_id: `pay_m3_${Date.now()}` },
-    });
+    await confirmBooking(b3Id, 'pay_m3');
 
     const cancel3Res = await request.post(`${BASE_URL}/api/bookings/cancel`, {
       headers: ADMIN_HEADERS,
@@ -248,19 +266,19 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     // Reset to 0
     await supabase.rpc('reset_test_provider_strikes', { p_provider_id: testProviderId, p_count: 0 });
 
-    const slotStart = new Date(Date.now() + 86400000 * 17).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 17 + 1800000).toISOString();
+    const baseOffset = 1000000000 + Math.floor(Math.random() * 5000000000);
+    const slotStart = new Date(Date.now() + baseOffset).toISOString();
+    const slotEnd = new Date(Date.now() + baseOffset + 1800000).toISOString();
     const hold = await request.post(`${BASE_URL}/api/bookings/hold`, {
       data: { customer_id: testCustomerId, resource_id: resourceAId, slot_start: slotStart, slot_end: slotEnd },
     });
     const { booking_id } = await hold.json();
-    await request.post(`${BASE_URL}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: `pay_mock_lastmin_${Date.now()}` },
-    });
+    await confirmBooking(booking_id, 'pay_mock_lastmin');
 
     // Backdate slot to exactly 15 minutes from now (<= 30 minutes)
     const slot15Min = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-    await supabase.from('bookings').update({ slot_start: slot15Min }).eq('id', booking_id);
+    const slot45Min = new Date(Date.now() + 45 * 60 * 1000).toISOString();
+    await supabase.from('bookings').update({ slot_start: slot15Min, slot_end: slot45Min }).eq('id', booking_id);
 
     // Merchant cancels last minute
     const cancelRes = await request.post(`${BASE_URL}/api/bookings/cancel`, {

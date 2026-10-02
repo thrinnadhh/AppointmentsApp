@@ -1,5 +1,8 @@
 # Memory Index
 
+## User Preferences
+- [user] Installed AI tooling: Roo Code, GSD, and Ralph Code available for autonomous execution, spec planning, and self-correcting feedback loops → user-preferences.md
+
 ## Project
 - [project] Always create a new dedicated branch for major code changes → project-conventions.md
 - [project] AG Kit only supports Gemini CLI and Google Antigravity (not other AI coding tools) → project-conventions.md

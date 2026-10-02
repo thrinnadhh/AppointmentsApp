@@ -144,12 +144,21 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin();
     const cleanEmail = email.trim().toLowerCase();
 
+    // Strict email format validation to block SQL LIKE metacharacters (% and _)
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return NextResponse.json(
+        { error: 'Please provide a valid email address.' },
+        { status: 400 }
+      );
+    }
+
     // 6. ACCOUNT TAKEOVER & DUPLICATE REGISTRATION GUARDS
     // Prevent overwriting an already registered business email
     const { data: existingProvider } = await supabaseAdmin
       .from('providers')
       .select('id, name')
-      .ilike('email', cleanEmail)
+      .eq('email', cleanEmail)
       .limit(1)
       .maybeSingle();
 
@@ -164,7 +173,7 @@ export async function POST(request: NextRequest) {
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
       .select('id, email')
-      .ilike('email', cleanEmail)
+      .eq('email', cleanEmail)
       .limit(1)
       .maybeSingle();
 

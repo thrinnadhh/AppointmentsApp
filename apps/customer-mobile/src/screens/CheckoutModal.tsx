@@ -11,7 +11,7 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import { Resource, Slot, getPlatformFee } from '@appointments/shared';
+import { Resource, Slot, getPlatformFee, CoolingPeriodEligibilityResult } from '@appointments/shared';
 import {
   createHoldOnSupabase,
   confirmBookingPaymentOnSupabase,
@@ -19,6 +19,7 @@ import {
   verifyRazorpayPayment,
   uploadPrescriptionDoc,
   fetchCustomerStrikes,
+  checkCoolingPeriodEligibility,
 } from '../services/api';
 
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -47,8 +48,10 @@ interface CheckoutModalProps {
   slot: Slot | null;
   categoryId?: string | null;
   customerId?: string;
+  providerId?: string;
+  coolingPeriodDays?: number;
   onClose: () => void;
-  onPaymentSuccess: (bookingId: string, referenceCode?: string) => void;
+  onPaymentSuccess: (bookingId: string, referenceCode?: string, isFollowup?: boolean) => void;
 }
 
 
@@ -58,15 +61,47 @@ export default function CheckoutModal({
   slot,
   categoryId,
   customerId = '99999999-9999-9999-9999-999999999991',
+  providerId,
+  coolingPeriodDays,
   onClose,
   onPaymentSuccess,
 }: CheckoutModalProps) {
   const [customerStrikes, setCustomerStrikes] = useState<number>(0);
   const [secondsLeft, setSecondsLeft] = useState<number>(300); // 5 minutes
+  const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
+  const [checkingCooling, setCheckingCooling] = useState<boolean>(false);
 
-  const platformFee = getPlatformFee(categoryId);
-  const depositAmount = resource ? Number(resource.deposit_amount) : 100;
-  const totalPayable = depositAmount + platformFee;
+  const isFreeFollowup = Boolean(coolingEligibility?.eligible);
+  const rawPlatformFee = getPlatformFee(categoryId);
+  const rawDepositAmount = resource ? Number(resource.deposit_amount) : 100;
+
+  const platformFee = isFreeFollowup ? 0 : rawPlatformFee;
+  const depositAmount = isFreeFollowup ? 0 : rawDepositAmount;
+  const totalPayable = isFreeFollowup ? 0 : (depositAmount + platformFee);
+
+  useEffect(() => {
+    let active = true;
+    if (visible && customerId && providerId && slot?.start_time) {
+      setCheckingCooling(true);
+      checkCoolingPeriodEligibility(customerId, providerId, slot.start_time)
+        .then((res) => {
+          if (active) {
+            setCoolingEligibility(res);
+          }
+        })
+        .catch((err) => {
+          console.warn('Cooling period eligibility check failed:', err);
+        })
+        .finally(() => {
+          if (active) setCheckingCooling(false);
+        });
+    } else {
+      setCoolingEligibility(null);
+    }
+    return () => {
+      active = false;
+    };
+  }, [visible, customerId, providerId, slot?.start_time]);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -176,8 +211,22 @@ export default function CheckoutModal({
       }
 
       const bookingId = holdRes.booking_id;
+      const effectiveFollowup = Boolean(holdRes.is_followup || isFreeFollowup);
 
-      // 2. Create official Razorpay order on backend
+      // 2. Free Cooling Period Follow-up Consultation: Zero fee bypasses payment gateway
+      if (effectiveFollowup) {
+        const paymentId = `free_cooling_period_${bookingId}`;
+        const confirmRes = await confirmBookingPaymentOnSupabase(bookingId, paymentId, attachedPath);
+        if (confirmRes && confirmRes.success === false) {
+          setPayError(confirmRes.error || 'Failed to confirm free follow-up appointment.');
+          setIsProcessing(false);
+          return;
+        }
+        onPaymentSuccess(bookingId, holdRes.reference_code, true);
+        return;
+      }
+
+      // 3. Create official Razorpay order on backend for regular paid appointments
       const orderRes = await createRazorpayOrder(bookingId, customerId);
       if (!orderRes.success || !orderRes.order_id) {
         setPayError(orderRes.error || 'Failed to initialize payment gateway order.');
@@ -284,7 +333,7 @@ export default function CheckoutModal({
               <View style={{ flex: 1 }}>
                 <Text style={styles.timerTitle}>Slot Held for You</Text>
                 <Text style={styles.timerSub}>
-                  Complete deposit payment within{' '}
+                  {isFreeFollowup ? 'Confirm reservation within ' : 'Complete deposit payment within '}
                   <Text style={styles.timerCountdown}>
                     0{minutes}:{seconds < 10 ? `0${seconds}` : seconds}
                   </Text>
@@ -292,8 +341,46 @@ export default function CheckoutModal({
               </View>
             </View>
 
+            {/* Free Follow-up Consultation Courtesy Banner */}
+            {isFreeFollowup && (
+              <View style={styles.coolingBannerCard} testID="cooling-period-banner">
+                <View style={styles.coolingBannerHeader}>
+                  <Text style={styles.coolingBannerIcon}>🎁</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.coolingBannerTitle}>
+                      Free Appointment Applied!
+                    </Text>
+                    <Text style={styles.coolingBannerSub}>
+                      As appointment date ({dateString}) is within the {coolingEligibility?.cooling_period_days || coolingPeriodDays || 20}-day cooling period (&lt; {coolingEligibility?.days_remaining ?? (coolingEligibility?.cooling_period_days || coolingPeriodDays || 20)} days remaining from your previous consultation), this appointment is completely FREE!
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.coolingBannerPill}>
+                  <Text style={styles.coolingBannerPillText}>
+                    ✓ As appointment date &lt; cooling period time &rarr; Free Appointment (₹0 Fee)
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {!isFreeFollowup && coolingEligibility?.prior_slot_start && (
+              <View style={styles.coolingExpiredCard} testID="cooling-expired-banner">
+                <View style={styles.coolingBannerHeader}>
+                  <Text style={styles.coolingBannerIcon}>ℹ️</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.coolingExpiredTitle}>
+                      Cooling Period Expired ({coolingEligibility.cooling_period_days || coolingPeriodDays} Days)
+                    </Text>
+                    <Text style={styles.coolingExpiredSub}>
+                      Previous appointment was on {new Date(coolingEligibility.prior_slot_start).toLocaleDateString('en-IN')}. Since the selected appointment date ({dateString}) exceeds the cooling period, standard booking charges apply.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {/* 3rd Strike Courtesy Notice if customer has 2 prior missed appointments */}
-            {customerStrikes >= 2 && (
+            {customerStrikes >= 2 && !isFreeFollowup && (
               <View style={styles.strikeWarningCard} testID="strike-warning-card">
                 <View style={styles.strikeWarningHeader}>
                   <Text style={styles.strikeWarningIcon}>⚠️</Text>
@@ -326,104 +413,136 @@ export default function CheckoutModal({
 
             {/* Price Breakdown */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Payment Details</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={styles.cardTitle}>Payment Details</Text>
+                {isFreeFollowup && (
+                  <View style={styles.freeFollowupBadge}>
+                    <Text style={styles.freeFollowupBadgeText}>Free Follow-up</Text>
+                  </View>
+                )}
+              </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Hold Deposit (Merchant Fee)</Text>
-                <Text style={styles.priceValue}>₹{depositAmount}</Text>
+                <Text style={[styles.priceValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${depositAmount}`}
+                </Text>
               </View>
               <View style={styles.priceRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={styles.priceLabel}>Platform Booking Fee</Text>
-                  <View style={styles.feeBadge}>
-                    <Text style={styles.feeBadgeText}>
-                      {platformFee === 50 ? 'Flat ₹50 Gaming/Turf' : 'Flat ₹10'}
+                  <View style={[styles.feeBadge, isFreeFollowup && { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
+                    <Text style={[styles.feeBadgeText, isFreeFollowup && { color: '#047857' }]}>
+                      {isFreeFollowup ? 'Waived' : (platformFee === 50 ? 'Flat ₹50 Gaming/Turf' : 'Flat ₹10')}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.priceValue}>₹{platformFee}</Text>
+                <Text style={[styles.priceValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${platformFee}`}
+                </Text>
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Remainder Fee</Text>
-                <Text style={styles.priceSub}>Payable at venue</Text>
+                <Text style={styles.priceSub}>
+                  {isFreeFollowup ? '₹0 Follow-up' : 'Payable at venue'}
+                </Text>
               </View>
               <View style={[styles.priceRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total Payable Now</Text>
-                <Text style={styles.totalValue}>₹{totalPayable}</Text>
+                <Text style={[styles.totalValue, isFreeFollowup && { color: '#047857' }]}>
+                  ₹{totalPayable}
+                </Text>
               </View>
             </View>
 
 
-            {/* Razorpay Payment Method Selector */}
-            <View style={styles.card} testID="payment-method-card">
-              <View style={styles.methodHeader}>
-                <Text style={styles.cardTitle}>Payment Method (Razorpay Gateway)</Text>
-                <View style={styles.rzpBadge}>
-                  <Text style={styles.rzpBadgeText}>⚡ Razorpay Secure</Text>
-                </View>
-              </View>
-
-              <View style={styles.tabsRow}>
-                <TouchableOpacity
-                  style={[styles.tabButton, paymentMethod === 'UPI' && styles.tabButtonActive]}
-                  onPress={() => setPaymentMethod('UPI')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Select UPI Payment"
-                >
-                  <Text style={[styles.tabButtonText, paymentMethod === 'UPI' && styles.tabButtonTextActive]}>
-                    📱 UPI Apps
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.tabButton, paymentMethod === 'QR' && styles.tabButtonActive]}
-                  onPress={() => setPaymentMethod('QR')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Select QR Code Payment"
-                >
-                  <Text style={[styles.tabButtonText, paymentMethod === 'QR' && styles.tabButtonTextActive]}>
-                    📷 QR Code
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.tabButton, paymentMethod === 'CARD' && styles.tabButtonActive]}
-                  onPress={() => setPaymentMethod('CARD')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Select Card Payment"
-                >
-                  <Text style={[styles.tabButtonText, paymentMethod === 'CARD' && styles.tabButtonTextActive]}>
-                    💳 Card
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {paymentMethod === 'UPI' && (
-                <View style={styles.methodContent}>
-                  <Text style={styles.methodHelpText}>Select your preferred UPI app:</Text>
-                  <View style={styles.upiGrid}>
-                    {[
-                      { id: 'phonepe', name: 'PhonePe', icon: '🟣' },
-                      { id: 'gpay', name: 'Google Pay', icon: '🔵' },
-                      { id: 'paytm', name: 'Paytm', icon: '🔷' },
-                      { id: 'bhim', name: 'BHIM UPI', icon: '🇮🇳' },
-                    ].map((app) => (
-                      <TouchableOpacity
-                        key={app.id}
-                        style={[styles.upiAppBtn, selectedUpiApp === app.id && styles.upiAppBtnActive]}
-                        onPress={() => setSelectedUpiApp(app.id as any)}
-                        accessibilityRole="button"
-                        accessibilityLabel={app.name}
-                      >
-                        <Text style={styles.upiAppIcon}>{app.icon}</Text>
-                        <Text style={[styles.upiAppName, selectedUpiApp === app.id && styles.upiAppNameActive]}>
-                          {app.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+            {/* Razorpay Payment Method Selector or Free Courtesy Notice */}
+            {isFreeFollowup ? (
+              <View style={styles.card} testID="free-payment-notice-card">
+                <View style={styles.methodHeader}>
+                  <Text style={styles.cardTitle}>Payment Method</Text>
+                  <View style={[styles.rzpBadge, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
+                    <Text style={[styles.rzpBadgeText, { color: '#047857' }]}>✓ Courtesy Booking</Text>
                   </View>
-                  <Text style={styles.upiVpaText}>Fast 1-click checkout powered by Razorpay Test Sandbox</Text>
                 </View>
-              )}
+                <View style={styles.freeFollowupBox}>
+                  <Text style={{ fontSize: 28, marginBottom: 8 }}>🤝</Text>
+                  <Text style={styles.freeFollowupBoxTitle}>Zero Payment Required</Text>
+                  <Text style={styles.freeFollowupBoxText}>
+                    As appointment date is within the cooling period of your previous visit, this appointment is 100% Free. No card, UPI, or deposit payment is needed. Simply tap confirm below to lock in your appointment slot.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.card} testID="payment-method-card">
+                <View style={styles.methodHeader}>
+                  <Text style={styles.cardTitle}>Payment Method (Razorpay Gateway)</Text>
+                  <View style={styles.rzpBadge}>
+                    <Text style={styles.rzpBadgeText}>⚡ Razorpay Secure</Text>
+                  </View>
+                </View>
+
+                <View style={styles.tabsRow}>
+                  <TouchableOpacity
+                    style={[styles.tabButton, paymentMethod === 'UPI' && styles.tabButtonActive]}
+                    onPress={() => setPaymentMethod('UPI')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Select UPI Payment"
+                  >
+                    <Text style={[styles.tabButtonText, paymentMethod === 'UPI' && styles.tabButtonTextActive]}>
+                      📱 UPI Apps
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.tabButton, paymentMethod === 'QR' && styles.tabButtonActive]}
+                    onPress={() => setPaymentMethod('QR')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Select QR Code Payment"
+                  >
+                    <Text style={[styles.tabButtonText, paymentMethod === 'QR' && styles.tabButtonTextActive]}>
+                      📷 QR Code
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.tabButton, paymentMethod === 'CARD' && styles.tabButtonActive]}
+                    onPress={() => setPaymentMethod('CARD')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Select Card Payment"
+                  >
+                    <Text style={[styles.tabButtonText, paymentMethod === 'CARD' && styles.tabButtonTextActive]}>
+                      💳 Card
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {paymentMethod === 'UPI' && (
+                  <View style={styles.methodContent}>
+                    <Text style={styles.methodHelpText}>Select your preferred UPI app:</Text>
+                    <View style={styles.upiGrid}>
+                      {[
+                        { id: 'phonepe', name: 'PhonePe', icon: '💳' },
+                        { id: 'gpay', name: 'Google Pay', icon: '🔵' },
+                        { id: 'paytm', name: 'Paytm', icon: '🔷' },
+                        { id: 'bhim', name: 'BHIM UPI', icon: '🇮🇳' },
+                      ].map((app) => (
+                        <TouchableOpacity
+                          key={app.id}
+                          style={[styles.upiAppBtn, selectedUpiApp === app.id && styles.upiAppBtnActive]}
+                          onPress={() => setSelectedUpiApp(app.id as any)}
+                          accessibilityRole="button"
+                          accessibilityLabel={app.name}
+                        >
+                          <Text style={styles.upiAppIcon}>{app.icon}</Text>
+                          <Text style={[styles.upiAppName, selectedUpiApp === app.id && styles.upiAppNameActive]}>
+                            {app.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <Text style={styles.upiVpaText}>Fast 1-click checkout powered by Razorpay Test Sandbox</Text>
+                  </View>
+                )}
 
               {paymentMethod === 'QR' && (
                 <View style={[styles.methodContent, { alignItems: 'center', paddingVertical: 8 }]}>
@@ -456,6 +575,7 @@ export default function CheckoutModal({
                 </View>
               )}
             </View>
+          )}
 
             {/* Optional Health / Prescription Attachment */}
             <View style={styles.card}>
@@ -555,11 +675,15 @@ export default function CheckoutModal({
             <View style={styles.feeBreakdown}>
               <View style={styles.feeRow}>
                 <Text style={styles.feeLabel}>Booking Deposit (refundable)</Text>
-                <Text style={styles.feeValue}>₹{depositAmount}</Text>
+                <Text style={[styles.feeValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${depositAmount}`}
+                </Text>
               </View>
               <View style={styles.feeRow}>
                 <Text style={styles.feeLabel}>Platform Convenience Fee</Text>
-                <Text style={styles.feeValue}>₹{platformFee}</Text>
+                <Text style={[styles.feeValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${platformFee}`}
+                </Text>
               </View>
               <View style={styles.feeRow}>
                 <Text style={[styles.feeLabel, { color: '#94a3b8', fontSize: 11 }]}>GST on platform fee</Text>
@@ -567,7 +691,9 @@ export default function CheckoutModal({
               </View>
               <View style={[styles.feeRow, styles.feeTotalRow]}>
                 <Text style={styles.feeTotalLabel}>Total charged now</Text>
-                <Text style={styles.feeTotalValue}>₹{totalPayable}</Text>
+                <Text style={[styles.feeTotalValue, isFreeFollowup && { color: '#047857' }]}>
+                  ₹{totalPayable}
+                </Text>
               </View>
               <Text style={styles.feeFootnote}>* GST will be shown once platform obtains GSTIN</Text>
             </View>
@@ -578,7 +704,11 @@ export default function CheckoutModal({
               </View>
             )}
             <TouchableOpacity
-              style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
+              style={[
+                styles.payButton,
+                isFreeFollowup && styles.freePayButton,
+                isProcessing && styles.payButtonDisabled,
+              ]}
               disabled={isProcessing || secondsLeft === 0}
               onPress={handlePay}
             >
@@ -586,12 +716,18 @@ export default function CheckoutModal({
                 <ActivityIndicator color="#ffffff" />
               ) : (
                 <Text style={styles.payButtonText}>
-                  Pay ₹{totalPayable} via Razorpay (UPI / Card)
+                  {isFreeFollowup
+                    ? 'Confirm Free Follow-up Appointment (₹0)'
+                    : `Pay ₹${totalPayable} via Razorpay (UPI / Card)`}
                 </Text>
               )}
             </TouchableOpacity>
 
-            <Text style={styles.secureText}>🔒 256-Bit Encrypted Payment Gateway</Text>
+            <Text style={styles.secureText}>
+              {isFreeFollowup
+                ? '🔒 Verified Provider Cooling Period Policy'
+                : '🔒 256-Bit Encrypted Payment Gateway'}
+            </Text>
           </View>
         </View>
       </SafeAreaView>
@@ -1161,5 +1297,101 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontWeight: '600',
     marginTop: 2,
+  },
+  coolingBannerCard: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  coolingBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  coolingBannerIcon: {
+    fontSize: 24,
+  },
+  coolingBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#065f46',
+  },
+  coolingBannerSub: {
+    fontSize: 12,
+    color: '#047857',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  coolingBannerPill: {
+    backgroundColor: '#d1fae5',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignSelf: 'flex-start',
+  },
+  coolingBannerPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  freeFollowupBadge: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  freeFollowupBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  freeFollowupBox: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  freeFollowupBoxTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  freeFollowupBoxText: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  freePayButton: {
+    backgroundColor: '#047857',
+  },
+  coolingExpiredCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    marginBottom: 16,
+  },
+  coolingExpiredTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  coolingExpiredSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 16,
   },
 });

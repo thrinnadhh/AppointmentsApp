@@ -34,9 +34,9 @@ env:
   TEST_SALON_EMAIL: ${{ secrets.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com' }}
   TEST_SALON_PASSWORD: ${{ secrets.TEST_SALON_PASSWORD || 'NaturalsSalon2026!' }}
   TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com' }}
-  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'AdminSecure2026!' }}
-  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026' }}
-  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026' }}
+  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || '' }}
+  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || '' }}
+  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || '' }}
   ALLOW_MOCK_PAYMENTS: 'true'
   CRON_SECRET: ${{ secrets.CRON_SECRET || 'test_cron_secret_2026' }}
 

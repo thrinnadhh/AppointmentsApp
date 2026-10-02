@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import crypto from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
     // Strictly block this test helper in production
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
       return NextResponse.json({ error: 'Not available in production' }, { status: 404 });
     }
 
@@ -13,11 +14,22 @@ export async function POST(req: NextRequest) {
     const adminSecret = process.env.ADMIN_SECRET || process.env.SUPERADMIN_E2E_TOKEN;
     const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
     const token = authHeader?.replace(/^Bearer\s+/i, '').trim();
-    const bypassHeader = req.headers.get('x-admin-bypass-key');
 
-    const isAuthorized =
-      (cronSecret && token === cronSecret) ||
-      (adminSecret && (token === adminSecret || bypassHeader === adminSecret));
+    const isCronAuthorized = Boolean(
+      cronSecret &&
+      token &&
+      token === cronSecret &&
+      token.length === cronSecret.length &&
+      crypto.timingSafeEqual(Buffer.from(token), Buffer.from(cronSecret))
+    );
+    const isAdminAuthorized = Boolean(
+      adminSecret &&
+      token &&
+      token.length === adminSecret.length &&
+      crypto.timingSafeEqual(Buffer.from(token), Buffer.from(adminSecret))
+    );
+
+    const isAuthorized = isCronAuthorized || isAdminAuthorized;
 
     if (!isAuthorized) {
       return NextResponse.json(

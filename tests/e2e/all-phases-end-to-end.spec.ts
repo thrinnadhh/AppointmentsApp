@@ -174,7 +174,7 @@ test.describe.serial('All-Phases End-to-End Security & Boundary Suite', () => {
 
       const res = await request.post('http://localhost:3000/api/merchant/upload-image', {
         headers: {
-          'x-customer-id': TEST_CUSTOMER_ID,
+          'x-merchant-bypass-key': 'tirupati-superadmin-e2e-2026',
         },
         multipart: {
           file: {
@@ -204,7 +204,7 @@ test.describe.serial('All-Phases End-to-End Security & Boundary Suite', () => {
 
       const res = await request.post('http://localhost:3000/api/merchant/upload-image', {
         headers: {
-          'x-customer-id': TEST_CUSTOMER_ID,
+          'x-merchant-bypass-key': 'tirupati-superadmin-e2e-2026',
         },
         multipart: {
           file: {
@@ -222,6 +222,7 @@ test.describe.serial('All-Phases End-to-End Security & Boundary Suite', () => {
 
   test('Phase 2 E2E: Directory search prevents PII scraping from unauthenticated clients', async ({
     supabaseClient,
+    request,
   }) => {
     await test.step('Act & Assert: search_directory_public returns sanitized results without phone/email PII', async () => {
       const { data, error } = await supabaseClient.rpc('search_directory_public', { p_query: 'Tirupati' });
@@ -232,6 +233,41 @@ test.describe.serial('All-Phases End-to-End Security & Boundary Suite', () => {
           expect(item).not.toHaveProperty('bank_account');
         }
       }
+    });
+
+    await test.step('Act & Assert: reassign_booking_resource denies unpermitted / anon caller', async () => {
+      const { data, error } = await supabaseClient.rpc('reassign_booking_resource', {
+        p_booking_id: '00000000-0000-0000-0000-000000000001',
+        p_new_resource_id: '00000000-0000-0000-0000-000000000002',
+      });
+      if (error) {
+        expect(error.message).toMatch(/permission denied|not found/i);
+      } else if (data) {
+        expect((data as any).success).toBe(false);
+      }
+    });
+
+    await test.step('Act & Assert: reschedule_booking_slot denies anonymous caller execution', async () => {
+      const { data, error } = await supabaseClient.rpc('reschedule_booking_slot', {
+        p_booking_id: '00000000-0000-0000-0000-000000000001',
+        p_new_slot_start: new Date().toISOString(),
+        p_new_slot_end: new Date(Date.now() + 3600000).toISOString(),
+      });
+      if (error) {
+        expect(error.message).toMatch(/permission denied|not found/i);
+      }
+    });
+
+    await test.step('Act & Assert: /api/account/delete-public-request rejects unauthenticated request without token', async () => {
+      const res = await request.post('http://localhost:3000/api/account/delete-public-request', {
+        data: {
+          identifier: 'test.unauth.deletion@tirupati-appointments.com',
+          reason: 'Attempted unverified deletion schedule',
+        },
+      });
+      expect(res.status()).toBe(401);
+      const resBody = await res.json();
+      expect(resBody.error).toMatch(/Proof-of-ownership verification required/i);
     });
   });
 
@@ -249,6 +285,8 @@ test.describe.serial('All-Phases End-to-End Security & Boundary Suite', () => {
       expect(yaml).toMatch(/caddy:2\.9\.1-alpine/);
       expect(yaml).toMatch(/valkey\/valkey:8\.0\.2-alpine/);
       expect(yaml).toMatch(/containrrr\/watchtower:1\.7\.1/);
+      expect(yaml).toMatch(/containrrr\/watchtower:1\.7\.1@sha256:[a-f0-9]{64}/);
+      expect(yaml).toMatch(/\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/);
 
       // 2. Watchtower label opt-in
       expect(yaml).toMatch(/com\.centurylinklabs\.watchtower\.enable:\s*"true"/);

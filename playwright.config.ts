@@ -19,6 +19,7 @@ process.env.TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || 'NaturalsSa
 process.env.ADMIN_SECRET = process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
 process.env.SUPERADMIN_E2E_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026';
 process.env.ALLOW_MOCK_PAYMENTS = 'true';
+process.env.ENABLE_E2E_BYPASS = 'true';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -57,6 +58,7 @@ export default defineConfig({
         ADMIN_SECRET: process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026',
         SUPERADMIN_E2E_TOKEN: process.env.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026',
         ALLOW_MOCK_PAYMENTS: 'true',
+        ENABLE_E2E_BYPASS: 'true',
         RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || 'rzp_test_51MockAppPlatform',
         RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || 'mock_secret_key_1234567890',
       },

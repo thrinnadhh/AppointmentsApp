@@ -36,9 +36,10 @@ export type Database = {
           updated_at: string
           attachment_url: string | null
           reminder_1h_sent_at: string | null
-          reminder_30m_sent_at: string | null
           is_present: boolean
           customer_arrived_at: string | null
+          is_followup: boolean
+          followup_original_booking_id: string | null
         }
         Insert: {
           attachment_url?: string | null
@@ -59,6 +60,8 @@ export type Database = {
           reminder_30m_sent_at?: string | null
           is_present?: boolean
           customer_arrived_at?: string | null
+          is_followup?: boolean
+          followup_original_booking_id?: string | null
           resource_id: string
           slot_end: string
           slot_start: string
@@ -84,6 +87,8 @@ export type Database = {
           reminder_30m_sent_at?: string | null
           is_present?: boolean
           customer_arrived_at?: string | null
+          is_followup?: boolean
+          followup_original_booking_id?: string | null
           resource_id?: string
           slot_end?: string
           slot_start?: string
@@ -414,6 +419,7 @@ export type Database = {
           is_active: boolean
           auto_accept_bookings: boolean
           daily_booking_limit: number
+          cooling_period_days: number
           weekly_hours: Json
           updated_at: string
         }
@@ -443,6 +449,7 @@ export type Database = {
           is_active?: boolean
           auto_accept_bookings?: boolean
           daily_booking_limit?: number
+          cooling_period_days?: number
           weekly_hours?: Json
           updated_at?: string
         }
@@ -472,6 +479,7 @@ export type Database = {
           is_active?: boolean
           auto_accept_bookings?: boolean
           daily_booking_limit?: number
+          cooling_period_days?: number
           weekly_hours?: Json
           updated_at?: string
         }

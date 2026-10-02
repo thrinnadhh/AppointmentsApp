@@ -532,7 +532,10 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
       if (bkg?.id) {
         await supabaseClient
           .from('bookings')
-          .update({ slot_start: new Date(Date.now() - 3600000).toISOString() })
+          .update({
+            slot_start: new Date(Date.now() - 3600000).toISOString(),
+            slot_end: new Date(Date.now() - 1800000).toISOString(),
+          })
           .eq('id', bkg.id);
       }
 
@@ -700,12 +703,179 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
     });
   });
 
+  test('Flow 17 (Cooling Period & Free Follow-up Lifecycle): Merchant sets 20-day cooling period; Customer receives ₹0 follow-up with zero gateway payment', async ({
+    triRole,
+    supabaseClient,
+    bookingApi,
+  }) => {
+    const { customerApp, merchantPortal } = triRole;
+    const testProviderId = '11111111-1111-1111-1111-111111111111';
+
+    await test.step('1. Merchant configures 20-day cooling period in Settings', async () => {
+      await merchantPortal.gotoSettings();
+      await merchantPortal.setCoolingPeriod(20);
+
+      const { data: prov } = await supabaseClient
+        .from('providers')
+        .select('cooling_period_days')
+        .eq('id', testProviderId)
+        .single();
+      expect(prov?.cooling_period_days).toBe(20);
+    });
+
+    await test.step('2. Customer completes an initial consultation appointment', async () => {
+      const pastOffset = 3600000 * 24 * 3;
+      const testCustomerId = '99999999-9999-9999-9999-999999999991';
+      const slotStart = new Date(Date.now() - pastOffset).toISOString();
+      const slotEnd = new Date(Date.now() - pastOffset + 1800000).toISOString();
+
+      const { error: insErr } = await supabaseClient
+        .from('bookings')
+        .insert({
+          customer_id: testCustomerId,
+          provider_id: testProviderId,
+          resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          slot_start: slotStart,
+          slot_end: slotEnd,
+          status: 'COMPLETED',
+          payment_status: 'CAPTURED',
+          deposit_amount: 100,
+          platform_fee: 10,
+          total_amount: 110,
+        });
+      expect(insErr).toBeNull();
+    });
+
+    await test.step('3. Customer browses clinic and verifies Free Follow-up detection', async () => {
+      await customerApp.goto();
+      await customerApp.selectCategory('Hospitals & Clinics');
+      await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
+      await customerApp.selectDateOffset('Tomorrow');
+      await customerApp.selectFirstSlot();
+      const freeNotice = customerApp.page.getByText(/Free Appointment|Cooling Period/i).first();
+      await expect(freeNotice).toBeVisible({ timeout: 15000 });
+    });
+
+    await test.step('4. Customer books follow-up appointment with ₹0 fee bypass', async () => {
+      await customerApp.openCheckout();
+      await expect(customerApp.page.getByText(/Free Appointment Applied/i).first()).toBeVisible({ timeout: 10000 });
+
+      // Submit free appointment
+      await customerApp.submitPayment();
+
+      // Confirmed immediately with Digital Pass
+      await expect(customerApp.confirmationToast.first()).toBeVisible({ timeout: 15000 });
+      await customerApp.expectBookingInList('CONFIRMED');
+    });
+
+    await test.step('5. Merchant queue reflects follow-up booking marked with zero deposit', async () => {
+      await merchantPortal.gotoBookings();
+      await merchantPortal.filterByStatus('CONFIRMED');
+      await expect(merchantPortal.getBookingCard().getByText(/FREE FOLLOW-UP|₹0|Dr\. S\. K\. Murthy/i).first()).toBeVisible({ timeout: 10000 });
+    });
+  });
+
+  test('Flow 18 (30-Minute Cancellation Cutoff Policy): Advance cancellation yields 100% refund; Late cancellation forfeits deposit', async ({
+    request,
+    bookingApi,
+  }) => {
+    const testCustomerId = '99999999-9999-9999-9999-999999999991';
+
+    await test.step('1. Advance Cancellation (>30m): Full refund granted to customer', async () => {
+      const futureStart = new Date(Date.now() + 3600000 * 3).toISOString();
+      const futureEnd = new Date(Date.now() + 3600000 * 3 + 1800000).toISOString();
+      const hold = await bookingApi.createHold({ slotStart: futureStart, slotEnd: futureEnd });
+      await bookingApi.confirmBooking(hold.booking_id);
+
+      const cancelRes = await request.post('http://localhost:3000/api/bookings/cancel', {
+        headers: { 'x-customer-id': testCustomerId },
+        data: {
+          booking_id: hold.booking_id,
+          reason: 'Schedule conflict',
+          initiated_by: 'CUSTOMER',
+        },
+      });
+      expect(cancelRes.status()).toBe(200);
+      const data = await cancelRes.json();
+      expect(data.success).toBe(true);
+      expect(data.payment_status).toBe('REFUNDED');
+      expect(data.refund_eligible).toBe(true);
+      expect(data.penalty_applied).toBe(false);
+    });
+
+    await test.step('2. Late Cancellation (<=30m): Deposit forfeited to merchant', async () => {
+      const lateStart = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const lateEnd = new Date(Date.now() + 45 * 60 * 1000).toISOString();
+      const hold = await bookingApi.createHold({ slotStart: lateStart, slotEnd: lateEnd });
+      await bookingApi.confirmBooking(hold.booking_id);
+
+      const cancelRes = await request.post('http://localhost:3000/api/bookings/cancel', {
+        headers: { 'x-customer-id': testCustomerId },
+        data: {
+          booking_id: hold.booking_id,
+          reason: 'Cannot attend on short notice',
+          initiated_by: 'CUSTOMER',
+        },
+      });
+      expect(cancelRes.status()).toBe(200);
+      const data = await cancelRes.json();
+      expect(data.success).toBe(true);
+      expect(data.payment_status).toBe('FORFEITED');
+      expect(data.refund_eligible).toBe(false);
+      expect(data.refund_amount).toBe(0);
+    });
+  });
+
+  test('Flow 19 (Data Privacy & Cryptographic Account Deletion): Enforces signed token and validates deletion instructions', async ({
+    request,
+    customerApp,
+  }) => {
+    await test.step('1. Public deletion request without cryptographic token is rejected', async () => {
+      // 1a. Request without valid identifier is rejected with 400
+      const badReq = await request.post('http://localhost:3000/api/account/delete-public-request', {
+        data: { reason: 'No identifier provided' },
+      });
+      expect(badReq.status()).toBe(400);
+
+      // 1b. Unauthenticated request without token returns 401
+      const noTokenRes = await request.post('http://localhost:3000/api/account/delete-public-request', {
+        data: {
+          identifier: 'guest@customer.tirupati.in',
+          reason: 'Deleting account without token',
+        },
+      });
+      expect(noTokenRes.status()).toBe(401);
+      const noTokenBody = await noTokenRes.json();
+      expect(noTokenBody.error).toMatch(/Proof-of-ownership/i);
+      expect(noTokenBody.requires_verification).toBe(true);
+
+      // 1c. Tampered/forged token returns 403
+      const forgedTokenRes = await request.post('http://localhost:3000/api/account/delete-public-request', {
+        data: {
+          identifier: 'guest@customer.tirupati.in',
+          token: 'invalid_forged_base64_payload.tampered_hmac_signature',
+          reason: 'Deleting account with forged token',
+        },
+      });
+      expect(forgedTokenRes.status()).toBe(403);
+      const forgedBody = await forgedTokenRes.json();
+      expect(forgedBody.error).toMatch(/verification failed/i);
+    });
+
+    await test.step('2. Privacy deletion page renders instructions and GDPR compliance controls', async () => {
+      await customerApp.page.goto('http://localhost:3000/account/delete', { waitUntil: 'domcontentloaded' });
+      await expect(customerApp.page.getByRole('heading', { name: /Request Account Deletion|Account Deletion/i })).toBeVisible({ timeout: 15000 });
+      await expect(customerApp.page.getByText(/permanent|DPDPA|Compliant|irreversible/i).first()).toBeVisible();
+    });
+  });
+
   test('Unhappy Paths & Resilience: Search resets, empty query fallbacks, and boundary handling', async ({
     customerApp,
     merchantPortal,
     unauthenticatedAdmin,
   }) => {
     await test.step('1. Customer app handles non-matching search queries gracefully', async () => {
+      await customerApp.goto();
       await customerApp.selectCategory('Hospitals & Clinics');
 
       await customerApp.search('Dental');

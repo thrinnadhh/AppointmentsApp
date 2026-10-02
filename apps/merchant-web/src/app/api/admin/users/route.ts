@@ -45,12 +45,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password, fullName, role = 'merchant', phone, providerId } = body;
 
-    // 1. Merchants cannot provision admin accounts
-    if (authResult.profile.role === 'merchant' && role === 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Only Super Administrators can provision admin accounts.' },
-        { status: 403 }
-      );
+    // 1. Merchants cannot provision privileged accounts (admin or city_director)
+    if (authResult.profile.role === 'merchant') {
+      if (role !== 'staff' && role !== 'customer') {
+        return NextResponse.json(
+          { error: 'Forbidden: Merchants may only provision staff or customer accounts.' },
+          { status: 403 }
+        );
+      }
     }
 
     if (!email || !password || !fullName) {

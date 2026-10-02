@@ -95,6 +95,35 @@ export async function POST(req: NextRequest) {
       categoryId = prov?.category_id || null;
     }
 
+    const isFreeFollowup = Number(booking.deposit_amount) === 0 && Number(booking.total_amount || 0) === 0;
+    if (isFreeFollowup) {
+      const freeOrderId = `order_free_followup_${booking.id}`;
+      await supabaseAdmin
+        .from('bookings')
+        .update({
+          gateway_order_id: freeOrderId,
+          deposit_amount: 0,
+          platform_fee: 0,
+          total_amount: 0,
+        })
+        .eq('id', booking.id);
+
+      return NextResponse.json<CreateRazorpayOrderResponse>(
+        {
+          success: true,
+          order_id: freeOrderId,
+          key_id: getRazorpayKeyId(),
+          amount: 0,
+          currency: 'INR',
+          is_mock: true,
+          deposit_amount: 0,
+          platform_fee: 0,
+          total_amount: 0,
+        },
+        { status: 200 }
+      );
+    }
+
     // Merchant sets deposit fee; platform adds ₹10 (or ₹50 for gaming/turf)
     const depositInInr = Number(booking.deposit_amount) || 100;
     const platformFeeInInr = getPlatformFee(categoryId);

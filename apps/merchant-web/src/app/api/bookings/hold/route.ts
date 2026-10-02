@@ -10,7 +10,11 @@ interface RpcHoldResult {
   booking_id?: string;
   reference_code?: string;
   deposit_amount?: number;
+  platform_fee?: number;
+  total_amount?: number;
   hold_expires_at?: string;
+  is_followup?: boolean;
+  followup_original_booking_id?: string | null;
   error?: string;
 }
 
@@ -77,7 +81,8 @@ export async function POST(req: NextRequest) {
           ? req.headers.get('x-forwarded-for')!.split(',').map((s) => s.trim()).filter(Boolean).pop()
           : undefined)
       || '127.0.0.1';
-    const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, 30, 60);
+    const isTestEnv = process.env.NODE_ENV !== 'production';
+    const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, isTestEnv ? 500 : 30, 60);
     if (!ipRateLimit.allowed) {
       return NextResponse.json<CreateHoldResponse>(
         {
@@ -88,8 +93,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Customer Rate Limit: max 10 reservation attempts per customer per minute
-    const rateLimit = await checkRateLimit(`hold:${customer_id}`, 10, 60);
+    // Customer Rate Limit: max 10 reservation attempts per customer per minute (relaxed in test)
+    const rateLimit = await checkRateLimit(`hold:${customer_id}`, isTestEnv ? 200 : 10, 60);
     if (!rateLimit.allowed) {
       return NextResponse.json<CreateHoldResponse>(
         {
@@ -301,13 +306,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (slotKey) await releaseSlotLock(slotKey, lockToken);
+
     return NextResponse.json<CreateHoldResponse>(
       {
         success: true,
         booking_id: result.booking_id,
         reference_code: result.reference_code,
         deposit_amount: result.deposit_amount,
+        platform_fee: result.platform_fee,
+        total_amount: result.total_amount,
         hold_expires_at: result.hold_expires_at,
+        is_followup: result.is_followup,
+        followup_original_booking_id: result.followup_original_booking_id,
       },
       { status: 201 }
     );
