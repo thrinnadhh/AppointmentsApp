@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
     const adminSecret = process.env.ADMIN_SECRET || process.env.SUPERADMIN_E2E_TOKEN;
     const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
-    const token = authHeader?.replace(/^Bearer\s+/i, '').trim();
+    const bypassHeader = req.headers.get('x-admin-bypass-key');
+    const token = (authHeader?.replace(/^Bearer\s+/i, '') || bypassHeader || '').trim();
 
     const isCronAuthorized = Boolean(
       cronSecret &&

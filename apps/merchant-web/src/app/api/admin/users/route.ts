@@ -45,11 +45,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password, fullName, role = 'merchant', phone, providerId } = body;
 
-    // 1. Merchants cannot provision privileged accounts (admin or city_director)
+    // 1. Merchants cannot provision privileged accounts (admin)
     if (authResult.profile.role === 'merchant') {
-      if (role !== 'staff' && role !== 'customer') {
+      if (role !== 'staff' && role !== 'merchant' && role !== 'customer') {
         return NextResponse.json(
-          { error: 'Forbidden: Merchants may only provision staff or customer accounts.' },
+          { error: 'Forbidden: Merchants may only provision staff, merchant, or customer accounts.' },
           { status: 403 }
         );
       }

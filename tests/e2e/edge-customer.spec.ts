@@ -37,9 +37,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
 
   // ─── EC-CUST-01: Hold expiry race ──────────────────────────────────────────
   test('EC-CUST-01: Expired hold cannot be confirmed — returns 410 Gone', async ({ request }) => {
-    // 1. Create a hold that is already expired by backdating hold_expires_at via seed endpoint
-    const slotStart = new Date(Date.now() + 86400000).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 + 1800000).toISOString();
+    // 1. Create a hold with a unique slot offset to avoid test collisions
+    const randomOffset = 86400000 + Math.floor(Math.random() * 864000000);
+    const slotStart = new Date(Date.now() + randomOffset).toISOString();
+    const slotEnd = new Date(Date.now() + randomOffset + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
       data: {
@@ -55,18 +56,25 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     // 2. Expire the hold via test-only backdating utility (CI seed helper)
     const expireRes = await request.post(`${BASE}/api/test/expire-hold`, {
       data: { booking_id },
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: {
+        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'Authorization': 'Bearer tirupati-superadmin-e2e-2026',
+      },
     });
     // Helper may not exist yet — skip gracefully if 404
     if (expireRes.status() === 404) {
       test.skip(); return;
     }
+    expect([200, 204]).toContain(expireRes.status());
 
     // 3. Now attempt to confirm the expired hold
     const confirmRes = await request.post(`${BASE}/api/bookings/confirm`, {
       data: {
         booking_id,
         gateway_payment_id: `pay_expired_${Date.now()}`,
+      },
+      headers: {
+        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
       },
     });
 
