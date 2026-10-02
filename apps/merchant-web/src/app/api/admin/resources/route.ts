@@ -14,7 +14,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const providerId = searchParams.get('providerId');
 
-    let query = supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
       .from('resources')
       .select('*, providers(id, name, category_id)')
       .order('created_at', { ascending: false });
