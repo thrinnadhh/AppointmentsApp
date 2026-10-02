@@ -227,24 +227,13 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
     ) {
       return null;
     }
-    // Known mock/test prefixes always get a captured mock response
+    // When mock payments are enabled (test/dev), any synthetic payment ID
+    // (sim_, mock_, pay_) gets a captured mock response instead of hitting live Razorpay.
     if (
       paymentId.startsWith('sim_') ||
       paymentId.startsWith('mock_') ||
-      paymentId.startsWith('pay_mock_') ||
-      paymentId.startsWith('pay_test_')
+      paymentId.startsWith('pay_')
     ) {
-      return {
-        id: paymentId,
-        status: 'captured',
-        order_id: 'order_test_mock',
-        amount: 11000,
-        currency: 'INR',
-      };
-    }
-    // When Razorpay credentials are not configured (CI), treat any pay_ prefix as
-    // a captured mock to avoid live API calls with synthetic E2E payment IDs.
-    if (!isRazorpayConfigured() && paymentId.startsWith('pay_')) {
       return {
         id: paymentId,
         status: 'captured',

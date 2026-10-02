@@ -264,7 +264,7 @@ export async function POST(req: NextRequest) {
 
       // Verify payment amount matches required booking amount in live mode
       const expectedAmountInPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 100) * 100);
-      if (isRazorpayConfigured() && paymentDetails.amount !== expectedAmountInPaise) {
+      if (isRazorpayConfigured() && !isMockTestOrder && paymentDetails.amount !== expectedAmountInPaise) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: `Payment amount mismatch: expected ${expectedAmountInPaise} paise, received ${paymentDetails.amount} paise` },
           { status: 400 }
