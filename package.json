@@ -19,6 +19,7 @@
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test:e2e": "playwright test",
+    "test:mobile": "node tests/mobile/customer-mobile-android.test.mjs",
     "test": "pnpm test:e2e",
     "test:validation": "node --test test-validation.mjs",
     "test:security": "node --test test-security.mjs test-routes.mjs test-validation.mjs"
@@ -34,7 +35,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.63.0",
+    "webdriverio": "^9.32.0"
   },
   "pnpm": {
     "overrides": {

@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { VERTICALS, normCategory, City } from '@appointments/shared';
 import {
@@ -419,6 +420,21 @@ export default function HomeScreen({
               ⚡ Small ₹50–₹200 deposit guarantees your slot with zero waiting at venue.
             </Text>
           </View>
+
+          {onOpenProfile && (
+            <TouchableOpacity
+              style={styles.accountHubButton}
+              onPress={onOpenProfile}
+              accessibilityLabel="Manage Profile and Account Settings"
+            >
+              <Text style={styles.accountHubIcon}>⚙️</Text>
+              <View style={styles.accountHubTextCol}>
+                <Text style={styles.accountHubTitle}>Account & Privacy Settings</Text>
+                <Text style={styles.accountHubSubtitle}>Profile, DPDP privacy rights & delete account</Text>
+              </View>
+              <Text style={styles.accountHubChevron}>→</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       ) : (
         /* ========================================================================= */
@@ -785,6 +801,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
   },
   header: {
     paddingHorizontal: 20,
@@ -845,6 +862,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginRight: 52,
   },
   myBookingsButton: {
     backgroundColor: '#f1f5f9',
@@ -1119,6 +1137,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#065f46',
     textAlign: 'center',
+  },
+  accountHubButton: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 12,
+  },
+  accountHubIcon: {
+    fontSize: 20,
+  },
+  accountHubTextCol: {
+    flex: 1,
+  },
+  accountHubTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  accountHubSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  accountHubChevron: {
+    fontSize: 16,
+    color: '#94a3b8',
+    fontWeight: '700',
   },
 
   /* Providers List */

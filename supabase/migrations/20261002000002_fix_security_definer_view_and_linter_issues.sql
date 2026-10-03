@@ -124,14 +124,13 @@ REVOKE EXECUTE ON FUNCTION public.handle_new_auth_user() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.set_booking_reference_code() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.validate_booking_update() FROM PUBLIC, anon;
 
-REVOKE EXECUTE ON FUNCTION public.is_admin(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO authenticated, service_role;
+-- RLS policies invoke is_admin(uuid) and get_user_authorized_providers(uuid) under all querying roles (including anon).
+GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO anon, authenticated, service_role;
 
 REVOKE EXECUTE ON FUNCTION public.is_merchant_owner_or_admin(uuid, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.is_merchant_owner_or_admin(uuid, uuid) TO authenticated, service_role;
 
-REVOKE EXECUTE ON FUNCTION public.get_user_authorized_providers(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.get_user_authorized_providers(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_user_authorized_providers(uuid) TO anon, authenticated, service_role;
 
 REVOKE EXECUTE ON FUNCTION public.admin_update_merchant_status(uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_update_merchant_status(uuid, text, text) TO authenticated, service_role;

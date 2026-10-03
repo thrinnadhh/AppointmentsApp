@@ -21,6 +21,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import ProviderDetailScreen from './src/screens/ProviderDetailScreen';
 import CheckoutModal from './src/screens/CheckoutModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
+import AccountScreen from './src/screens/AccountScreen';
 import {
   fetchCustomerBookingsFromSupabase,
   cancelBookingOnSupabase,
@@ -51,6 +52,7 @@ export default function App() {
   ]);
   const [checkoutVisible, setCheckoutVisible] = useState<boolean>(false);
   const [profileVisible, setProfileVisible] = useState<boolean>(false);
+  const [accountVisible, setAccountVisible] = useState<boolean>(false);
   const [activeResource, setActiveResource] = useState<Resource | null>(null);
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
   const [activeProviderName, setActiveProviderName] = useState<string>('Sri Venkateswara Dental & Implant Care');
@@ -241,6 +243,10 @@ export default function App() {
 
   // Navigate backward through history stack
   const handleGoBack = useCallback(() => {
+    if (accountVisible) {
+      setAccountVisible(false);
+      return true;
+    }
     if (checkoutVisible) {
       setCheckoutVisible(false);
       return true;
@@ -281,7 +287,7 @@ export default function App() {
       return true;
     }
     return false;
-  }, [checkoutVisible, profileVisible, currentScreen, activeCategoryId, history.length]);
+  }, [accountVisible, checkoutVisible, profileVisible, currentScreen, activeCategoryId, history.length]);
 
   // Category selection handler with history stack awareness
   const handleSelectCategory = useCallback((catId: string | null) => {
@@ -681,9 +687,34 @@ export default function App() {
                   View Appointments ({customerBookings.length})
                 </Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.openAccountSettingsBtn}
+                onPress={() => {
+                  setProfileVisible(false);
+                  setAccountVisible(true);
+                }}
+                testID="btn-open-account-settings"
+                accessibilityLabel="Open Account, Privacy & Delete Account"
+              >
+                <Text style={styles.openAccountSettingsText}>
+                  ⚙️ Account, Privacy & Delete Account →
+                </Text>
+              </TouchableOpacity>
             </ScrollView>
           </SafeAreaView>
         </View>
+      </Modal>
+
+      {/* Account, Privacy & Deletion Screen Modal */}
+      <Modal
+        visible={accountVisible}
+        animationType="slide"
+        onRequestClose={() => setAccountVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+          <AccountScreen onClose={() => setAccountVisible(false)} />
+        </SafeAreaView>
       </Modal>
 
       {/* Confirmation Toast Alert */}
@@ -978,5 +1009,22 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontSize: 13,
     fontWeight: '700',
+  },
+  openAccountSettingsBtn: {
+    marginTop: 12,
+    marginBottom: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff1f2',
+    borderWidth: 1.5,
+    borderColor: '#fecdd3',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  openAccountSettingsText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#be123c',
   },
 });

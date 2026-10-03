@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, ScrollView, Linking, Switch,
+  Platform, StatusBar,
 } from 'react-native';
 import { supabase, getApiBaseUrl } from '../services/api';
 
@@ -22,7 +23,11 @@ interface ConsentState {
   loaded: boolean;
 }
 
-export default function AccountScreen() {
+export interface AccountScreenProps {
+  onClose?: () => void;
+}
+
+export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
   const [user, setUser]                 = useState<{ id: string; phone?: string; email?: string } | null>(null);
   const [deletion, setDeletion]         = useState<DeletionStatus | null>(null);
   const [loadingDelete, setLoadingDelete] = useState(false);
@@ -54,20 +59,22 @@ export default function AccountScreen() {
             });
           }
         } catch { /* non-fatal */ }
-      }
 
-      // Check for existing deletion request
-      try {
-        const base = getApiBaseUrl();
-        const session = await supabase.auth.getSession();
-        const token = session.data.session?.access_token;
-        if (token) {
-          const res = await fetch(`${base}/api/account/delete`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) setDeletion(await res.json());
-        }
-      } catch { /* non-fatal */ }
+        // Check for existing deletion request in DB directly
+        try {
+          const { data: req } = await supabase
+            .from('account_deletion_requests')
+            .select('id, requested_at, scheduled_for')
+            .eq('user_id', user.id)
+            .is('completed_at', null)
+            .is('cancelled_at', null)
+            .maybeSingle();
+
+          if (req) {
+            setDeletion({ pending: true, request: req });
+          }
+        } catch { /* non-fatal */ }
+      }
 
       setLoading(false);
     })();
@@ -75,6 +82,7 @@ export default function AccountScreen() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    if (onClose) onClose();
   };
 
   const toggleConsent = async (purpose: 'location_detection' | 'marketing_notifications', value: boolean) => {
@@ -113,21 +121,47 @@ export default function AccountScreen() {
   const confirmDelete = async () => {
     setLoadingDelete(true);
     try {
-      const base = getApiBaseUrl();
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
-      if (!token) {
-        Alert.alert('Error', 'You must be signed in to delete your account.');
+      if (!token || !user) {
+        Alert.alert(
+          'Sign In Required',
+          'You must be signed in to request account deletion. You can also submit a deletion request via our public web portal at https://appointments4u.in/account/delete'
+        );
         return;
       }
 
+      // Try direct Supabase RPC first (most reliable on mobile)
+      const { data: rpcData, error: rpcErr } = await (supabase.rpc as any)('request_account_deletion', {
+        p_reason: 'User requested via mobile app',
+      });
+
+      if (!rpcErr && rpcData?.success) {
+        setDeletion({
+          pending: true,
+          request: {
+            id: rpcData.request_id,
+            requested_at: new Date().toISOString(),
+            scheduled_for: rpcData.scheduled_for || new Date(Date.now() + 30 * 86400000).toISOString(),
+          },
+        });
+        Alert.alert(
+          'Deletion Scheduled',
+          'Your account is scheduled for deletion in 30 days. To cancel, email support@appointments4u.in with subject "Cancel Account Deletion".',
+          [{ text: 'OK', onPress: handleSignOut }]
+        );
+        return;
+      }
+
+      // Fallback to web API endpoint
+      const base = getApiBaseUrl();
       const res = await fetch(`${base}/api/account/delete`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ reason: 'User requested via app' }),
+        body: JSON.stringify({ reason: 'User requested via mobile app' }),
       });
 
       const data = await res.json();
@@ -139,22 +173,32 @@ export default function AccountScreen() {
           [{ text: 'OK', onPress: handleSignOut }]
         );
       } else {
-        Alert.alert('Error', data.error || 'Failed to schedule deletion');
+        Alert.alert('Error', data?.error || rpcErr?.message || 'Failed to schedule deletion');
       }
-    } catch {
-      Alert.alert('Error', 'Network error. Please try again.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Network error. Please try again.');
     } finally {
       setLoadingDelete(false);
     }
   };
 
   if (loading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#3b82f6" /></View>;
+    return <View style={styles.centered}><ActivityIndicator size="large" color="#047857" /></View>;
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Account</Text>
+    <View style={styles.container}>
+      {onClose && (
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.backButton} onPress={onClose} testID="btn-close-account">
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.topBarTitle}>Account & Settings</Text>
+          <View style={{ width: 60 }} />
+        </View>
+      )}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
+        {!onClose && <Text style={styles.heading}>Account</Text>}
 
       {/* Profile */}
       <View style={styles.section}>
@@ -264,11 +308,42 @@ export default function AccountScreen() {
         Response within 48 hours · Resolution within 30 days
       </Text>
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:            { flex: 1, backgroundColor: '#f8fafc' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  backButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#047857',
+  },
+  topBarTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
   content:              { padding: 20, paddingBottom: 40 },
   centered:             { flex: 1, justifyContent: 'center', alignItems: 'center' },
   heading:              { fontSize: 28, fontWeight: '700', color: '#0f172a', marginBottom: 24 },
