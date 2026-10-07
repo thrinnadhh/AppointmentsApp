@@ -74,23 +74,20 @@ export async function POST(req: NextRequest) {
     }
 
     // IP Rate Limit: prioritize platform-verified IP or rightmost trusted proxy before client headers
-    const clientIp = (req as any).ip
-      || req.headers.get('x-real-ip')
-      || req.headers.get('cf-connecting-ip')
-      || (req.headers.get('x-forwarded-for')
-          ? req.headers.get('x-forwarded-for')!.split(',').map((s) => s.trim()).filter(Boolean).pop()
-          : undefined)
-      || '127.0.0.1';
+    // Leverages getClientIp with fallback to req.headers.get('x-real-ip') and req.headers.get('cf-connecting-ip')
+    const clientIp = getClientIp(req);
     const isTestEnv = process.env.NODE_ENV !== 'production';
-    const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, isTestEnv ? 500 : 30, 60);
-    if (!ipRateLimit.allowed) {
-      return NextResponse.json<CreateHoldResponse>(
-        {
-          success: false,
-          error: 'Too many reservation attempts from this network. Please wait a minute.',
-        },
-        { status: 429 }
-      );
+    if (clientIp) {
+      const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, isTestEnv ? 500 : 30, 60);
+      if (!ipRateLimit.allowed) {
+        return NextResponse.json<CreateHoldResponse>(
+          {
+            success: false,
+            error: 'Too many reservation attempts from this network. Please wait a minute.',
+          },
+          { status: 429 }
+        );
+      }
     }
 
     // Customer Rate Limit: max 10 reservation attempts per customer per minute (relaxed in test)
@@ -105,9 +102,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Customer Identity Integrity: prevent creating holds under another user's customer_id
+    // Customer Identity Integrity: prevent creating holds without verified authentication
     const caller = await verifyAuthenticatedUser(req);
-    if (process.env.NODE_ENV === 'production' && !caller) {
+    if (!caller) {
       return NextResponse.json<CreateHoldResponse>(
         {
           success: false,
@@ -116,7 +113,7 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
-    if (caller && caller.id !== customer_id) {
+    if (caller.id !== customer_id) {
       const supabaseAdmin = getSupabaseAdmin();
       const { data: profile } = await supabaseAdmin
         .from('profiles')

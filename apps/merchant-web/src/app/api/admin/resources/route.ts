@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAdminRequest } from '@/lib/auth-admin';
+import { verifyStaffManagerRequest, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const authResult = await verifyAdminRequest(request as NextRequest);
+    // Admin & Staff authorization gate (verifyAdminRequest / verifyStaffManagerRequest)
+    const authResult = await verifyStaffManagerRequest(request as NextRequest);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -15,6 +16,38 @@ export async function GET(request: Request) {
     const providerId = searchParams.get('providerId');
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    // If caller is merchant, ensure they only access resources for authorized providers
+    if (authResult.profile.role === 'merchant') {
+      if (providerId) {
+        const isAuthorized = await isCallerAuthorizedForProvider(authResult.user.id, providerId);
+        if (!isAuthorized) {
+          return NextResponse.json(
+            { error: 'Forbidden: You do not have permission to view resources for this provider' },
+            { status: 403 }
+          );
+        }
+      } else {
+        const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
+          p_user_id: authResult.user.id,
+        });
+        const authorizedList: string[] = Array.isArray(authProviders) ? authProviders : [];
+        if (authorizedList.length === 0) {
+          return NextResponse.json({ success: true, resources: [] }, { status: 200 });
+        }
+        const { data, error } = await supabaseAdmin
+          .from('resources')
+          .select('*, providers(id, name, category_id)')
+          .in('provider_id', authorizedList)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        return NextResponse.json({ success: true, resources: data || [] }, { status: 200 });
+      }
+    }
+
     let query = supabaseAdmin
       .from('resources')
       .select('*, providers(id, name, category_id)')
@@ -39,7 +72,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await verifyAdminRequest(request);
+    const authResult = await verifyStaffManagerRequest(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -68,6 +101,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid providerId format' }, { status: 400 });
     }
 
+    // Verify merchant authorization for this venue
+    if (authResult.profile.role === 'merchant') {
+      const isAuthorized = await isCallerAuthorizedForProvider(authResult.user.id, providerId);
+      if (!isAuthorized) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to manage resources for this provider' },
+          { status: 403 }
+        );
+      }
+    }
+
     const numPrice = Number(price);
     if (isNaN(numPrice) || numPrice < 0 || numPrice > 1000000) {
       return NextResponse.json(
@@ -86,11 +130,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Slot duration can be any number >= 0 (only strictly negative numbers are disallowed)
     if (durationMinutes !== undefined && durationMinutes !== null) {
       const numDuration = Number(durationMinutes);
-      if (isNaN(numDuration) || numDuration < 5 || numDuration > 720) {
+      if (isNaN(numDuration) || numDuration < 0) {
         return NextResponse.json(
-          { error: 'Invalid duration: must be between 5 and 720 minutes' },
+          { error: 'Invalid duration: slot duration cannot be less than zero' },
           { status: 400 }
         );
       }
@@ -123,14 +168,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const finalDuration = (durationMinutes !== undefined && durationMinutes !== null && !isNaN(Number(durationMinutes)))
+      ? Math.round(Number(durationMinutes))
+      : 30;
+
     const { data, error } = await supabaseAdmin.rpc('admin_create_resource', {
       p_provider_id: providerId,
-      p_name: name,
+      p_name: name.trim(),
       p_type: type,
       p_department: department || 'General',
-      p_price: Number(price) || 500,
-      p_deposit_amount: (depositAmount !== undefined && depositAmount !== null && !isNaN(Number(depositAmount))) ? Number(depositAmount) : (Number(price) || 500),
-      p_duration_minutes: Number(durationMinutes) || 30,
+      p_price: Number(price) || 0,
+      p_deposit_amount: (depositAmount !== undefined && depositAmount !== null && !isNaN(Number(depositAmount)))
+        ? Number(depositAmount)
+        : (Number(price) || 0),
+      p_duration_minutes: finalDuration,
       p_capacity: Number(capacity) || 1,
     });
 
@@ -147,7 +198,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const authResult = await verifyAdminRequest(request);
+    const authResult = await verifyStaffManagerRequest(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -160,6 +211,27 @@ export async function DELETE(request: NextRequest) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    // Verify merchant authorization if caller is not platform admin
+    if (authResult.profile.role === 'merchant') {
+      const { data: resource, error: resError } = await supabaseAdmin
+        .from('resources')
+        .select('id, provider_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (resError || !resource) {
+        return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
+      }
+
+      const isAuthorized = await isCallerAuthorizedForProvider(authResult.user.id, resource.provider_id);
+      if (!isAuthorized) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to delete this resource' },
+          { status: 403 }
+        );
+      }
+    }
 
     // Call PostgreSQL SECURITY DEFINER RPC to safely delete the resource while enforcing constraints
     const { data, error } = await (supabaseAdmin.rpc as any)('admin_delete_resource', {

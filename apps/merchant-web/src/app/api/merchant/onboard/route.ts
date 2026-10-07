@@ -84,17 +84,19 @@ export async function POST(request: NextRequest) {
     const ip = getClientIp(request);
 
     // 1. RATE LIMITING: Maximum 5 registration attempts per 5 minutes per IP
-    const rateLimit = await checkRateLimit(`merchant_onboard:${ip}`, 5, 300);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many registration attempts. Please try again in 5 minutes.' },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(rateLimit.reset - Math.floor(Date.now() / 1000)),
-          },
-        }
-      );
+    if (ip) {
+      const rateLimit = await checkRateLimit(`merchant_onboard:${ip}`, 5, 300);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many registration attempts. Please try again in 5 minutes.' },
+          {
+            status: 429,
+            headers: {
+              'Retry-After': String(rateLimit.reset - Math.floor(Date.now() / 1000)),
+            },
+          }
+        );
+      }
     }
 
     const body: OnboardRequestBody = await request.json().catch(() => ({}));

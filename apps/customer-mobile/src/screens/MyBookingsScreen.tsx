@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { Booking } from '@appointments/shared';
 import BookingPassModal from './BookingPassModal';
@@ -426,6 +427,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
   },
   header: {
     flexDirection: 'row',

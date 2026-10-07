@@ -259,10 +259,16 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
   // ─── EC-MERCH-08: Zero deposit resource ────────────────────────────────────
   test('EC-MERCH-08: Creating a resource with zero deposit amount is accepted or rejected with clear error', async ({ request }) => {
+    const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+    });
+    const venuesData = await venuesRes.json();
+    const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
+
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
       headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: {
-        providerId: MERCHANT_A_PROVIDER_ID,
+        providerId: testProviderId,
         name: `Zero Deposit Test Resource ${Date.now()}`,
         type: 'doctor',
         department: 'General',
@@ -292,12 +298,18 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
   // ─── EC-MERCH-09: Duplicate resource name ─────────────────────────────────
   test('EC-MERCH-09: Creating two resources with identical names under the same provider is rejected', async ({ request }) => {
+    const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+    });
+    const venuesData = await venuesRes.json();
+    const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
+
     const uniqueName = `Duplicate Resource ${Date.now()}`;
 
     const createFirst = await request.post(`${BASE}/api/admin/resources`, {
       headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
       data: {
-        providerId: MERCHANT_A_PROVIDER_ID,
+        providerId: testProviderId,
         name: uniqueName,
         type: 'doctor',
         department: 'General',
@@ -315,7 +327,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       const createSecond = await request.post(`${BASE}/api/admin/resources`, {
         headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
         data: {
-          providerId: MERCHANT_A_PROVIDER_ID,
+          providerId: testProviderId,
           name: uniqueName, // same name
           type: 'doctor',
           department: 'General',
@@ -376,5 +388,102 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       content.match(/403|Access Denied|Sign In with Administrator/i);
 
     expect(isRejected).toBeTruthy();
+  });
+
+  // ─── EC-MERCH-11: Zero duration slot resource ──────────────────────────────
+  test('EC-MERCH-11: Creating a doctor resource with slot duration 0 is accepted', async ({ request }) => {
+    const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+    });
+    const venuesData = await venuesRes.json();
+    const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
+
+    const uniqueName = `Walk-in Doctor Zero Duration ${Date.now()}`;
+    const createRes = await request.post(`${BASE}/api/admin/resources`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      data: {
+        providerId: testProviderId,
+        name: uniqueName,
+        type: 'doctor',
+        department: 'Emergency & Walk-in',
+        price: 250,
+        depositAmount: 0,
+        durationMinutes: 0,
+        capacity: 1,
+      },
+    });
+
+    expect(createRes.status()).toBe(201);
+    const body = await createRes.json();
+    const resId = body.resource?.id ?? body.id;
+    expect(resId).toBeDefined();
+
+    if (resId) {
+      await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
+        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      });
+    }
+  });
+
+  // ─── EC-MERCH-12: Custom slot duration ─────────────────────────────────────
+  test('EC-MERCH-12: Creating a resource with custom duration (e.g. 12 mins) is accepted', async ({ request }) => {
+    const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+    });
+    const venuesData = await venuesRes.json();
+    const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
+
+    const uniqueName = `Specialist Custom Duration ${Date.now()}`;
+    const createRes = await request.post(`${BASE}/api/admin/resources`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      data: {
+        providerId: testProviderId,
+        name: uniqueName,
+        type: 'doctor',
+        department: 'Cardiology',
+        price: 800,
+        depositAmount: 100,
+        durationMinutes: 12,
+        capacity: 1,
+      },
+    });
+
+    expect(createRes.status()).toBe(201);
+    const body = await createRes.json();
+    const resId = body.resource?.id ?? body.id;
+    expect(resId).toBeDefined();
+
+    if (resId) {
+      await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
+        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      });
+    }
+  });
+
+  // ─── EC-MERCH-13: Negative slot duration rejected ──────────────────────────
+  test('EC-MERCH-13: Creating a resource with negative slot duration is rejected with 400', async ({ request }) => {
+    const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+    });
+    const venuesData = await venuesRes.json();
+    const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
+
+    const createRes = await request.post(`${BASE}/api/admin/resources`, {
+      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      data: {
+        providerId: testProviderId,
+        name: `Negative Duration Doctor ${Date.now()}`,
+        type: 'doctor',
+        department: 'General',
+        price: 500,
+        depositAmount: 50,
+        durationMinutes: -15,
+        capacity: 1,
+      },
+    });
+
+    expect(createRes.status()).toBe(400);
+    const body = await createRes.json();
+    expect(body.error).toMatch(/duration cannot be less than zero/i);
   });
 });

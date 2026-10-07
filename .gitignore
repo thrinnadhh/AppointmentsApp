@@ -61,4 +61,7 @@ __agent__/
 .planning/
 .source-aware/
 .agents/preview.pid
+scripts/e2e-*.mjs
+*.log
+strix-*.log
 

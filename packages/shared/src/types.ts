@@ -173,9 +173,10 @@ export type NotificationEventType =
   | 'BOOKING_CONFIRMED'
   | 'BOOKING_REMINDER_1H'
   | 'BOOKING_REMINDER_30M'
-  | 'BOOKING_CANCELLED';
+  | 'BOOKING_CANCELLED'
+  | 'BOOKING_COMPLETED';
 
-export type NotificationChannel = 'whatsapp' | 'sms';
+export type NotificationChannel = 'whatsapp' | 'sms' | 'email' | 'push';
 
 export interface NotificationLog {
   id: string;

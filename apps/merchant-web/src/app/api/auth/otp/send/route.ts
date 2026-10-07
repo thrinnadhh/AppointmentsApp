@@ -51,12 +51,14 @@ export async function POST(req: NextRequest) {
     // ── IP-level rate limit: 5 unique OTP attempts per IP per 10 minutes ─────
     // Bind to framework-verified IP, trusted edge headers, or rightmost trusted proxy
     const ip = getClientIp(req);
-    const ipLimit = await checkRateLimit(`otp-ip:${ip}`, 5, 600);
-    if (!ipLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many requests from this network. Please wait 10 minutes.' },
-        { status: 429, headers: { 'Retry-After': String(ipLimit.reset - Math.floor(Date.now() / 1000)) } }
-      );
+    if (ip) {
+      const ipLimit = await checkRateLimit(`otp-ip:${ip}`, 5, 600);
+      if (!ipLimit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many requests from this network. Please wait 10 minutes.' },
+          { status: 429, headers: { 'Retry-After': String(ipLimit.reset - Math.floor(Date.now() / 1000)) } }
+        );
+      }
     }
 
     // ── Delegate to Supabase Auth (server-side, SUPABASE_SERVICE_ROLE_KEY) ───

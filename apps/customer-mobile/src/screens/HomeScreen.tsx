@@ -18,6 +18,7 @@ import {
   fetchNearbyProviders,
   ProviderWithDetails,
   getCachedProvidersByCategory,
+  getCachedNearbyProviders,
   searchDirectoryOnSupabase,
   fetchActiveCities,
   joinCityWaitlist,
@@ -134,11 +135,11 @@ export default function HomeScreen({
     return [];
   });
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({
-    clinics: 29,
-    salons: 1,
-    restaurants: 1,
-    gaming: 28,
-    pets: 1,
+    clinics: 0,
+    salons: 0,
+    restaurants: 0,
+    gaming: 0,
+    pets: 0,
   });
   const [loading, setLoading] = useState(false);
 
@@ -185,25 +186,33 @@ export default function HomeScreen({
     async function loadAllCounts() {
       try {
         const allData = await fetchProvidersByCategory('all');
-        if (isMounted && allData && allData.length > 0) {
-          const counts: Record<string, number> = {};
-          allData.forEach((p) => {
-            const norm = p.category_id.toLowerCase().replace(/s$/, '');
-            const key =
-              norm === 'clinic' || norm === 'hospital'
-                ? 'clinics'
-                : norm === 'salon' || norm === 'spa'
-                ? 'salons'
-                : norm === 'restaurant' || norm === 'dining'
-                ? 'restaurants'
-                : norm === 'gaming' || norm === 'turf'
-                ? 'gaming'
-                : norm === 'pet'
-                ? 'pets'
-                : p.category_id;
-            counts[key] = (counts[key] || 0) + 1;
-          });
-          setCategoryCounts((prev) => ({ ...prev, ...counts }));
+        if (isMounted) {
+          const counts: Record<string, number> = {
+            clinics: 0,
+            salons: 0,
+            restaurants: 0,
+            gaming: 0,
+            pets: 0,
+          };
+          if (allData && allData.length > 0) {
+            allData.forEach((p) => {
+              const norm = p.category_id.toLowerCase().replace(/s$/, '');
+              const key =
+                norm === 'clinic' || norm === 'hospital'
+                  ? 'clinics'
+                  : norm === 'salon' || norm === 'spa'
+                  ? 'salons'
+                  : norm === 'restaurant' || norm === 'dining'
+                  ? 'restaurants'
+                  : norm === 'gaming' || norm === 'turf'
+                  ? 'gaming'
+                  : norm === 'pet'
+                  ? 'pets'
+                  : p.category_id;
+              counts[key] = (counts[key] || 0) + 1;
+            });
+          }
+          setCategoryCounts(counts);
         }
       } catch (err) {
         console.warn('Error loading category counts:', err);
@@ -220,7 +229,17 @@ export default function HomeScreen({
     if (!selectedCategory) return;
     let isMounted = true;
     async function load() {
-      setLoading(true);
+      const cached = getCachedNearbyProviders(
+        selectedCity.latitude,
+        selectedCity.longitude,
+        selectedCategory || undefined,
+        25000
+      );
+      if (cached && cached.length > 0) {
+        setProviders(cached);
+      } else {
+        setLoading(true);
+      }
       try {
         const data = await fetchNearbyProviders(
           selectedCity.latitude,
@@ -296,7 +315,7 @@ export default function HomeScreen({
 
   const renderCategoryCard = (cat: (typeof FIVE_CATEGORIES)[0]) => {
     const visual = getVerticalVisual(cat.id);
-    const count = categoryCounts[cat.id] || 1;
+    const count = categoryCounts[cat.id] ?? 0;
 
     return (
       <TouchableOpacity

@@ -130,21 +130,23 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 7. Atomic confirmation via RPC
-      const depositInInr = rawAmount ? rawAmount / 100 : Number(booking.deposit_amount);
+      // 7. Atomic confirmation via RPC (pass held deposit amount, not total amount with fees)
+      const expectedDepositAmount = Number(booking.deposit_amount);
       const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
         p_booking_id: booking.id,
         p_gateway_payment_id: paymentId,
-        p_deposit_amount: depositInInr,
+        p_deposit_amount: expectedDepositAmount,
       });
 
-      if (rpcError) {
-        console.error('Webhook confirm_booking_payment RPC failed:', rpcError);
-        return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 });
+      if (rpcError || !rpcData || !(rpcData as any).success) {
+        const errorMsg = rpcError?.message || (rpcData as any)?.error || 'Failed to update booking';
+        console.error('Webhook confirm_booking_payment RPC failed:', errorMsg);
+        return NextResponse.json({ error: errorMsg }, { status: 500 });
       }
 
       // 8. Record in payments ledger
-      await supabaseAdmin.from('payments').upsert(
+      const depositInInr = rawAmount ? rawAmount / 100 : expectedDepositAmount;
+      const { error: paymentInsertError } = await supabaseAdmin.from('payments').upsert(
         {
           booking_id: booking.id,
           gateway_payment_id: paymentId,
@@ -160,6 +162,11 @@ export async function POST(req: NextRequest) {
         },
         { onConflict: 'gateway_payment_id' }
       );
+
+      if (paymentInsertError) {
+        console.error('Webhook payments upsert failed:', paymentInsertError);
+        return NextResponse.json({ error: 'Failed to record payment in ledger' }, { status: 500 });
+      }
 
       return NextResponse.json({ success: true, received: true, event, booking_id: booking.id, status: 'CONFIRMED' }, { status: 200 });
     } else if (event === 'payment.failed') {

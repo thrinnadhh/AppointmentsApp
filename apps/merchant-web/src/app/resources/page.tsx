@@ -40,7 +40,7 @@ function ResourcesManagementContent() {
 
   const [providers, setProviders] = useState<Provider[]>(tenantProvider ? [tenantProvider] : []);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    tenantProvider?.id || (isSuperAdmin ? providerParam || '' : '')
+    providerParam || tenantProvider?.id || ''
   );
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,22 +79,33 @@ function ResourcesManagementContent() {
 
   // Keep selectedProviderId and formData in sync with tenant context
   useEffect(() => {
-    if (tenantProvider?.id && !isSuperAdmin) {
-      setSelectedProviderId(tenantProvider.id);
-      setProviders([tenantProvider]);
-      setFormData((prev) => ({
-        ...prev,
-        type: defaultResourceType,
-        department: '',
-        price: verticalConfig.defaultPrice,
-        deposit_amount: verticalConfig.defaultPrice,
-        duration_minutes: verticalConfig.defaultDurationMinutes,
-      }));
+    const activeId = providerParam || tenantProvider?.id;
+    if (activeId && !selectedProviderId) {
+      setSelectedProviderId(activeId);
     }
-  }, [tenantProvider, isSuperAdmin, verticalConfig, defaultResourceType]);
+    if (tenantProvider) {
+      setProviders((prev) => {
+        if (!prev.some((p) => p.id === tenantProvider.id)) {
+          return [tenantProvider, ...prev];
+        }
+        return prev;
+      });
+      if (!isSuperAdmin) {
+        setFormData((prev) => ({
+          ...prev,
+          type: defaultResourceType,
+          department: '',
+          price: verticalConfig.defaultPrice,
+          deposit_amount: verticalConfig.defaultPrice,
+          duration_minutes: verticalConfig.defaultDurationMinutes,
+        }));
+      }
+    }
+  }, [tenantProvider, isSuperAdmin, verticalConfig, defaultResourceType, providerParam, selectedProviderId]);
 
   const loadData = useCallback(async () => {
-    if (!selectedProviderId && !isSuperAdmin) {
+    const activeId = selectedProviderId || providerParam || tenantProvider?.id;
+    if (!activeId && !isSuperAdmin) {
       setLoading(false);
       setResources([]);
       return;
@@ -103,7 +114,7 @@ function ResourcesManagementContent() {
     try {
       const [fetchedProviders, fetchedResources] = await Promise.all([
         isSuperAdmin ? fetchAllProviders() : Promise.resolve(tenantProvider ? [tenantProvider] : []),
-        selectedProviderId ? fetchProviderResources(selectedProviderId) : Promise.resolve([]),
+        activeId ? fetchProviderResources(activeId) : Promise.resolve([]),
       ]);
 
       if (fetchedProviders && fetchedProviders.length > 0) {
@@ -129,12 +140,23 @@ function ResourcesManagementContent() {
     e.preventDefault();
     if (!formData.name) return;
 
+    const targetProviderId = selectedProviderId || providerParam || tenantProvider?.id;
+    if (!targetProviderId) {
+      setFeedbackToast('Error: No active business venue selected.');
+      return;
+    }
+
+    if (formData.duration_minutes < 0) {
+      setFeedbackToast('Error: Slot duration cannot be less than zero.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/admin/resources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerId: selectedProviderId,
+          providerId: targetProviderId,
           name: formData.name.trim(),
           type: formData.type,
           department: formData.department.trim() || 'General',
@@ -547,12 +569,16 @@ function ResourcesManagementContent() {
                     name="doctorDuration"
                     aria-label="Slot Duration in Minutes"
                     type="number"
-                    min="10"
-                    step="5"
+                    min="0"
+                    step="any"
                     value={formData.duration_minutes}
-                    onChange={(e) => setFormData({ ...formData, duration_minutes: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : Number(e.target.value);
+                      setFormData({ ...formData, duration_minutes: val });
+                    }}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
+                  <span className="text-[11px] text-slate-500">Can be any number (0 or higher)</span>
                 </div>
 
                 <div>

@@ -26,12 +26,14 @@ export async function POST(req: NextRequest) {
   try {
     const clientIp = getClientIp(req);
     const isTestEnv = process.env.NODE_ENV === 'test' || process.env.ENABLE_E2E_BYPASS === 'true' || req.headers.get('x-e2e-bypass') === 'true';
-    const ipLimit = await checkRateLimit(`public-del-req:${clientIp}`, isTestEnv ? 500 : 5, 300);
-    if (!ipLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please wait a few minutes before trying again.' },
-        { status: 429 }
-      );
+    if (clientIp) {
+      const ipLimit = await checkRateLimit(`public-del-req:${clientIp}`, isTestEnv ? 500 : 5, 300);
+      if (!ipLimit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please wait a few minutes before trying again.' },
+          { status: 429 }
+        );
+      }
     }
 
     const body = await req.json().catch(() => ({}));

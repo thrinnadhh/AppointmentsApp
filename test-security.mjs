@@ -29,6 +29,20 @@ function verifyRazorpaySignature({ orderId, paymentId, signature }, env = proces
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+function isPrivateIpv4(host) {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return false;
+  const octets = match.slice(1).map((part) => Number(part));
+  if (octets.some((octet) => octet > 255)) return false;
+  const [first, second] = octets;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 192 && second === 168) ||
+    (first === 172 && second >= 16 && second <= 31)
+  );
+}
+
 function isAllowedOrigin(origin, env = process.env) {
   if (!origin) return false;
   try {
@@ -39,8 +53,7 @@ function isAllowedOrigin(origin, env = process.env) {
       if (
         host === 'localhost' ||
         host === '127.0.0.1' ||
-        host.startsWith('192.168.') ||
-        host.startsWith('10.')
+        isPrivateIpv4(host)
       ) {
         return true;
       }
@@ -742,5 +755,163 @@ describe('Priority 4 Security Remediation: RPC In-Function Auth, Placeholder Reg
     assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.reschedule_booking_slot\(UUID, TIMESTAMPTZ, TIMESTAMPTZ\) TO authenticated, service_role;/);
   });
 });
+
+describe('Priority 5 Security Remediation: Strix Deep Scan Findings (vuln-0001 - vuln-0008)', () => {
+  const rootDir = process.cwd();
+
+  // vuln-0003: Exposed Supabase service_role Key Purged
+  it('verifies vuln-0003: no service_role JWT key literals are hardcoded in test scripts or repository', () => {
+    const e2eScript = fs.readFileSync(path.join(rootDir, 'scripts/e2e-trinadh-hospital-test.mjs'), 'utf8');
+    assert.doesNotMatch(e2eScript, /eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS/);
+    assert.match(e2eScript, /process\.env\.SUPABASE_SERVICE_ROLE_KEY/);
+
+    const gitignore = fs.readFileSync(path.join(rootDir, '.gitignore'), 'utf8');
+    assert.match(gitignore, /scripts\/e2e-\*\.mjs/);
+  });
+
+  // vuln-0005: User Impersonation & Fake Cookie Bypass
+  it('verifies vuln-0005: auth-admin.ts restricts x-customer-id and middleware rejects fabricated cookies', () => {
+    const authAdminCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/lib/auth-admin.ts'), 'utf8');
+    assert.match(authAdminCode, /isAuthorizedSecret/);
+    assert.doesNotMatch(authAdminCode, /testCustomerId\.startsWith\('99999999-'\)/, 'Must not allow prefix-only bypass without secret');
+
+    const middlewareCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/middleware.ts'), 'utf8');
+    assert.match(middlewareCode, /val\.length < 50 \|\| val === 'base64-deleted'/);
+    assert.match(middlewareCode, /decoded\.includes\('access_token'\) \|\| \(decoded\.startsWith\('eyJ'\) && decoded\.split\('\.'\)\.length >= 3\)/);
+    assert.match(middlewareCode, /bearerToken\.startsWith\('eyJ'\)[\s\S]*bearerToken\.split\('\.'\)\.length === 3/);
+  });
+
+  // vuln-0007: Unconditional Booking Hold & Confirm Authentication
+  it('verifies vuln-0007: hold and confirm endpoints enforce authentication unconditionally', () => {
+    const holdCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/bookings/hold/route.ts'), 'utf8');
+    assert.doesNotMatch(holdCode, /process\.env\.NODE_ENV === 'production' && !caller/);
+    assert.match(holdCode, /if \(!caller\) \{[\s\S]*Unauthorized: Authentication required to create booking hold/);
+
+    const confirmCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/bookings/confirm/route.ts'), 'utf8');
+    assert.doesNotMatch(confirmCode, /process\.env\.NODE_ENV === 'production' && !razorpay_signature/);
+    assert.match(confirmCode, /Unauthorized: Authentication or payment signature required to confirm booking/);
+  });
+
+  // vuln-0006: Anti-Double-Spend Database Atomicity
+  it('verifies vuln-0006: unique index migration exists and confirm route returns HTTP 409 on replay conflict', () => {
+    const migrationPath = path.join(rootDir, 'supabase/migrations/20261004000001_unique_gateway_payment_and_atomicity.sql');
+    assert.ok(fs.existsSync(migrationPath), 'Migration 20261004000001 must exist');
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_gateway_payment_id_unique/);
+    assert.match(sql, /ON public\.payments \(gateway_payment_id\)/);
+    assert.match(sql, /WHERE gateway_payment_id IS NOT NULL/);
+    assert.match(sql, /Payment identifier has already been used for another booking/);
+
+    const confirmCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/bookings/confirm/route.ts'), 'utf8');
+    assert.match(confirmCode, /status: isUniqueConflict \? 409 : 500/);
+    assert.match(confirmCode, /status: isNotFound \? 404 : \(isExpired \? 410 : \(isConflict \? 409 : 400\)\)/);
+  });
+
+  // vuln-0008: Razorpay Webhook Settlement & RPC Return Verification
+  it('verifies vuln-0008: razorpay webhook passes deposit_amount and fails cleanly if RPC returns success=false', () => {
+    const webhookCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts'), 'utf8');
+    assert.match(webhookCode, /p_deposit_amount: expectedDepositAmount/);
+    assert.match(webhookCode, /if \(rpcError \|\| !rpcData \|\| !\(rpcData as any\)\.success\)/);
+    assert.match(webhookCode, /paymentInsertError/);
+  });
+
+  // vuln-0004: Client-Controlled Proxy Header Rate-Limit Bypass
+  it('verifies vuln-0004: getClientIp requires trusted edge verification headers (cf-ray, x-vercel-id, or TRUSTED_PROXY)', () => {
+    const authAdminCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/lib/auth-admin.ts'), 'utf8');
+    assert.match(authAdminCode, /if \(cfConnectingIp && \(cfRay \|\| process\.env\.TRUSTED_PROXY === 'true'\)\)/);
+    assert.match(authAdminCode, /if \(xRealIp && \(vercelId \|\| process\.env\.TRUSTED_PROXY === 'true'\)\)/);
+    assert.match(authAdminCode, /if \(xff && \(cfRay \|\| vercelId \|\| process\.env\.TRUSTED_PROXY === 'true'\)\)/);
+  });
+
+  // vuln-0001 & vuln-0002: Transitive Dependency Overrides
+  it('verifies vuln-0001 & vuln-0002: package.json pins braces and node-forge overrides', () => {
+    const pkgJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+    assert.strictEqual(pkgJson.pnpm.overrides.braces, '>=3.0.3');
+    assert.strictEqual(pkgJson.pnpm.overrides['node-forge'], '>=1.4.0');
+  });
+});
+
+describe('Priority 6 Security Remediation: Strix Latest Scan (appointments_b7ac)', () => {
+  const rootDir = process.cwd();
+
+  it('verifies vuln-0001: auth-admin.ts requires isAuthorizedSecret for all customer overrides and disallows prefix-only allowance', () => {
+    const authAdminCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/lib/auth-admin.ts'), 'utf8');
+    assert.match(authAdminCode, /isAuthorizedSecret/);
+    assert.doesNotMatch(authAdminCode, /testCustomerId\.startsWith\('99999999-'\)/);
+    assert.doesNotMatch(authAdminCode, /testCustomerId\.startsWith\('test-'\)/);
+  });
+
+  it('verifies vuln-0002: auth-admin.ts and middleware.ts reject committed default secrets and require strong non-default token', () => {
+    const authAdminCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/lib/auth-admin.ts'), 'utf8');
+    assert.match(authAdminCode, /export function isE2EBypassEnabled\(\): boolean/);
+    assert.match(authAdminCode, /process\.env\.ENABLE_E2E_BYPASS === 'true'/);
+    assert.match(authAdminCode, /E2E_ADMIN_BYPASS_SECRET\.length >= 24/);
+    assert.match(authAdminCode, /COMMITTED_DEFAULT_E2E_SECRETS/);
+
+    const middlewareCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/middleware.ts'), 'utf8');
+    assert.match(middlewareCode, /COMMITTED_DEFAULT_E2E_SECRETS/);
+    assert.match(middlewareCode, /adminBypassToken!\.length >= 24/);
+    assert.match(middlewareCode, /!COMMITTED_DEFAULT_E2E_SECRETS\.includes\(adminBypassToken!\)/);
+
+    const expireHoldCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/test/expire-hold/route.ts'), 'utf8');
+    assert.match(expireHoldCode, /COMMITTED_DEFAULT_SECRETS/);
+    assert.match(expireHoldCode, /adminSecret\.length >= 24/);
+
+    const playwrightCode = fs.readFileSync(path.join(rootDir, 'playwright.config.ts'), 'utf8');
+    assert.doesNotMatch(playwrightCode, /process\.env\.ADMIN_SECRET \|\| 'tirupati-superadmin-e2e-2026'/);
+    assert.doesNotMatch(playwrightCode, /process\.env\.SUPERADMIN_E2E_TOKEN \|\| 'tirupati-superadmin-e2e-2026'/);
+  });
+
+  it('verifies vuln-0003: middleware.ts and evaluateCorsHeaders reject attacker subdomains starting with 10. and 192.168.', () => {
+    const middlewareCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/middleware.ts'), 'utf8');
+    assert.match(middlewareCode, /function isPrivateIpv4\(host: string\): boolean/);
+    assert.doesNotMatch(middlewareCode, /host\.startsWith\('10\.'\)/);
+    assert.doesNotMatch(middlewareCode, /host\.startsWith\('192\.168\.'\)/);
+
+    const devEnv = { NODE_ENV: 'development' };
+    const attackerOrigin1 = 'http://10.attacker.example.com';
+    const attackerOrigin2 = 'http://192.168.evil.com';
+    const legitimateLocal = 'http://192.168.1.100:3000';
+
+    assert.strictEqual(evaluateCorsHeaders(attackerOrigin1, devEnv)['Access-Control-Allow-Origin'], undefined);
+    assert.strictEqual(evaluateCorsHeaders(attackerOrigin2, devEnv)['Access-Control-Allow-Origin'], undefined);
+    assert.strictEqual(evaluateCorsHeaders(legitimateLocal, devEnv)['Access-Control-Allow-Origin'], legitimateLocal);
+  });
+
+  it('verifies vuln-0004 & vuln-0005: migration 20261007000001 drops unguarded update_city_status overload and binds check_cooling_period_eligibility to caller', () => {
+    const migrationPath = path.join(rootDir, 'supabase/migrations/20261007000001_strix_b7ac_rpc_hardening.sql');
+    assert.ok(fs.existsSync(migrationPath), 'Migration 20261007000001 must exist');
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
+    assert.match(sql, /REVOKE ALL ON FUNCTION public\.update_city_status\(TEXT, TEXT, INT\) FROM PUBLIC, anon, authenticated;/);
+    assert.match(sql, /DROP FUNCTION IF EXISTS public\.update_city_status\(TEXT, TEXT, INT\);/);
+
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.check_cooling_period_eligibility/);
+    assert.match(sql, /auth\.uid\(\) <> p_customer_id/);
+    assert.match(sql, /Access Denied: You are not authorized to check cooling period for this customer/);
+  });
+
+  it('verifies vuln-0006: getClientIp gates header trust on TRUSTED_PROXY, returns undefined when untrusted, and never defaults to 127.0.0.1', () => {
+    const authAdminCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/lib/auth-admin.ts'), 'utf8');
+    assert.match(authAdminCode, /export function getClientIp\(req: Request \| NextRequest\): string \| undefined/);
+    assert.match(authAdminCode, /return undefined;/);
+    assert.doesNotMatch(authAdminCode, /return '127\.0\.0\.1';/);
+
+    const otpSendCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/auth/otp/send/route.ts'), 'utf8');
+    assert.match(otpSendCode, /if \(ip\) \{[\s\S]*checkRateLimit\(`otp-ip:\$\{ip\}`/);
+
+    const otpVerifyCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/auth/otp/verify/route.ts'), 'utf8');
+    assert.match(otpVerifyCode, /if \(ip\) \{[\s\S]*checkRateLimit\(`otp-verify-ip:\$\{ip\}`/);
+  });
+
+  it('verifies vuln-0008 - vuln-0013: package.json pins shell-quote, compression, source-map-js, and sharp overrides', () => {
+    const pkgJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+    assert.strictEqual(pkgJson.pnpm.overrides['shell-quote'], '>=1.11.0');
+    assert.strictEqual(pkgJson.pnpm.overrides['compression'], '>=1.8.2');
+    assert.strictEqual(pkgJson.pnpm.overrides['source-map-js'], '>=1.2.2');
+    assert.strictEqual(pkgJson.pnpm.overrides['sharp'], '>=0.35.5');
+  });
+});
+
 
 

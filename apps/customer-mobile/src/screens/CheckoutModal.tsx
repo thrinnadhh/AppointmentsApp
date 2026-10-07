@@ -10,6 +10,7 @@ import {
   ScrollView,
   Platform,
   Linking,
+  StatusBar,
 } from 'react-native';
 import { Resource, Slot, getPlatformFee, CoolingPeriodEligibilityResult } from '@appointments/shared';
 import {
@@ -739,6 +740,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
   },
   container: {
     flex: 1,

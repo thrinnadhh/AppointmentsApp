@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAdminRequest } from '@/lib/auth-admin';
+import { verifyAdminRequest, verifyStaffManagerRequest } from '@/lib/auth-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await verifyAdminRequest(request);
+    const authResult = await verifyStaffManagerRequest(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
     };
     const dbCategoryId = CATEGORY_MAP[categoryId.toLowerCase()] || categoryId;
 
+    const effectiveOwnerId = authResult.profile.role === 'merchant'
+      ? authResult.user.id
+      : (ownerId || authResult.user.id);
+
     const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin.rpc('admin_create_venue', {
       p_name: name,
@@ -78,7 +82,7 @@ export async function POST(request: NextRequest) {
       p_closing_time: closingTime || '21:00:00',
       p_description: description || null,
       p_email: email || null,
-      p_owner_id: ownerId || null,
+      p_owner_id: effectiveOwnerId || null,
     });
 
     if (error) {

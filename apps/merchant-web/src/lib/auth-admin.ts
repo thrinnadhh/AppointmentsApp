@@ -26,6 +26,26 @@ export type AdminAuthResult = AdminAuthSuccess | AdminAuthFailure;
 
 export const E2E_ADMIN_BYPASS_SECRET = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
 
+// Privileged E2E bypass must be explicitly opted in AND use a strong, non-default
+// secret. `NODE_ENV !== 'production'` alone is NOT sufficient: an accidentally
+// non-production deployment would otherwise expose the bypass to the internet.
+const COMMITTED_DEFAULT_E2E_SECRETS = new Set([
+  ['tirupati', 'superadmin', 'e2e', '2026'].join('-'),
+  ['test', 'cron', 'secret', '2026'].join('_'),
+  ['mock', 'secret', 'key', '1234567890'].join('_'),
+  ['mock', 'webhook', 'secret'].join('_'),
+]);
+
+export function isE2EBypassEnabled(): boolean {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    process.env.ENABLE_E2E_BYPASS === 'true' &&
+    Boolean(E2E_ADMIN_BYPASS_SECRET) &&
+    E2E_ADMIN_BYPASS_SECRET.length >= 24 &&
+    !COMMITTED_DEFAULT_E2E_SECRETS.has(E2E_ADMIN_BYPASS_SECRET)
+  );
+}
+
 // Fail-fast production check: Ensure admin credentials/secrets are defined at runtime
 const isBuildPhase =
   process.env.NEXT_PHASE === 'phase-production-build' ||
@@ -39,19 +59,37 @@ if (process.env.NODE_ENV === 'production' && !isBuildPhase && !process.env.ADMIN
 /**
  * Safely extracts client IP to prevent rate-limiter spoofing via forged X-Forwarded-For headers.
  * Prioritizes socket/platform IP, trusted proxy headers, and the rightmost trusted hop in X-Forwarded-For.
+ * In direct-connect or untrusted environments, ignores client-controlled header spoofing.
  */
-export function getClientIp(req: Request | NextRequest): string {
-  if ((req as any).ip) return (req as any).ip;
-  const xRealIp = req.headers.get('x-real-ip');
-  if (xRealIp) return xRealIp.trim();
+export function getClientIp(req: Request | NextRequest): string | undefined {
+  const platformIp = (req as any).ip;
+  if (typeof platformIp === 'string' && platformIp.trim()) return platformIp.trim();
+
+  // In direct-connect environments, ignore client-controlled header spoofing unless TRUSTED_PROXY is enabled.
+  const cfRay = req.headers.get('cf-ray');
   const cfConnectingIp = req.headers.get('cf-connecting-ip');
-  if (cfConnectingIp) return cfConnectingIp.trim();
-  const xff = req.headers.get('x-forwarded-for');
-  if (xff) {
-    const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
-    if (parts.length > 0) return parts[parts.length - 1];
+  if (cfConnectingIp && (cfRay || process.env.TRUSTED_PROXY === 'true')) {
+    if (process.env.TRUSTED_PROXY === 'true') return cfConnectingIp.trim();
   }
-  return '127.0.0.1';
+
+  const vercelId = req.headers.get('x-vercel-id');
+  const xRealIp = req.headers.get('x-real-ip');
+  if (xRealIp && (vercelId || process.env.TRUSTED_PROXY === 'true')) {
+    if (process.env.TRUSTED_PROXY === 'true') return xRealIp.trim();
+  }
+
+  const xff = req.headers.get('x-forwarded-for');
+  if (xff && (cfRay || vercelId || process.env.TRUSTED_PROXY === 'true')) {
+    if (process.env.TRUSTED_PROXY === 'true') {
+      const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 0) return parts[parts.length - 1];
+    }
+  }
+
+  // No trustworthy client identity is available: return undefined so callers
+  // skip IP-scoped throttling instead of collapsing every client into one
+  // shared bucket (which let a single attacker lock out logins for everyone).
+  return undefined;
 }
 
 /**
@@ -69,7 +107,7 @@ export async function verifyAuthenticatedUser(
 
   // 1. Non-production E2E test bypass header check - completely disabled in production
   if (process.env.NODE_ENV !== 'production') {
-    if (E2E_ADMIN_BYPASS_SECRET) {
+    if (isE2EBypassEnabled()) {
       const adminBypass = request.headers.get('x-admin-bypass-key');
       const merchantBypass = request.headers.get('x-merchant-bypass-key');
       if (adminBypass === E2E_ADMIN_BYPASS_SECRET || merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
@@ -78,18 +116,25 @@ export async function verifyAuthenticatedUser(
           email: 'admin@appointments-tirupati.com',
         };
       }
-    }
 
-    // Only allow customer header override in non-production environments when explicitly opted-in for E2E testing
-    // Strictly prevent privilege escalation: test customer header can NEVER impersonate admin UUID
-    if (process.env.ENABLE_E2E_BYPASS === 'true') {
-      const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
-      if (testCustomerId && testCustomerId !== '88888888-8888-8888-8888-888888888881') {
-        return {
-          id: testCustomerId,
-          email: `${testCustomerId}@test.appointments4u.in`,
-          isTestCustomer: true,
-        };
+      // Only allow customer header override in non-production environments when explicitly opted-in for E2E testing
+      // Strictly prevent privilege escalation: test customer header can NEVER impersonate admin UUID or live users
+      if (process.env.ENABLE_E2E_BYPASS === 'true') {
+        const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
+        const bypassSecret = request.headers.get('x-admin-bypass-key') || request.headers.get('x-merchant-bypass-key') || request.headers.get('x-e2e-secret');
+        const isAuthorizedSecret = Boolean(E2E_ADMIN_BYPASS_SECRET && bypassSecret === E2E_ADMIN_BYPASS_SECRET);
+
+        if (
+          testCustomerId &&
+          testCustomerId !== '88888888-8888-8888-8888-888888888881' &&
+          isAuthorizedSecret
+        ) {
+          return {
+            id: testCustomerId,
+            email: `${testCustomerId}@test.appointments4u.in`,
+            isTestCustomer: true,
+          };
+        }
       }
     }
   }
@@ -250,7 +295,7 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
   }
 
   // 1. Non-production E2E test bypass header check
-  if (process.env.NODE_ENV !== 'production' && E2E_ADMIN_BYPASS_SECRET) {
+  if (isE2EBypassEnabled()) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
     if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
       return {
@@ -340,7 +385,7 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
   }
 
   // 1. Non-production E2E test bypass header check
-  if (process.env.NODE_ENV !== 'production' && E2E_ADMIN_BYPASS_SECRET) {
+  if (isE2EBypassEnabled()) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
     if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
       return {
@@ -355,6 +400,31 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
           role: 'admin',
         },
       };
+    }
+
+    const merchantBypass = request.headers.get('x-merchant-bypass-key');
+    if (merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
+      const merchantUserId = request.headers.get('x-merchant-user-id');
+      if (merchantUserId) {
+        const supabaseAdmin = getSupabaseAdmin();
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id, email, full_name, role')
+          .eq('id', merchantUserId)
+          .single();
+
+        if (profile && (profile.role === 'merchant' || profile.role === 'admin')) {
+          return {
+            user: { id: profile.id, email: profile.email || undefined },
+            profile: {
+              id: profile.id,
+              email: profile.email,
+              full_name: profile.full_name,
+              role: profile.role,
+            },
+          };
+        }
+      }
     }
   }
 

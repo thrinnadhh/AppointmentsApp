@@ -477,9 +477,9 @@ export async function adminCreateDoctorResource(params: {
     p_name: params.name,
     p_type: params.type,
     p_department: params.department,
-    p_price: params.price,
-    p_deposit_amount: params.depositAmount,
-    p_duration_minutes: params.durationMinutes || 30,
+    p_duration_minutes: (params.durationMinutes !== undefined && params.durationMinutes !== null && !isNaN(Number(params.durationMinutes)))
+      ? Math.round(Number(params.durationMinutes))
+      : 30,
     p_capacity: params.capacity || 1,
   });
 

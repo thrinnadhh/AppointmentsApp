@@ -11,8 +11,12 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  LogBox,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+
+LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
+LogBox.ignoreAllLogs(true);
 
 import { Resource, Slot, Booking, getPlatformFee } from '@appointments/shared';
 
@@ -29,6 +33,8 @@ import {
   markBookingReached,
   sendPhoneOtp,
   verifyPhoneOtp,
+  sendEmailOtp,
+  verifyEmailOtp,
   syncCustomerProfile,
   getCurrentCustomerSession,
   signOutCustomer,
@@ -62,9 +68,14 @@ export default function App() {
   // Authentication & Active Customer State
   const [activeCustomerId, setActiveCustomerId] = useState<string>(DEMO_CUSTOMER_ID);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean>(false);
   const [authPhone, setAuthPhone] = useState<string>('+919999999991');
   const [authOtp, setAuthOtp] = useState<string>('');
   const [otpSent, setOtpSent] = useState<boolean>(false);
+  const [authEmail, setAuthEmail] = useState<string>('trinadh.patient@appointments4u.in');
+  const [authEmailOtp, setAuthEmailOtp] = useState<string>('');
+  const [emailOtpSent, setEmailOtpSent] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -76,9 +87,9 @@ export default function App() {
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
-    name: 'Ravi Teja',
+    name: 'Trinadh Test Patient',
     phone: '+91 98765 43210',
-    email: 'ravi.teja@customer.tirupati.in',
+    email: 'trinadh.patient@appointments4u.in',
     city: 'Tirupati, AP',
   });
 
@@ -92,10 +103,16 @@ export default function App() {
           setActiveCustomerId(u.id);
           setIsAuthenticated(true);
           const p = u.phone ? (u.phone.startsWith('+') ? u.phone : `+${u.phone}`) : authPhone;
+          if (u.phone) setIsPhoneVerified(true);
+          if (u.email) {
+            setIsEmailVerified(true);
+            setAuthEmail(u.email);
+          }
           setCustomerProfile((prev) => ({
             ...prev,
             phone: p,
-            name: (u.user_metadata?.full_name as string) || `Customer ${p.slice(-4)}`,
+            email: u.email || prev.email,
+            name: (u.user_metadata?.full_name as string) || prev.name,
           }));
         }
       } catch (err) {
@@ -148,8 +165,15 @@ export default function App() {
         },
         (payload) => {
           const newStatus = (payload.new as { status?: string })?.status;
-          if (newStatus) {
-            setConfirmationToast(`Booking Confirmed on Supabase! Status is now ${newStatus}`);
+          const newRec = payload.new as { status?: string; reminder_1h_sent_at?: string };
+          if (newStatus === 'COMPLETED') {
+            setConfirmationToast('🎉 Consultation Complete! Status changed to COMPLETED. In-app & email notification delivered.');
+            setTimeout(() => setConfirmationToast(null), 12000);
+          } else if (newRec?.reminder_1h_sent_at) {
+            setConfirmationToast('🔔 1-Hour Reminder: Your hospital appointment starts in 1 hour! Notification sent to phone & email.');
+            setTimeout(() => setConfirmationToast(null), 12000);
+          } else if (newStatus === 'CONFIRMED') {
+            setConfirmationToast('Appointment Confirmed on Supabase! Status is now CONFIRMED.');
             setTimeout(() => setConfirmationToast(null), 10000);
           }
           loadBookings();
@@ -198,15 +222,15 @@ export default function App() {
         const uid = res.user.id;
         const phone = res.user.phone || authPhone;
         const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
-        await syncCustomerProfile('Verified Customer', formattedPhone, `${formattedPhone.replace(/\D/g, '')}@customer.tirupati.in`);
+        await syncCustomerProfile(customerProfile.name || 'Verified Customer', formattedPhone, authEmail || `${formattedPhone.replace(/\D/g, '')}@customer.tirupati.in`);
         setActiveCustomerId(uid);
         setIsAuthenticated(true);
+        setIsPhoneVerified(true);
         setOtpSent(false);
         setAuthOtp('');
         setCustomerProfile((prev) => ({
           ...prev,
           phone: formattedPhone,
-          name: `Verified Customer (${formattedPhone.slice(-4)})`,
         }));
         setConfirmationToast('Phone verified! Signed in with Supabase.');
         setTimeout(() => setConfirmationToast(null), 4000);
@@ -215,6 +239,56 @@ export default function App() {
       }
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Failed to verify OTP');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSendEmailOtp = async () => {
+    if (!authEmail.trim() || !authEmail.includes('@')) {
+      setAuthError('Please enter a valid email address');
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const res = await sendEmailOtp(authEmail);
+      if (res.success) {
+        setEmailOtpSent(true);
+        setConfirmationToast('Email verification code sent! Test OTP is 123456');
+        setTimeout(() => setConfirmationToast(null), 4000);
+      } else {
+        setAuthError(res.error || 'Failed to send email verification');
+      }
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : 'Error sending email verification');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (!authEmailOtp.trim()) {
+      setAuthError('Please enter the 6-digit email verification code');
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const res = await verifyEmailOtp(authEmail, authEmailOtp);
+      if (res.success) {
+        setIsEmailVerified(true);
+        setEmailOtpSent(false);
+        setAuthEmailOtp('');
+        setCustomerProfile((prev) => ({ ...prev, email: authEmail.trim() }));
+        await syncCustomerProfile(customerProfile.name, customerProfile.phone, authEmail.trim());
+        setConfirmationToast('Email verified! Linked to your patient profile.');
+        setTimeout(() => setConfirmationToast(null), 4000);
+      } else {
+        setAuthError(res.error || 'Invalid email verification code. Try 123456.');
+      }
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : 'Failed to verify email');
     } finally {
       setAuthLoading(false);
     }
@@ -347,10 +421,16 @@ export default function App() {
     const fee = isFollowup ? 0 : getPlatformFee(activeCategoryId);
     const deposit = isFollowup ? 0 : (Number(activeResource?.deposit_amount) || 100);
     const total = deposit + fee;
+    const slotTimeFormatted = activeSlot?.start_time
+      ? new Date(activeSlot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+    const hospitalName = activeProviderName || 'Hospital';
+    const refCode = referenceCode || `TPT-${bookingId.slice(0, 6).toUpperCase()}`;
+
     if (isFollowup) {
-      setConfirmationToast(`Booking Confirmed! Free Follow-up Consultation (₹0 fee waived within cooling period).`);
+      setConfirmationToast(`Booking Confirmed! Appointment Confirmed at ${hospitalName}! Time: ${slotTimeFormatted}. Ref: ${refCode}. Expected arrival: 10 mins prior (Zero-wait queue).`);
     } else {
-      setConfirmationToast(`Booking Confirmed! Paid ₹${total} (Deposit ₹${deposit} + Platform Fee ₹${fee}).`);
+      setConfirmationToast(`Booking Confirmed! Appointment Confirmed at ${hospitalName}! Time: ${slotTimeFormatted}. Ref: ${refCode}. Expected arrival: 10 mins prior. Paid ₹${total}.`);
     }
 
     const newBooking: Booking & { provider_name?: string; resource_name?: string } = {
@@ -546,10 +626,28 @@ export default function App() {
                 </View>
               </View>
 
+              {/* Customer Personal Details Card */}
+              <View style={styles.authCard}>
+                <View style={styles.authCardHeader}>
+                  <Text style={styles.authCardTitle}>1. Customer Personal Details</Text>
+                </View>
+                <View style={styles.authInputGroup}>
+                  <Text style={styles.authInputLabel}>PATIENT FULL NAME</Text>
+                  <TextInput
+                    style={styles.authTextInput}
+                    value={customerProfile.name}
+                    onChangeText={(val) => setCustomerProfile((prev) => ({ ...prev, name: val }))}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#94a3b8"
+                    testID="input-customer-name"
+                  />
+                </View>
+              </View>
+
               {/* Phone OTP Authentication Card */}
               <View style={styles.authCard}>
                 <View style={styles.authCardHeader}>
-                  <Text style={styles.authCardTitle}>1-Tap Phone OTP Authentication</Text>
+                  <Text style={styles.authCardTitle}>2. Phone Verification (SMS OTP)</Text>
                 </View>
                 <Text style={styles.authCardSubtitle}>
                   {isAuthenticated
@@ -560,6 +658,12 @@ export default function App() {
                 {authError && (
                   <View style={styles.authErrorBox}>
                     <Text style={styles.authErrorText}>⚠️ {authError}</Text>
+                  </View>
+                )}
+
+                {isPhoneVerified && (
+                  <View style={{ backgroundColor: '#ecfdf5', padding: 12, borderRadius: 8, marginTop: 8, marginBottom: 8 }} testID="badge-phone-verified">
+                    <Text style={{ color: '#059669', fontWeight: '700' }}>✓ Mobile Phone Verified: {customerProfile.phone}</Text>
                   </View>
                 )}
 
@@ -649,6 +753,98 @@ export default function App() {
                 )}
               </View>
 
+              {/* Email Verification Card */}
+              <View style={styles.authCard}>
+                <View style={styles.authCardHeader}>
+                  <Text style={styles.authCardTitle}>3. Email Verification</Text>
+                </View>
+                <Text style={styles.authCardSubtitle}>
+                  {isEmailVerified
+                    ? `Verified email: ${customerProfile.email}. Official appointment notifications, 1-hour reminders, and receipts are sent here.`
+                    : 'Enter your email address to receive appointment confirmations, 1-hour reminders, and completion receipts.'}
+                </Text>
+
+                {isEmailVerified ? (
+                  <View style={{ backgroundColor: '#ecfdf5', padding: 12, borderRadius: 8, marginTop: 8 }} testID="badge-email-verified">
+                    <Text style={{ color: '#059669', fontWeight: '700' }}>✓ Email Verified: {customerProfile.email}</Text>
+                  </View>
+                ) : (
+                  !emailOtpSent ? (
+                    <View>
+                      <View style={styles.authInputGroup}>
+                        <Text style={styles.authInputLabel}>PATIENT EMAIL ADDRESS</Text>
+                        <TextInput
+                          style={styles.authTextInput}
+                          value={authEmail}
+                          onChangeText={setAuthEmail}
+                          placeholder="trinadh.patient@appointments4u.in"
+                          placeholderTextColor="#94a3b8"
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          editable={!authLoading}
+                          testID="input-email-auth"
+                        />
+                      </View>
+                      <TouchableOpacity
+                        style={styles.authPrimaryBtn}
+                        onPress={handleSendEmailOtp}
+                        disabled={authLoading}
+                        accessibilityLabel="Send Email Verification Code"
+                        testID="btn-send-email-otp"
+                      >
+                        {authLoading ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={styles.authPrimaryBtnText}>Send Email Verification OTP</Text>
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.authHelperText}>
+                        ℹ️ Test Email OTP: 123456
+                      </Text>
+                    </View>
+                  ) : (
+                    <View>
+                      <View style={styles.authInputGroup}>
+                        <Text style={styles.authInputLabel}>6-DIGIT EMAIL VERIFICATION CODE</Text>
+                        <TextInput
+                          style={[styles.authTextInput, { letterSpacing: 4, textAlign: 'center', fontSize: 20 }]}
+                          value={authEmailOtp}
+                          onChangeText={setAuthEmailOtp}
+                          placeholder="123456"
+                          placeholderTextColor="#94a3b8"
+                          keyboardType="number-pad"
+                          maxLength={6}
+                          editable={!authLoading}
+                          testID="input-email-otp"
+                        />
+                      </View>
+                      <TouchableOpacity
+                        style={styles.authPrimaryBtn}
+                        onPress={handleVerifyEmailOtp}
+                        disabled={authLoading}
+                        accessibilityLabel="Verify Email OTP"
+                        testID="btn-verify-email-otp"
+                      >
+                        {authLoading ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={styles.authPrimaryBtnText}>Verify Email & Link Profile</Text>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.authSecondaryBtn}
+                        onPress={() => {
+                          setEmailOtpSent(false);
+                          setAuthError(null);
+                        }}
+                      >
+                        <Text style={styles.authSecondaryBtnText}>← Change Email</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )
+                )}
+              </View>
+
               <View style={styles.profileFields}>
                 <View style={styles.profileField}>
                   <Text style={styles.fieldLabel}>ACTIVE MOBILE</Text>
@@ -719,8 +915,8 @@ export default function App() {
 
       {/* Confirmation Toast Alert */}
       {confirmationToast && (
-        <View style={styles.toastContainer}>
-          <Text style={styles.toastText}>🎉 {confirmationToast}</Text>
+        <View style={styles.toastContainer} testID="app-toast-banner">
+          <Text style={styles.toastText} testID="app-toast-text">🎉 {confirmationToast}</Text>
         </View>
       )}
     </View>

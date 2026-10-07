@@ -8,11 +8,14 @@ import {
   Image,
   SafeAreaView,
   ActivityIndicator,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Resource, Slot, DayOfWeek, CoolingPeriodEligibilityResult } from '@appointments/shared';
 import {
   generateAvailableSlots,
   fetchProviderById,
+  getCachedProviderById,
   fetchBookedSlots,
   checkCoolingPeriodEligibility,
   ProviderWithDetails,
@@ -37,12 +40,15 @@ export default function ProviderDetailScreen({
   onBack,
   onProceedToHold,
 }: ProviderDetailScreenProps) {
-  const [provider, setProvider] = useState<ProviderWithDetails | null>(null);
-  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const initialCached = getCachedProviderById(providerId);
+  const [provider, setProvider] = useState<ProviderWithDetails | null>(initialCached);
+  const [selectedResource, setSelectedResource] = useState<Resource | null>(
+    initialCached?.resources && initialCached.resources.length > 0 ? initialCached.resources[0] : null
+  );
   const [selectedDateIndex, setSelectedDateIndex] = useState(0); // 0 = today, 1 = tomorrow, 2 = day after
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialCached);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
   const [checkingCooling, setCheckingCooling] = useState<boolean>(false);
@@ -58,16 +64,16 @@ export default function ProviderDetailScreen({
   useEffect(() => {
     let isMounted = true;
     async function load() {
-      setLoading(true);
-      // Always fetch real data first — real resource IDs + deposit_amount from DB
+      if (!initialCached) {
+        setLoading(true);
+      }
+      // Always fetch real data to ensure up-to-date slots and resources
       const p = await fetchProviderById(providerId);
       if (!isMounted) return;
       if (p) {
         setProvider(p);
-        if (p.resources && p.resources.length > 0) {
-          setSelectedResource(p.resources[0]);
-        }
-      } else {
+        setSelectedResource((prev) => prev || (p.resources && p.resources.length > 0 ? p.resources[0] : null));
+      } else if (!initialCached) {
         setProvider(null);
         setSelectedResource(null);
       }
@@ -128,9 +134,32 @@ export default function ProviderDetailScreen({
     }
   }, [selectedResource?.id, selectedDateIndex]);
 
-  const availableSlots = selectedResource && provider
+  useEffect(() => {
+    // If opening venue when today has zero slots left, automatically select Tomorrow
+    if (selectedResource && provider && selectedDateIndex === 0) {
+      const todaySlots = generateAvailableSlots(selectedResource, dates[0], provider, bookedSlots);
+      const hasRemainingToday = todaySlots.some((s) => {
+        const slotTime = new Date(s.start_time).getTime();
+        return slotTime > Date.now() + 2 * 60 * 1000 && s.is_available;
+      });
+      if (todaySlots.length > 0 && !hasRemainingToday && dates.length > 1) {
+        setSelectedDateIndex(1);
+      }
+    }
+  }, [selectedResource?.id, provider?.id]);
+
+  const rawSlots = selectedResource && provider
     ? generateAvailableSlots(selectedResource, dates[selectedDateIndex], provider, bookedSlots)
     : [];
+
+  const isToday = selectedDateIndex === 0;
+  // For today, only display slots that haven't passed yet, so user immediately sees upcoming bookable slots!
+  const availableSlots = isToday
+    ? rawSlots.filter((slot) => {
+        const slotTime = new Date(slot.start_time).getTime();
+        return slotTime > Date.now() + 2 * 60 * 1000;
+      })
+    : rawSlots;
 
   useEffect(() => {
     let isMounted = true;
@@ -365,16 +394,30 @@ export default function ProviderDetailScreen({
                 {provider.name} is marked closed on {selectedDateIndex === 0 ? 'today' : selectedDateIndex === 1 ? 'tomorrow' : selectedDate?.toLocaleDateString('en-IN', { weekday: 'long' })} (weekly off or holiday). Please select another date for your visit.
               </Text>
             </View>
-          ) : availableSlots.length > 0 && availableSlots.every((s) => !s.is_available) ? (
+          ) : (isToday ? availableSlots.length === 0 : (availableSlots.length > 0 && availableSlots.every((s) => !s.is_available))) ? (
             <View style={styles.closedDayBanner} testID="customer-all-slots-past-notice">
               <Text style={styles.closedDayTitle}>
-                {selectedDateIndex === 0 ? '🌙 All Slots for Today Concluded' : '🌙 All Slots for This Day Booked'}
+                {isToday ? '🌙 All Slots for Today Concluded' : '🌙 All Slots for This Day Booked'}
               </Text>
               <Text style={styles.closedDaySub}>
-                {selectedDateIndex === 0
-                  ? 'All booking slots for today have already passed. Please tap "Tomorrow" above to view available appointments.'
+                {isToday
+                  ? 'All booking slots for today have already passed. Please tap "Tomorrow" below to view available appointments.'
                   : 'All booking slots for this date are fully reserved. Please select another date for your visit.'}
               </Text>
+              {isToday && dates.length > 1 && (
+                <TouchableOpacity
+                  style={styles.viewTomorrowBtn}
+                  onPress={() => {
+                    setSlotsLoading(true);
+                    setSelectedDateIndex(1);
+                    setSelectedSlot(null);
+                  }}
+                >
+                  <Text style={styles.viewTomorrowBtnText}>
+                    View Tomorrow's Slots ({dates[1].toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}) →
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={styles.slotGrid}>
@@ -486,6 +529,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#ffffff',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
   },
   topBar: {
     flexDirection: 'row',
@@ -901,5 +945,18 @@ const styles = StyleSheet.create({
   },
   holdButtonFree: {
     backgroundColor: '#047857',
+  },
+  viewTomorrowBtn: {
+    marginTop: 12,
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  viewTomorrowBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

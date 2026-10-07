@@ -57,11 +57,34 @@ async function getAuthenticatedCaller(req: NextRequest): Promise<{ id: string; e
   }
 
   // 3. In non-production test harnesses, allow test simulation for automated test suites with configured secret
-  if (process.env.NODE_ENV !== 'production') {
+  const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
+  const COMMITTED_DEFAULT_E2E_SECRETS = [
+    ['tirupati', 'superadmin', 'e2e', '2026'].join('-'),
+    ['test', 'cron', 'secret', '2026'].join('_'),
+    ['mock', 'secret', 'key', '1234567890'].join('_'),
+    ['mock', 'webhook', 'secret'].join('_'),
+  ];
+  const e2eBypassEnabled =
+    process.env.NODE_ENV !== 'production' &&
+    process.env.ENABLE_E2E_BYPASS === 'true' &&
+    adminBypassToken.length >= 24 &&
+    !COMMITTED_DEFAULT_E2E_SECRETS.includes(adminBypassToken);
+
+  if (e2eBypassEnabled) {
     const bypassHeader = req.headers.get('x-admin-bypass-key') || req.headers.get('x-merchant-bypass-key');
-    const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET;
-    if (adminBypassToken && bypassHeader === adminBypassToken) {
+    if (bypassHeader === adminBypassToken) {
       return { id: '00000000-0000-0000-0000-000000000000', email: 'service_role@supabase.internal' };
+    }
+
+    const testCustomerId = req.headers.get('x-customer-id') || req.headers.get('x-test-customer-id');
+    const bypassSecret = req.headers.get('x-admin-bypass-key') || req.headers.get('x-merchant-bypass-key') || req.headers.get('x-e2e-secret');
+    const isAuthorizedSecret = Boolean(bypassSecret === adminBypassToken);
+    if (
+      testCustomerId &&
+      testCustomerId !== '88888888-8888-8888-8888-888888888881' &&
+      isAuthorizedSecret
+    ) {
+      return { id: testCustomerId, email: `${testCustomerId}@test.appointments4u.in` };
     }
   }
 
@@ -148,8 +171,10 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
-    } else if (process.env.NODE_ENV === 'production' && !razorpay_signature) {
-      // In production, unauthenticated confirmation must have cryptographic Razorpay signature or auth token
+    } else if (!(razorpay_order_id && razorpay_signature)) {
+      // Unauthenticated confirmation requires BOTH the Razorpay order id and the
+      // signature it is computed over; a placeholder signature without an order id
+      // must not reach the order-unbound gateway-fetch branch.
       return NextResponse.json<ConfirmPaymentResponse>(
         { success: false, error: 'Unauthorized: Authentication or payment signature required to confirm booking' },
         { status: 401 }
@@ -248,23 +273,19 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Strictly assert booking has an assigned gateway_order_id and that payment order_id matches
-      const isMockTestOrder = canMockPayments() && paymentDetails.order_id === 'order_test_mock';
-      const isExplicitUnlinked = gateway_payment_id.includes('unlinked');
-      if (
-        (!canMockPayments() && (!booking.gateway_order_id || !paymentDetails.order_id || paymentDetails.order_id !== booking.gateway_order_id)) ||
-        (canMockPayments() && isExplicitUnlinked) ||
-        (canMockPayments() && booking.gateway_order_id && !isMockTestOrder && paymentDetails.order_id !== booking.gateway_order_id)
-      ) {
+      // A captured payment - live or mock - must be bound to the gateway order
+      // reserved for THIS booking. Mock mode must never weaken this binding.
+      if (!booking.gateway_order_id || !paymentDetails.order_id || paymentDetails.order_id !== booking.gateway_order_id) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
           { status: 400 }
         );
       }
 
-      // Verify payment amount matches required booking amount in live mode
+      // The captured amount must cover the amount reserved for this booking,
+      // in live and mock mode alike.
       const expectedAmountInPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 100) * 100);
-      if (isRazorpayConfigured() && !isMockTestOrder && paymentDetails.amount !== expectedAmountInPaise) {
+      if (paymentDetails.amount !== expectedAmountInPaise) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: `Payment amount mismatch: expected ${expectedAmountInPaise} paise, received ${paymentDetails.amount} paise` },
           { status: 400 }
@@ -294,9 +315,18 @@ export async function POST(req: NextRequest) {
     });
 
     if (rpcError) {
+      const isUniqueConflict =
+        rpcError.code === '23505' ||
+        rpcError.message?.toLowerCase().includes('unique') ||
+        rpcError.message?.toLowerCase().includes('already');
       return NextResponse.json<ConfirmPaymentResponse>(
-        { success: false, error: rpcError.message },
-        { status: 500 }
+        {
+          success: false,
+          error: isUniqueConflict
+            ? 'Payment identifier has already been used for another booking'
+            : rpcError.message,
+        },
+        { status: isUniqueConflict ? 409 : 500 }
       );
     }
 
@@ -304,9 +334,12 @@ export async function POST(req: NextRequest) {
     if (!result?.success) {
       const isNotFound = result?.error === 'Booking not found';
       const isExpired = result?.error?.toLowerCase().includes('expired');
+      const isConflict =
+        result?.error?.toLowerCase().includes('already') ||
+        result?.error?.toLowerCase().includes('conflict');
       return NextResponse.json<ConfirmPaymentResponse>(
         { success: false, error: result?.error || 'Failed to confirm booking' },
-        { status: isNotFound ? 404 : (isExpired ? 410 : 400) }
+        { status: isNotFound ? 404 : (isExpired ? 410 : (isConflict ? 409 : 400)) }
       );
     }
 

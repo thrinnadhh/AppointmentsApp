@@ -232,7 +232,8 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
     if (
       paymentId.startsWith('sim_') ||
       paymentId.startsWith('mock_') ||
-      paymentId.startsWith('pay_')
+      paymentId.startsWith('pay_mock_') ||
+      paymentId.startsWith('pay_test_')
     ) {
       return {
         id: paymentId,

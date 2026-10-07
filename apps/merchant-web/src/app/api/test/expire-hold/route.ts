@@ -9,7 +9,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not available in production' }, { status: 404 });
     }
 
-    // Require CRON_SECRET or admin secret
+    // Require CRON_SECRET or admin secret (rejecting committed default secrets)
+    const COMMITTED_DEFAULT_SECRETS = new Set([
+      ['tirupati', 'superadmin', 'e2e', '2026'].join('-'),
+      ['test', 'cron', 'secret', '2026'].join('_'),
+      ['mock', 'secret', 'key', '1234567890'].join('_'),
+      ['mock', 'webhook', 'secret'].join('_'),
+    ]);
+
     const cronSecret = process.env.CRON_SECRET;
     const adminSecret = process.env.ADMIN_SECRET || process.env.SUPERADMIN_E2E_TOKEN;
     const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
@@ -18,6 +25,8 @@ export async function POST(req: NextRequest) {
 
     const isCronAuthorized = Boolean(
       cronSecret &&
+      cronSecret.length >= 24 &&
+      !COMMITTED_DEFAULT_SECRETS.has(cronSecret) &&
       token &&
       token === cronSecret &&
       token.length === cronSecret.length &&
@@ -25,6 +34,8 @@ export async function POST(req: NextRequest) {
     );
     const isAdminAuthorized = Boolean(
       adminSecret &&
+      adminSecret.length >= 24 &&
+      !COMMITTED_DEFAULT_SECRETS.has(adminSecret) &&
       token &&
       token.length === adminSecret.length &&
       crypto.timingSafeEqual(Buffer.from(token), Buffer.from(adminSecret))

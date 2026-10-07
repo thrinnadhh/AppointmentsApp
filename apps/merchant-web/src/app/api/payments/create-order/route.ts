@@ -9,12 +9,14 @@ export async function POST(req: NextRequest) {
   try {
     // 1. IP rate limiting (30 requests/minute)
     const clientIp = getClientIp(req);
-    const rateLimit = await checkRateLimit(`order-ip:${clientIp}`, 30, 60);
-    if (!rateLimit.allowed) {
-      return NextResponse.json<CreateRazorpayOrderResponse>(
-        { success: false, error: 'Too many order requests. Please wait a minute.' },
-        { status: 429 }
-      );
+    if (clientIp) {
+      const rateLimit = await checkRateLimit(`order-ip:${clientIp}`, 30, 60);
+      if (!rateLimit.allowed) {
+        return NextResponse.json<CreateRazorpayOrderResponse>(
+          { success: false, error: 'Too many order requests. Please wait a minute.' },
+          { status: 429 }
+        );
+      }
     }
 
     const body = (await req.json()) as Partial<CreateRazorpayOrderRequest>;

@@ -28,6 +28,20 @@ const PUBLIC_API_ROUTES = [
   '/api/account/delete-public-request',
 ];
 
+function isPrivateIpv4(host: string): boolean {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return false;
+  const octets = match.slice(1).map((part) => Number(part));
+  if (octets.some((octet) => octet > 255)) return false;
+  const [first, second] = octets;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 192 && second === 168) ||
+    (first === 172 && second >= 16 && second <= 31)
+  );
+}
+
 export function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
   try {
@@ -39,8 +53,7 @@ export function isAllowedOrigin(origin: string | null): boolean {
       if (
         host === 'localhost' ||
         host === '127.0.0.1' ||
-        host.startsWith('192.168.') ||
-        host.startsWith('10.')
+        isPrivateIpv4(host)
       ) {
         return true;
       }
@@ -108,10 +121,19 @@ export function middleware(req: NextRequest) {
 
   // Non-production E2E test bypass header verification using environment variable.
   // In production, NEVER allow test header overrides under any circumstance.
+  const COMMITTED_DEFAULT_E2E_SECRETS = [
+    ['tirupati', 'superadmin', 'e2e', '2026'].join('-'),
+    ['test', 'cron', 'secret', '2026'].join('_'),
+    ['mock', 'secret', 'key', '1234567890'].join('_'),
+    ['mock', 'webhook', 'secret'].join('_'),
+  ];
   const adminBypassToken = !isProduction ? (process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET) : null;
   const isE2EBypass =
     !isProduction &&
+    process.env.ENABLE_E2E_BYPASS === 'true' &&
     Boolean(adminBypassToken) &&
+    adminBypassToken!.length >= 24 &&
+    !COMMITTED_DEFAULT_E2E_SECRETS.includes(adminBypassToken!) &&
     (req.headers.get('x-merchant-bypass-key') === adminBypassToken ||
       req.headers.get('x-admin-bypass-key') === adminBypassToken);
 
@@ -124,15 +146,30 @@ export function middleware(req: NextRequest) {
       (cookie.name.includes('sb-') && cookie.name.includes('-auth'));
     if (!isSupabaseCookie) return false;
     const val = cookie.value ? cookie.value.trim() : '';
-    return val.length > 20 && val !== 'base64-deleted';
+    if (val.length < 50 || val === 'base64-deleted') return false;
+
+    // Reject fabricated cookies: Require valid token structure (JSON with access_token or 3-part base64 JWT)
+    try {
+      let decoded = val;
+      if (val.startsWith('base64-')) {
+        decoded = Buffer.from(val.slice(7), 'base64').toString('utf8');
+      }
+      if (decoded.includes('access_token') || (decoded.startsWith('eyJ') && decoded.split('.').length >= 3)) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
   });
 
   // Check for Authorization: Bearer <jwt> header
   const authHeader = req.headers.get('authorization');
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
   const hasBearerToken = Boolean(
-    authHeader &&
-    authHeader.startsWith('Bearer ') &&
-    authHeader.replace(/^Bearer\s+/i, '').trim().length > 20
+    bearerToken &&
+    bearerToken.startsWith('eyJ') &&
+    bearerToken.split('.').length === 3
   );
 
   const isAuthenticated = hasAuthCookie || hasBearerToken;

@@ -166,6 +166,17 @@ export default function BookingPassModal({
                   </Text>
                 </View>
 
+                {/* Expected Arrival & Zero-Wait Schedule */}
+                <View style={styles.expectedTimeBox} testID="pass-expected-time">
+                  <View style={styles.expectedTimeHeader}>
+                    <Text style={styles.expectedTimeIcon}>⏱️</Text>
+                    <Text style={styles.expectedTimeTitle}>Expected Time & Zero-Wait Advice</Text>
+                  </View>
+                  <Text style={styles.expectedTimeText}>
+                    Scheduled Slot: <Text style={{ fontWeight: '700', color: '#0f172a' }}>{timeString}</Text> | Expected Arrival: <Text style={{ fontWeight: '700', color: '#0284c7' }}>10 mins prior</Text> | Est. Consultation Wait: <Text style={{ fontWeight: '700', color: '#059669' }}>0–5 mins</Text> (Zero-Wait OPD Token #{passId.slice(-3)})
+                  </Text>
+                </View>
+
                 {/* Late Arrival Grace Reminder */}
                 {booking.status === 'CONFIRMED' && (
                   <View style={styles.lateArrivalPassNote} testID="pass-late-arrival-note">
@@ -557,6 +568,33 @@ const styles = StyleSheet.create({
     color: '#15803d',
     fontSize: 12,
     fontWeight: '800',
+  },
+  expectedTimeBox: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+    marginTop: 12,
+  },
+  expectedTimeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  expectedTimeIcon: {
+    fontSize: 14,
+  },
+  expectedTimeTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0369a1',
+  },
+  expectedTimeText: {
+    fontSize: 11,
+    color: '#0c4a6e',
+    lineHeight: 16,
   },
   lateArrivalPassNote: {
     backgroundColor: '#fffbeb',

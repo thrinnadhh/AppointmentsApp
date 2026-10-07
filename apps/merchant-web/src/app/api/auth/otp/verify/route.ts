@@ -56,12 +56,14 @@ export async function POST(req: NextRequest) {
     }
 
     const ip = getClientIp(req);
-    const ipLimit = await checkRateLimit(`otp-verify-ip:${ip}`, 15, 600);
-    if (!ipLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many verification attempts from this network. Please wait 10 minutes.' },
-        { status: 429, headers: { 'Retry-After': String(ipLimit.reset - Math.floor(Date.now() / 1000)) } }
-      );
+    if (ip) {
+      const ipLimit = await checkRateLimit(`otp-verify-ip:${ip}`, 15, 600);
+      if (!ipLimit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many verification attempts from this network. Please wait 10 minutes.' },
+          { status: 429, headers: { 'Retry-After': String(ipLimit.reset - Math.floor(Date.now() / 1000)) } }
+        );
+      }
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

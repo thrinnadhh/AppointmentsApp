@@ -16,8 +16,11 @@ process.env.TEST_MERCHANT_EMAIL = process.env.TEST_MERCHANT_EMAIL || 'svims.clin
 process.env.TEST_MERCHANT_PASSWORD = process.env.TEST_MERCHANT_PASSWORD || 'SvimsClinic2026!';
 process.env.TEST_SALON_EMAIL = process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com';
 process.env.TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || 'NaturalsSalon2026!';
-process.env.ADMIN_SECRET = process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
-process.env.SUPERADMIN_E2E_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026';
+// E2E secrets must be supplied via the environment; never fall back to a
+// committed literal, which would activate the privileged bypass on any
+// deployment using the default value.
+process.env.ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+process.env.SUPERADMIN_E2E_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || '';
 process.env.ALLOW_MOCK_PAYMENTS = 'true';
 process.env.ENABLE_E2E_BYPASS = 'true';
 
@@ -55,12 +58,12 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
       env: {
-        ADMIN_SECRET: process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026',
-        SUPERADMIN_E2E_TOKEN: process.env.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026',
+        ADMIN_SECRET: process.env.ADMIN_SECRET || '',
+        SUPERADMIN_E2E_TOKEN: process.env.SUPERADMIN_E2E_TOKEN || '',
         ALLOW_MOCK_PAYMENTS: 'true',
         ENABLE_E2E_BYPASS: 'true',
         RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || 'rzp_test_51MockAppPlatform',
-        RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || 'mock_secret_key_1234567890',
+        RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || '',
       },
     },
     {
@@ -70,8 +73,8 @@ export default defineConfig({
       timeout: 120000,
       env: {
         ALLOW_MOCK_PAYMENTS: 'true',
-        ADMIN_SECRET: process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026',
-        SUPERADMIN_E2E_TOKEN: process.env.SUPERADMIN_E2E_TOKEN || 'tirupati-superadmin-e2e-2026',
+        ADMIN_SECRET: process.env.ADMIN_SECRET || '',
+        SUPERADMIN_E2E_TOKEN: process.env.SUPERADMIN_E2E_TOKEN || '',
       },
     },
   ],
@@ -89,6 +92,7 @@ export default defineConfig({
         '**/customer-app.spec.ts',
         '**/customer-reflection.spec.ts',
         '**/edge-customer.spec.ts',
+        '**/customer-hospital-full-lifecycle.spec.ts',
       ],
     },
 
@@ -101,6 +105,7 @@ export default defineConfig({
         '**/admin-merchant-integration.spec.ts',
         '**/edge-integrations.spec.ts',
         '**/flow-audit.spec.ts',
+        '**/customer-hospital-full-lifecycle.spec.ts',
       ],
       // Allow up to 2 min per test for concurrency stress cases
       timeout: 120000,

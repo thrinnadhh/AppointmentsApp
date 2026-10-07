@@ -53,14 +53,22 @@ export class CustomerAppPage {
 
   // Confirmation Toast
   readonly confirmationToast: Locator;
+  readonly toastBanner: Locator;
 
   // Profile & Auth Locators
   readonly profileBtn: Locator;
   readonly profileModalTitle: Locator;
+  readonly authNameInput: Locator;
   readonly authPhoneInput: Locator;
   readonly sendOtpBtn: Locator;
   readonly otpCodeInput: Locator;
   readonly verifyOtpBtn: Locator;
+  readonly phoneVerifiedBadge: Locator;
+  readonly authEmailInput: Locator;
+  readonly sendEmailOtpBtn: Locator;
+  readonly emailOtpCodeInput: Locator;
+  readonly verifyEmailOtpBtn: Locator;
+  readonly emailVerifiedBadge: Locator;
   readonly signOutBtn: Locator;
   readonly closeProfileBtn: Locator;
 
@@ -74,6 +82,7 @@ export class CustomerAppPage {
   readonly passModalTitle: Locator;
   readonly passQrVerification: Locator;
   readonly passRefCode: Locator;
+  readonly passExpectedTime: Locator;
   readonly passDirectionsBtn: Locator;
   readonly passSaveBtn: Locator;
   readonly passCloseBtn: Locator;
@@ -127,15 +136,23 @@ export class CustomerAppPage {
     this.emptyBookingsState = page.getByText('No Appointments Yet');
 
     // Toast
-    this.confirmationToast = page.locator('text=/Booking Confirmed/i').first();
+    this.toastBanner = page.getByTestId('app-toast-banner');
+    this.confirmationToast = page.getByTestId('app-toast-banner').or(page.locator('text=/Booking Confirmed|Appointment Confirmed/i')).first();
 
     // Profile & Auth
     this.profileBtn = page.getByRole('button', { name: 'Customer Profile' }).or(page.getByLabel('Customer Profile')).or(page.getByText('👤')).first();
     this.profileModalTitle = page.getByText(/Customer Profile & Sign In/i);
+    this.authNameInput = page.getByTestId('input-customer-name');
     this.authPhoneInput = page.getByTestId('input-phone-auth').or(page.locator('input[type="tel"]')).or(page.getByPlaceholder('+919999999991')).first();
     this.sendOtpBtn = page.getByTestId('btn-send-otp');
     this.otpCodeInput = page.getByTestId('input-otp-code');
     this.verifyOtpBtn = page.getByTestId('btn-verify-otp');
+    this.phoneVerifiedBadge = page.getByTestId('badge-phone-verified');
+    this.authEmailInput = page.getByTestId('input-email-auth');
+    this.sendEmailOtpBtn = page.getByTestId('btn-send-email-otp');
+    this.emailOtpCodeInput = page.getByTestId('input-email-otp');
+    this.verifyEmailOtpBtn = page.getByTestId('btn-verify-email-otp');
+    this.emailVerifiedBadge = page.getByTestId('badge-email-verified');
     this.signOutBtn = page.getByTestId('btn-sign-out');
     this.closeProfileBtn = page.getByLabel('Close profile modal').or(page.getByText('✕')).first();
 
@@ -149,6 +166,7 @@ export class CustomerAppPage {
     this.passModalTitle = page.getByText('Digital Booking Pass');
     this.passQrVerification = page.getByText('Scan at reception desk for check-in');
     this.passRefCode = page.getByTestId('pass-reference-code');
+    this.passExpectedTime = page.getByTestId('pass-expected-time');
     this.passDirectionsBtn = page.getByText('Directions');
     this.passSaveBtn = page.getByText('Save Pass');
     this.passCloseBtn = page.getByText('✕').first();
@@ -437,6 +455,30 @@ export class CustomerAppPage {
     await this.verifyOtpBtn.click();
 
     await expect(this.signOutBtn).toBeVisible({ timeout: 10000 });
+  }
+
+  async enterCustomerName(name: string) {
+    await this.authNameInput.scrollIntoViewIfNeeded();
+    await expect(this.authNameInput).toBeVisible({ timeout: 10000 });
+    await this.authNameInput.fill(name);
+  }
+
+  async verifyEmail(email: string = 'trinadh.patient@appointments4u.in', otp: string = '123456') {
+    if (await this.emailVerifiedBadge.isVisible().catch(() => false)) {
+      return;
+    }
+    await this.authEmailInput.scrollIntoViewIfNeeded();
+    await expect(this.authEmailInput).toBeVisible({ timeout: 10000 });
+    await this.authEmailInput.fill(email);
+    await expect(this.sendEmailOtpBtn).toBeVisible();
+    await this.sendEmailOtpBtn.click();
+
+    await expect(this.emailOtpCodeInput).toBeVisible({ timeout: 10000 });
+    await this.emailOtpCodeInput.fill(otp);
+    await expect(this.verifyEmailOtpBtn).toBeVisible();
+    await this.verifyEmailOtpBtn.click();
+
+    await expect(this.emailVerifiedBadge).toBeVisible({ timeout: 10000 });
   }
 
   async signOutCustomer() {
