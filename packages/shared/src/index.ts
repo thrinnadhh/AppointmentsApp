@@ -3,3 +3,4 @@ export * from './constants';
 export * from './database.types';
 export * from './schemas';
 export * from './privacy';
+export * from './logger';

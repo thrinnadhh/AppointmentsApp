@@ -26,6 +26,7 @@ import ProviderDetailScreen from './src/screens/ProviderDetailScreen';
 import CheckoutModal from './src/screens/CheckoutModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import {
   fetchCustomerBookingsFromSupabase,
   cancelBookingOnSupabase,
@@ -535,8 +536,9 @@ export default function App() {
   }, [handleGoBack]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
+    <ErrorBoundary>
+      <View style={styles.container}>
+        <StatusBar style="dark" />
 
       {/* Screen Router */}
       {currentScreen === 'HOME' && (
@@ -919,7 +921,8 @@ export default function App() {
           <Text style={styles.toastText} testID="app-toast-text">🎉 {confirmationToast}</Text>
         </View>
       )}
-    </View>
+      </View>
+    </ErrorBoundary>
   );
 }
 

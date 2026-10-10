@@ -40,6 +40,8 @@ export type Database = {
           customer_arrived_at: string | null
           is_followup: boolean
           followup_original_booking_id: string | null
+          queue_position: number | null
+          estimated_wait_minutes: number | null
         }
         Insert: {
           attachment_url?: string | null
@@ -62,6 +64,8 @@ export type Database = {
           customer_arrived_at?: string | null
           is_followup?: boolean
           followup_original_booking_id?: string | null
+          queue_position?: number | null
+          estimated_wait_minutes?: number | null
           resource_id: string
           slot_end: string
           slot_start: string
@@ -89,6 +93,8 @@ export type Database = {
           customer_arrived_at?: string | null
           is_followup?: boolean
           followup_original_booking_id?: string | null
+          queue_position?: number | null
+          estimated_wait_minutes?: number | null
           resource_id?: string
           slot_end?: string
           slot_start?: string

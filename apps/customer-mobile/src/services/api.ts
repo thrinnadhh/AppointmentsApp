@@ -16,6 +16,7 @@ import {
   DayOfWeek,
   CoolingPeriodEligibilityResult
 } from '@appointments/shared';
+import { mobileLogger } from './logger';
 
 declare const process: { env: Record<string, string | undefined> };
 declare const __DEV__: boolean | undefined;
@@ -552,6 +553,7 @@ export async function createHoldOnSupabase(
   } catch (networkErr: unknown) {
     const msg = networkErr instanceof Error ? networkErr.message : 'Network error';
     console.error('Backend /api/bookings/hold request failed:', networkErr);
+    mobileLogger.forComponent('MobileApi').error('Booking hold request failed', networkErr, { endpoint: '/api/bookings/hold' });
     return {
       success: false,
       error: `Unable to reserve slot: ${msg}`,
@@ -653,6 +655,7 @@ export async function confirmBookingPaymentOnSupabase(
       return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED' }];
     }
     console.error('Error confirming booking in Supabase:', err);
+    mobileLogger.forComponent('MobileApi').error('Booking confirmation failed', err, { bookingId });
     throw err;
   }
 }
@@ -815,6 +818,7 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
     return { data, isLate };
   } catch (err) {
     console.error('Error cancelling booking on Supabase:', err);
+    mobileLogger.forComponent('MobileApi').error('Booking cancellation failed', err, { bookingId });
     throw err;
   }
 }

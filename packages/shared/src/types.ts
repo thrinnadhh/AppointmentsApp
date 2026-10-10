@@ -362,3 +362,29 @@ export interface CoolingPeriodEligibilityResult {
   prior_valid_until?: string;
   reason?: string;
 }
+
+export type AppPlatform = 'web' | 'mobile' | 'backend' | 'edge';
+export type AppLogLevel = 'error' | 'warn' | 'info';
+
+export interface AppLogEntry {
+  id?: string;
+  created_at?: string;
+  platform: AppPlatform;
+  level: AppLogLevel;
+  component?: string;
+  message: string;
+  stack_trace?: string;
+  metadata?: Record<string, unknown>;
+  device_info?: Record<string, unknown>;
+  user_id?: string | null;
+  session_id?: string | null;
+}
+
+export interface AppLogsFilter {
+  platform?: AppPlatform | 'all';
+  level?: AppLogLevel | 'all';
+  component?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}

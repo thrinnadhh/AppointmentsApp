@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   MapPin,
   Building2,
@@ -33,6 +34,10 @@ import {
   Smartphone,
   Trash2,
   X,
+  Terminal,
+  ChevronDown,
+  Activity,
+  LayoutDashboard,
 } from 'lucide-react';
 import {
   CityAdminStats,
@@ -43,6 +48,7 @@ import {
   AdminMfaStatus,
   checkAdminMfaStatus,
   unenrollAdminMfaFactor,
+  AppLogEntry,
   supabase,
 } from '@/lib/supabase';
 
@@ -103,8 +109,21 @@ export default function AdminDashboardPage() {
   const [velocity, setVelocity] = useState<AdminVelocityMetrics | null>(null);
   const [merchants, setMerchants] = useState<MerchantItem[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [waitlistExpanded, setWaitlistExpanded] = useState(false);
+  const [waitlistRoleFilter, setWaitlistRoleFilter] = useState<'all' | 'customer' | 'merchant'>('all');
   const [auditLogs, setAuditLogs] = useState<AdminAuditLogEntry[]>([]);
+  const [auditLogsExpanded, setAuditLogsExpanded] = useState(false);
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
+
+  // Application & Component Observability Logs State
+  const [appLogs, setAppLogs] = useState<AppLogEntry[]>([]);
+  const [appLogsLoading, setAppLogsLoading] = useState(false);
+  const [appLogSearchQuery, setAppLogSearchQuery] = useState('');
+  const [appLogPlatformFilter, setAppLogPlatformFilter] = useState<'all' | 'web' | 'mobile' | 'backend'>('all');
+  const [appLogLevelFilter, setAppLogLevelFilter] = useState<'all' | 'error' | 'warn' | 'info'>('all');
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [purgingLogs, setPurgingLogs] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
@@ -141,12 +160,13 @@ export default function AdminDashboardPage() {
       const headers = await getAdminAuthHeaders(false);
 
       const cityParam = cityFilter !== 'all' ? `&cityId=${cityFilter}` : '';
-      const [citiesRes, velocityRes, merchantsRes, waitlistRes, auditLogsRes] = await Promise.all([
+      const [citiesRes, velocityRes, merchantsRes, waitlistRes, auditLogsRes, appLogsRes] = await Promise.all([
         fetch('/api/admin/cities', { headers }),
         fetch(`/api/admin/analytics?window=${windowFilter}${cityParam}`, { headers }),
         fetch(`/api/admin/merchants${cityFilter !== 'all' ? `?cityId=${cityFilter}` : ''}`, { headers }),
         fetch(`/api/admin/waitlist${cityFilter !== 'all' ? `?cityId=${cityFilter}` : ''}`, { headers }),
         fetch('/api/admin/audit-logs?limit=50', { headers }),
+        fetch('/api/admin/app-logs?limit=100', { headers }),
       ]);
 
       if (citiesRes.ok) {
@@ -168,6 +188,10 @@ export default function AdminDashboardPage() {
       if (auditLogsRes.ok) {
         const data = await auditLogsRes.json();
         setAuditLogs(data.logs || []);
+      }
+      if (appLogsRes.ok) {
+        const data = await appLogsRes.json();
+        setAppLogs(data.logs || []);
       }
     } catch (err) {
       console.error('Failed to load admin dashboard data:', err);
@@ -396,6 +420,54 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Handle Refresh App Logs
+  const handleRefreshAppLogs = async () => {
+    try {
+      setAppLogsLoading(true);
+      const headers = await getAdminAuthHeaders(false);
+      const params = new URLSearchParams({
+        limit: '100',
+        platform: appLogPlatformFilter,
+        level: appLogLevelFilter,
+      });
+      if (appLogSearchQuery) params.set('search', appLogSearchQuery);
+      const res = await fetch(`/api/admin/app-logs?${params.toString()}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setAppLogs(data.logs || []);
+      }
+    } catch (err) {
+      console.warn('Error refreshing app logs:', err);
+    } finally {
+      setAppLogsLoading(false);
+    }
+  };
+
+  // Handle Explicit Retention Pruning (> 30 Days)
+  const handlePurgeAppLogs = async () => {
+    if (!confirm('Are you sure you want to prune application logs older than 30 days?')) return;
+    try {
+      setPurgingLogs(true);
+      const headers = await getAdminAuthHeaders(false);
+      const res = await fetch('/api/admin/app-logs?retentionDays=30', {
+        method: 'DELETE',
+        headers,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionFeedback(`✓ Pruned ${data.deleted_count ?? 0} application log records older than 30 days.`);
+        await handleRefreshAppLogs();
+      } else {
+        setActionFeedback(`⚠️ Prune failed: ${data.error}`);
+      }
+    } catch {
+      setActionFeedback('⚠️ Failed to prune application logs.');
+    } finally {
+      setPurgingLogs(false);
+      setTimeout(() => setActionFeedback(null), 4000);
+    }
+  };
+
   // Filtered lists
   const filteredCities = cities.filter((c) =>
     c.city_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -549,6 +621,49 @@ export default function AdminDashboardPage() {
       </div>
     );
   }
+
+  // Robust Derived Aggregates (resilient to partial RPC responses)
+  const activeCitiesCount = cities.filter((c) => c.status === 'ACTIVE').length;
+  const expandingCitiesCount = cities.filter((c) => c.status === 'EXPANDING').length;
+  const plannedCitiesCount = cities.filter((c) => c.status === 'PLANNED').length;
+
+  const totalMerchantsCount = merchants.length;
+  const activeMerchantsCount = merchants.filter((m) => m.status === 'ACTIVE').length;
+  const pendingMerchantsCount = merchants.filter((m) => m.status === 'PENDING_APPROVAL').length;
+
+  const totalBookingsAll = velocity?.total_bookings ?? cities.reduce((acc, c) => acc + (c.total_bookings || 0), 0);
+  const completedBookingsAll = velocity?.completed_bookings ?? cities.reduce((acc, c) => acc + (c.completed_bookings || 0), 0);
+  const completionPercentage = totalBookingsAll > 0 
+    ? Math.round((completedBookingsAll / totalBookingsAll) * 100) 
+    : 100;
+
+  const totalDepositAmount = velocity?.gross_deposit_amount ?? cities.reduce((acc, c) => acc + (c.deposit_volume || 0), 0);
+
+  const waitlistByCity = waitlist.reduce<Record<string, number>>((acc, entry) => {
+    const cityName = entry.cities?.name || entry.city_id || 'Unknown';
+    acc[cityName] = (acc[cityName] || 0) + 1;
+    return acc;
+  }, {});
+
+  const filteredWaitlist = waitlist.filter((entry) => {
+    if (waitlistRoleFilter !== 'all' && entry.role_interest !== waitlistRoleFilter) return false;
+    return true;
+  });
+  const displayedWaitlist = waitlistExpanded ? filteredWaitlist : filteredWaitlist.slice(0, 8);
+
+  const filteredAuditLogs = auditLogs.filter((log) => {
+    if (!auditSearchQuery) return true;
+    const q = auditSearchQuery.toLowerCase();
+    return (
+      log.action.toLowerCase().includes(q) ||
+      (log.target_id && log.target_id.toLowerCase().includes(q)) ||
+      (log.target_type && log.target_type.toLowerCase().includes(q)) ||
+      (log.admin_name && log.admin_name.toLowerCase().includes(q)) ||
+      (log.admin_email && log.admin_email.toLowerCase().includes(q)) ||
+      JSON.stringify(log.details).toLowerCase().includes(q)
+    );
+  });
+  const displayedAuditLogs = auditLogsExpanded ? filteredAuditLogs : filteredAuditLogs.slice(0, 8);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
@@ -722,19 +837,16 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-3 flex items-baseline gap-2">
                 <span data-testid="admin-kpi-completed-value" className="text-2xl font-black text-slate-900 tracking-tight">
-                  {velocity?.completed_bookings ?? 0}
+                  {completedBookingsAll}
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
-                  of {velocity?.total_bookings ?? 0} total
+                  of {totalBookingsAll} total
                 </span>
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center text-xs font-bold text-emerald-600">
               <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-              {velocity && velocity.total_bookings > 0
-                ? Math.round((velocity.completed_bookings / velocity.total_bookings) * 100)
-                : 100}
-              % Completion Velocity
+              {completionPercentage}% Completion Velocity
             </div>
           </div>
 
@@ -751,15 +863,15 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-3 flex items-baseline gap-2">
                 <span className="text-2xl font-black text-slate-900 tracking-tight">
-                  {velocity?.merchant_funnel?.onboarded_count ?? 0}
+                  {activeMerchantsCount}
                 </span>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                  +{velocity?.merchant_funnel?.in_progress_count ?? 0} Pending
+                  +{pendingMerchantsCount} Pending
                 </span>
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 font-medium">
-              Total Managed: {velocity?.merchant_funnel?.total_merchants ?? 0} providers
+              Total Managed: {totalMerchantsCount} providers
             </div>
           </div>
 
@@ -777,15 +889,15 @@ export default function AdminDashboardPage() {
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 animate-pulse"></span>
-                  {velocity?.cities_overview?.active_cities ?? 0} Active
+                  {activeCitiesCount} Active
                 </span>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                  {velocity?.cities_overview?.expanding_cities ?? 0} Expanding
+                  {expandingCitiesCount} Expanding
                 </span>
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 font-medium">
-              {velocity?.cities_overview?.planned_cities ?? 0} Planned on Radar
+              {plannedCitiesCount} Planned on Radar
             </div>
           </div>
 
@@ -802,7 +914,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-3 flex items-baseline">
                 <span data-testid="admin-kpi-deposit-value" className="text-2xl font-black text-slate-900 tracking-tight">
-                  ₹{Number(velocity?.gross_deposit_amount || 0).toLocaleString('en-IN')}
+                  ₹{Number(totalDepositAmount || 0).toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
@@ -1199,7 +1311,7 @@ export default function AdminDashboardPage() {
 
         {/* SECTION 3: Expansion Demand Waitlist Leaderboard */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+          <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-500" />
@@ -1209,9 +1321,41 @@ export default function AdminDashboardPage() {
                 Inbound customer & merchant requests from non-active cities to prioritize next territory unlocks
               </p>
             </div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              {waitlist.length} Inbound Requests
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
+                {(['all', 'customer', 'merchant'] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setWaitlistRoleFilter(r)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold capitalize transition-all ${
+                      waitlistRoleFilter === r
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs font-bold text-slate-500 px-2.5 py-1 rounded-lg bg-slate-100">
+                {filteredWaitlist.length} Inbound Requests
+              </span>
+            </div>
+          </div>
+
+          {/* Territory Signals Summary Bar */}
+          <div className="px-5 py-3 bg-slate-50/75 border-b border-slate-200 flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Demand by Territory:</span>
+            {Object.entries(waitlistByCity).map(([cityName, count]) => (
+              <span
+                key={cityName}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 shadow-2xs"
+              >
+                <MapPin className="w-3 h-3 text-slate-400" />
+                <span>{cityName}:</span>
+                <strong className="text-emerald-700">{count}</strong>
+              </span>
+            ))}
           </div>
 
           <div className="overflow-x-auto">
@@ -1226,14 +1370,14 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {waitlist.length === 0 ? (
+                {displayedWaitlist.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-xs">
                       No waitlist entries yet for this territory.
                     </td>
                   </tr>
                 ) : (
-                  waitlist.map((entry) => (
+                  displayedWaitlist.map((entry) => (
                     <tr key={entry.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-4">
                         <span className="font-bold text-slate-900 uppercase">
@@ -1264,6 +1408,19 @@ export default function AdminDashboardPage() {
               </tbody>
             </table>
           </div>
+
+          {filteredWaitlist.length > 8 && (
+            <div className="p-3 bg-slate-50 border-t border-slate-200 text-center">
+              <button
+                onClick={() => setWaitlistExpanded(!waitlistExpanded)}
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-colors py-1 px-3 rounded-lg hover:bg-emerald-50"
+              >
+                {waitlistExpanded
+                  ? 'Show Top 8 Leads ↑'
+                  : `Show All ${filteredWaitlist.length} Inbound Requests ↓`}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* SECTION 4: Immutable Administrative Audit Trail & Security Ledger */}
@@ -1311,20 +1468,7 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100" data-testid="audit-log-rows">
-                {auditLogs
-                  .filter((log) => {
-                    if (!auditSearchQuery) return true;
-                    const q = auditSearchQuery.toLowerCase();
-                    return (
-                      log.action.toLowerCase().includes(q) ||
-                      (log.target_id && log.target_id.toLowerCase().includes(q)) ||
-                      (log.target_type && log.target_type.toLowerCase().includes(q)) ||
-                      (log.admin_name && log.admin_name.toLowerCase().includes(q)) ||
-                      (log.admin_email && log.admin_email.toLowerCase().includes(q)) ||
-                      JSON.stringify(log.details).toLowerCase().includes(q)
-                    );
-                  })
-                  .map((log) => {
+                {displayedAuditLogs.map((log) => {
                     const isCity = log.action.includes('CITY');
                     const isMerchant = log.action.includes('MERCHANT');
                     const actionBadgeClass = isCity
@@ -1393,7 +1537,7 @@ export default function AdminDashboardPage() {
                       </tr>
                     );
                   })}
-                {auditLogs.length === 0 && (
+                {filteredAuditLogs.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                       <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-slate-300" />
@@ -1404,6 +1548,215 @@ export default function AdminDashboardPage() {
                 )}
               </tbody>
             </table>
+          </div>
+          {filteredAuditLogs.length > 8 && (
+            <div className="p-3 bg-slate-50 border-t border-slate-200 text-center">
+              <button
+                onClick={() => setAuditLogsExpanded(!auditLogsExpanded)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
+              >
+                {auditLogsExpanded
+                  ? 'Show Recent 8 Audit Logs ↑'
+                  : `Show All ${filteredAuditLogs.length} Audit Records ↓`}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 5: Executive Observability Health & Telemetry Status */}
+        <div id="observability-logs" className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden scroll-mt-6" data-testid="admin-app-logs-section">
+          <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-600" />
+                  Application Observability & Telemetry
+                </h2>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <ShieldCheck className="w-3 h-3" />
+                  Live Ingestion
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Centralized monitoring for client crashes, API errors, and component lifecycle events across Web and Mobile.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link
+                href="/admin/logs"
+                className="inline-flex items-center px-3.5 py-1.5 rounded-xl border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
+                title="Open Dedicated Observability Console"
+              >
+                <Terminal className="w-3.5 h-3.5 mr-1.5 text-emerald-100" />
+                Dedicated Console ↗
+              </Link>
+
+              <button
+                onClick={handleRefreshAppLogs}
+                disabled={appLogsLoading}
+                className="inline-flex items-center px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                title="Refresh application telemetry"
+                data-testid="refresh-app-logs-btn"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 text-slate-500 ${appLogsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+
+              <button
+                onClick={handlePurgeAppLogs}
+                disabled={purgingLogs}
+                className="inline-flex items-center px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                title="Prune logs older than 30 days"
+                data-testid="purge-app-logs-btn"
+              >
+                <Trash2 className={`w-3.5 h-3.5 mr-1.5 text-rose-600 ${purgingLogs ? 'animate-spin' : ''}`} />
+                Prune &gt;30d
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics Grid */}
+          <div className="p-6 bg-slate-50/50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* System Health */}
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Health Status</span>
+                {appLogs.filter((l) => l.level === 'error').length === 0 ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Healthy
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                    Action Needed
+                  </span>
+                )}
+              </div>
+              <div className="text-xl font-bold text-slate-900">
+                {appLogs.filter((l) => l.level === 'error').length === 0
+                  ? 'All Systems Normal'
+                  : `${appLogs.filter((l) => l.level === 'error').length} Crash Events`}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {appLogs.filter((l) => l.level === 'error').length === 0
+                  ? 'Zero unhandled client exceptions'
+                  : 'Requires administrator triage in console'}
+              </p>
+            </div>
+
+            {/* Total Telemetry Records */}
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Events Ingested</span>
+                <Terminal className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div className="text-xl font-bold text-slate-900">
+                {appLogs.length} Records
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                30-day sliding retention buffer
+              </p>
+            </div>
+
+            {/* Platform Distribution */}
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Platforms</span>
+                <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Mobile: {appLogs.filter((l) => l.platform === 'mobile').length}
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                  Web: {appLogs.filter((l) => l.platform === 'web').length}
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  API: {appLogs.filter((l) => l.platform === 'backend').length}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Active client and server origins
+              </p>
+            </div>
+
+            {/* Dedicated Console Link */}
+            <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200 shadow-2xs flex flex-col justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">Advanced Telemetry</span>
+                <p className="text-xs text-slate-600 font-medium">
+                  Full stack traces, JSON metadata, and search filters are consolidated on the dedicated page.
+                </p>
+              </div>
+              <Link
+                href="/admin/logs"
+                className="mt-3 inline-flex items-center text-xs font-bold text-emerald-700 hover:text-emerald-900 transition-colors"
+              >
+                Go to Dedicated Console <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Recent Event Snapshot Preview */}
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Latest Telemetry Stream Snippet
+              </span>
+              <span className="text-xs text-slate-400">
+                Showing most recent 3 entries
+              </span>
+            </div>
+
+            {appLogs.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                <CheckCircle2 className="w-6 h-6 mx-auto mb-1 text-emerald-500" />
+                <p className="text-xs font-medium text-slate-600">No application telemetry entries captured yet</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {appLogs.slice(0, 3).map((log, index) => {
+                  const levelClass =
+                    log.level === 'error'
+                      ? 'bg-rose-50 border-rose-200 text-rose-700'
+                      : log.level === 'warn'
+                      ? 'bg-amber-50 border-amber-200 text-amber-700'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700';
+
+                  return (
+                    <div
+                      key={log.id || index}
+                      className="p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border font-mono ${levelClass}`}>
+                          {log.level}
+                        </span>
+                        <span className="text-[11px] font-bold font-mono text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {log.platform}:{log.component || 'Global'}
+                        </span>
+                        <span className="text-xs text-slate-800 font-medium truncate max-w-md" title={log.message}>
+                          {log.message}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 text-[11px] text-slate-400 font-mono">
+                        <span>
+                          {log.created_at ? new Date(log.created_at).toLocaleTimeString('en-IN') : 'Just now'}
+                        </span>
+                        <Link
+                          href={`/admin/logs?search=${encodeURIComponent(log.component || log.message)}`}
+                          className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                        >
+                          View Trace →
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

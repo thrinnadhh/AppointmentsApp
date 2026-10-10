@@ -26,6 +26,7 @@ const PUBLIC_API_ROUTES = [
   '/api/merchant/onboard',
   '/api/merchant/register-shop',
   '/api/account/delete-public-request',
+  '/api/logs/ingest',
 ];
 
 function isPrivateIpv4(host: string): boolean {

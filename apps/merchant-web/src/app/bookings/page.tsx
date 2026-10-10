@@ -31,6 +31,7 @@ import {
   fetchProviderResources,
   getPrescriptionSignedUrl,
   fetchBookingNotifications,
+  manageLateQueueBooking,
   MerchantBookingWithDetails,
   NotificationLog
 } from '@/lib/supabase';
@@ -62,6 +63,52 @@ export default function BookingsManagementPage() {
   const [notificationModalBooking, setNotificationModalBooking] = useState<MerchantBookingWithDetails | null>(null);
   const [bookingNotificationLogs, setBookingNotificationLogs] = useState<NotificationLog[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+
+  // Late Arrival & Buffer Queue State
+  const [lateCheckinBooking, setLateCheckinBooking] = useState<MerchantBookingWithDetails | null>(null);
+  const [lateBufferOffset, setLateBufferOffset] = useState<number>(2);
+  const [isProcessingLateQueue, setIsProcessingLateQueue] = useState(false);
+
+  const handleOpenLateCheckin = (booking: MerchantBookingWithDetails) => {
+    setLateCheckinBooking(booking);
+    setLateBufferOffset(2);
+  };
+
+  const handleConfirmLateCheckin = async () => {
+    if (!lateCheckinBooking) return;
+    setIsProcessingLateQueue(true);
+    try {
+      const res = await manageLateQueueBooking(lateCheckinBooking.id, 'CHECKIN_LATE', lateBufferOffset);
+      if (res.success) {
+        setFeedbackToast(`✓ ${lateCheckinBooking.customer_name} accommodated after ${lateBufferOffset} appointments. Token #${res.queue_position}.`);
+        setLateCheckinBooking(null);
+        await loadData();
+      } else {
+        setFeedbackToast(`⚠️ Failed: ${res.error || 'Could not update queue'}`);
+      }
+    } catch {
+      setFeedbackToast('⚠️ Error processing late check-in.');
+    } finally {
+      setIsProcessingLateQueue(false);
+      setTimeout(() => setFeedbackToast(null), 4500);
+    }
+  };
+
+  const handleMoveToStandby = async (booking: MerchantBookingWithDetails) => {
+    try {
+      const res = await manageLateQueueBooking(booking.id, 'MOVE_TO_STANDBY');
+      if (res.success) {
+        setFeedbackToast(`⏳ ${booking.customer_name} placed in Standby Queue.`);
+        await loadData();
+      } else {
+        setFeedbackToast(`⚠️ ${res.error || 'Failed to move to standby'}`);
+      }
+    } catch {
+      setFeedbackToast('⚠️ Error moving to standby.');
+    } finally {
+      setTimeout(() => setFeedbackToast(null), 4000);
+    }
+  };
 
   // Sync selected provider when active provider changes
   useEffect(() => {
@@ -615,6 +662,21 @@ export default function BookingsManagementPage() {
                           <span>📍 PRESENT</span>
                         </span>
                       )}
+                      {booking.queue_position && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                          Token #{booking.queue_position}
+                        </span>
+                      )}
+                      {booking.estimated_wait_minutes && booking.estimated_wait_minutes > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          Wait: ~{booking.estimated_wait_minutes}m
+                        </span>
+                      ) : null}
+                      {!booking.is_present && booking.status === 'CONFIRMED' && new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                          ⏳ NOT ARRIVED (STANDBY)
+                        </span>
+                      )}
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         booking.status === 'CONFIRMED'
                           ? (booking.is_present ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800')
@@ -715,8 +777,31 @@ export default function BookingsManagementPage() {
                         }`}
                       >
                         <Check className="w-3.5 h-3.5 mr-1" />
-                        {booking.is_present ? 'Admit & Complete' : 'Complete'}
+                        {booking.is_present ? 'Admit & Complete' : 'Check-In On-Time'}
                       </button>
+
+                      {/* Late Arrival +2 Buffer Action when slot has started */}
+                      {new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                        <button
+                          onClick={() => handleOpenLateCheckin(booking)}
+                          className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 transition shadow-2xs cursor-pointer"
+                          title="Patient arrived after slot time: Place after 2 member appointments and send SMS/WhatsApp notification"
+                          data-testid={`late-checkin-btn-${booking.id}`}
+                        >
+                          <Clock className="w-3.5 h-3.5 mr-1 text-amber-600" />
+                          Arrived Late (+2 Queue)
+                        </button>
+                      )}
+
+                      {!booking.is_present && new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                        <button
+                          onClick={() => handleMoveToStandby(booking)}
+                          className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition border border-slate-200 cursor-pointer"
+                          title="Move patient to Standby Queue until physical arrival"
+                        >
+                          Move to Standby
+                        </button>
+                      )}
 
                       <button
                         onClick={() => setRescheduleModalId(booking.id)}
@@ -898,6 +983,115 @@ export default function BookingsManagementPage() {
                 className="px-4 py-1.5 text-xs font-semibold bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 transition"
               >
                 {isReassigning ? 'Reassigning...' : 'Confirm Substitution'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Late Arrival Check-In & Buffer Modal */}
+      {lateCheckinBooking && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                  Late Arrival Check-In & Buffer
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Accommodate late patient fairly without disrupting on-time patients.
+                </p>
+              </div>
+              <button
+                onClick={() => setLateCheckinBooking(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4">
+              <div className="bg-amber-50/80 p-3.5 rounded-xl border border-amber-200/70 text-xs text-amber-900 space-y-1.5">
+                <div className="font-semibold text-amber-900 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  Scheduled Slot Has Passed
+                </div>
+                <div className="text-amber-800">
+                  Patient: <strong className="text-slate-900">{lateCheckinBooking.customer_name}</strong>
+                </div>
+                <div className="text-amber-800">
+                  Original Slot: <strong className="text-slate-900">{new Date(lateCheckinBooking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
+                  {lateCheckinBooking.resource_name && (
+                    <span> • Specialist: <strong className="text-slate-900">{lateCheckinBooking.resource_name}</strong></span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+                  Dynamic Queue Accommodation Rule:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[1, 2, 3].map((offset) => (
+                    <button
+                      key={offset}
+                      type="button"
+                      onClick={() => setLateBufferOffset(offset)}
+                      className={`p-2.5 rounded-xl border text-center transition ${
+                        lateBufferOffset === offset
+                          ? 'bg-amber-600 text-white border-amber-700 font-bold shadow-sm'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'
+                      }`}
+                    >
+                      <div className="text-sm">+{offset} Member{offset > 1 ? 's' : ''}</div>
+                      <div className={`text-[10px] ${lateBufferOffset === offset ? 'text-amber-100' : 'text-slate-500'}`}>
+                        {offset === 2 ? 'Standard Buffer' : `~${offset * 15}m wait`}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  Patient will be positioned after {lateBufferOffset} active consultations to ensure zero delay for punctual patients.
+                </p>
+              </div>
+
+              {/* Live Patient Message Preview */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="text-[11px] font-semibold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Automated WhatsApp / SMS Preview</span>
+                  <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Auto-dispatched</span>
+                </div>
+                <p className="text-xs text-slate-700 font-mono bg-white p-2.5 rounded-lg border border-slate-200/80 leading-relaxed">
+                  &ldquo;Hello {lateCheckinBooking.customer_name}, you arrived after your scheduled slot. You will be accommodated after {lateBufferOffset} member appointments (Estimated wait: ~{lateBufferOffset * 15} mins). Queue Token will be assigned.&rdquo;
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setLateCheckinBooking(null)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmLateCheckin}
+                disabled={isProcessingLateQueue}
+                className="px-4 py-2 text-xs font-bold bg-amber-600 text-white rounded-xl hover:bg-amber-700 disabled:opacity-50 transition flex items-center gap-1.5 shadow-sm"
+              >
+                {isProcessingLateQueue ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Assigning Queue...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Accommodate After {lateBufferOffset} Appointments
+                  </>
+                )}
               </button>
             </div>
           </div>

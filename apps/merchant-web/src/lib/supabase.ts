@@ -19,6 +19,8 @@ import {
   TimeWindowFilter,
   AdminAuditLogEntry,
   MerchantMembership,
+  AppLogEntry,
+  AppLogsFilter,
 } from '@appointments/shared';
 
 export type {
@@ -37,6 +39,8 @@ export type {
   TimeWindowFilter,
   AdminAuditLogEntry,
   MerchantMembership,
+  AppLogEntry,
+  AppLogsFilter,
 };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -103,12 +107,39 @@ export interface MerchantBookingWithDetails {
   reminder_30m_sent_at?: string | null;
   is_present?: boolean;
   customer_arrived_at?: string | null;
+  queue_position?: number | null;
+  estimated_wait_minutes?: number | null;
   customer_name?: string;
   customer_phone?: string;
   no_show_count?: number;
   resource_name?: string;
   resource_type?: string;
   provider_name?: string;
+}
+
+export async function manageLateQueueBooking(
+  bookingId: string, 
+  action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE', 
+  bufferOffset = 2
+): Promise<{
+  success: boolean;
+  queue_position?: number;
+  estimated_wait_minutes?: number;
+  queue_notice?: string;
+  message?: string;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/bookings/late-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: bookingId, action, buffer_offset: bufferOffset }),
+    });
+    return await res.json();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Network error';
+    return { success: false, error: msg };
+  }
 }
 
 export async function fetchAllProviders(): Promise<(Provider & { resources: Resource[] })[]> {
@@ -1060,6 +1091,71 @@ export async function unenrollAdminMfaFactor(factorId: string): Promise<{ succes
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Failed to unenroll MFA factor' };
+  }
+}
+
+/**
+ * Fetch application system & component logs for administrators with filtering.
+ */
+export async function fetchAdminAppLogs(
+  filter: AppLogsFilter = {}
+): Promise<AppLogEntry[]> {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
+      .from('app_logs' as any)
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (filter.level && filter.level !== 'all') {
+      query = query.eq('level', filter.level);
+    }
+    if (filter.platform && filter.platform !== 'all') {
+      query = query.eq('platform', filter.platform);
+    }
+    if (filter.component && filter.component.trim()) {
+      query = query.ilike('component', `%${filter.component.trim()}%`);
+    }
+    if (filter.search && filter.search.trim()) {
+      query = query.or(`message.ilike.%${filter.search.trim()}%,component.ilike.%${filter.search.trim()}%`);
+    }
+
+    const limit = Math.min(Math.max(filter.limit || 50, 1), 200);
+    const offset = Math.max(filter.offset || 0, 0);
+
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn('Error fetching app logs:', error.message);
+      return [];
+    }
+
+    return (data || []) as unknown as AppLogEntry[];
+  } catch (err) {
+    console.warn('Error in fetchAdminAppLogs:', err);
+    return [];
+  }
+}
+
+/**
+ * Explicit admin purge of application logs older than retention period.
+ */
+export async function purgeAdminAppLogs(
+  retentionDays: number = 30
+): Promise<{ count: number; error?: string }> {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await (supabaseAdmin.rpc as any)('purge_old_app_logs', {
+      p_retention_days: retentionDays,
+    });
+
+    if (error) {
+      return { count: 0, error: error.message };
+    }
+    return { count: typeof data === 'number' ? data : 0 };
+  } catch (err) {
+    return { count: 0, error: err instanceof Error ? err.message : 'Failed to purge logs' };
   }
 }
 

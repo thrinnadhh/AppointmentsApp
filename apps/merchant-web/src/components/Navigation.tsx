@@ -19,7 +19,8 @@ import {
   Scissors,
   Stethoscope,
   Gamepad2,
-  Utensils
+  Utensils,
+  Terminal
 } from 'lucide-react';
 import { supabase, getCurrentUserProfile, signOutMerchant } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
@@ -89,16 +90,29 @@ export default function Navigation() {
     ? Utensils
     : Stethoscope;
 
-  const navItems = [
-    { href: '/', label: 'Overview', icon: LayoutDashboard },
-    ...(isSuperAdmin ? [{ href: '/admin', label: 'Platform Admin', icon: ShieldCheck }] : []),
-    { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },
-    { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users },
-    { href: '/bookings', label: 'Bookings', icon: CalendarDays },
-    { href: '/schedule', label: 'Schedule', icon: Clock },
-    { href: '/team', label: 'Team', icon: UserCheck },
-    { href: '/settings', label: 'Settings', icon: Settings },
-  ];
+  const isAdminRoute = pathname.startsWith('/admin');
+
+  const navItems = isAdminRoute
+    ? [
+        { href: '/admin', label: 'Admin Hub', icon: ShieldCheck },
+        { href: '/admin/logs', label: 'System Logs', icon: Terminal },
+        { href: '/', label: 'Merchant App', icon: LayoutDashboard },
+      ]
+    : [
+        { href: '/', label: 'Overview', icon: LayoutDashboard },
+        ...(isSuperAdmin || currentUser?.role === 'admin'
+          ? [
+              { href: '/admin', label: 'Platform Admin', icon: ShieldCheck },
+              { href: '/admin/logs', label: 'System Logs', icon: Terminal },
+            ]
+          : []),
+        { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },
+        { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users },
+        { href: '/bookings', label: 'Bookings', icon: CalendarDays },
+        { href: '/schedule', label: 'Schedule', icon: Clock },
+        { href: '/team', label: 'Team', icon: UserCheck },
+        { href: '/settings', label: 'Settings', icon: Settings },
+      ];
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname.startsWith('/admin/login');
 
@@ -137,6 +151,10 @@ export default function Navigation() {
               </div>
             </Link>
             <div className="flex items-center gap-2">
+              <Link href="/admin/login" className="btn btn-ghost" style={{ fontSize: 12, padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <ShieldCheck style={{ width: 13, height: 13 }} />
+                Admin
+              </Link>
               <Link href="/login?mode=register" className="btn btn-primary" style={{ fontSize: 12, padding: '7px 14px' }}>
                 Register Venue
               </Link>
@@ -150,7 +168,7 @@ export default function Navigation() {
     );
   }
 
-  const hasPortalAccess = Boolean(currentUser && (activeProvider || isSuperAdmin));
+  const hasPortalAccess = Boolean(currentUser && (activeProvider || isSuperAdmin || currentUser?.role === 'admin'));
   const userInitials = currentUser?.fullName ? currentUser.fullName.substring(0, 2).toUpperCase() : 'ME';
 
   return (
@@ -159,12 +177,12 @@ export default function Navigation() {
         <div className="flex justify-between items-center" style={{ height: 60 }}>
 
           {/* Brand */}
-          <Link href="/" className="flex items-center gap-3 group" style={{ textDecoration: 'none' }}>
+          <Link href={isAdminRoute ? "/admin" : "/"} className="flex items-center gap-3 group" style={{ textDecoration: 'none' }}>
             {logoMark}
             <div>
               <div className="flex items-center gap-2">
                 <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-ink)', letterSpacing: '-0.02em' }}>
-                  Tirupati Merchant Hub
+                  {isAdminRoute ? 'Platform Administration' : 'Tirupati Merchant Hub'}
                 </span>
                 {hasPortalAccess && (
                   <span style={{
@@ -181,16 +199,16 @@ export default function Navigation() {
                     letterSpacing: '0.01em',
                   }}>
                     <ShieldCheck style={{ width: 10, height: 10 }} />
-                    Verified
+                    {isAdminRoute ? 'Super Admin' : 'Verified'}
                   </span>
                 )}
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-tertiary)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
                 <Activity style={{ width: 10, height: 10, color: 'var(--color-primary)', flexShrink: 0 }} className="animate-pulse" />
                 <span style={{ fontWeight: 500, color: 'var(--color-ink-secondary)', fontSize: 11 }}>
-                  {activeProvider?.name || 'Private Merchant Space'}
+                  {isAdminRoute ? 'Central Regional Operations Hub' : (activeProvider?.name || 'Private Merchant Space')}
                 </span>
-                {activeProvider && (
+                {!isAdminRoute && activeProvider && (
                   <span style={{ fontSize: 10, color: 'var(--color-primary)', background: 'var(--color-primary-light)', padding: '1px 6px', borderRadius: 99 }}>
                     {verticalConfig.badgeLabel}
                   </span>
@@ -292,6 +310,10 @@ export default function Navigation() {
               </div>
             ) : (
               <div className="flex items-center" style={{ gap: 8 }}>
+                <Link href="/admin/login" className="btn btn-ghost" style={{ fontSize: 12, padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <ShieldCheck style={{ width: 13, height: 13 }} />
+                  Admin
+                </Link>
                 <Link href="/login?mode=register" className="btn btn-primary" style={{ fontSize: 12, padding: '7px 14px' }}>
                   Register Venue
                 </Link>
