@@ -1331,14 +1331,55 @@ export default function MerchantOverviewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left 2 Cols: Live Bookings Queue */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">Today&apos;s Live Appointments</h2>
-              <p className="text-xs text-slate-500">Real-time status updates from Supabase queue</p>
+          {/* Queue Header & Live Status Metrics */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                  <span>🏥 Today&apos;s Hospital Live Queue</span>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    Tokens #1 to #{todaysBookings.length || 0}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500">Live hospital OPD roster with presence color states &amp; late queue tracking</p>
+              </div>
+              <span className="text-xs font-semibold text-slate-500 self-start sm:self-center">
+                Total: {todaysBookings.length} appointments
+              </span>
             </div>
-            <span className="text-xs font-medium text-slate-500">
-              Showing {todaysBookings.length} of {bookings.length} reservations today
-            </span>
+
+            {/* Quick Metrics Bar: Green, Red, Amber */}
+            <div className="grid grid-cols-3 gap-2.5 pt-1">
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="text-[11px] font-bold">Present &amp; Ready</span>
+                </div>
+                <span className="text-sm font-black font-mono">
+                  {todaysBookings.filter((b) => b.is_present || b.status === 'CHECKED_IN').length}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                  <span className="text-[11px] font-bold">Not Present</span>
+                </div>
+                <span className="text-sm font-black font-mono">
+                  {todaysBookings.filter((b) => !b.is_present && b.status !== 'CHECKED_IN' && !b.queue_position).length}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                  <span className="text-[11px] font-bold">Late Comers Queue</span>
+                </div>
+                <span className="text-sm font-black font-mono">
+                  {todaysBookings.filter((b) => Boolean(b.queue_position)).length}
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -1347,10 +1388,11 @@ export default function MerchantOverviewPage() {
                 No active bookings found for this venue today.
               </div>
             ) : (
-              todaysBookings.map((booking) => {
+              todaysBookings.map((booking, index) => {
                 const startTime = new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const endTime = new Date(booking.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const isPresent = Boolean(booking.is_present || booking.status === 'CHECKED_IN');
+                const isLateQueue = Boolean(booking.queue_position);
 
                 return (
                   <div 
@@ -1360,51 +1402,67 @@ export default function MerchantOverviewPage() {
                     className={`rounded-2xl p-5 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                       isPresent
                         ? 'bg-emerald-50/90 border-2 border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
-                        : 'bg-white border border-slate-200 shadow-xs hover:shadow-md'
+                        : isLateQueue
+                        ? 'bg-amber-50/90 border-2 border-amber-400 shadow-sm ring-1 ring-amber-300/40'
+                        : 'bg-rose-50/60 border-2 border-rose-300 shadow-xs hover:shadow-md ring-1 ring-rose-200/50'
                     }`}
                   >
                     <div className="flex items-start gap-3">
+                      {/* Sequential Token # Badge */}
+                      <div className={`flex flex-col items-center justify-center min-w-[54px] px-2.5 py-1.5 rounded-xl border font-mono font-bold text-center shrink-0 shadow-2xs ${
+                        isPresent
+                          ? 'bg-emerald-100/90 border-emerald-400 text-emerald-950'
+                          : isLateQueue
+                          ? 'bg-amber-100/90 border-amber-400 text-amber-950'
+                          : 'bg-rose-100/90 border-rose-300 text-rose-950'
+                      }`}>
+                        <span className="text-[9px] uppercase tracking-wider font-extrabold opacity-75">TOKEN</span>
+                        <span className="text-sm font-black">
+                          {isLateQueue ? `#L${booking.queue_position}` : `#${index + 1}`}
+                        </span>
+                      </div>
+
                       <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 transition-colors ${
                         isPresent 
                           ? 'bg-emerald-200 text-emerald-900 ring-2 ring-emerald-400' 
-                          : 'bg-slate-100 text-slate-600'
+                          : isLateQueue
+                          ? 'bg-amber-200 text-amber-900 ring-2 ring-amber-400'
+                          : 'bg-rose-200 text-rose-900 ring-2 ring-rose-300'
                       }`}>
                         <User className="w-5 h-5" />
                       </div>
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="font-semibold text-slate-900 text-sm">{booking.customer_name}</h4>
-                          {isPresent && (
+                          {isPresent ? (
                             <span 
                               data-testid={`present-badge-${booking.id}`}
                               className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs"
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                              <span>📍 PRESENT</span>
+                              <span>✓ PRESENT &amp; READY</span>
                             </span>
-                          )}
-                          {booking.queue_position ? (
+                          ) : isLateQueue ? (
                             <span 
-                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300"
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-950 border border-amber-400"
                               title="Accommodated after 2 member appointments due to late arrival"
                             >
-                              <Clock className="w-3 h-3 text-amber-700" />
-                              <span>LATE TURN #{booking.queue_position} {booking.estimated_wait_minutes ? `(~${booking.estimated_wait_minutes}m wait)` : ''}</span>
+                              <Clock className="w-3 h-3 text-amber-800" />
+                              <span>⏰ LATE COMERS QUEUE (Turn #{booking.queue_position}) {booking.estimated_wait_minutes ? `(~${booking.estimated_wait_minutes}m wait)` : ''}</span>
                             </span>
-                          ) : null}
-                          {!isPresent && new Date(booking.slot_start).getTime() < Date.now() && booking.status === 'CONFIRMED' && !booking.queue_position && (
+                          ) : (
                             <span 
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
-                              title="Patient has not yet arrived for their slot"
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-200 text-rose-950 border border-rose-300"
+                              title="Customer has not yet arrived or given code"
                             >
-                              <span>⏳ STANDBY (NOT ARRIVED)</span>
+                              <span>✕ NOT PRESENT (AWAITING ARRIVAL)</span>
                             </span>
                           )}
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             booking.status === 'CHECKED_IN'
                               ? 'bg-emerald-600 text-white font-extrabold' :
                             booking.status === 'CONFIRMED' 
-                              ? (isPresent ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800') :
+                              ? (isPresent ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-slate-200 text-slate-800') :
                             booking.status === 'HELD' ? 'bg-amber-100 text-amber-800' :
                             booking.status === 'COMPLETED' ? 'bg-teal-100 text-teal-800' :
                             'bg-slate-100 text-slate-700'

@@ -19,7 +19,13 @@ import {
   User,
   MapPin,
   ChevronRight,
-  Check
+  Check,
+  Building2,
+  Users,
+  Activity,
+  CalendarDays,
+  Flame,
+  ArrowUpRight
 } from 'lucide-react';
 import {
   supabase,
@@ -30,6 +36,18 @@ import {
   Provider
 } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+
+export interface HospitalQueueToken {
+  tokenNumber: number;
+  patientName: string;
+  slotTime: string;
+  expectedTime: string;
+  status: 'COMPLETED' | 'IN_CONSULTATION' | 'PRESENT_READY' | 'NOT_PRESENT' | 'LATE_QUEUE';
+  code?: string;
+  isCurrentCustomer?: boolean;
+  lateTurnNumber?: number;
+  estimatedWaitMinutes?: number;
+}
 
 interface DemoBookingState {
   id: string;
@@ -49,15 +67,81 @@ interface DemoBookingState {
   estimated_wait_minutes: number | null;
 }
 
+const INITIAL_TRINADH_HOSPITAL_QUEUE: HospitalQueueToken[] = [
+  {
+    tokenNumber: 1,
+    patientName: 'Suresh Babu',
+    slotTime: '09:00 - 09:15',
+    expectedTime: '09:00 AM',
+    status: 'COMPLETED',
+  },
+  {
+    tokenNumber: 2,
+    patientName: 'Lakshmi Devi',
+    slotTime: '09:15 - 09:30',
+    expectedTime: '09:15 AM',
+    status: 'IN_CONSULTATION',
+  },
+  {
+    tokenNumber: 3,
+    patientName: 'Rajesh Sharma',
+    slotTime: '09:30 - 09:45',
+    expectedTime: '09:30 AM',
+    status: 'PRESENT_READY',
+  },
+  {
+    tokenNumber: 4,
+    patientName: 'Venkatesh Rao (You)',
+    slotTime: '09:45 - 10:00',
+    expectedTime: '09:45 AM',
+    status: 'NOT_PRESENT', // Starts RED (Not present) until code is given to reception
+    code: '4821',
+    isCurrentCustomer: true,
+    estimatedWaitMinutes: 15,
+  },
+  {
+    tokenNumber: 5,
+    patientName: 'Priya Nair',
+    slotTime: '10:00 - 10:15',
+    expectedTime: '10:00 AM',
+    status: 'NOT_PRESENT',
+    estimatedWaitMinutes: 30,
+  },
+  {
+    tokenNumber: 6,
+    patientName: 'Anand Mohan',
+    slotTime: '10:15 - 10:30',
+    expectedTime: '10:15 AM',
+    status: 'NOT_PRESENT',
+    estimatedWaitMinutes: 45,
+  },
+  {
+    tokenNumber: 7,
+    patientName: 'Haritha P.',
+    slotTime: '10:30 - 10:45',
+    expectedTime: '10:30 AM',
+    status: 'NOT_PRESENT',
+    estimatedWaitMinutes: 60,
+  },
+  {
+    tokenNumber: 8,
+    patientName: 'Subba Rao',
+    slotTime: '10:45 - 11:00',
+    expectedTime: '10:45 AM',
+    status: 'NOT_PRESENT',
+    estimatedWaitMinutes: 75,
+  },
+];
+
 const DEFAULT_SAMPLE_BOOKINGS: DemoBookingState[] = [
   {
     id: 'demo-booking-001',
-    reference_code: 'TPT-DENT-841',
+    reference_code: 'TNH-CARD-04',
     customer_name: 'Venkatesh Rao',
     customer_phone: '+91 98490 12345',
-    provider_name: 'Sri Venkateswara Dental Care',
-    resource_name: 'Dr. R. K. Sharma (Dental Surgeon)',
-    slot_start: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 mins ago (late arrival scenario)
+    provider_name: 'Trinadh Multi-Speciality Hospital',
+    resource_name: 'Dr. K. Trinadh (Chief Physician & Cardiologist)',
+    slot_start: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
     slot_end: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     status: 'CONFIRMED',
     is_present: false,
@@ -65,16 +149,16 @@ const DEFAULT_SAMPLE_BOOKINGS: DemoBookingState[] = [
     checked_in_method: null,
     checkin_code: '4821',
     queue_position: null,
-    estimated_wait_minutes: null,
+    estimated_wait_minutes: 15,
   },
   {
     id: 'demo-booking-002',
-    reference_code: 'TPT-CLIN-392',
+    reference_code: 'TNH-DENT-02',
     customer_name: 'Ananya Reddy',
     customer_phone: '+91 97012 34567',
-    provider_name: 'Tirupati Health City Clinic',
-    resource_name: 'Dr. S. P. V. Raman (Cardiologist)',
-    slot_start: new Date(Date.now() + 20 * 60 * 1000).toISOString(), // in 20 mins (on-time)
+    provider_name: 'Trinadh Multi-Speciality Hospital',
+    resource_name: 'Dr. S. P. V. Raman (Dental Surgeon)',
+    slot_start: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
     slot_end: new Date(Date.now() + 50 * 60 * 1000).toISOString(),
     status: 'CONFIRMED',
     is_present: false,
@@ -82,7 +166,7 @@ const DEFAULT_SAMPLE_BOOKINGS: DemoBookingState[] = [
     checked_in_method: null,
     checkin_code: '7194',
     queue_position: null,
-    estimated_wait_minutes: null,
+    estimated_wait_minutes: 25,
   },
   {
     id: 'demo-booking-003',
@@ -91,7 +175,7 @@ const DEFAULT_SAMPLE_BOOKINGS: DemoBookingState[] = [
     customer_phone: '+91 94401 98765',
     provider_name: 'Royal Looks Salon Tirupati',
     resource_name: 'Styling Station 2 (Senior Stylist)',
-    slot_start: new Date(Date.now() - 40 * 60 * 1000).toISOString(), // 40 mins ago
+    slot_start: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
     slot_end: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
     status: 'CONFIRMED',
     is_present: false,
@@ -99,7 +183,7 @@ const DEFAULT_SAMPLE_BOOKINGS: DemoBookingState[] = [
     checked_in_method: null,
     checkin_code: '9033',
     queue_position: null,
-    estimated_wait_minutes: null,
+    estimated_wait_minutes: 30,
   },
 ];
 
@@ -108,8 +192,26 @@ export default function InteractiveDemoPage() {
 
   const [booking, setBooking] = useState<DemoBookingState>(DEFAULT_SAMPLE_BOOKINGS[0]);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [isSimulatingLiveDb, setIsSimulatingLiveDb] = useState(false);
-  const [realLiveBookings, setRealLiveBookings] = useState<MerchantBookingWithDetails[]>([]);
+  const [mobileActiveTab, setMobileActiveTab] = useState<'pass' | 'queue'>('pass');
+
+  // Hospital Live OPD Queue State (Tokens #1 to #N)
+  const [hospitalQueue, setHospitalQueue] = useState<HospitalQueueToken[]>(INITIAL_TRINADH_HOSPITAL_QUEUE);
+  const [lateComersQueue, setLateComersQueue] = useState<Array<{
+    turnNumber: number;
+    patientName: string;
+    originalSlot: string;
+    expectedWait: string;
+    code: string;
+    isCurrentCustomer?: boolean;
+  }>>([
+    {
+      turnNumber: 12,
+      patientName: 'Ramesh Varma',
+      originalSlot: '08:45 AM',
+      expectedWait: '~25 mins wait',
+      code: '3109',
+    },
+  ]);
 
   // Reception Desk Input State
   const [codeInput, setCodeInput] = useState('');
@@ -125,7 +227,7 @@ export default function InteractiveDemoPage() {
 
   // Telemetry log events
   const [eventLogs, setEventLogs] = useState<Array<{ id: string; time: string; text: string; type: 'info' | 'success' | 'warn' }>>([
-    { id: '1', time: new Date().toLocaleTimeString(), text: 'Interactive Sandbox Initialized with sample booking #TPT-DENT-841', type: 'info' },
+    { id: '1', time: new Date().toLocaleTimeString(), text: 'Trinadh Hospital OPD Live Queue Initialized (Tokens #1 to #8)', type: 'info' },
   ]);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -133,30 +235,9 @@ export default function InteractiveDemoPage() {
   const addLog = (text: string, type: 'info' | 'success' | 'warn' = 'info') => {
     setEventLogs((prev) => [
       { id: Math.random().toString(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), text, type },
-      ...prev.slice(0, 19),
+      ...prev.slice(0, 24),
     ]);
   };
-
-  // Fetch real live bookings from Supabase if user wants to test actual DB data
-  useEffect(() => {
-    async function loadLiveBookings() {
-      if (!activeProvider?.id) return;
-      try {
-        const { data } = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('provider_id', activeProvider.id)
-          .eq('status', 'CONFIRMED')
-          .limit(10);
-        if (data && data.length > 0) {
-          setRealLiveBookings(data as any);
-        }
-      } catch (err) {
-        console.warn('Could not load live bookings for demo picker:', err);
-      }
-    }
-    loadLiveBookings();
-  }, [activeProvider?.id]);
 
   // Handle Copy Code from Customer Pass
   const handleCopyCode = () => {
@@ -184,55 +265,20 @@ export default function InteractiveDemoPage() {
     setVerifyError(null);
     setVerifySuccess(null);
 
-    // If testing against real database ID
-    if (isSimulatingLiveDb && activeProvider?.id) {
-      try {
-        const res = await verifyCheckinCodeRpc(activeProvider.id, code);
-        if (res.success) {
-          const nowStr = res.checked_in_at || new Date().toISOString();
-          setBooking((prev) => ({
-            ...prev,
-            status: 'CHECKED_IN',
-            is_present: true,
-            checked_in_at: nowStr,
-            checked_in_method: 'code',
-          }));
-          setVerifySuccess({
-            patient_name: res.patient_name || booking.customer_name,
-            slot_time: res.slot_time || formatTime(booking.slot_start),
-            is_late: res.is_late,
-            checked_in_at: nowStr,
-            message: 'Live database confirmed check-in!',
-          });
-          setCodeInput('');
-          addLog(`✓ Supabase verified check-in code ${code} for ${res.patient_name || 'Patient'}`, 'success');
-        } else {
-          setVerifyError(res.message || 'Invalid check-in code');
-          addLog(`❌ Check-in failed: ${res.message || res.error}`, 'warn');
-        }
-      } catch (err) {
-        setVerifyError(err instanceof Error ? err.message : 'Verification failed');
-      } finally {
-        setIsVerifying(false);
-      }
-      return;
-    }
-
-    // Local Simulator Verification
     setTimeout(() => {
       setIsVerifying(false);
-      if (code === booking.checkin_code) {
-        if (booking.status === 'CHECKED_IN') {
-          setVerifyError('This appointment is already checked in.');
+
+      if (code === booking.checkin_code || code === '4821') {
+        if (booking.status === 'CHECKED_IN' && booking.is_present) {
+          setVerifyError('This patient is already verified and present.');
           addLog(`Attempted check-in on already verified booking`, 'warn');
           return;
         }
 
-        const slotTime = new Date(booking.slot_start).getTime();
-        const nowTime = Date.now();
-        const isLate = nowTime > slotTime + 10 * 60 * 1000;
         const nowStr = new Date().toISOString();
+        const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+        // Flip booking state to CHECKED_IN (GREEN)
         setBooking((prev) => ({
           ...prev,
           status: 'CHECKED_IN',
@@ -241,25 +287,36 @@ export default function InteractiveDemoPage() {
           checked_in_method: 'code',
         }));
 
+        // Flip Token #4 on Hospital Queue from RED to GREEN!
+        setHospitalQueue((prev) =>
+          prev.map((tok) =>
+            tok.tokenNumber === 4
+              ? {
+                  ...tok,
+                  status: 'PRESENT_READY',
+                }
+              : tok
+          )
+        );
+
         setVerifySuccess({
           patient_name: booking.customer_name,
           slot_time: formatTime(booking.slot_start),
-          is_late: isLate,
+          is_late: false,
           checked_in_at: nowStr,
-          message: 'Code matched! Customer marked as present.',
+          message: 'Code 4821 verified! Token #4 turned GREEN (Present & Ready in Lobby).',
         });
 
-        setCodeInput('');
-        addLog(`✓ Reception verified OTP ${code} for ${booking.customer_name} (${isLate ? 'Late arrival >10m' : 'On-time'})`, 'success');
+        addLog(`✓ Reception verified OTP ${code} for ${booking.customer_name} — Token #4 turned GREEN (Present & Ready)!`, 'success');
       } else {
-        setVerifyError('Invalid check-in code. Please verify the code on customer pass.');
-        addLog(`❌ Staff entered incorrect OTP: ${code}`, 'warn');
+        setVerifyError('Invalid check-in code. Please verify the code on the customer pass.');
+        addLog(`❌ Check-in rejected: Code ${code} does not match active booking`, 'warn');
       }
-    }, 400);
+    }, 350);
   };
 
-  // Handle Manual Reception Fallback
-  const handleManualCheckIn = () => {
+  // Handle Manual Fallback (Dead Phone)
+  const handleMarkPresentManual = () => {
     const nowStr = new Date().toISOString();
     setBooking((prev) => ({
       ...prev,
@@ -268,73 +325,68 @@ export default function InteractiveDemoPage() {
       checked_in_at: nowStr,
       checked_in_method: 'manual',
     }));
+
+    setHospitalQueue((prev) =>
+      prev.map((tok) =>
+        tok.tokenNumber === 4
+          ? {
+              ...tok,
+              status: 'PRESENT_READY',
+            }
+          : tok
+      )
+    );
+
     setVerifySuccess({
       patient_name: booking.customer_name,
       slot_time: formatTime(booking.slot_start),
       is_late: false,
       checked_in_at: nowStr,
-      message: 'Emergency manual check-in recorded (Customer phone was dead/offline)',
+      message: 'Patient marked present manually (Offline / Dead phone fallback).',
     });
-    addLog(`Staff marked present manually (bypassed OTP for dead phone)`, 'info');
+
+    addLog(`Staff marked ${booking.customer_name} present manually — Token #4 turned GREEN!`, 'success');
   };
 
-  // Handle Customer "I've Reached" Button
-  const handleCustomerSayReached = () => {
-    const nowStr = new Date().toISOString();
-    const isLate = new Date().getTime() > new Date(booking.slot_start).getTime() + 5 * 60 * 1000;
-    
-    if (isLate) {
-      const assignedToken = 12; // Ongoing #10 + 2 buffer
-      const waitMins = 30;
-      setBooking((prev) => ({
+  // Handle Throw into Late Comers Queue (+2 Rule)
+  const handleThrowToLateQueue = (customTurn = 14) => {
+    setBooking((prev) => ({
+      ...prev,
+      queue_position: customTurn,
+      estimated_wait_minutes: 35,
+    }));
+
+    // Update hospital queue state
+    setHospitalQueue((prev) =>
+      prev.map((tok) =>
+        tok.tokenNumber === 4
+          ? {
+              ...tok,
+              status: 'LATE_QUEUE',
+              lateTurnNumber: customTurn,
+              estimatedWaitMinutes: 35,
+            }
+          : tok
+      )
+    );
+
+    // Add to late comers list if not present
+    setLateComersQueue((prev) => {
+      if (prev.some((l) => l.isCurrentCustomer)) return prev;
+      return [
         ...prev,
-        is_present: true,
-        customer_arrived_at: nowStr,
-        queue_position: assignedToken,
-        estimated_wait_minutes: waitMins,
-      }));
-      addLog(`Patient tapped "I've Reached" late. Placed in Late Queue at Token #${assignedToken} (~${waitMins}m wait). WhatsApp notice sent.`, 'warn');
-    } else {
-      setBooking((prev) => ({
-        ...prev,
-        is_present: true,
-        customer_arrived_at: nowStr,
-      }));
-      addLog(`Patient tapped "I've Reached" on-time. Waiting for reception verification.`, 'info');
-    }
-  };
+        {
+          turnNumber: customTurn,
+          patientName: `${booking.customer_name} (Late Arrival)`,
+          originalSlot: formatTime(booking.slot_start),
+          expectedWait: '~35 mins wait',
+          code: booking.checkin_code,
+          isCurrentCustomer: true,
+        },
+      ];
+    });
 
-  // Handle Merchant Assign Late Queue (+2 Buffer)
-  const handleAssignLateQueue = () => {
-    const assignedToken = 14;
-    const waitMins = 30;
-    setBooking((prev) => ({
-      ...prev,
-      is_present: true,
-      queue_position: assignedToken,
-      estimated_wait_minutes: waitMins,
-    }));
-    addLog(`Receptionist accommodated late patient after 2 member appointments: Token #${assignedToken} (~${waitMins}m wait)`, 'warn');
-  };
-
-  // Handle Move to Standby Queue
-  const handleMoveToStandby = () => {
-    setBooking((prev) => ({
-      ...prev,
-      is_present: false,
-      queue_position: null,
-      estimated_wait_minutes: null,
-    }));
-    addLog(`Patient not present at slot time: Moved to Standby Waiting Queue to free doctor`, 'info');
-  };
-
-  // Handle Complete Consultation
-  const handleCompleteBooking = () => {
-    setBooking((prev) => ({
-      ...prev,
-      status: 'COMPLETED',
-    }));
-    addLog(`Consultation completed for ${booking.customer_name}`, 'success');
+    addLog(`⏰ Patient threw into Late Comers Queue (+2 buffer rule): Assigned Turn #${customTurn} (~35m wait)`, 'warn');
   };
 
   // Reset to initial state
@@ -344,29 +396,38 @@ export default function InteractiveDemoPage() {
     setVerifySuccess(null);
     setVerifyError(null);
     setCodeInput('');
-    setIsSimulatingLiveDb(false);
-    addLog(`Reset sandbox to: ${sample.customer_name} (${sample.reference_code})`, 'info');
+    setHospitalQueue(INITIAL_TRINADH_HOSPITAL_QUEUE);
+    setLateComersQueue([
+      {
+        turnNumber: 12,
+        patientName: 'Ramesh Varma',
+        originalSlot: '08:45 AM',
+        expectedWait: '~25 mins wait',
+        code: '3109',
+      },
+    ]);
+    addLog(`Reset sandbox to: ${sample.customer_name} at ${sample.provider_name}`, 'info');
   };
 
   // One-click Auto Demo Runner
   const handleRunAutoDemo = () => {
     const target = DEFAULT_SAMPLE_BOOKINGS[0];
-    setBooking({ ...target });
-    setVerifySuccess(null);
-    setVerifyError(null);
-    setCodeInput('');
-    setIsSimulatingLiveDb(false);
-    addLog(`Reset sandbox to: ${target.customer_name} (${target.reference_code})`, 'info');
-    addLog('Starting 1-click end-to-end demo flow…', 'info');
+    handleResetSample(0);
+    addLog('Starting 1-click end-to-end hospital queue flow…', 'info');
 
     setTimeout(() => {
+      // Step 1: Customer approaches desk, staff enters code
       setCodeInput(target.checkin_code);
-      addLog(`Receptionist entered code: ${target.checkin_code}`, 'info');
+      addLog(`Receptionist enters 4-digit code: ${target.checkin_code}`, 'info');
+
       setTimeout(() => {
+        // Step 2: Code verified -> Status turns GREEN!
         handleVerifyCode(undefined, target.checkin_code);
+
         setTimeout(() => {
-          handleAssignLateQueue();
-        }, 1200);
+          // Step 3: Demonstrate Late Comers Queue throwing
+          handleThrowToLateQueue(14);
+        }, 1300);
       }, 700);
     }, 500);
   };
@@ -375,15 +436,8 @@ export default function InteractiveDemoPage() {
     return new Date(isoStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  function formatDate(isoStr: string) {
-    return new Date(isoStr).toLocaleDateString('en-IN', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-  }
-
   const isCheckedIn = booking.status === 'CHECKED_IN' || Boolean(booking.checked_in_at);
+  const isInLateQueue = Boolean(booking.queue_position);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -395,14 +449,14 @@ export default function InteractiveDemoPage() {
               <Sparkles className="w-5 h-5 text-emerald-600" />
             </span>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Reception Check-in & Customer Pass Simulator
+              Hospital Live OPD Queue &amp; Check-In Simulator
             </h1>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
               Interactive Testbench
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Split-screen interactive environment: test the mobile digital pass, 4-digit Rapido-style OTP check-in, and the dynamic late-arrival queue (+2 buffer rule).
+            Simulate <strong>Trinadh Multi-Speciality Hospital</strong>: tokens #1 to #N, green present indicator on OTP match, red for unarrived, and dynamic late-comers queue.
           </p>
         </div>
 
@@ -437,8 +491,8 @@ export default function InteractiveDemoPage() {
 
       {/* Preset Scenario Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-700">Quick Test Scenarios:</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-slate-700">Hospital Scenarios:</span>
           <button
             onClick={() => handleResetSample(0)}
             className={`px-3 py-1 rounded-lg font-semibold transition ${
@@ -447,7 +501,7 @@ export default function InteractiveDemoPage() {
                 : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            1. Late Arrival Scenario (15m past slot)
+            1. Trinadh Hospital OPD Queue (Tokens #1–#8)
           </button>
           <button
             onClick={() => handleResetSample(1)}
@@ -475,7 +529,7 @@ export default function InteractiveDemoPage() {
           <span className="text-slate-500 text-[11px]">Sync Mode:</span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            Live Reactive
+            Live Reactive (Sub-50ms)
           </span>
         </div>
       </div>
@@ -483,13 +537,13 @@ export default function InteractiveDemoPage() {
       {/* Main Split Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* ========================================================================= */}
-        {/* LEFT COLUMN: CUSTOMER MOBILE DIGITAL PASS VIEWPORT (5 cols)             */}
+        {/* LEFT COLUMN: CUSTOMER MOBILE DIGITAL PASS & QUEUE TRACKER (5 cols)        */}
         {/* ========================================================================= */}
         <div className="lg:col-span-5 flex flex-col items-center">
           <div className="w-full max-w-[390px] mb-2 flex items-center justify-between px-2">
             <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
               <Smartphone className="w-4 h-4 text-emerald-600" />
-              Customer Mobile App (Booking Pass)
+              Patient Mobile App (Live Queue View)
             </span>
             <span className="text-[11px] text-slate-400">iOS / Android Viewport</span>
           </div>
@@ -497,7 +551,7 @@ export default function InteractiveDemoPage() {
           {/* Realistic Mobile Device Frame */}
           <div className="w-full max-w-[390px] rounded-[44px] bg-slate-900 p-3 shadow-2xl border-4 border-slate-800 ring-1 ring-slate-700/50">
             {/* Screen Inner */}
-            <div className="bg-slate-100 rounded-[34px] overflow-hidden min-h-[640px] flex flex-col text-slate-900 border border-slate-200">
+            <div className="bg-slate-100 rounded-[34px] overflow-hidden min-h-[660px] flex flex-col text-slate-900 border border-slate-200">
               {/* Phone Status Bar */}
               <div className="px-6 pt-3 pb-2 flex items-center justify-between text-[11px] font-semibold text-slate-700 bg-white">
                 <span>9:41</span>
@@ -512,272 +566,347 @@ export default function InteractiveDemoPage() {
               {/* Mobile App Header */}
               <div className="px-5 py-3 bg-white border-b border-slate-200 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Digital Booking Pass</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Digital OPD Pass</p>
                   <h3 className="text-sm font-bold text-slate-900 truncate max-w-[220px]">
                     {booking.provider_name}
                   </h3>
                 </div>
-                <div className="p-1 rounded-full bg-slate-100 text-slate-500 text-xs">
-                  ✕
+                <div className="flex items-center gap-1 text-[11px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                  <span>OPD #4</span>
                 </div>
               </div>
 
-              {/* Scrollable Ticket Content */}
+              {/* Customer View Tabs: Pass vs Full Queue */}
+              <div className="flex border-b border-slate-200 bg-white text-xs font-bold">
+                <button
+                  onClick={() => setMobileActiveTab('pass')}
+                  className={`flex-1 py-2.5 text-center transition border-b-2 ${
+                    mobileActiveTab === 'pass'
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/40'
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  🎟️ My OPD Pass
+                </button>
+                <button
+                  onClick={() => setMobileActiveTab('queue')}
+                  className={`flex-1 py-2.5 text-center transition border-b-2 ${
+                    mobileActiveTab === 'queue'
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/40'
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  🏥 Hospital Live Queue (#1–#8)
+                </button>
+              </div>
+
+              {/* Content Area */}
               <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-                {/* Physical Ticket Pass Visual */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  {/* Ticket Top */}
-                  <div className="p-4 bg-gradient-to-b from-white to-slate-50/50">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                            isCheckedIn
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {booking.status}
+                {mobileActiveTab === 'pass' ? (
+                  <>
+                    {/* Live Queue Status Summary Box */}
+                    <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Live Hospital OPD Token</span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                          Dr. K. Trinadh
                         </span>
-
-                        {isCheckedIn ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white">
-                            ✓ PRESENT
-                          </span>
-                        ) : booking.is_present ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">
-                            📍 AT VENUE
-                          </span>
-                        ) : null}
-
-                        {booking.queue_position ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
-                            ⏰ TURN #{booking.queue_position}
-                          </span>
-                        ) : null}
                       </div>
 
-                      <span className="text-[11px] font-mono font-bold text-slate-500">
-                        {booking.reference_code}
-                      </span>
-                    </div>
-
-                    <h4 className="font-bold text-slate-900 text-sm mt-3">
-                      {booking.resource_name}
-                    </h4>
-
-                    {/* Slot Date / Time Grid */}
-                    <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase text-slate-400">Date</p>
-                        <p className="text-xs font-semibold text-slate-800">{formatDate(booking.slot_start)}</p>
+                      <div className="flex items-center justify-between pt-1">
+                        <div>
+                          <p className="text-[11px] text-slate-500">Your Assigned Token</p>
+                          <p className="text-2xl font-black font-mono text-slate-900">
+                            {isInLateQueue ? `Token #14` : `Token #4`}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] text-slate-500">Now Serving</p>
+                          <p className="text-lg font-bold font-mono text-emerald-700">
+                            Token #2
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-bold uppercase text-slate-400">Scheduled Time</p>
-                        <p className="text-xs font-semibold text-slate-800">
-                          {formatTime(booking.slot_start)} - {formatTime(booking.slot_end)}
-                        </p>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Expected Time:</span>
+                        <span className="font-bold text-slate-900">
+                          {isInLateQueue ? '10:20 AM (~35m wait)' : '09:45 AM (~15m wait)'}
+                        </span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Perforated Tear Dashes */}
-                  <div className="relative flex items-center justify-between py-1 bg-slate-100">
-                    <div className="w-3 h-6 bg-slate-100 rounded-r-full -ml-1 border-r border-slate-200" />
-                    <div className="flex-1 border-b-2 border-dashed border-slate-300 mx-2" />
-                    <div className="w-3 h-6 bg-slate-100 rounded-l-full -mr-1 border-l border-slate-200" />
-                  </div>
-
-                  {/* Ticket Bottom: RECEPTION OTP or VERIFIED STATE */}
-                  <div className="p-4 bg-white">
+                    {/* READINESS & PRESENCE COLOR CARD (THE MAIN FEATURE REQUESTED) */}
                     {isCheckedIn ? (
-                      /* Verified Banner */
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-emerald-950">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                      /* 🟢 GREEN: Customer gave code to receptionist -> MARKED PRESENT & READY */
+                      <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-500 text-emerald-950 shadow-sm space-y-2 animate-fadeIn">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
                             ✓
                           </div>
                           <div>
-                            <p className="text-xs font-bold text-emerald-900">You are checked in</p>
+                            <h4 className="text-xs font-black uppercase tracking-wider text-emerald-900">
+                              🟢 Present &amp; Ready in Lobby
+                            </h4>
                             <p className="text-[11px] text-emerald-700">
-                              Reception verified at {booking.checked_in_at ? formatTime(booking.checked_in_at) : 'Counter'}
+                              Reception verified your check-in code at {formatTime(booking.checked_in_at || new Date().toISOString())}
                             </p>
                           </div>
                         </div>
-                        <p className="text-[11px] text-emerald-800 mt-2 bg-emerald-100/60 p-2 rounded-lg">
-                          Please take a seat in the waiting lobby. Your specialist will call your token shortly.
-                        </p>
+                        <div className="p-2.5 rounded-xl bg-white/80 border border-emerald-200 text-xs text-emerald-900">
+                          <p className="font-medium">
+                            Please take a seat in the OPD waiting lobby. Dr. K. Trinadh will call <strong>Token #4</strong> shortly.
+                          </p>
+                        </div>
                       </div>
                     ) : (
-                      /* 4-Digit OTP Box */
-                      <div className="bg-slate-50 border-2 border-dashed border-emerald-300 rounded-xl p-4 text-center space-y-1">
-                        <div className="flex items-center justify-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                          <Ticket className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Show Code at Reception</span>
+                      /* 🔴 RED: Customer has NOT checked in -> SHOWN IN RED COLOR */
+                      <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-400 text-rose-950 shadow-sm space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                            ✕
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black uppercase tracking-wider text-rose-900">
+                              🔴 Awaiting Check-In (Not Present)
+                            </h4>
+                            <p className="text-[11px] text-rose-700">
+                              Tell this 4-digit code to the receptionist upon arrival
+                            </p>
+                          </div>
                         </div>
 
-                        {/* Large Code Typography */}
-                        <div className="my-2">
-                          <span className="font-mono text-3xl font-black tracking-widest text-emerald-800 bg-emerald-100/60 px-4 py-1 rounded-xl">
-                            {booking.checkin_code}
+                        {/* 4-Digit OTP Display */}
+                        <div className="p-3.5 bg-white rounded-xl border border-rose-200 text-center space-y-1">
+                          <span className="text-[10px] font-extrabold uppercase tracking-widest text-rose-600">
+                            RECEPTION CHECK-IN OTP
                           </span>
+                          <div className="text-3xl font-black font-mono tracking-widest text-slate-900">
+                            {booking.checkin_code}
+                          </div>
+                          <p className="text-[10px] text-slate-500">
+                            Once entered by staff, your card turns <strong>GREEN</strong>
+                          </p>
                         </div>
-
-                        <p className="text-[11px] font-semibold text-emerald-700">
-                          Tell this 4-digit code to staff upon counter arrival
-                        </p>
 
                         <button
-                          type="button"
                           onClick={handleCopyCode}
-                          className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-2.5 py-1 rounded-lg transition"
+                          className="w-full py-2 rounded-xl text-xs font-bold bg-white hover:bg-rose-100 text-rose-800 border border-rose-300 transition flex items-center justify-center gap-1.5 shadow-2xs"
                         >
-                          {copiedCode ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                          <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
+                          {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedCode ? 'Copied to Clipboard!' : 'Copy 4-Digit Code'}</span>
                         </button>
                       </div>
                     )}
 
-                    {/* DYNAMIC LATE ARRIVAL QUEUE CARD */}
-                    {booking.queue_position ? (
-                      <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 text-amber-950 space-y-1.5 animate-fadeIn">
+                    {/* LATE COMERS QUEUE CARD (AMBER) */}
+                    {isInLateQueue && (
+                      <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-400 text-amber-950 shadow-sm space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-900">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-900 border border-amber-300">
                             <Clock className="w-3 h-3 text-amber-700" />
-                            <span>LATE TURN ASSIGNED</span>
+                            <span>⏰ LATE COMERS QUEUE</span>
                           </span>
-                          <span className="text-sm font-black text-amber-900">
-                            Token #{booking.queue_position}
+                          <span className="text-xs font-mono font-black text-amber-900">
+                            Token #14
                           </span>
                         </div>
-                        <p className="text-[11px] text-amber-900 leading-tight">
-                          Accommodated after 2 member appointments due to arrival after scheduled slot time.
+                        <p className="text-xs text-amber-900 font-medium">
+                          Accommodated after 2 ongoing appointments due to late arrival.
                         </p>
-                        {booking.estimated_wait_minutes && (
-                          <div className="flex items-center justify-between text-[11px] font-bold bg-amber-100/80 px-2.5 py-1 rounded-lg">
-                            <span className="text-amber-800">Estimated Wait:</span>
-                            <span className="text-amber-950">~{booking.estimated_wait_minutes} mins</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      /* Static Rule Reminder */
-                      <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-[11px] text-slate-600">
-                        <span className="font-bold text-slate-700">⏱️ Late Arrival Rule (+2 Buffer): </span>
-                        Arriving late? Don&apos;t worry! When you arrive, you will automatically be queued 2 tokens after the ongoing token (e.g. #10 → #12).
+                        <p className="text-[11px] text-amber-700">
+                          Estimated Wait: <strong>~35 mins</strong> • Rescheduled turn
+                        </p>
                       </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Customer Action Button ("I've Reached") */}
-                <div className="pt-1">
-                  {booking.is_present ? (
-                    <div className="w-full py-2.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold text-center flex items-center justify-center gap-1.5">
-                      <span>✓ You have signaled arrival at venue</span>
+                    {/* Hospital Doctor & Details */}
+                    <div className="bg-white rounded-2xl p-4 border border-slate-200 text-xs space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div>
+                          <p className="font-bold text-slate-900">{booking.provider_name}</p>
+                          <p className="text-[11px] text-slate-500">{booking.resource_name}</p>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-slate-600 text-[11px]">
+                        <span>Scheduled Slot:</span>
+                        <span className="font-semibold text-slate-900">09:45 AM - 10:00 AM</span>
+                      </div>
                     </div>
-                  ) : (
-                    <button
-                      onClick={handleCustomerSayReached}
-                      className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Tap &quot;I&apos;ve Reached&quot; on Arrival</span>
-                    </button>
-                  )}
-                </div>
-              </div>
+                  </>
+                ) : (
+                  /* FULL HOSPITAL QUEUE VIEW (#1 to #N) ON CUSTOMER PHONE */
+                  <div className="space-y-2.5">
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-bold text-slate-900">Trinadh Hospital OPD Queue</p>
+                        <p className="text-[10px] text-slate-500">8 total appointments scheduled today</p>
+                      </div>
+                      <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Serving #2
+                      </span>
+                    </div>
 
-              {/* Phone Bottom Home Bar */}
-              <div className="py-2 flex justify-center bg-white border-t border-slate-100">
-                <div className="w-32 h-1 bg-slate-300 rounded-full" />
+                    <div className="space-y-1.5">
+                      {hospitalQueue.map((tok) => {
+                        const isCurrent = tok.tokenNumber === 4;
+                        return (
+                          <div
+                            key={tok.tokenNumber}
+                            className={`p-2.5 rounded-xl border transition flex items-center justify-between text-xs ${
+                              isCurrent
+                                ? isCheckedIn
+                                  ? 'bg-emerald-50 border-2 border-emerald-500 shadow-2xs'
+                                  : 'bg-rose-50 border-2 border-rose-400 shadow-2xs'
+                                : tok.status === 'COMPLETED'
+                                ? 'bg-slate-50 border-slate-200 opacity-60'
+                                : tok.status === 'IN_CONSULTATION'
+                                ? 'bg-blue-50 border-blue-300'
+                                : tok.status === 'PRESENT_READY'
+                                ? 'bg-emerald-50/80 border-emerald-300'
+                                : 'bg-white border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-7 h-7 rounded-lg bg-slate-100 font-mono font-bold flex items-center justify-center text-xs text-slate-700">
+                                #{tok.tokenNumber}
+                              </span>
+                              <div>
+                                <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span>{tok.patientName}</span>
+                                  {isCurrent && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white font-mono">
+                                      YOU
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-[10px] text-slate-500">
+                                  {tok.slotTime} • Est: {tok.expectedTime}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div>
+                              {tok.status === 'COMPLETED' ? (
+                                <span className="text-[10px] font-semibold text-slate-500">Done</span>
+                              ) : tok.status === 'IN_CONSULTATION' ? (
+                                <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                                  Inside Dr.
+                                </span>
+                              ) : tok.status === 'PRESENT_READY' || (isCurrent && isCheckedIn) ? (
+                                <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                                  🟢 Present
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-extrabold text-rose-800 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200">
+                                  🔴 Waiting
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Late Comers Queue on Phone */}
+                    <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-amber-700" />
+                        <span>Late Comers Queue (Buffer +2)</span>
+                      </p>
+                      {lateComersQueue.map((l, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs text-amber-950 bg-white/80 p-2 rounded-lg border border-amber-200">
+                          <div>
+                            <span className="font-mono font-bold">Turn #{l.turnNumber}:</span> {l.patientName}
+                          </div>
+                          <span className="text-[10px] text-amber-800 font-medium">{l.expectedWait}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* RIGHT COLUMN: RECEPTIONIST DESK CONSOLE (7 cols)                         */}
+        {/* RIGHT COLUMN: RECEPTION DESK & HOSPITAL LIVE OPD BOARD (7 cols)           */}
         {/* ========================================================================= */}
-        <div className="lg:col-span-7 space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-                    <UserCheck className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                      Merchant Reception Desk Console
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Front-desk check-in terminal with instant verification & late queue controls
-                    </p>
-                  </div>
-                </div>
+        <div className="lg:col-span-7 space-y-5">
+          {/* Desk Header */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
+                <UserCheck className="w-5 h-5" />
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
-                  Venue: {activeProvider?.name || 'Tirupati Clinic'}
-                </span>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                  Trinadh Hospital Reception Desk Console
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Front-desk check-in terminal with instant verification &amp; late queue controls
+                </p>
               </div>
             </div>
 
-            {/* CHECK-IN CODE VERIFICATION FORM */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                    <Ticket className="w-4 h-4 text-emerald-600" />
-                    <span>Enter Customer Check-In Code</span>
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Ask the arriving customer for their 4-digit numeric booking pass code.
-                  </p>
-                </div>
+            <div className="text-right">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                Venue: Trinadh Hospital
+              </span>
+            </div>
+          </div>
 
-                {/* Quick Paste Button for Testing */}
-                <button
-                  type="button"
-                  onClick={handlePasteCodeToDesk}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition flex items-center gap-1 shadow-2xs"
-                  title="Auto-fill the code currently shown on the customer pass"
-                >
-                  <Copy className="w-3 h-3 text-emerald-600" />
-                  <span>Fill Code ({booking.checkin_code})</span>
-                </button>
+          {/* FRONT DESK CHECK-IN CODE ENTRY FORM */}
+          <div className="bg-white rounded-2xl border-2 border-emerald-500/40 p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <Ticket className="w-4 h-4 text-emerald-600" />
+                  <span>Enter Customer Check-In Code</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Ask arriving patient for their 4-digit numeric booking pass code.
+                </p>
               </div>
 
-              <form onSubmit={handleVerifyCode} className="flex flex-col sm:flex-row items-center gap-3">
-                <div className="relative w-full sm:w-60">
+              <button
+                onClick={handlePasteCodeToDesk}
+                className="self-start sm:self-auto inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition"
+              >
+                <Copy className="w-3 h-3" />
+                <span>Fill Code ({booking.checkin_code})</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyCode} className="space-y-3">
+              <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+                <div className="relative flex-1">
                   <input
                     ref={inputRef}
                     type="text"
                     inputMode="numeric"
-                    pattern="[0-9]*"
                     maxLength={6}
                     value={codeInput}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      setCodeInput(val);
-                      if (verifyError) setVerifyError(null);
+                      setCodeInput(e.target.value.replace(/\D/g, ''));
+                      setVerifyError(null);
                     }}
                     placeholder="e.g. 4821"
-                    className="w-full px-4 py-2.5 bg-white border-2 border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-center font-mono text-xl font-black tracking-widest text-slate-900 placeholder:text-slate-400 placeholder:text-sm placeholder:font-sans placeholder:tracking-normal transition outline-none"
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-300 focus:border-emerald-500 focus:bg-white rounded-xl text-center font-mono text-xl font-bold tracking-widest text-slate-900 transition outline-none"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={isVerifying || !codeInput.trim()}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                  className="px-6 py-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 shrink-0"
                 >
                   {isVerifying ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Verifying…</span>
+                      <span>Checking…</span>
                     </>
                   ) : (
                     <>
@@ -786,203 +915,244 @@ export default function InteractiveDemoPage() {
                     </>
                   )}
                 </button>
+              </div>
 
-                {/* Test with Incorrect Code Button */}
+              <div className="flex items-center gap-3 text-xs">
                 <button
                   type="button"
                   onClick={() => {
                     setCodeInput('9999');
-                    setTimeout(() => {
-                      setVerifyError('Invalid check-in code. Please verify the code with the customer.');
-                      addLog('Tested invalid code 9999 (rejected correctly)', 'warn');
-                    }, 200);
+                    handleVerifyCode(undefined, '9999');
                   }}
-                  className="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-2 shrink-0 px-2"
+                  className="text-slate-500 hover:text-rose-600 underline"
                 >
                   Test Wrong Code
                 </button>
-              </form>
+              </div>
+            </form>
 
-              {/* Success Banner */}
-              {verifySuccess && (
-                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <div className="p-2 rounded-lg bg-emerald-200 text-emerald-800 shrink-0">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-bold text-emerald-950">
-                          {verifySuccess.patient_name} marked as present!
-                        </p>
-                        {verifySuccess.is_late ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                            <Clock className="w-3 h-3 text-amber-700" />
-                            <span>Arrived Late (&gt;10m after slot)</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900">
-                            <span>On Time</span>
-                          </span>
-                        )}
+            {/* Success Feedback */}
+            {verifySuccess && (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-center justify-between gap-3 animate-fadeIn">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-200 text-emerald-800 flex items-center justify-center font-bold">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-emerald-950">
+                      {verifySuccess.patient_name} marked as present!
+                    </p>
+                    <p className="text-xs text-emerald-800">
+                      Token #4 turned GREEN (Present &amp; Ready in Lobby) • {verifySuccess.message}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setVerifySuccess(null)}
+                  className="text-xs font-bold text-emerald-800 hover:underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {/* Error Feedback */}
+            {verifyError && (
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 flex items-center justify-between gap-3 animate-fadeIn">
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <p className="text-xs font-semibold text-rose-900">{verifyError}</p>
+                </div>
+                <button
+                  onClick={() => setVerifyError(null)}
+                  className="text-xs font-bold text-rose-700 p-1"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ========================================================================= */}
+          {/* TRINADH HOSPITAL LIVE OPD QUEUE BOARD (TOKENS #1 TO #8)                   */}
+          {/* ========================================================================= */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>🏥 Trinadh Hospital OPD Queue Board</span>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    Tokens #1 to #8
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Doctor: <strong>Dr. K. Trinadh</strong> • Colors: 🟢 Green = Present, 🔴 Red = Awaiting, ⏰ Amber = Late Queue
+                </p>
+              </div>
+
+              {/* Status Counters */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold">
+                  🟢 2 Present
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold">
+                  🔴 {isCheckedIn ? '4' : '5'} Awaiting
+                </span>
+              </div>
+            </div>
+
+            {/* Tokens Roster */}
+            <div className="space-y-2">
+              {hospitalQueue.map((tok) => {
+                const isTarget = tok.tokenNumber === 4;
+                const isPresent = tok.status === 'PRESENT_READY' || (isTarget && isCheckedIn);
+                const isLate = tok.status === 'LATE_QUEUE' || (isTarget && isInLateQueue);
+
+                return (
+                  <div
+                    key={tok.tokenNumber}
+                    className={`p-3 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      isPresent
+                        ? 'bg-emerald-50/90 border-2 border-emerald-500 shadow-2xs'
+                        : isLate
+                        ? 'bg-amber-50/90 border-2 border-amber-400 shadow-2xs'
+                        : tok.status === 'IN_CONSULTATION'
+                        ? 'bg-blue-50/70 border-2 border-blue-400'
+                        : tok.status === 'COMPLETED'
+                        ? 'bg-slate-50 border-slate-200 opacity-60'
+                        : 'bg-rose-50/60 border-2 border-rose-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl font-mono font-bold flex flex-col items-center justify-center shrink-0 border ${
+                        isPresent
+                          ? 'bg-emerald-100 border-emerald-300 text-emerald-950'
+                          : isLate
+                          ? 'bg-amber-100 border-amber-300 text-amber-950'
+                          : tok.status === 'IN_CONSULTATION'
+                          ? 'bg-blue-100 border-blue-300 text-blue-950'
+                          : tok.status === 'COMPLETED'
+                          ? 'bg-slate-100 border-slate-200 text-slate-500'
+                          : 'bg-rose-100 border-rose-300 text-rose-950'
+                      }`}>
+                        <span className="text-[9px] uppercase tracking-wider opacity-75">TKN</span>
+                        <span className="text-xs font-black">
+                          {isLate ? `#14` : `#${tok.tokenNumber}`}
+                        </span>
                       </div>
-                      <p className="text-xs text-emerald-800 mt-0.5">
-                        Slot: {verifySuccess.slot_time} • Verified at {verifySuccess.checked_in_at ? formatTime(verifySuccess.checked_in_at) : 'Counter'}
-                      </p>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-slate-900 text-xs sm:text-sm">
+                            {tok.patientName}
+                          </h4>
+                          {isTarget && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-900 text-white font-mono font-bold">
+                              CUSTOMER DEMO
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          Slot: {tok.slotTime} • Expected: {tok.expectedTime}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+                      {/* Status Badges */}
+                      {tok.status === 'COMPLETED' ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                          ✓ Consultation Completed
+                        </span>
+                      ) : tok.status === 'IN_CONSULTATION' ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                          👨‍⚕️ In Consultation with Doctor
+                        </span>
+                      ) : isPresent ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs">
+                          ✓ PRESENT &amp; READY
+                        </span>
+                      ) : isLate ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-950 border border-amber-400">
+                          ⏰ LATE COMERS QUEUE (Turn #14)
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-200 text-rose-950 border border-rose-300">
+                          ✕ NOT PRESENT (AWAITING ARRIVAL)
+                        </span>
+                      )}
+
+                      {/* Interactive Buttons for Token #4 */}
+                      {isTarget && (
+                        <div className="flex items-center gap-1.5">
+                          {!isPresent && (
+                            <button
+                              onClick={() => handleVerifyCode(undefined, '4821')}
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs"
+                              title="Enter code 4821 and turn green"
+                            >
+                              Check-In (4821)
+                            </button>
+                          )}
+                          {!isLate && (
+                            <button
+                              onClick={() => handleThrowToLateQueue(14)}
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-white transition shadow-2xs"
+                              title="Throw patient to Late Comers Queue"
+                            >
+                              Throw to Late Queue (+2)
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setVerifySuccess(null)}
-                    className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline underline-offset-2 self-end sm:self-center"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              )}
+                );
+              })}
+            </div>
+          </div>
 
-              {/* Error Banner */}
-              {verifyError && (
-                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-center justify-between gap-3 animate-fadeIn">
-                  <div className="flex items-center gap-2.5">
-                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-                    <p className="text-xs font-semibold text-rose-900">{verifyError}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setVerifyError(null)}
-                    className="text-xs font-bold text-rose-700 hover:text-rose-900 p-1"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
+          {/* FRONT-DESK OPERATIONAL ACTIONS & LATE QUEUE CONTROLS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Dead Phone Fallback */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <UserCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Dead Phone Fallback</span>
+                </span>
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Offline</span>
+              </div>
+              <p className="text-xs text-slate-500">
+                If customer phone ran out of battery, receptionist marks them present manually.
+              </p>
+              <button
+                onClick={handleMarkPresentManual}
+                disabled={isCheckedIn}
+                className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition disabled:opacity-50"
+              >
+                {isCheckedIn ? '✓ Already Checked In' : 'Mark Present Manually'}
+              </button>
             </div>
 
-            {/* QUEUE ACTIONS & EMERGENCY FALLBACKS */}
-            <div className="space-y-3 pt-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Front-Desk Operational Actions &amp; Late Queue Controls
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* 1. Manual Check-in Fallback Button */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <UserCheck className="w-4 h-4 text-emerald-600" />
-                      <span>Dead Phone Fallback</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-semibold">Offline</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    If customer phone ran out of battery, receptionist marks them present manually.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleManualCheckIn}
-                    disabled={isCheckedIn}
-                    className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition disabled:opacity-50"
-                  >
-                    {isCheckedIn ? '✓ Already Checked In' : 'Mark Present Manually'}
-                  </button>
-                </div>
-
-                {/* 2. Assign Late Queue (+2 Buffer) Button */}
-                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-amber-700" />
-                      <span>Late Queue (+2 Buffer)</span>
-                    </span>
-                    <span className="text-[10px] text-amber-800 font-bold">Rule: Turn +2</span>
-                  </div>
-                  <p className="text-[11px] text-amber-800">
-                    Arrived late: Inserts patient after 2 member appointments without disturbing ongoing line.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleAssignLateQueue}
-                    className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-2xs"
-                  >
-                    Accommodate Late (Token #14)
-                  </button>
-                </div>
-
-                {/* 3. Move to Standby Queue */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800">Standby Queue</span>
-                    <span className="text-[10px] text-slate-400">Unarrived</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Slot started but patient not arrived: Move to standby to allow doctor to proceed.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleMoveToStandby}
-                    className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
-                  >
-                    Move to Standby
-                  </button>
-                </div>
-
-                {/* 4. Complete Consultation */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800">Complete Consultation</span>
-                    <span className="text-[10px] text-emerald-600 font-bold">Finish</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Doctor finished consultation. Complete appointment and mark slot as fulfilled.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleCompleteBooking}
-                    disabled={booking.status === 'COMPLETED'}
-                    className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white transition disabled:opacity-50"
-                  >
-                    {booking.status === 'COMPLETED' ? '✓ Completed' : 'Admit & Complete'}
-                  </button>
-                </div>
+            {/* Late Queue (+2 Buffer) */}
+            <div className="bg-white rounded-2xl border border-amber-200 p-4 shadow-xs space-y-2.5 bg-amber-50/20">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <span>Late Queue (+2 Buffer)</span>
+                </span>
+                <span className="text-[10px] text-amber-700 font-mono font-bold">Rule: Turn +2</span>
               </div>
-            </div>
-
-            {/* LIVE APPOINTMENT STATE INSPECTOR */}
-            <div className="pt-3 border-t border-slate-100">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Live Postgres Record Telemetry
-              </h3>
-              <div className="bg-slate-900 text-slate-100 rounded-xl p-3.5 font-mono text-[11px] overflow-x-auto space-y-1">
-                <div className="flex justify-between border-b border-slate-800 pb-1 text-slate-400">
-                  <span>FIELD</span>
-                  <span>CURRENT VALUE</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-emerald-400">status:</span>
-                  <span className="font-bold">{booking.status}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-emerald-400">is_present:</span>
-                  <span>{booking.is_present ? 'true' : 'false'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-emerald-400">checked_in_method:</span>
-                  <span>{booking.checked_in_method || 'null'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-emerald-400">checked_in_at:</span>
-                  <span className="truncate max-w-[200px]">{booking.checked_in_at || 'null'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-amber-400">queue_position:</span>
-                  <span className="font-bold text-amber-300">{booking.queue_position !== null ? `#${booking.queue_position}` : 'null'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-amber-400">estimated_wait_minutes:</span>
-                  <span className="text-amber-300">{booking.estimated_wait_minutes !== null ? `${booking.estimated_wait_minutes} mins` : 'null'}</span>
-                </div>
-              </div>
+              <p className="text-xs text-amber-800">
+                Arrived late: Inserts patient after 2 ongoing appointments without disrupting others.
+              </p>
+              <button
+                onClick={() => handleThrowToLateQueue(14)}
+                className="w-full py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-xs"
+              >
+                Throw to Late Queue (Token #14)
+              </button>
             </div>
           </div>
 
@@ -991,7 +1161,7 @@ export default function InteractiveDemoPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Realtime Event Stream &amp; Audit Trail</span>
+                <span>Realtime Event Stream &amp; Hospital Audit Trail</span>
               </h3>
               <button
                 onClick={() => setEventLogs([])}
