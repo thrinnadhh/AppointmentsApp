@@ -21,6 +21,7 @@ import {
   MerchantMembership,
   AppLogEntry,
   AppLogsFilter,
+  VerifyCheckinCodeResult,
 } from '@appointments/shared';
 
 export type {
@@ -41,6 +42,7 @@ export type {
   MerchantMembership,
   AppLogEntry,
   AppLogsFilter,
+  VerifyCheckinCodeResult,
 };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -1158,5 +1160,78 @@ export async function purgeAdminAppLogs(
     return { count: 0, error: err instanceof Error ? err.message : 'Failed to purge logs' };
   }
 }
+
+/**
+ * Verify customer check-in code at reception desk
+ */
+export async function verifyCheckinCodeRpc(
+  shopId: string,
+  code: string
+): Promise<VerifyCheckinCodeResult> {
+  try {
+    const { data, error } = await (supabase.rpc as any)('verify_checkin_code', {
+      p_shop_id: shopId,
+      p_code: code.trim(),
+    });
+
+    if (error) {
+      console.error('Error in verify_checkin_code RPC:', error);
+      return {
+        success: false,
+        error: 'INVALID_CODE',
+        message: error.message || 'Failed to verify check-in code',
+      };
+    }
+
+    return (data || {
+      success: false,
+      error: 'INVALID_CODE',
+      message: 'Unknown response from server',
+    }) as VerifyCheckinCodeResult;
+  } catch (err) {
+    console.error('Exception in verifyCheckinCodeRpc:', err);
+    return {
+      success: false,
+      error: 'INVALID_CODE',
+      message: err instanceof Error ? err.message : 'Check-in request failed',
+    };
+  }
+}
+
+/**
+ * Fallback manual check-in when customer phone is dead
+ */
+export async function markPresentManuallyRpc(
+  bookingId: string
+): Promise<VerifyCheckinCodeResult> {
+  try {
+    const { data, error } = await (supabase.rpc as any)('mark_present_manually', {
+      p_booking_id: bookingId,
+    });
+
+    if (error) {
+      console.error('Error in mark_present_manually RPC:', error);
+      return {
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: error.message || 'Failed to mark present manually',
+      };
+    }
+
+    return (data || {
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: 'Unknown response from server',
+    }) as VerifyCheckinCodeResult;
+  } catch (err) {
+    console.error('Exception in markPresentManuallyRpc:', err);
+    return {
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: err instanceof Error ? err.message : 'Manual check-in failed',
+    };
+  }
+}
+
 
 

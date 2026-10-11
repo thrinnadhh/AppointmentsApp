@@ -27,13 +27,17 @@ import {
   Calendar,
   Copy,
   Activity,
-  Terminal
+  Terminal,
+  UserCheck,
+  Ticket
 } from 'lucide-react';
 import { 
   supabase, 
   updateBookingStatus, 
   recordMerchantNoShow,
   manageLateQueueBooking,
+  verifyCheckinCodeRpc,
+  markPresentManuallyRpc,
   MerchantBookingWithDetails,
   Provider,
   Resource,
@@ -125,6 +129,21 @@ export default function MerchantOverviewPage() {
   const [today, setToday] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
   const [diagnosticResult, setDiagnosticResult] = useState<{ status: string; latency_ms: number } | null>(null);
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false);
+
+  // Reception Check-in Desk State
+  const [checkinCodeInput, setCheckinCodeInput] = useState('');
+  const [isVerifyingCheckin, setIsVerifyingCheckin] = useState(false);
+  const [checkinSuccessData, setCheckinSuccessData] = useState<{
+    booking_id?: string;
+    patient_name?: string;
+    service_doctor?: string;
+    slot_time?: string;
+    is_late?: boolean;
+    checked_in_at?: string;
+  } | null>(null);
+  const [checkinErrorMessage, setCheckinErrorMessage] = useState<string | null>(null);
+  const checkinInputRef = useRef<HTMLInputElement>(null);
+
 
   const runDiagnostics = async () => {
     setIsRunningDiagnostics(true);
@@ -588,9 +607,10 @@ export default function MerchantOverviewPage() {
   // Venue Appointment Metrics
   const todaysBookings = bookings.filter((booking) => booking.provider_id === selectedProviderId &&
     new Date(booking.slot_start).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === today);
-  const confirmedCount = todaysBookings.filter((b) => b.status === 'CONFIRMED').length;
+  const confirmedCount = todaysBookings.filter((b) => b.status === 'CONFIRMED' || b.status === 'CHECKED_IN').length;
   const heldCount = todaysBookings.filter((b) => b.status === 'HELD').length;
   const completedCount = todaysBookings.filter((b) => b.status === 'COMPLETED').length;
+  const checkedInCount = todaysBookings.filter((b) => b.status === 'CHECKED_IN' || b.is_present).length;
   const totalDepositCollected = todaysBookings
     .filter((b) => b.payment_status === 'CAPTURED')
     .reduce((acc, curr) => acc + Number(curr.deposit_amount), 0);
@@ -640,6 +660,75 @@ export default function MerchantOverviewPage() {
       }
     } catch {
       setErrorMessage('Network error updating late queue');
+    } finally {
+      setPendingBookingId(null);
+    }
+  };
+
+  const handleVerifyCheckinCode = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const code = checkinCodeInput.trim();
+    if (!code) return;
+    if (!selectedProviderId) {
+      setCheckinErrorMessage('Please select an active venue to verify check-in code');
+      return;
+    }
+
+    setIsVerifyingCheckin(true);
+    setCheckinErrorMessage(null);
+    setCheckinSuccessData(null);
+
+    try {
+      const res = await verifyCheckinCodeRpc(selectedProviderId, code);
+      if (res.success) {
+        setCheckinSuccessData({
+          booking_id: res.booking_id,
+          patient_name: res.patient_name,
+          service_doctor: res.service_doctor,
+          slot_time: res.slot_time,
+          is_late: res.is_late,
+          checked_in_at: res.checked_in_at,
+        });
+        setCheckinCodeInput('');
+        setRecentNotification(`Checked in: ${res.patient_name || 'Patient'} (${res.service_doctor || 'Appointment'})`);
+        void loadData();
+      } else {
+        let msg = res.message || 'Check-in failed';
+        if (res.error === 'INVALID_CODE') {
+          msg = 'Invalid check-in code. Please verify the code with the customer.';
+        } else if (res.error === 'ALREADY_CHECKED_IN') {
+          msg = 'This appointment is already checked in.';
+        } else if (res.error === 'TOO_EARLY') {
+          msg = 'Check-in is only allowed within 60 minutes before the scheduled slot.';
+        } else if (res.error === 'EXPIRED') {
+          msg = 'This appointment date or check-in window has expired.';
+        } else if (res.error === 'WRONG_SHOP') {
+          msg = 'This check-in code belongs to another clinic or venue.';
+        } else if (res.error === 'RATE_LIMITED') {
+          msg = 'Too many failed attempts. Check-in is locked for 60 seconds.';
+        }
+        setCheckinErrorMessage(msg);
+      }
+    } catch (err: unknown) {
+      setCheckinErrorMessage(err instanceof Error ? err.message : 'Check-in failed');
+    } finally {
+      setIsVerifyingCheckin(false);
+      checkinInputRef.current?.focus();
+    }
+  };
+
+  const handleMarkPresentManually = async (bookingId: string) => {
+    try {
+      setPendingBookingId(bookingId);
+      const res = await markPresentManuallyRpc(bookingId);
+      if (res.success) {
+        setRecentNotification(`Marked present: ${res.patient_name || 'Patient'}`);
+        void loadData();
+      } else {
+        alert(res.message || 'Failed to mark present manually');
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error marking present manually');
     } finally {
       setPendingBookingId(null);
     }
@@ -1096,6 +1185,148 @@ export default function MerchantOverviewPage() {
         </div>
       </div>
 
+      {/* ========================================================================= */}
+      {/* RECEPTION CHECK-IN DESK (RAPIDO-STYLE CODE VERIFICATION)                 */}
+      {/* ========================================================================= */}
+      <div 
+        data-testid="reception-checkin-panel"
+        className="bg-white rounded-2xl border-2 border-emerald-500/30 p-5 sm:p-6 shadow-xs relative overflow-hidden"
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                <Ticket className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                  Reception Check-In Desk
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider">
+                    Fast Pass OTP
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ask arriving patient for their 4-digit booking code to verify and mark present.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form 
+            onSubmit={handleVerifyCheckinCode} 
+            className="flex items-center gap-2.5 w-full md:w-auto"
+          >
+            <div className="relative flex-1 md:w-56">
+              <input
+                ref={checkinInputRef}
+                type="text"
+                data-testid="checkin-code-input"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={checkinCodeInput}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setCheckinCodeInput(val);
+                  if (checkinErrorMessage) setCheckinErrorMessage(null);
+                }}
+                placeholder="4-digit code"
+                autoFocus
+                className="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-300 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-center font-mono text-lg font-bold tracking-widest text-slate-900 placeholder:text-slate-400 placeholder:tracking-normal placeholder:font-sans placeholder:text-sm transition outline-none"
+              />
+            </div>
+            <button
+              type="submit"
+              data-testid="verify-checkin-btn"
+              disabled={isVerifyingCheckin || !checkinCodeInput.trim()}
+              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs flex items-center gap-1.5 shrink-0"
+            >
+              {isVerifyingCheckin ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Verifying…</span>
+                </>
+              ) : (
+                <>
+                  <UserCheck className="w-4 h-4" />
+                  <span>Verify Code</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Success Banner */}
+        {checkinSuccessData && (
+          <div
+            role="status"
+            data-testid="checkin-success-banner"
+            className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn"
+          >
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-200 text-emerald-800 shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-bold text-emerald-950">
+                    {checkinSuccessData.patient_name || 'Patient'} successfully checked in!
+                  </p>
+                  {checkinSuccessData.is_late ? (
+                    <span 
+                      data-testid="checkin-late-badge"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300"
+                    >
+                      <Clock className="w-3 h-3 text-amber-700" />
+                      <span>Arrived Late (&gt;10m after slot)</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900">
+                      <span>On Time</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-emerald-800 mt-0.5">
+                  {checkinSuccessData.service_doctor ? `${checkinSuccessData.service_doctor} • ` : ''}
+                  {checkinSuccessData.slot_time ? `Slot: ${checkinSuccessData.slot_time} • ` : ''}
+                  Checked in at {checkinSuccessData.checked_in_at ? new Date(checkinSuccessData.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCheckinSuccessData(null)}
+              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline underline-offset-2 self-end sm:self-center"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Error Banner */}
+        {checkinErrorMessage && (
+          <div
+            role="alert"
+            data-testid="checkin-error-banner"
+            className="mt-4 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-center justify-between gap-3 animate-fadeIn"
+          >
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <p className="text-xs font-semibold text-rose-900">{checkinErrorMessage}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCheckinErrorMessage(null)}
+              className="text-xs font-bold text-rose-700 hover:text-rose-900 p-1"
+              aria-label="Dismiss error"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Main Content Layout: Live Queue & Operations */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left 2 Cols: Live Bookings Queue */}
@@ -1119,21 +1350,22 @@ export default function MerchantOverviewPage() {
               todaysBookings.map((booking) => {
                 const startTime = new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const endTime = new Date(booking.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const isPresent = Boolean(booking.is_present || booking.status === 'CHECKED_IN');
 
                 return (
                   <div 
                     key={booking.id} 
                     data-testid={`live-booking-card-${booking.id}`}
-                    data-present={booking.is_present ? 'true' : 'false'}
+                    data-present={isPresent ? 'true' : 'false'}
                     className={`rounded-2xl p-5 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                      booking.is_present
+                      isPresent
                         ? 'bg-emerald-50/90 border-2 border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
                         : 'bg-white border border-slate-200 shadow-xs hover:shadow-md'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 transition-colors ${
-                        booking.is_present 
+                        isPresent 
                           ? 'bg-emerald-200 text-emerald-900 ring-2 ring-emerald-400' 
                           : 'bg-slate-100 text-slate-600'
                       }`}>
@@ -1142,13 +1374,13 @@ export default function MerchantOverviewPage() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="font-semibold text-slate-900 text-sm">{booking.customer_name}</h4>
-                          {booking.is_present && (
+                          {isPresent && (
                             <span 
                               data-testid={`present-badge-${booking.id}`}
                               className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs"
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                              <span>📍 PATIENT PRESENT</span>
+                              <span>📍 PRESENT</span>
                             </span>
                           )}
                           {booking.queue_position ? (
@@ -1160,7 +1392,7 @@ export default function MerchantOverviewPage() {
                               <span>LATE TURN #{booking.queue_position} {booking.estimated_wait_minutes ? `(~${booking.estimated_wait_minutes}m wait)` : ''}</span>
                             </span>
                           ) : null}
-                          {booking.is_present === false && new Date(booking.slot_start).getTime() < Date.now() && booking.status === 'CONFIRMED' && !booking.queue_position && (
+                          {!isPresent && new Date(booking.slot_start).getTime() < Date.now() && booking.status === 'CONFIRMED' && !booking.queue_position && (
                             <span 
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
                               title="Patient has not yet arrived for their slot"
@@ -1169,8 +1401,10 @@ export default function MerchantOverviewPage() {
                             </span>
                           )}
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            booking.status === 'CHECKED_IN'
+                              ? 'bg-emerald-600 text-white font-extrabold' :
                             booking.status === 'CONFIRMED' 
-                              ? (booking.is_present ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800') :
+                              ? (isPresent ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800') :
                             booking.status === 'HELD' ? 'bg-amber-100 text-amber-800' :
                             booking.status === 'COMPLETED' ? 'bg-teal-100 text-teal-800' :
                             'bg-slate-100 text-slate-700'
@@ -1222,10 +1456,24 @@ export default function MerchantOverviewPage() {
                         </p>
                       </div>
 
-                      {booking.status === 'CONFIRMED' && (
+                      {(booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN') && (
                         <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {/* Fallback "Mark present" manual button when patient phone is dead */}
+                          {!isPresent && (
+                            <button
+                              onClick={() => handleMarkPresentManually(booking.id)}
+                              disabled={pendingBookingId === booking.id}
+                              data-testid={`mark-present-btn-${booking.id}`}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition disabled:opacity-60 flex items-center gap-1 shadow-xs"
+                              title="Customer phone dead or offline — mark present manually"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Mark present</span>
+                            </button>
+                          )}
+
                           {/* If scheduled slot is in the past and patient has not arrived */}
-                          {new Date(booking.slot_start).getTime() < Date.now() && !booking.customer_arrived_at && (
+                          {new Date(booking.slot_start).getTime() < Date.now() && !booking.customer_arrived_at && !isPresent && (
                             <>
                               <button
                                 onClick={() => handleLateQueueAction(booking.id, 'CHECKIN_LATE', 2)}
@@ -1253,12 +1501,12 @@ export default function MerchantOverviewPage() {
                             onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
                             disabled={pendingBookingId === booking.id}
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-60 ${
-                              booking.is_present
+                              isPresent
                                 ? 'bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400/40 shadow-xs font-bold'
                                 : 'bg-emerald-600 text-white hover:bg-emerald-700'
                             }`}
                           >
-                            {pendingBookingId === booking.id ? 'Saving…' : (booking.is_present ? 'Admit / Check-In' : 'Check-In')}
+                            {pendingBookingId === booking.id ? 'Saving…' : (isPresent ? 'Admit / Complete' : 'Check-In')}
                           </button>
                           <button
                             onClick={() => handleStatusChange(booking.id, 'NO_SHOW')}
