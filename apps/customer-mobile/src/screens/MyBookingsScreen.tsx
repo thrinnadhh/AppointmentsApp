@@ -198,7 +198,12 @@ export default function MyBookingsScreen({
                       </View>
                     )}
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {booking.queue_position ? (
+                      <View style={styles.lateTurnBadge} testID={`late-turn-${booking.id}`}>
+                        <Text style={styles.lateTurnBadgeText}>⏰ Turn #{booking.queue_position}</Text>
+                      </View>
+                    ) : null}
                     {booking.is_present && (
                       <View style={styles.presentBadge} testID={`present-badge-${booking.id}`}>
                         <Text style={styles.presentBadgeText}>📍 Present in Lobby</Text>
@@ -252,12 +257,21 @@ export default function MyBookingsScreen({
                   </View>
                 )}
 
-                {booking.status === 'CONFIRMED' && !booking.is_present && (
-                  <View style={styles.lateArrivalTipBox} testID={`late-arrival-tip-${booking.id}`}>
-                    <Text style={styles.lateArrivalTipText}>
-                      ⏱️ <Text style={{ fontWeight: '700' }}>Running late?</Text> Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"Say Reached"</Text> on arrival to enter at Ongoing Token + 2 (e.g. #10 → #12).
+                {booking.queue_position ? (
+                  <View style={styles.lateQueueNoticeBox} testID={`late-queue-notice-${booking.id}`}>
+                    <Text style={styles.lateQueueNoticeText}>
+                      ⏰ <Text style={{ fontWeight: '700' }}>Late Arrival Accommodated:</Text> Assigned Queue Token #{booking.queue_position} (after 2 member appointments).
+                      {booking.estimated_wait_minutes ? ` Estimated wait: ~${booking.estimated_wait_minutes} mins.` : ''}
                     </Text>
                   </View>
+                ) : (
+                  booking.status === 'CONFIRMED' && !booking.is_present && (
+                    <View style={styles.lateArrivalTipBox} testID={`late-arrival-tip-${booking.id}`}>
+                      <Text style={styles.lateArrivalTipText}>
+                        ⏱️ <Text style={{ fontWeight: '700' }}>Running late?</Text> Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"Say Reached"</Text> on arrival to enter at Ongoing Token + 2 (e.g. #10 → #12).
+                      </Text>
+                    </View>
+                  )
                 )}
 
                 <View style={styles.cardFooter}>
@@ -870,5 +884,32 @@ const styles = StyleSheet.create({
     color: '#047857',
     fontSize: 10,
     fontWeight: '700',
+  },
+  lateTurnBadge: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  lateTurnBadgeText: {
+    color: '#92400e',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  lateQueueNoticeBox: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+  },
+  lateQueueNoticeText: {
+    fontSize: 11,
+    color: '#92400e',
+    lineHeight: 15,
   },
 });

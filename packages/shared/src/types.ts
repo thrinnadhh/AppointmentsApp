@@ -132,6 +132,8 @@ export interface Booking {
   checked_in_at?: string | null;
   checked_in_by?: string | null;
   checked_in_method?: 'code' | 'manual' | null;
+  queue_position?: number | null;
+  estimated_wait_minutes?: number | null;
   provider?: Provider;
   resource?: Resource;
 }

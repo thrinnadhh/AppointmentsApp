@@ -30,13 +30,17 @@ export default function BookingPassModal({
   const [checkinCode, setCheckinCode] = React.useState<string | null>(null);
   const [liveStatus, setLiveStatus] = React.useState<string>(booking?.status || 'HELD');
   const [liveCheckedInAt, setLiveCheckedInAt] = React.useState<string | null>(booking?.checked_in_at || null);
+  const [liveQueuePosition, setLiveQueuePosition] = React.useState<number | null>(booking?.queue_position || null);
+  const [liveWaitMinutes, setLiveWaitMinutes] = React.useState<number | null>(booking?.estimated_wait_minutes || null);
 
   React.useEffect(() => {
     if (booking) {
       setLiveStatus(booking.status);
       setLiveCheckedInAt(booking.checked_in_at || null);
+      setLiveQueuePosition(booking.queue_position || null);
+      setLiveWaitMinutes(booking.estimated_wait_minutes || null);
     }
-  }, [booking?.status, booking?.checked_in_at]);
+  }, [booking?.status, booking?.checked_in_at, booking?.queue_position, booking?.estimated_wait_minutes]);
 
   React.useEffect(() => {
     if (!booking?.id || !visible) return;
@@ -52,7 +56,7 @@ export default function BookingPassModal({
     };
   }, [booking?.id, booking?.status, visible]);
 
-  // Reactive Supabase Realtime update for live check-in
+  // Reactive Supabase Realtime update for live check-in and late queue
   React.useEffect(() => {
     if (!booking?.id || !visible) return;
 
@@ -67,12 +71,23 @@ export default function BookingPassModal({
           filter: `id=eq.${booking.id}`,
         },
         (payload) => {
-          const newRec = payload.new as { status?: string; checked_in_at?: string };
+          const newRec = payload.new as {
+            status?: string;
+            checked_in_at?: string;
+            queue_position?: number | null;
+            estimated_wait_minutes?: number | null;
+          };
           if (newRec?.status) {
             setLiveStatus(newRec.status);
           }
           if (newRec?.checked_in_at) {
             setLiveCheckedInAt(newRec.checked_in_at);
+          }
+          if (newRec?.queue_position !== undefined) {
+            setLiveQueuePosition(newRec.queue_position);
+          }
+          if (newRec?.estimated_wait_minutes !== undefined) {
+            setLiveWaitMinutes(newRec.estimated_wait_minutes);
           }
         }
       )
@@ -100,6 +115,8 @@ export default function BookingPassModal({
   const windowOpenMs = slotMs - 60 * 60 * 1000;
   const isWindowOpen = nowMs >= windowOpenMs;
   const isCheckedIn = liveStatus === 'CHECKED_IN' || Boolean(liveCheckedInAt);
+  const currentQueuePosition = liveQueuePosition ?? booking.queue_position;
+  const currentWaitMinutes = liveWaitMinutes ?? booking.estimated_wait_minutes;
 
 
   const handleSayReached = async () => {
@@ -167,6 +184,11 @@ export default function BookingPassModal({
                     ) : booking.is_present ? (
                       <View style={styles.presentPill} testID="pass-present-pill">
                         <Text style={styles.presentPillText}>📍 AT VENUE</Text>
+                      </View>
+                    ) : null}
+                    {currentQueuePosition ? (
+                      <View style={styles.lateTurnPill} testID="pass-late-turn-pill">
+                        <Text style={styles.lateTurnPillText}>⏰ TURN #{currentQueuePosition}</Text>
                       </View>
                     ) : null}
                   </View>
@@ -300,17 +322,42 @@ export default function BookingPassModal({
                   </Text>
                 </View>
 
-                {/* Late Arrival Grace Reminder */}
-                {(liveStatus === 'CONFIRMED' || isCheckedIn) && (
-                  <View style={styles.lateArrivalPassNote} testID="pass-late-arrival-note">
-                    <View style={styles.lateArrivalPassHeader}>
-                      <Text style={styles.lateArrivalPassIcon}>⏱️</Text>
-                      <Text style={styles.lateArrivalPassTitle}>Late Arrival Rule (+2 Token Buffer)</Text>
+                {/* Late Arrival Queue Token or Grace Reminder */}
+                {currentQueuePosition ? (
+                  <View style={styles.lateQueueActiveBox} testID="pass-late-queue-token">
+                    <View style={styles.lateQueueActiveHeader}>
+                      <View style={styles.lateQueueBadgePill}>
+                        <Text style={styles.lateQueueBadgeIcon}>⏰</Text>
+                        <Text style={styles.lateQueueBadgeText}>LATE TURN ASSIGNED</Text>
+                      </View>
+                      <Text style={styles.lateQueueTokenNumber} testID="pass-late-token-number">
+                        Token #{currentQueuePosition}
+                      </Text>
                     </View>
-                    <Text style={styles.lateArrivalPassText}>
-                      Arriving late? Don't worry! Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"I've Reached"</Text> below when you arrive. You will be placed <Text style={{ fontWeight: '700', color: '#0f172a' }}>2 tokens after the ongoing token</Text> (e.g. token #10 ongoing → queued at #12).
+                    <Text style={styles.lateQueueNoticeText}>
+                      You have been accommodated after 2 member appointments due to late arrival.
                     </Text>
+                    {currentWaitMinutes ? (
+                      <View style={styles.lateWaitRow}>
+                        <Text style={styles.lateWaitLabel}>Estimated Wait:</Text>
+                        <Text style={styles.lateWaitVal} testID="pass-late-wait-minutes">
+                          ~{currentWaitMinutes} mins
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
+                ) : (
+                  (liveStatus === 'CONFIRMED' || isCheckedIn) && (
+                    <View style={styles.lateArrivalPassNote} testID="pass-late-arrival-note">
+                      <View style={styles.lateArrivalPassHeader}>
+                        <Text style={styles.lateArrivalPassIcon}>⏱️</Text>
+                        <Text style={styles.lateArrivalPassTitle}>Late Arrival Rule (+2 Token Buffer)</Text>
+                      </View>
+                      <Text style={styles.lateArrivalPassText}>
+                        Arriving late? Don't worry! Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"I've Reached"</Text> below when you arrive. You will be placed <Text style={{ fontWeight: '700', color: '#0f172a' }}>2 tokens after the ongoing token</Text> (e.g. token #10 ongoing → queued at #12).
+                      </Text>
+                    </View>
+                  )
                 )}
               </View>
             </View>
@@ -880,5 +927,85 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     lineHeight: 16,
+  },
+  lateTurnPill: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  lateTurnPillText: {
+    color: '#92400e',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  lateQueueActiveBox: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
+    marginBottom: 16,
+  },
+  lateQueueActiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  lateQueueBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  lateQueueBadgeIcon: {
+    fontSize: 12,
+  },
+  lateQueueBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#92400e',
+    letterSpacing: 0.5,
+  },
+  lateQueueTokenNumber: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#b45309',
+    letterSpacing: 0.5,
+  },
+  lateQueueNoticeText: {
+    fontSize: 12,
+    color: '#78350f',
+    lineHeight: 16,
+    marginBottom: 6,
+  },
+  lateWaitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  lateWaitLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400e',
+  },
+  lateWaitVal: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#b45309',
   },
 });
