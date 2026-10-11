@@ -14,8 +14,7 @@
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. EXTEND booking_status ENUM & CONSTRAINTS
--- ─────────────────────────────────────────────────────────────────────────────
-ALTER TYPE public.booking_status ADD VALUE IF NOT EXISTS 'CHECKED_IN';
+-- Note: 'CHECKED_IN' enum value added in preceding migration 20261011000000_add_checked_in_status_enum.sql
 
 -- Range exclusion constraint: keep slot reserved for HELD, CONFIRMED, and CHECKED_IN
 ALTER TABLE public.bookings

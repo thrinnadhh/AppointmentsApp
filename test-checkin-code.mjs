@@ -10,17 +10,25 @@ const MIGRATION_PATH = path.join(
   ROOT_DIR,
   'supabase/migrations/20261011000001_reception_checkin_code_system.sql'
 );
+const ENUM_MIGRATION_PATH = path.join(
+  ROOT_DIR,
+  'supabase/migrations/20261011000000_add_checked_in_status_enum.sql'
+);
 
 describe('Reception Check-in Code System Suite', () => {
   const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf8');
+  const enumMigrationSql = fs.existsSync(ENUM_MIGRATION_PATH)
+    ? fs.readFileSync(ENUM_MIGRATION_PATH, 'utf8')
+    : '';
 
   // =========================================================================
   // 1. Database Schema & Migration Guarantees
   // =========================================================================
   describe('1. Schema & Migration Guarantees', () => {
     it('verifies booking_status ENUM is extended with CHECKED_IN', () => {
+      const combinedSql = enumMigrationSql + '\n' + migrationSql;
       assert.match(
-        migrationSql,
+        combinedSql,
         /ALTER\s+TYPE\s+public\.booking_status\s+ADD\s+VALUE\s+IF\s+NOT\s+EXISTS\s+'CHECKED_IN'/i,
         'Migration must add CHECKED_IN to booking_status enum'
       );
