@@ -14,6 +14,49 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_checkin_codes: {
+        Row: {
+          id: string
+          booking_id: string
+          provider_id: string
+          customer_id: string
+          appointment_date: string
+          code: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          booking_id: string
+          provider_id: string
+          customer_id: string
+          appointment_date: string
+          code: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          booking_id?: string
+          provider_id?: string
+          customer_id?: string
+          appointment_date?: string
+          code?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_checkin_codes_booking_id_fkey"
+            columns: ["booking_id"]
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_checkin_codes_provider_id_fkey"
+            columns: ["provider_id"]
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       bookings: {
         Row: {
           created_at: string
@@ -42,6 +85,9 @@ export type Database = {
           followup_original_booking_id: string | null
           queue_position: number | null
           estimated_wait_minutes: number | null
+          checked_in_at: string | null
+          checked_in_by: string | null
+          checked_in_method: string | null
         }
         Insert: {
           attachment_url?: string | null
@@ -66,6 +112,9 @@ export type Database = {
           followup_original_booking_id?: string | null
           queue_position?: number | null
           estimated_wait_minutes?: number | null
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          checked_in_method?: string | null
           resource_id: string
           slot_end: string
           slot_start: string
@@ -95,6 +144,9 @@ export type Database = {
           followup_original_booking_id?: string | null
           queue_position?: number | null
           estimated_wait_minutes?: number | null
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          checked_in_method?: string | null
           resource_id?: string
           slot_end?: string
           slot_start?: string
@@ -897,12 +949,26 @@ export type Database = {
         }
         Returns: Json
       }
+      verify_checkin_code: {
+        Args: {
+          p_shop_id: string
+          p_code: string
+        }
+        Returns: Json
+      }
+      mark_present_manually: {
+        Args: {
+          p_booking_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       booking_status:
         | "HELD"
         | "PENDING_PAYMENT"
         | "CONFIRMED"
+        | "CHECKED_IN"
         | "COMPLETED"
         | "CANCELLED"
         | "NO_SHOW"
@@ -1040,6 +1106,7 @@ export const Constants = {
         "HELD",
         "PENDING_PAYMENT",
         "CONFIRMED",
+        "CHECKED_IN",
         "COMPLETED",
         "CANCELLED",
         "NO_SHOW",
