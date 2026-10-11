@@ -12,6 +12,7 @@ const PUBLIC_ROUTES = [
   '/terms',
   '/refund-policy',
   '/account/delete',
+  '/demo',
 ];
 
 // Strictly public API endpoints (webhook listeners, auth callbacks, customer checkout, and territory endpoints)
