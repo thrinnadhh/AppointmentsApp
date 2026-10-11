@@ -212,7 +212,7 @@ export default function MyBookingsScreen({
                     <View
                       style={[
                         styles.statusBadge,
-                        booking.status === 'CONFIRMED'
+                        booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN'
                           ? styles.statusConfirmed
                           : (booking.status === 'CANCELLED' || booking.status === 'NO_SHOW')
                           ? styles.statusCancelled
@@ -222,7 +222,7 @@ export default function MyBookingsScreen({
                       <Text
                         style={[
                           styles.statusText,
-                          booking.status === 'CONFIRMED'
+                          booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN'
                             ? styles.statusTextConfirmed
                             : (booking.status === 'CANCELLED' || booking.status === 'NO_SHOW')
                             ? styles.statusTextCancelled
@@ -268,9 +268,13 @@ export default function MyBookingsScreen({
                     </Text>
                   </View>
 
-                  {booking.status === 'CONFIRMED' && (
+                  {(booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN') && (
                     <View style={styles.actionButtonsGroup}>
-                      {booking.is_present ? (
+                      {booking.status === 'CHECKED_IN' ? (
+                        <View style={styles.arrivedPill} testID={`arrived-status-${booking.id}`}>
+                          <Text style={styles.arrivedPillText}>✓ Checked In</Text>
+                        </View>
+                      ) : booking.is_present ? (
                         <View style={styles.arrivedPill} testID={`arrived-status-${booking.id}`}>
                           <Text style={styles.arrivedPillText}>✓ Reached Venue</Text>
                         </View>

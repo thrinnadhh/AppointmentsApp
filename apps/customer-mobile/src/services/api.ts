@@ -1544,3 +1544,26 @@ export async function reassignBookingResourceApi(
     return { success: false, error: 'Reassignment failed' };
   }
 }
+
+/**
+ * Fetch reception check-in code for a booking (protected by customer RLS)
+ */
+export async function fetchBookingCheckinCode(bookingId: string): Promise<string | null> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from('appointment_checkin_codes')
+      .select('code')
+      .eq('booking_id', bookingId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Error fetching checkin code from Supabase:', error);
+      return null;
+    }
+    return data?.code || null;
+  } catch (err) {
+    console.warn('Network error fetching checkin code:', err);
+    return null;
+  }
+}
+

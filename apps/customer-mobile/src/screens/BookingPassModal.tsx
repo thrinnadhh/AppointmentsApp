@@ -8,8 +8,10 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
+  Platform,
 } from 'react-native';
 import { Booking } from '@appointments/shared';
+import { fetchBookingCheckinCode, supabase } from '../services/api';
 
 interface BookingPassModalProps {
   visible: boolean;
@@ -25,6 +27,61 @@ export default function BookingPassModal({
   onMarkReached,
 }: BookingPassModalProps) {
   const [isMarkingReached, setIsMarkingReached] = React.useState(false);
+  const [checkinCode, setCheckinCode] = React.useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = React.useState<string>(booking?.status || 'HELD');
+  const [liveCheckedInAt, setLiveCheckedInAt] = React.useState<string | null>(booking?.checked_in_at || null);
+
+  React.useEffect(() => {
+    if (booking) {
+      setLiveStatus(booking.status);
+      setLiveCheckedInAt(booking.checked_in_at || null);
+    }
+  }, [booking?.status, booking?.checked_in_at]);
+
+  React.useEffect(() => {
+    if (!booking?.id || !visible) return;
+    if (booking.status !== 'CONFIRMED' && booking.status !== 'CHECKED_IN') return;
+
+    let isMounted = true;
+    fetchBookingCheckinCode(booking.id).then((code) => {
+      if (isMounted) setCheckinCode(code);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [booking?.id, booking?.status, visible]);
+
+  // Reactive Supabase Realtime update for live check-in
+  React.useEffect(() => {
+    if (!booking?.id || !visible) return;
+
+    const channel = supabase
+      .channel(`modal-checkin-${booking.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'bookings',
+          filter: `id=eq.${booking.id}`,
+        },
+        (payload) => {
+          const newRec = payload.new as { status?: string; checked_in_at?: string };
+          if (newRec?.status) {
+            setLiveStatus(newRec.status);
+          }
+          if (newRec?.checked_in_at) {
+            setLiveCheckedInAt(newRec.checked_in_at);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [booking?.id, visible]);
 
   if (!booking) return null;
 
@@ -37,6 +94,13 @@ export default function BookingPassModal({
     year: 'numeric',
   });
   const passId = booking.reference_code || `TPT-${booking.id.slice(0, 6).toUpperCase()}`;
+
+  const nowMs = Date.now();
+  const slotMs = slotDate.getTime();
+  const windowOpenMs = slotMs - 60 * 60 * 1000;
+  const isWindowOpen = nowMs >= windowOpenMs;
+  const isCheckedIn = liveStatus === 'CHECKED_IN' || Boolean(liveCheckedInAt);
+
 
   const handleSayReached = async () => {
     if (!booking) return;
@@ -90,15 +154,21 @@ export default function BookingPassModal({
               <View style={styles.passTop}>
                 <View style={styles.badgeRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <View style={styles.statusPill}>
-                      <Text style={styles.statusDot}>●</Text>
-                      <Text style={styles.statusText}>{booking.status}</Text>
+                    <View style={[styles.statusPill, isCheckedIn && styles.statusPillCheckedIn]}>
+                      <Text style={[styles.statusDot, isCheckedIn && { color: '#047857' }]}>●</Text>
+                      <Text style={[styles.statusText, isCheckedIn && { color: '#047857' }]}>
+                        {isCheckedIn ? 'CHECKED_IN' : liveStatus}
+                      </Text>
                     </View>
-                    {booking.is_present && (
+                    {isCheckedIn ? (
+                      <View style={styles.checkedInBadge} testID="pass-checkedin-badge">
+                        <Text style={styles.checkedInBadgeText}>✓ PRESENT</Text>
+                      </View>
+                    ) : booking.is_present ? (
                       <View style={styles.presentPill} testID="pass-present-pill">
                         <Text style={styles.presentPillText}>📍 AT VENUE</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                   <Text style={styles.passNumber} testID="pass-reference-code">{passId}</Text>
                 </View>
@@ -126,35 +196,88 @@ export default function BookingPassModal({
               </View>
 
               <View style={styles.passBottom}>
-                {/* Visual QR Code Generator */}
-                <View style={styles.qrContainer}>
-                  <View style={styles.qrMatrix}>
-                    {/* Corner Position Detection Blocks */}
-                    <View style={[styles.qrCornerBlock, styles.qrTopLeft]}>
-                      <View style={styles.qrInnerBlock} />
+                {/* RECEPTION CHECK-IN PANEL */}
+                {isCheckedIn ? (
+                  /* 1. Verified & Checked In: Hide code, show verified banner */
+                  <View style={styles.checkedInCard} testID="pass-checked-in-card">
+                    <View style={styles.checkedInRow}>
+                      <View style={styles.checkedInCheckCircle}>
+                        <Text style={styles.checkedInCheckMark}>✓</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.checkedInTitle}>You are checked in</Text>
+                        <Text style={styles.checkedInTime} testID="pass-checked-in-time">
+                          {liveCheckedInAt
+                            ? `Reception verified at ${new Date(liveCheckedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                            : 'Reception desk verified arrival'}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={[styles.qrCornerBlock, styles.qrTopRight]}>
-                      <View style={styles.qrInnerBlock} />
+                    <Text style={styles.checkedInNotice}>
+                      Please have a seat in the waiting lobby. Your specialist will attend to you shortly.
+                    </Text>
+                  </View>
+                ) : (liveStatus === 'CONFIRMED' && isWindowOpen) ? (
+                  /* 2. Check-in Window Open: Show code in large type */
+                  <View style={styles.checkinCodeBox} testID="pass-checkin-code-box">
+                    <View style={styles.checkinCodeHeader}>
+                      <Text style={styles.checkinCodeIcon}>🎟️</Text>
+                      <Text style={styles.checkinCodeBadge}>RECEPTION CHECK-IN CODE</Text>
                     </View>
-                    <View style={[styles.qrCornerBlock, styles.qrBottomLeft]}>
-                      <View style={styles.qrInnerBlock} />
-                    </View>
-
-                    {/* Matrix visual pattern lines */}
-                    <View style={styles.qrGridPattern}>
-                      <View style={[styles.qrDot, { top: 38, left: 38 }]} />
-                      <View style={[styles.qrDot, { top: 38, left: 54 }]} />
-                      <View style={[styles.qrDot, { top: 38, left: 70 }]} />
-                      <View style={[styles.qrDot, { top: 54, left: 38 }]} />
-                      <View style={[styles.qrDot, { top: 54, left: 54 }]} />
-                      <View style={[styles.qrDot, { top: 70, left: 54 }]} />
-                      <View style={[styles.qrDot, { top: 70, left: 70 }]} />
-                      <View style={[styles.qrDot, { top: 86, left: 38 }]} />
-                      <View style={[styles.qrDot, { top: 86, left: 86 }]} />
+                    <Text style={styles.checkinCodeNumber} testID="pass-checkin-code-number">
+                      {checkinCode || '••••'}
+                    </Text>
+                    <Text style={styles.checkinCodeInstruction}>
+                      Show this code at reception
+                    </Text>
+                    <Text style={styles.checkinCodeSubtext}>
+                      Tell this OTP to reception staff upon arrival to check in
+                    </Text>
+                  </View>
+                ) : (liveStatus === 'CONFIRMED' && !isWindowOpen) ? (
+                  /* 3. Window Not Yet Open: Friendly upcoming notice */
+                  <View style={styles.checkinEarlyBox} testID="pass-checkin-early-box">
+                    <Text style={styles.checkinEarlyIcon}>🔒</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.checkinEarlyTitle}>Check-in Code Opening Soon</Text>
+                      <Text style={styles.checkinEarlySubtitle}>
+                        Your 4-digit reception OTP will appear here 60 minutes before your slot (at {new Date(windowOpenMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).
+                      </Text>
                     </View>
                   </View>
-                  <Text style={styles.qrCaption}>Scan at reception desk for check-in</Text>
-                </View>
+                ) : null}
+
+                {/* Decorative Visual QR Code */}
+                {!isCheckedIn && (
+                  <View style={styles.qrContainer}>
+                    <View style={styles.qrMatrix}>
+                      {/* Corner Position Detection Blocks */}
+                      <View style={[styles.qrCornerBlock, styles.qrTopLeft]}>
+                        <View style={styles.qrInnerBlock} />
+                      </View>
+                      <View style={[styles.qrCornerBlock, styles.qrTopRight]}>
+                        <View style={styles.qrInnerBlock} />
+                      </View>
+                      <View style={[styles.qrCornerBlock, styles.qrBottomLeft]}>
+                        <View style={styles.qrInnerBlock} />
+                      </View>
+
+                      {/* Matrix visual pattern lines */}
+                      <View style={styles.qrGridPattern}>
+                        <View style={[styles.qrDot, { top: 38, left: 38 }]} />
+                        <View style={[styles.qrDot, { top: 38, left: 54 }]} />
+                        <View style={[styles.qrDot, { top: 38, left: 70 }]} />
+                        <View style={[styles.qrDot, { top: 54, left: 38 }]} />
+                        <View style={[styles.qrDot, { top: 54, left: 54 }]} />
+                        <View style={[styles.qrDot, { top: 70, left: 54 }]} />
+                        <View style={[styles.qrDot, { top: 70, left: 70 }]} />
+                        <View style={[styles.qrDot, { top: 86, left: 38 }]} />
+                        <View style={[styles.qrDot, { top: 86, left: 86 }]} />
+                      </View>
+                    </View>
+                    <Text style={styles.qrCaption}>Scan at reception desk for check-in</Text>
+                  </View>
+                )}
 
                 <View style={styles.depositInfoBox}>
                   <View style={styles.depositRow}>
@@ -178,7 +301,7 @@ export default function BookingPassModal({
                 </View>
 
                 {/* Late Arrival Grace Reminder */}
-                {booking.status === 'CONFIRMED' && (
+                {(liveStatus === 'CONFIRMED' || isCheckedIn) && (
                   <View style={styles.lateArrivalPassNote} testID="pass-late-arrival-note">
                     <View style={styles.lateArrivalPassHeader}>
                       <Text style={styles.lateArrivalPassIcon}>⏱️</Text>
@@ -194,8 +317,13 @@ export default function BookingPassModal({
 
             {/* Quick Actions */}
             <View style={styles.actionRow}>
-              {booking.status === 'CONFIRMED' && (
-                booking.is_present ? (
+              {(liveStatus === 'CONFIRMED' || isCheckedIn) && (
+                isCheckedIn ? (
+                  <View style={styles.reachedPill} testID="pass-reached-status">
+                    <Text style={styles.btnIcon}>✓</Text>
+                    <Text style={styles.reachedPillText}>Checked In</Text>
+                  </View>
+                ) : booking.is_present ? (
                   <View style={styles.reachedPill} testID="pass-reached-status">
                     <Text style={styles.btnIcon}>✓</Text>
                     <Text style={styles.reachedPillText}>At Venue</Text>
@@ -622,5 +750,135 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#78350f',
     lineHeight: 15,
+  },
+  statusPillCheckedIn: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+  },
+  checkedInBadge: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  checkedInBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  checkedInCard: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    marginBottom: 16,
+  },
+  checkedInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  checkedInCheckCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#047857',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkedInCheckMark: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  checkedInTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#064e3b',
+  },
+  checkedInTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+    marginTop: 2,
+  },
+  checkedInNotice: {
+    fontSize: 12,
+    color: '#065f46',
+    lineHeight: 16,
+  },
+  checkinCodeBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 18,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    borderStyle: 'dashed',
+    marginBottom: 16,
+  },
+  checkinCodeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  checkinCodeIcon: {
+    fontSize: 14,
+  },
+  checkinCodeBadge: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#475569',
+    letterSpacing: 1,
+  },
+  checkinCodeNumber: {
+    fontSize: 40,
+    fontWeight: '900',
+    color: '#0f172a',
+    letterSpacing: 8,
+    marginVertical: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  checkinCodeInstruction: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#047857',
+    marginTop: 4,
+  },
+  checkinCodeSubtext: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  checkinEarlyBox: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  checkinEarlyIcon: {
+    fontSize: 16,
+    marginTop: 2,
+  },
+  checkinEarlyTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#334155',
+    marginBottom: 2,
+  },
+  checkinEarlySubtitle: {
+    fontSize: 11,
+    color: '#64748b',
+    lineHeight: 16,
   },
 });
