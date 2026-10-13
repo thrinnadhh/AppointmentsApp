@@ -717,6 +717,8 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
 export interface VerifyPaymentResult {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
+  queue_position?: number;
   status?: string;
   payment_status?: string;
   error?: string;
@@ -754,6 +756,8 @@ export async function verifyRazorpayPayment(params: {
     return {
       success: true,
       booking_id: json.booking_id,
+      reference_code: json.reference_code,
+      queue_position: json.queue_position,
       status: json.status,
       payment_status: json.payment_status,
     };
@@ -1385,6 +1389,76 @@ export async function signOutCustomer() {
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Sign out failed';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Sign in using Google OAuth via Supabase.
+ * In Web environments, initiates OAuth redirect.
+ * In React Native / Expo, opens the authorization URL using Linking.
+ */
+export async function signInWithGoogle(): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const isWeb = typeof window !== 'undefined' && typeof window.location !== 'undefined';
+    const redirectUrl = isWeb && window.location
+      ? window.location.origin
+      : 'appointments://auth/callback';
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: !isWeb,
+      },
+    });
+
+    if (error) {
+      console.warn('Supabase Google OAuth error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    if (data?.url) {
+      if (isWeb && window.location) {
+        window.location.href = data.url;
+      } else {
+        const { Linking } = await import('react-native');
+        await Linking.openURL(data.url);
+      }
+      return { success: true, url: data.url };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Google authentication failed';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Fast development/demo Google Sign-In helper.
+ * Generates or signs into an authenticated customer session for local development
+ * without requiring third-party OAuth configuration in the Supabase Dashboard.
+ */
+export async function signInWithGoogleDev(
+  email: string = 'trinadh.patient@gmail.com',
+  name: string = 'Trinadh Google User'
+): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
+  try {
+    const testPhone = '+919999999991';
+    const otpRes = await verifyPhoneOtp(testPhone, '123456');
+    if (otpRes.success && otpRes.user) {
+      await syncCustomerProfile(name, testPhone, email);
+      return {
+        success: true,
+        user: { ...otpRes.user, email, user_metadata: { full_name: name, avatar_url: 'https://lh3.googleusercontent.com/a/default-user' } },
+        session: otpRes.session,
+      };
+    }
+
+    return { success: false, error: 'Could not initialize Google dev session' };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Google dev sign-in error';
     return { success: false, error: msg };
   }
 }

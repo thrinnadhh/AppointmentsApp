@@ -242,10 +242,18 @@ export async function POST(req: NextRequest) {
     }
 
 
+    const { data: confirmedBkg } = await supabaseAdmin
+      .from('bookings')
+      .select('queue_position, reference_code')
+      .eq('id', booking_id)
+      .maybeSingle();
+
     return NextResponse.json<VerifyRazorpayPaymentResponse>(
       {
         success: true,
         booking_id,
+        reference_code: confirmedBkg?.reference_code ?? undefined,
+        queue_position: confirmedBkg?.queue_position ?? 1,
         status: 'CONFIRMED',
         payment_status: 'CAPTURED',
       },

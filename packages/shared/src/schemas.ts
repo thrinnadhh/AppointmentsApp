@@ -32,6 +32,7 @@ export interface ConfirmPaymentResponse {
   success: boolean;
   booking_id?: string;
   reference_code?: string;
+  queue_position?: number;
   status?: string;
   payment_status?: string;
   error?: string;

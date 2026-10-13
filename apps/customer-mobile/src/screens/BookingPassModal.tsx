@@ -16,6 +16,12 @@ import { fetchBookingCheckinCode, supabase } from '../services/api';
 interface BookingPassModalProps {
   visible: boolean;
   booking: (Booking & { provider_name?: string; resource_name?: string }) | null;
+  patientDetails?: {
+    fullName?: string;
+    phone?: string;
+    email?: string;
+  };
+  assignedTokenNumber?: number;
   onClose: () => void;
   onMarkReached?: (bookingId: string) => Promise<void>;
 }
@@ -35,6 +41,8 @@ export interface HospitalQueueTokenItem {
 export default function BookingPassModal({
   visible,
   booking,
+  patientDetails,
+  assignedTokenNumber,
   onClose,
   onMarkReached,
 }: BookingPassModalProps) {
@@ -132,8 +140,8 @@ export default function BookingPassModal({
   const currentWaitMinutes = liveWaitMinutes ?? booking.estimated_wait_minutes;
   const isLateQueue = Boolean(currentQueuePosition);
 
-  // Derive user token number (e.g. Token #4 by default for hospital OPD session)
-  const myTokenNumber = 4;
+  // Derive user token number (e.g. from assignedTokenNumber, booking.queue_position, or default 1)
+  const myTokenNumber = assignedTokenNumber ?? booking.queue_position ?? 1;
 
   // Build the complete Hospital OPD queue roster (Tokens #1 to #8)
   const hospitalQueueRoster: HospitalQueueTokenItem[] = [
@@ -421,6 +429,32 @@ export default function BookingPassModal({
                     </View>
 
                     <Text style={styles.serviceName}>{booking.resource_name || 'OPD Consultation'}</Text>
+
+                    {/* Registered Patient Details & Token Banner */}
+                    <View style={{
+                      backgroundColor: '#eff6ff',
+                      borderRadius: 10,
+                      padding: 10,
+                      marginVertical: 10,
+                      borderWidth: 1,
+                      borderColor: '#bfdbfe',
+                    }} testID="pass-patient-details-card">
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#1e40af', textTransform: 'uppercase' }}>
+                          Registered Patient Details
+                        </Text>
+                        <View style={{ backgroundColor: '#2563eb', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                          <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 11 }}>TOKEN #{myTokenNumber}</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#0f172a', marginTop: 4 }}>
+                        {patientDetails?.fullName || 'Registered Patient'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>
+                        📱 {patientDetails?.phone || '+91 99999 99991'}
+                        {patientDetails?.email ? ` • ✉️ ${patientDetails.email}` : ''}
+                      </Text>
+                    </View>
 
                     <View style={styles.slotBox}>
                       <View style={styles.slotCol}>

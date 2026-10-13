@@ -351,6 +351,8 @@ export interface VerifyRazorpayPaymentRequest {
 export interface VerifyRazorpayPaymentResponse {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
+  queue_position?: number;
   status?: string;
   payment_status?: string;
   error?: string;

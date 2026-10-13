@@ -69,10 +69,10 @@ const VERTICAL_VISUALS: Record<string, VerticalVisual> = {
   pets: {
     emoji: '🐾',
     tag: 'Vets & Pets',
-    bg: '#faf5ff',
-    iconBg: '#f3e8ff',
-    color: '#7c3aed',
-    borderColor: '#e9d5ff',
+    bg: '#ecfdf5',
+    iconBg: '#d1fae5',
+    color: '#059669',
+    borderColor: '#a7f3d0',
   },
 };
 
