@@ -488,6 +488,12 @@ export default function App() {
     };
     setCustomerBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== bookingId)]);
 
+    // Push MY_BOOKINGS onto history so navigation state transitions to My Bookings
+    setHistory((prev) => [
+      ...prev,
+      { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
+    ]);
+
     // Present appointment pass with assigned token directly in-app!
     setSelectedBookingForPass(newBooking);
     setPassModalVisible(true);

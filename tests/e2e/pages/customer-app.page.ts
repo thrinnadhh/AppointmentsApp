@@ -289,12 +289,25 @@ export class CustomerAppPage {
   async openCheckout() {
     await expect(this.holdDepositBtn).toBeVisible();
     await this.holdDepositBtn.click();
+
+    // If pre-booking customer details modal appears, proceed to checkout
+    const detailsProceedBtn = this.page.getByTestId('btn-proceed-to-checkout').or(this.page.getByText(/Proceed to Hold & Pay Deposit/i));
+    if (await detailsProceedBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+      await detailsProceedBtn.click();
+    }
+
     await expect(this.checkoutTitle).toBeVisible();
   }
 
   async submitPayment() {
     await expect(this.payDepositBtn).toBeVisible();
     await this.payDepositBtn.click();
+
+    // If the digital appointment pass modal pops up upon payment, dismiss it to reveal My Bookings screen
+    const passCloseBtn = this.page.getByText('✕').first().or(this.page.getByText(/Close Pass|Close/i).first());
+    if (await passCloseBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+      await passCloseBtn.click();
+    }
   }
 
   async navigateToMyBookings() {

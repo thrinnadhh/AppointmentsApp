@@ -169,7 +169,7 @@ async function seedE2EData() {
       owner_id: salonOwnerId,
       category_id: 'salons',
       sub_category_id: 'hair_styling',
-      name: 'Elite Looks Luxury Salon',
+      name: 'Naturals Luxury Salon',
       description: 'Premium hair styling, beard grooming, and rejuvenating facials by senior stylists.',
       address: 'Air Bypass Road, Beside Domino’s Pizza',
       city: 'Tirupati',
