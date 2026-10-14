@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import crypto from 'crypto';
 
 // Load environment variables for E2E tests without hardcoding secrets in spec files
 if (typeof process.loadEnvFile === 'function') {
@@ -20,7 +21,7 @@ process.env.TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || 'NaturalsSa
 // committed literal, which would activate the privileged bypass on any
 // deployment using the default value.
 if (!process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN) {
-  const dynamicTestToken = `ci-test-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+  const dynamicTestToken = `ci-test-e2e-${crypto.randomBytes(24).toString('hex')}`;
   process.env.ADMIN_SECRET = dynamicTestToken;
   process.env.SUPERADMIN_E2E_TOKEN = dynamicTestToken;
 } else {

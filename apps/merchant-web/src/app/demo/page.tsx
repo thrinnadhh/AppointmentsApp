@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Play,
   ArrowRight,
-  User,
   Check,
   Building2,
 } from 'lucide-react';
