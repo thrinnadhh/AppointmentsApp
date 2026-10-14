@@ -279,6 +279,8 @@ export default function CustomerDetailsModal({
               style={styles.proceedButton}
               onPress={handleContinue}
               testID="btn-proceed-to-checkout"
+              accessibilityRole="button"
+              accessibilityLabel="Proceed to Hold & Pay Deposit"
             >
               <Text style={styles.proceedButtonText}>Proceed to Hold & Pay Deposit →</Text>
             </TouchableOpacity>

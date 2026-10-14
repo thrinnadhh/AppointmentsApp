@@ -291,8 +291,12 @@ export class CustomerAppPage {
     await this.holdDepositBtn.click();
 
     // If pre-booking customer details modal appears, proceed to checkout
-    const detailsProceedBtn = this.page.getByTestId('btn-proceed-to-checkout').or(this.page.getByText(/Proceed to Hold & Pay Deposit/i));
-    const hasDetailsModal = await detailsProceedBtn.waitFor({ state: 'visible', timeout: 3500 }).then(() => true).catch(() => false);
+    const detailsProceedBtn = this.page
+      .getByTestId('btn-proceed-to-checkout')
+      .or(this.page.getByRole('button', { name: /Proceed to Hold & Pay Deposit/i }))
+      .or(this.page.getByText(/Proceed to Hold & Pay Deposit/i))
+      .first();
+    const hasDetailsModal = await detailsProceedBtn.waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false);
     if (hasDetailsModal) {
       await detailsProceedBtn.click();
     }
@@ -305,8 +309,12 @@ export class CustomerAppPage {
     await this.payDepositBtn.click();
 
     // If the digital appointment pass modal pops up upon payment, dismiss it to reveal My Bookings screen
-    const passCloseBtn = this.page.getByTestId('btn-close-booking-pass').or(this.page.getByText('✕').first()).or(this.page.getByText(/Close Pass|Close/i).first());
-    const hasPassModal = await passCloseBtn.waitFor({ state: 'visible', timeout: 3500 }).then(() => true).catch(() => false);
+    const passCloseBtn = this.page
+      .getByTestId('btn-close-booking-pass')
+      .or(this.page.getByText('✕'))
+      .or(this.page.getByText(/Close Pass|Close/i))
+      .first();
+    const hasPassModal = await passCloseBtn.waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false);
     if (hasPassModal) {
       await passCloseBtn.click();
     }

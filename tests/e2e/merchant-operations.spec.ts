@@ -198,6 +198,10 @@ test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () 
     const slotEnd = new Date(Date.now() + 600000000 + 1800000).toISOString();
 
     const pausedHoldRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      headers: {
+        'x-customer-id': testCustomerId,
+        'x-admin-bypass-key': adminBypassToken,
+      },
       data: {
         customer_id: testCustomerId,
         resource_id: testResourceId,
