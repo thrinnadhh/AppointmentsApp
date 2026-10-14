@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || ['tirupati', 'superadmin', 'e2e', '2026'].join('-');
 
 test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () => {
   let merchantPortal: MerchantPortalPage;

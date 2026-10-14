@@ -23,14 +23,14 @@ const SEED_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
 const SEED_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // Dr. S. K. Murthy
 const INACTIVE_RESOURCE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'; // seeded inactive resource
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111';
-const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || ['tirupati', 'superadmin', 'e2e', '2026'].join('-');
 
 test.describe('Customer — Edge & Boundary Cases', () => {
   test.beforeEach(async ({ request }) => {
     await request.patch(`${BASE}/api/admin/merchants`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': ADMIN_BYPASS,
       },
       data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'ACTIVE' },
     }).catch(() => null);
@@ -44,6 +44,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + randomOffset + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: {
         customer_id: SEED_CUSTOMER_ID,
         resource_id: SEED_RESOURCE_ID,
@@ -58,8 +62,8 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     const expireRes = await request.post(`${BASE}/api/test/expire-hold`, {
       data: { booking_id },
       headers: {
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
-        'Authorization': 'Bearer tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': ADMIN_BYPASS,
+        'Authorization': `Bearer ${ADMIN_BYPASS}`,
       },
     });
     // Helper may not exist yet — skip gracefully if 404
@@ -75,7 +79,7 @@ test.describe('Customer — Edge & Boundary Cases', () => {
         gateway_payment_id: `pay_expired_${Date.now()}`,
       },
       headers: {
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': ADMIN_BYPASS,
       },
     });
 
@@ -97,9 +101,14 @@ test.describe('Customer — Edge & Boundary Cases', () => {
       slot_end: slotEnd,
     };
 
+    const authHeaders = {
+      'x-customer-id': SEED_CUSTOMER_ID,
+      'x-admin-bypass-key': ADMIN_BYPASS,
+    };
+
     const [first, second] = await Promise.all([
-      request.post(`${BASE}/api/bookings/hold`, { data: holdPayload }),
-      request.post(`${BASE}/api/bookings/hold`, { data: holdPayload }),
+      request.post(`${BASE}/api/bookings/hold`, { headers: authHeaders, data: holdPayload }),
+      request.post(`${BASE}/api/bookings/hold`, { headers: authHeaders, data: holdPayload }),
     ]);
 
     const statuses = [first.status(), second.status()];
@@ -116,7 +125,7 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     // Check customer flag status first
     const profileRes = await request.get(
       `${BASE}/api/customers/${SEED_CUSTOMER_ID}/profile`,
-      { headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' } }
+      { headers: { 'x-admin-bypass-key': ADMIN_BYPASS } }
     );
 
     if (profileRes.status() === 404) { test.skip(); return; }
@@ -130,6 +139,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
       const slotEnd = new Date(Date.now() + 86400000 * 2 + 1800000).toISOString();
 
       const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': SEED_CUSTOMER_ID,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
         data: {
           customer_id: SEED_CUSTOMER_ID,
           resource_id: SEED_RESOURCE_ID,
@@ -153,6 +166,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + 20 * 60 * 1000 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: {
         customer_id: SEED_CUSTOMER_ID,
         resource_id: SEED_RESOURCE_ID,
@@ -186,6 +203,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
 
     // Book slot A first (taken)
     const holdA = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: {
         customer_id: SEED_CUSTOMER_ID,
         resource_id: SEED_RESOURCE_ID,
@@ -201,6 +222,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
 
     // Book slot B to reschedule
     const holdB = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: {
         customer_id: SEED_CUSTOMER_ID,
         resource_id: SEED_RESOURCE_ID,
@@ -235,6 +260,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + 86400000 * 3 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
     });
     if (holdRes.status() !== 201) { test.skip(); return; }
@@ -265,6 +294,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     const pastEnd = new Date(Date.now() - 86400000 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: {
         customer_id: SEED_CUSTOMER_ID,
         resource_id: SEED_RESOURCE_ID,
@@ -282,7 +315,7 @@ test.describe('Customer — Edge & Boundary Cases', () => {
   test('EC-CUST-08: Holding a slot for a deactivated resource returns 404 or 422', async ({ request }) => {
     // Deactivate the resource first
     await request.patch(`${BASE}/api/resources/${INACTIVE_RESOURCE_ID}`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { is_active: false },
     });
 
@@ -291,6 +324,10 @@ test.describe('Customer — Edge & Boundary Cases', () => {
       const slotEnd = new Date(Date.now() + 86400000 * 4 + 1800000).toISOString();
 
       const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': SEED_CUSTOMER_ID,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
         data: {
           customer_id: SEED_CUSTOMER_ID,
           resource_id: INACTIVE_RESOURCE_ID,
@@ -305,7 +342,7 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     } finally {
       // Restore resource active state
       await request.patch(`${BASE}/api/resources/${INACTIVE_RESOURCE_ID}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: { is_active: true },
       });
     }

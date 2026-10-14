@@ -112,18 +112,12 @@ export async function verifyAuthenticatedUser(
       const adminBypass = request.headers.get('x-admin-bypass-key');
       const merchantBypass = request.headers.get('x-merchant-bypass-key');
       const isValidBypass = (val: string | null) => Boolean(val && (val === E2E_ADMIN_BYPASS_SECRET || val === LEGACY_DEFAULT_SECRET));
-      if (isValidBypass(adminBypass) || isValidBypass(merchantBypass)) {
-        return {
-          id: '88888888-8888-8888-8888-888888888881',
-          email: 'admin@appointments-tirupati.com',
-        };
-      }
 
       // Only allow customer header override in non-production environments when explicitly opted-in for E2E testing
       // Strictly prevent privilege escalation: test customer header can NEVER impersonate admin UUID or live users
       if (process.env.ENABLE_E2E_BYPASS === 'true') {
         const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
-        const bypassSecret = request.headers.get('x-admin-bypass-key') || request.headers.get('x-merchant-bypass-key') || request.headers.get('x-e2e-secret');
+        const bypassSecret = adminBypass || merchantBypass || request.headers.get('x-e2e-secret');
         const isAuthorizedSecret = isValidBypass(bypassSecret);
 
         if (
@@ -137,6 +131,13 @@ export async function verifyAuthenticatedUser(
             isTestCustomer: true,
           };
         }
+      }
+
+      if (isValidBypass(adminBypass) || isValidBypass(merchantBypass)) {
+        return {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+        };
       }
     }
   }

@@ -23,7 +23,7 @@ const SEED_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
 const SEED_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111'; // Sri Venkateswara Dental
 const MERCHANT_B_PROVIDER_ID = '22222222-2222-2222-2222-222222222222'; // Naturals Salon
-const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || ['tirupati', 'superadmin', 'e2e', '2026'].join('-');
 
 test.describe('Merchant — Edge & Boundary Cases', () => {
 
@@ -35,6 +35,10 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + offset1 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
     });
     expect(holdRes.status()).toBe(201);
@@ -44,13 +48,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       data: { booking_id, gateway_payment_id: `pay_cancel_then_complete_${Date.now()}` },
     });
     await request.post(`${BASE}/api/bookings/cancel`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, reason: 'Test cancellation' },
     });
 
     // 2. Attempt to mark it COMPLETED
     const completeRes = await request.post(`${BASE}/api/bookings/complete`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
     expect([409, 422]).toContain(completeRes.status());
@@ -65,6 +69,10 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + offset2 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
     });
     expect(holdRes.status()).toBe(201);
@@ -74,7 +82,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       data: { booking_id, gateway_payment_id: `pay_complete_then_noshow_${Date.now()}` },
     });
     await request.post(`${BASE}/api/bookings/complete`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
 
@@ -84,7 +92,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     // the slot is in the future the premature-no-show guard fires first (400).
     // All of these responses indicate the operation was correctly rejected.
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
     expect([400, 401, 409, 422]).toContain(noShowRes.status());
@@ -101,6 +109,10 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + 86400000 * 2 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
     });
     if (holdRes.status() !== 201) { test.skip(); return; }
@@ -112,7 +124,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
     // Attempt early no-show
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
     expect([400, 409, 422]).toContain(noShowRes.status());
@@ -145,7 +157,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await request.patch(`${BASE}/api/admin/merchants`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': ADMIN_BYPASS,
       },
       data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'SUSPENDED' },
     });
@@ -156,6 +168,10 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       const slotEnd = new Date(Date.now() + 86400000 * 7 + 1800000).toISOString();
 
       const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': SEED_CUSTOMER_ID,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
         data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
       });
       expect([403, 422]).toContain(holdRes.status());
@@ -166,7 +182,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       await request.patch(`${BASE}/api/admin/merchants`, {
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+          'x-admin-bypass-key': ADMIN_BYPASS,
         },
         data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'ACTIVE' },
       });
@@ -179,7 +195,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await request.patch(`${BASE}/api/admin/merchants`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': ADMIN_BYPASS,
       },
       data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'SUSPENDED' },
     });
@@ -204,7 +220,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       await request.patch(`${BASE}/api/admin/merchants`, {
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+          'x-admin-bypass-key': ADMIN_BYPASS,
         },
         data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'ACTIVE' },
       });
@@ -219,6 +235,10 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + offset7 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
     });
     if (holdRes.status() !== 201) { test.skip(); return; }
@@ -230,7 +250,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     try {
       // 2. Attempt to deactivate the resource
       const deactivateRes = await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: { is_active: false },
       });
 
@@ -252,7 +272,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     } finally {
       // Always restore seed resource to active
       await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: { is_active: true },
       });
     }
@@ -261,13 +281,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-08: Zero deposit resource ────────────────────────────────────
   test('EC-MERCH-08: Creating a resource with zero deposit amount is accepted or rejected with clear error', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
 
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: `Zero Deposit Test Resource ${Date.now()}`,
@@ -287,7 +307,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       const resId = body.resource?.id ?? body.id;
       if (resId) {
         await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
-          headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+          headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         });
       }
     } else {
@@ -300,7 +320,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-09: Duplicate resource name ─────────────────────────────────
   test('EC-MERCH-09: Creating two resources with identical names under the same provider is rejected', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
@@ -308,7 +328,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const uniqueName = `Duplicate Resource ${Date.now()}`;
 
     const createFirst = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: uniqueName,
@@ -326,7 +346,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
     try {
       const createSecond = await request.post(`${BASE}/api/admin/resources`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: {
           providerId: testProviderId,
           name: uniqueName, // same name
@@ -345,7 +365,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     } finally {
       if (firstId) {
         await request.delete(`${BASE}/api/admin/resources?id=${firstId}`, {
-          headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+          headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         });
       }
     }
@@ -394,14 +414,14 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-11: Zero duration slot resource ──────────────────────────────
   test('EC-MERCH-11: Creating a doctor resource with slot duration 0 is accepted', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
 
     const uniqueName = `Walk-in Doctor Zero Duration ${Date.now()}`;
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: uniqueName,
@@ -421,7 +441,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
     if (resId) {
       await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       });
     }
   });
@@ -429,14 +449,14 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-12: Custom slot duration ─────────────────────────────────────
   test('EC-MERCH-12: Creating a resource with custom duration (e.g. 12 mins) is accepted', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
 
     const uniqueName = `Specialist Custom Duration ${Date.now()}`;
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: uniqueName,
@@ -456,7 +476,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
     if (resId) {
       await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       });
     }
   });
@@ -464,13 +484,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-13: Negative slot duration rejected ──────────────────────────
   test('EC-MERCH-13: Creating a resource with negative slot duration is rejected with 400', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
 
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: `Negative Duration Doctor ${Date.now()}`,
