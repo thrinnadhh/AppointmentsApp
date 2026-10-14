@@ -9,8 +9,6 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
-  Alert,
-  Platform,
 } from 'react-native';
 import { signInWithGoogle, signInWithGoogleDev, syncCustomerProfile } from '../services/api';
 

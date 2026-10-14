@@ -136,10 +136,8 @@ describe('Reception Check-in Code System Suite', () => {
 
     it('simulates CSPRNG code generator uniqueness and configurable length (4 and 6 digits)', () => {
       function generateCode(len = 4) {
-        const buf = crypto.randomBytes(4);
-        const randInt = buf.readUInt32BE(0) & 0x7fffffff;
-        const mod = Math.pow(10, len);
-        return String(randInt % mod).padStart(len, '0');
+        const val = crypto.randomInt(0, Math.pow(10, len));
+        return String(val).padStart(len, '0');
       }
 
       // Generate 100 4-digit codes
@@ -163,12 +161,12 @@ describe('Reception Check-in Code System Suite', () => {
       const db = new Set(['shop-1:2026-10-11:1234']); // Pre-existing code
 
       let attempts = 0;
-      function allocateCode(shopId, date, forceCollisionFirst = true) {
+      function allocateCode(shopId, date) {
         let inserted = false;
         let finalCode = null;
         while (attempts < 10 && !inserted) {
           attempts++;
-          const candidate = (attempts === 1 && forceCollisionFirst) ? '1234' : '5678';
+          const candidate = attempts === 1 ? '1234' : '5678';
           const key = `${shopId}:${date}:${candidate}`;
           if (!db.has(key)) {
             db.add(key);
@@ -179,7 +177,7 @@ describe('Reception Check-in Code System Suite', () => {
         return finalCode;
       }
 
-      const allocated = allocateCode('shop-1', '2026-10-11', true);
+      const allocated = allocateCode('shop-1', '2026-10-11');
       assert.equal(allocated, '5678');
       assert.equal(attempts, 2, 'Should have collided on attempt 1 and succeeded on attempt 2');
     });

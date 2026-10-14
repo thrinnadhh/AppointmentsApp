@@ -610,7 +610,6 @@ export default function MerchantOverviewPage() {
   const confirmedCount = todaysBookings.filter((b) => b.status === 'CONFIRMED' || b.status === 'CHECKED_IN').length;
   const heldCount = todaysBookings.filter((b) => b.status === 'HELD').length;
   const completedCount = todaysBookings.filter((b) => b.status === 'COMPLETED').length;
-  const checkedInCount = todaysBookings.filter((b) => b.status === 'CHECKED_IN' || b.is_present).length;
   const totalDepositCollected = todaysBookings
     .filter((b) => b.payment_status === 'CAPTURED')
     .reduce((acc, curr) => acc + Number(curr.deposit_amount), 0);

@@ -19,8 +19,14 @@ process.env.TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || 'NaturalsSa
 // E2E secrets must be supplied via the environment; never fall back to a
 // committed literal, which would activate the privileged bypass on any
 // deployment using the default value.
-process.env.ADMIN_SECRET = process.env.ADMIN_SECRET || '';
-process.env.SUPERADMIN_E2E_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || '';
+if (!process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN) {
+  const dynamicTestToken = `ci-test-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+  process.env.ADMIN_SECRET = dynamicTestToken;
+  process.env.SUPERADMIN_E2E_TOKEN = dynamicTestToken;
+} else {
+  process.env.ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+  process.env.SUPERADMIN_E2E_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || '';
+}
 process.env.ALLOW_MOCK_PAYMENTS = 'true';
 process.env.ENABLE_E2E_BYPASS = 'true';
 

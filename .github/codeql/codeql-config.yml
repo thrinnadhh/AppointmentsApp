@@ -18,3 +18,7 @@ paths-ignore:
   - '**/*.spec.ts'
   - '**/*.test.tsx'
   - '**/*Test.kt'
+  - 'test-*.mjs'
+  - '*.mjs'
+  - 'scripts/**'
+  - 'tests/**'

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import {
   Ticket,
@@ -14,28 +14,10 @@ import {
   RefreshCw,
   Play,
   ArrowRight,
-  ShieldCheck,
-  Zap,
   User,
-  MapPin,
-  ChevronRight,
   Check,
   Building2,
-  Users,
-  Activity,
-  CalendarDays,
-  Flame,
-  ArrowUpRight
 } from 'lucide-react';
-import {
-  supabase,
-  verifyCheckinCodeRpc,
-  markPresentManuallyRpc,
-  manageLateQueueBooking,
-  MerchantBookingWithDetails,
-  Provider
-} from '@/lib/supabase';
-import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 export interface HospitalQueueToken {
   tokenNumber: number;
@@ -188,8 +170,6 @@ const DEFAULT_SAMPLE_BOOKINGS: DemoBookingState[] = [
 ];
 
 export default function InteractiveDemoPage() {
-  const { activeProvider } = useMerchantTenant();
-
   const [booking, setBooking] = useState<DemoBookingState>(DEFAULT_SAMPLE_BOOKINGS[0]);
   const [copiedCode, setCopiedCode] = useState(false);
   const [mobileActiveTab, setMobileActiveTab] = useState<'pass' | 'queue'>('pass');
@@ -276,7 +256,6 @@ export default function InteractiveDemoPage() {
         }
 
         const nowStr = new Date().toISOString();
-        const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         // Flip booking state to CHECKED_IN (GREEN)
         setBooking((prev) => ({
