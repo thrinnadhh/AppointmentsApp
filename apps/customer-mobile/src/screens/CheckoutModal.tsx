@@ -51,8 +51,20 @@ interface CheckoutModalProps {
   customerId?: string;
   providerId?: string;
   coolingPeriodDays?: number;
+  patientDetails?: {
+    fullName?: string;
+    phone?: string;
+    email?: string;
+  };
+  isAuthenticated?: boolean;
+  onRequireAuth?: () => void;
   onClose: () => void;
-  onPaymentSuccess: (bookingId: string, referenceCode?: string, isFollowup?: boolean) => void;
+  onPaymentSuccess: (
+    bookingId: string,
+    referenceCode?: string,
+    isFollowup?: boolean,
+    tokenNumber?: number
+  ) => void;
 }
 
 
@@ -64,6 +76,9 @@ export default function CheckoutModal({
   customerId = '99999999-9999-9999-9999-999999999991',
   providerId,
   coolingPeriodDays,
+  patientDetails,
+  isAuthenticated = false,
+  onRequireAuth,
   onClose,
   onPaymentSuccess,
 }: CheckoutModalProps) {
@@ -197,6 +212,12 @@ export default function CheckoutModal({
     setIsProcessing(true);
     setPayError(null);
     try {
+      if (!isAuthenticated) {
+        setPayError('Authentication required to create booking hold. Please sign in with your mobile number.');
+        setIsProcessing(false);
+        return;
+      }
+
       // 1. Acquire atomic hold via backend API (with all validation)
       const holdRes = await createHoldOnSupabase(
         customerId,
@@ -223,7 +244,8 @@ export default function CheckoutModal({
           setIsProcessing(false);
           return;
         }
-        onPaymentSuccess(bookingId, holdRes.reference_code, true);
+        const assignedToken = (confirmRes as any)?.queue_position || 1;
+        onPaymentSuccess(bookingId, holdRes.reference_code, true, assignedToken);
         return;
       }
 
@@ -261,7 +283,8 @@ export default function CheckoutModal({
                   customerId,
                 });
                 if (verifyRes.success) {
-                  onPaymentSuccess(bookingId, holdRes.reference_code);
+                  const assignedToken = verifyRes.queue_position || 1;
+                  onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
                 } else {
                   setPayError(verifyRes.error || 'Payment verification failed.');
                 }
@@ -297,11 +320,13 @@ export default function CheckoutModal({
       });
 
       if (verifyRes.success) {
-        onPaymentSuccess(bookingId, holdRes.reference_code);
+        const assignedToken = verifyRes.queue_position || 1;
+        onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
       } else {
         // Fallback to direct Supabase confirmation if verification endpoint is unavailable
-        await confirmBookingPaymentOnSupabase(bookingId, paymentId, attachedPath);
-        onPaymentSuccess(bookingId, holdRes.reference_code);
+        const fallbackRes = await confirmBookingPaymentOnSupabase(bookingId, paymentId, attachedPath);
+        const assignedToken = (fallbackRes as any)?.queue_position || 1;
+        onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Payment failed. Please try again.';
@@ -392,6 +417,28 @@ export default function CheckoutModal({
                 </Text>
               </View>
             )}
+
+            {/* Patient & Registered Details Overview */}
+            {patientDetails?.fullName ? (
+              <View style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 14,
+                padding: 14,
+                marginBottom: 14,
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+              }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Patient & Registered Contact
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0f172a', marginTop: 4 }}>
+                  {patientDetails.fullName}
+                </Text>
+                <Text style={{ fontSize: 13, color: '#334155', marginTop: 2 }}>
+                  📞 {patientDetails.phone}{patientDetails.email ? ` • ✉️ ${patientDetails.email}` : ''}
+                </Text>
+              </View>
+            ) : null}
 
             {/* Booking Summary */}
             <View style={styles.card}>
@@ -702,6 +749,27 @@ export default function CheckoutModal({
             {payError && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorBannerText}>⚠️ {payError}</Text>
+                {payError.toLowerCase().includes('authentication') && onRequireAuth && (
+                  <TouchableOpacity
+                    style={{
+                      marginTop: 10,
+                      backgroundColor: '#2563eb',
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      onClose();
+                      onRequireAuth();
+                    }}
+                    testID="btn-prompt-sign-in"
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
+                      👤 Sign In with Phone OTP (Test OTP: 123456) →
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
             <TouchableOpacity

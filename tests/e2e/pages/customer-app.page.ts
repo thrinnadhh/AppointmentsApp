@@ -137,7 +137,7 @@ export class CustomerAppPage {
 
     // Toast
     this.toastBanner = page.getByTestId('app-toast-banner');
-    this.confirmationToast = page.getByTestId('app-toast-banner').or(page.locator('text=/Booking Confirmed|Appointment Confirmed/i')).first();
+    this.confirmationToast = page.getByTestId('app-toast-banner').or(page.locator('text=/Booking Confirmed|Appointment Confirmed|Token #|Assigned & Registered/i')).first();
 
     // Profile & Auth
     this.profileBtn = page.getByRole('button', { name: 'Customer Profile' }).or(page.getByLabel('Customer Profile')).or(page.getByText('👤')).first();
@@ -289,12 +289,37 @@ export class CustomerAppPage {
   async openCheckout() {
     await expect(this.holdDepositBtn).toBeVisible();
     await this.holdDepositBtn.click();
+
+    // If pre-booking customer details modal appears, proceed to checkout
+    const detailsProceedBtn = this.page
+      .getByTestId('btn-proceed-to-checkout')
+      .or(this.page.getByRole('button', { name: /Proceed to Hold & Pay Deposit/i }))
+      .or(this.page.getByText(/Proceed to Hold & Pay Deposit/i))
+      .first();
+    const hasDetailsModal = await detailsProceedBtn.waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false);
+    if (hasDetailsModal) {
+      await detailsProceedBtn.click();
+    }
+
     await expect(this.checkoutTitle).toBeVisible();
   }
 
   async submitPayment() {
     await expect(this.payDepositBtn).toBeVisible();
     await this.payDepositBtn.click();
+
+    // Wait for checkout modal to finish processing and dismiss
+    await expect(this.checkoutTitle).not.toBeVisible({ timeout: 20000 }).catch(() => {});
+
+    // If the digital appointment pass modal pops up upon payment, dismiss it to reveal My Bookings screen
+    const passCloseBtn = this.page
+      .getByTestId('btn-close-booking-pass')
+      .or(this.page.getByLabel('Close appointment pass'))
+      .first();
+    const hasPassModal = await passCloseBtn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+    if (hasPassModal) {
+      await passCloseBtn.click();
+    }
   }
 
   async navigateToMyBookings() {

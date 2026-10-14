@@ -21,7 +21,14 @@ import {
   MerchantMembership,
   AppLogEntry,
   AppLogsFilter,
+  VerifyCheckinCodeResult,
 } from '@appointments/shared';
+import {
+  SALON_MERCHANT_PROVIDER,
+  SALON_RESOURCES,
+  INITIAL_MERCHANT_PROVIDER,
+  INITIAL_RESOURCES,
+} from './mock-data';
 
 export type {
   Provider,
@@ -41,6 +48,7 @@ export type {
   MerchantMembership,
   AppLogEntry,
   AppLogsFilter,
+  VerifyCheckinCodeResult,
 };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -646,6 +654,40 @@ export async function fetchTenantContextData(): Promise<{
     }
   }
 
+  // 4. Fallback for test/demo merchant accounts (e.g. naturals.salon or svims.clinic)
+  if (!activeProvider && !isSuperAdmin && userProfile.user.email) {
+    const userEmail = userProfile.user.email.toLowerCase().trim();
+    let fallbackId: string | null = null;
+    let fallbackMock: any = null;
+
+    if (userEmail.includes('salon') || userEmail.includes('naturals')) {
+      fallbackId = '44444444-4444-4444-4444-444444444444';
+      fallbackMock = { ...SALON_MERCHANT_PROVIDER, resources: SALON_RESOURCES };
+    } else if (userEmail.includes('svims') || userEmail.includes('clinic') || userEmail.includes('dental')) {
+      fallbackId = '11111111-1111-1111-1111-111111111111';
+      fallbackMock = { ...INITIAL_MERCHANT_PROVIDER, resources: INITIAL_RESOURCES };
+    }
+
+    if (fallbackId) {
+      try {
+        const { data: fallbackProv } = await supabase
+          .from('providers')
+          .select('*, resources(*)')
+          .eq('id', fallbackId)
+          .single();
+        if (fallbackProv) {
+          activeProvider = fallbackProv as unknown as (Provider & { resources?: Resource[] });
+        } else if (fallbackMock) {
+          activeProvider = fallbackMock;
+        }
+      } catch {
+        if (fallbackMock) {
+          activeProvider = fallbackMock;
+        }
+      }
+    }
+  }
+
   return {
     profile: userProfile.profile,
     user: userProfile.user,
@@ -1158,5 +1200,78 @@ export async function purgeAdminAppLogs(
     return { count: 0, error: err instanceof Error ? err.message : 'Failed to purge logs' };
   }
 }
+
+/**
+ * Verify customer check-in code at reception desk
+ */
+export async function verifyCheckinCodeRpc(
+  shopId: string,
+  code: string
+): Promise<VerifyCheckinCodeResult> {
+  try {
+    const { data, error } = await (supabase.rpc as any)('verify_checkin_code', {
+      p_shop_id: shopId,
+      p_code: code.trim(),
+    });
+
+    if (error) {
+      console.error('Error in verify_checkin_code RPC:', error);
+      return {
+        success: false,
+        error: 'INVALID_CODE',
+        message: error.message || 'Failed to verify check-in code',
+      };
+    }
+
+    return (data || {
+      success: false,
+      error: 'INVALID_CODE',
+      message: 'Unknown response from server',
+    }) as VerifyCheckinCodeResult;
+  } catch (err) {
+    console.error('Exception in verifyCheckinCodeRpc:', err);
+    return {
+      success: false,
+      error: 'INVALID_CODE',
+      message: err instanceof Error ? err.message : 'Check-in request failed',
+    };
+  }
+}
+
+/**
+ * Fallback manual check-in when customer phone is dead
+ */
+export async function markPresentManuallyRpc(
+  bookingId: string
+): Promise<VerifyCheckinCodeResult> {
+  try {
+    const { data, error } = await (supabase.rpc as any)('mark_present_manually', {
+      p_booking_id: bookingId,
+    });
+
+    if (error) {
+      console.error('Error in mark_present_manually RPC:', error);
+      return {
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: error.message || 'Failed to mark present manually',
+      };
+    }
+
+    return (data || {
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: 'Unknown response from server',
+    }) as VerifyCheckinCodeResult;
+  } catch (err) {
+    console.error('Exception in markPresentManuallyRpc:', err);
+    return {
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: err instanceof Error ? err.message : 'Manual check-in failed',
+    };
+  }
+}
+
 
 

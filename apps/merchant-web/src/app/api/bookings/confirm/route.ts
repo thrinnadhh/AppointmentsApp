@@ -353,11 +353,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const { data: confirmedBkg } = await supabaseAdmin
+      .from('bookings')
+      .select('queue_position, reference_code')
+      .eq('id', booking_id)
+      .maybeSingle();
+
     return NextResponse.json<ConfirmPaymentResponse>(
       {
         success: true,
         booking_id,
-        reference_code: booking.reference_code ?? undefined,
+        reference_code: confirmedBkg?.reference_code ?? booking.reference_code ?? undefined,
+        queue_position: confirmedBkg?.queue_position ?? 1,
         status: 'CONFIRMED',
         payment_status: 'CAPTURED',
       },

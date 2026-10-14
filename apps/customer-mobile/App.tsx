@@ -23,7 +23,9 @@ import { Resource, Slot, Booking, getPlatformFee } from '@appointments/shared';
 
 import HomeScreen from './src/screens/HomeScreen';
 import ProviderDetailScreen from './src/screens/ProviderDetailScreen';
+import CustomerDetailsModal, { CustomerBookingDetails } from './src/screens/CustomerDetailsModal';
 import CheckoutModal from './src/screens/CheckoutModal';
+import BookingPassModal from './src/screens/BookingPassModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -58,6 +60,15 @@ export default function App() {
     { screen: 'HOME', categoryId: null },
   ]);
   const [checkoutVisible, setCheckoutVisible] = useState<boolean>(false);
+  const [detailsModalVisible, setDetailsModalVisible] = useState<boolean>(false);
+  const [patientBookingDetails, setPatientBookingDetails] = useState<CustomerBookingDetails>({
+    fullName: 'Trinadh Patient',
+    phone: '+919999999991',
+    email: 'trinadh.patient@gmail.com',
+  });
+  const [assignedTokenNumber, setAssignedTokenNumber] = useState<number | undefined>(undefined);
+  const [passModalVisible, setPassModalVisible] = useState<boolean>(false);
+  const [selectedBookingForPass, setSelectedBookingForPass] = useState<(Booking & { provider_name?: string; resource_name?: string }) | null>(null);
   const [profileVisible, setProfileVisible] = useState<boolean>(false);
   const [accountVisible, setAccountVisible] = useState<boolean>(false);
   const [activeResource, setActiveResource] = useState<Resource | null>(null);
@@ -229,10 +240,14 @@ export default function App() {
         setIsPhoneVerified(true);
         setOtpSent(false);
         setAuthOtp('');
+        setProfileVisible(false);
         setCustomerProfile((prev) => ({
           ...prev,
           phone: formattedPhone,
         }));
+        if (activeResource && activeSlot) {
+          setCheckoutVisible(true);
+        }
         setConfirmationToast('Phone verified! Signed in with Supabase.');
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {
@@ -414,11 +429,30 @@ export default function App() {
     if (providerName) setActiveProviderName(providerName);
     setActiveProviderCoolingDays(coolingPeriodDays);
     setActiveProviderId(providerId || selectedProviderId);
+    setDetailsModalVisible(true);
+  };
+
+  const handleProceedFromDetails = (details: CustomerBookingDetails) => {
+    setPatientBookingDetails(details);
+    setCustomerProfile((prev) => ({
+      ...prev,
+      name: details.fullName,
+      phone: details.phone,
+      email: details.email || prev.email,
+    }));
+    setDetailsModalVisible(false);
     setCheckoutVisible(true);
   };
 
-  const handlePaymentSuccess = (bookingId: string, referenceCode?: string, isFollowup?: boolean) => {
+  const handlePaymentSuccess = (
+    bookingId: string,
+    referenceCode?: string,
+    isFollowup?: boolean,
+    tokenNumber?: number
+  ) => {
     setCheckoutVisible(false);
+    const token = tokenNumber || 1;
+    setAssignedTokenNumber(token);
     const fee = isFollowup ? 0 : getPlatformFee(activeCategoryId);
     const deposit = isFollowup ? 0 : (Number(activeResource?.deposit_amount) || 100);
     const total = deposit + fee;
@@ -428,11 +462,9 @@ export default function App() {
     const hospitalName = activeProviderName || 'Hospital';
     const refCode = referenceCode || `TPT-${bookingId.slice(0, 6).toUpperCase()}`;
 
-    if (isFollowup) {
-      setConfirmationToast(`Booking Confirmed! Appointment Confirmed at ${hospitalName}! Time: ${slotTimeFormatted}. Ref: ${refCode}. Expected arrival: 10 mins prior (Zero-wait queue).`);
-    } else {
-      setConfirmationToast(`Booking Confirmed! Appointment Confirmed at ${hospitalName}! Time: ${slotTimeFormatted}. Ref: ${refCode}. Expected arrival: 10 mins prior. Paid ₹${total}.`);
-    }
+    setConfirmationToast(
+      `🎉 Token #${token} Assigned & Registered! Ref: ${refCode}. Appointment at ${hospitalName} (${slotTimeFormatted}).`
+    );
 
     const newBooking: Booking & { provider_name?: string; resource_name?: string } = {
       id: bookingId,
@@ -447,7 +479,8 @@ export default function App() {
       platform_fee: fee,
       total_amount: total,
       is_followup: Boolean(isFollowup),
-      reference_code: referenceCode || `TPT-${bookingId.slice(0, 6).toUpperCase()}`,
+      reference_code: refCode,
+      queue_position: token,
       provider_name: activeProviderName || 'Sri Venkateswara Dental & Implant Care',
       resource_name: activeResource?.name || 'Assigned Staff / Unit',
       created_at: new Date().toISOString(),
@@ -455,11 +488,16 @@ export default function App() {
     };
     setCustomerBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== bookingId)]);
 
-    // Push MY_BOOKINGS onto history so clicking back returns to where the user left off (Provider Detail)
+    // Push MY_BOOKINGS onto history so navigation state transitions to My Bookings
     setHistory((prev) => [
       ...prev,
       { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
     ]);
+
+    // Present appointment pass with assigned token directly in-app!
+    setSelectedBookingForPass(newBooking);
+    setPassModalVisible(true);
+
     loadBookings();
 
     setTimeout(() => {
@@ -570,7 +608,29 @@ export default function App() {
         />
       )}
 
-      {/* Checkout Modal with 5-min Hold Timer */}
+      {/* 1. Pre-Booking Patient Details & Google Sign-In Modal */}
+      <CustomerDetailsModal
+        visible={detailsModalVisible}
+        initialName={customerProfile.name}
+        initialPhone={customerProfile.phone}
+        initialEmail={customerProfile.email}
+        doctorName={activeResource?.name}
+        slotTime={activeSlot?.start_time ? new Date(activeSlot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+        isAuthenticated={isAuthenticated}
+        onClose={() => setDetailsModalVisible(false)}
+        onProceedToPayment={handleProceedFromDetails}
+        onAuthSuccess={(user) => {
+          setIsAuthenticated(true);
+          setActiveCustomerId(user.id);
+          if (user.phone) setIsPhoneVerified(true);
+          if (user.email) {
+            setIsEmailVerified(true);
+            setAuthEmail(user.email);
+          }
+        }}
+      />
+
+      {/* 2. Checkout Modal with 5-min Hold Timer */}
       <CheckoutModal
         visible={checkoutVisible}
         resource={activeResource}
@@ -579,8 +639,24 @@ export default function App() {
         customerId={activeCustomerId}
         providerId={activeProviderId || selectedProviderId}
         coolingPeriodDays={activeProviderCoolingDays}
+        patientDetails={patientBookingDetails}
+        isAuthenticated={isAuthenticated}
+        onRequireAuth={() => {
+          setAuthError('Please verify your phone number to reserve an appointment.');
+          setProfileVisible(true);
+        }}
         onClose={() => setCheckoutVisible(false)}
         onPaymentSuccess={handlePaymentSuccess}
+      />
+
+      {/* 3. In-App Appointment Pass & Queue Token Modal */}
+      <BookingPassModal
+        visible={passModalVisible}
+        booking={selectedBookingForPass}
+        patientDetails={patientBookingDetails}
+        assignedTokenNumber={assignedTokenNumber}
+        onClose={() => setPassModalVisible(false)}
+        onMarkReached={handleMarkReached}
       />
 
 

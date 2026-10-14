@@ -6,6 +6,7 @@ export type BookingStatus =
   | 'HELD'
   | 'PENDING_PAYMENT'
   | 'CONFIRMED'
+  | 'CHECKED_IN'
   | 'COMPLETED'
   | 'CANCELLED'
   | 'NO_SHOW';
@@ -128,6 +129,11 @@ export interface Booking {
   reminder_30m_sent_at?: string | null;
   is_present?: boolean;
   customer_arrived_at?: string | null;
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
+  checked_in_method?: 'code' | 'manual' | null;
+  queue_position?: number | null;
+  estimated_wait_minutes?: number | null;
   provider?: Provider;
   resource?: Resource;
 }
@@ -345,6 +351,8 @@ export interface VerifyRazorpayPaymentRequest {
 export interface VerifyRazorpayPaymentResponse {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
+  queue_position?: number;
   status?: string;
   payment_status?: string;
   error?: string;
@@ -388,3 +396,38 @@ export interface AppLogsFilter {
   limit?: number;
   offset?: number;
 }
+
+export interface AppointmentCheckinCode {
+  id: string;
+  booking_id: string;
+  provider_id: string;
+  customer_id: string;
+  appointment_date: string;
+  code: string;
+  created_at: string;
+}
+
+export type CheckinErrorCode =
+  | 'INVALID_CODE'
+  | 'ALREADY_CHECKED_IN'
+  | 'TOO_EARLY'
+  | 'EXPIRED'
+  | 'WRONG_SHOP'
+  | 'RATE_LIMITED'
+  | 'UNAUTHORIZED'
+  | 'NOT_FOUND'
+  | 'INVALID_STATUS';
+
+export interface VerifyCheckinCodeResult {
+  success: boolean;
+  booking_id?: string;
+  patient_name?: string;
+  service_doctor?: string;
+  slot_time?: string;
+  is_late?: boolean;
+  checked_in_at?: string;
+  error?: CheckinErrorCode;
+  message?: string;
+  locked_until?: string;
+}
+

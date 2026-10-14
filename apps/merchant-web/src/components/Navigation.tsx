@@ -20,7 +20,8 @@ import {
   Stethoscope,
   Gamepad2,
   Utensils,
-  Terminal
+  Terminal,
+  Sparkles
 } from 'lucide-react';
 import { supabase, getCurrentUserProfile, signOutMerchant } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
@@ -96,10 +97,12 @@ export default function Navigation() {
     ? [
         { href: '/admin', label: 'Admin Hub', icon: ShieldCheck },
         { href: '/admin/logs', label: 'System Logs', icon: Terminal },
+        { href: '/demo', label: 'Live Simulator', icon: Sparkles },
         { href: '/', label: 'Merchant App', icon: LayoutDashboard },
       ]
     : [
         { href: '/', label: 'Overview', icon: LayoutDashboard },
+        { href: '/demo', label: 'Live Simulator', icon: Sparkles },
         ...(isSuperAdmin || currentUser?.role === 'admin'
           ? [
               { href: '/admin', label: 'Platform Admin', icon: ShieldCheck },

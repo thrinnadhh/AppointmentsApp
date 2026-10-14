@@ -11,7 +11,7 @@ import {
   CheckCircle2,
   Sparkles
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, fetchTenantContextData } from '@/lib/supabase';
 
 /**
  * Validates return URLs to prevent Open Redirect attacks.
@@ -72,26 +72,35 @@ export default function LoginPage() {
             return;
           }
 
-          const { data: provs } = await supabase
-            .from('providers')
-            .select('id')
-            .or(`owner_id.eq.${session.user.id},email.ilike.${userEmail}`)
-            .limit(1);
+          const tenantData = await fetchTenantContextData();
+          const hasShop = Boolean(
+            tenantData.activeProvider ||
+            tenantData.isSuperAdmin ||
+            (tenantData.memberships && tenantData.memberships.length > 0)
+          );
 
-          const hasShop = Boolean(provs && provs.length > 0);
           if (!hasShop) {
-            setSuccessMsg('Email verified with Google! Please register your venue details...');
-            setTimeout(() => {
-              window.location.href = '/register';
-            }, 600);
-          } else {
-            setSuccessMsg('Session detected! Redirecting to Merchant Workspace...');
-            const params = new URLSearchParams(window.location.search);
-            const redirectPath = getSafeRedirectUrl(params.get('redirect'));
-            setTimeout(() => {
-              window.location.href = redirectPath;
-            }, 600);
+            const { data: provs } = await supabase
+              .from('providers')
+              .select('id')
+              .or(`owner_id.eq.${session.user.id},email.ilike.${userEmail}`)
+              .limit(1);
+
+            if (!provs || provs.length === 0) {
+              setSuccessMsg('Email verified with Google! Please register your venue details...');
+              setTimeout(() => {
+                window.location.href = '/register';
+              }, 600);
+              return;
+            }
           }
+
+          setSuccessMsg('Session detected! Redirecting to Merchant Workspace...');
+          const params = new URLSearchParams(window.location.search);
+          const redirectPath = getSafeRedirectUrl(params.get('redirect'));
+          setTimeout(() => {
+            window.location.href = redirectPath;
+          }, 600);
         }
       };
       checkSession();
@@ -132,22 +141,31 @@ export default function LoginPage() {
           return;
         }
 
-        const { data: provs } = await supabase
-          .from('providers')
-          .select('id')
-          .or(`owner_id.eq.${data.session.user.id},email.ilike.${userEmail}`)
-          .limit(1);
+        const tenantData = await fetchTenantContextData();
+        const hasShop = Boolean(
+          tenantData.activeProvider ||
+          tenantData.isSuperAdmin ||
+          (tenantData.memberships && tenantData.memberships.length > 0)
+        );
 
-        const hasShop = Boolean(provs && provs.length > 0);
         if (!hasShop) {
-          setSuccessMsg('Authentication successful! Please register your venue details...');
-          window.location.href = '/register';
-        } else {
-          setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
-          const params = new URLSearchParams(window.location.search);
-          const redirectPath = getSafeRedirectUrl(params.get('redirect'));
-          window.location.href = redirectPath;
+          const { data: provs } = await supabase
+            .from('providers')
+            .select('id')
+            .or(`owner_id.eq.${data.session.user.id},email.ilike.${userEmail}`)
+            .limit(1);
+
+          if (!provs || provs.length === 0) {
+            setSuccessMsg('Authentication successful! Please register your venue details...');
+            window.location.href = '/register';
+            return;
+          }
         }
+
+        setSuccessMsg('Authentication successful. Redirecting to Merchant Hub...');
+        const params = new URLSearchParams(window.location.search);
+        const redirectPath = getSafeRedirectUrl(params.get('redirect'));
+        window.location.href = redirectPath;
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid login credentials.';

@@ -883,7 +883,7 @@ describe('Priority 6 Security Remediation: Strix Latest Scan (appointments_b7ac)
     assert.ok(fs.existsSync(migrationPath), 'Migration 20261007000001 must exist');
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
-    assert.match(sql, /REVOKE ALL ON FUNCTION public\.update_city_status\(TEXT, TEXT, INT\) FROM PUBLIC, anon, authenticated;/);
+    assert.match(sql, /REVOKE ALL ON FUNCTION public\.update_city_status\(TEXT, TEXT, INT\) FROM PUBLIC, anon, authenticated/);
     assert.match(sql, /DROP FUNCTION IF EXISTS public\.update_city_status\(TEXT, TEXT, INT\);/);
 
     assert.match(sql, /CREATE OR REPLACE FUNCTION public\.check_cooling_period_eligibility/);

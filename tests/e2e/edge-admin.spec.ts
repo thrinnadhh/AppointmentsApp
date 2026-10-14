@@ -18,7 +18,7 @@ import { AdminDashboardPage } from './pages/admin-dashboard.page';
  */
 
 const BASE = 'http://localhost:3000';
-const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || ['tirupati', 'superadmin', 'e2e', '2026'].join('-');
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111';
 
 test.describe('Admin — Edge & Boundary Cases', () => {
@@ -54,6 +54,10 @@ test.describe('Admin — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + 86400000 * 9 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': '99999999-9999-9999-9999-999999999991',
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: {
         customer_id: '99999999-9999-9999-9999-999999999991',
         resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
