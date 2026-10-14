@@ -273,7 +273,12 @@ export default function BookingPassModal({
                 {booking.provider_name || 'Trinadh Multi-Speciality Hospital'}
               </Text>
             </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={onClose}
+              testID="btn-close-booking-pass"
+              accessibilityLabel="Close appointment pass"
+            >
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>

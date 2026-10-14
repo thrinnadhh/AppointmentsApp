@@ -4,6 +4,7 @@ const TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tir
 const TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!';
 const TEST_SALON_EMAIL = process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com';
 const TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || '';
+const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
 
 /**
  * Super Admin Security Hardening E2E Test Suite (Phases 1, 2, and 3)
@@ -96,7 +97,7 @@ test.describe.serial('Super Admin Security Hardening - Three Phases E2E Suite', 
 
       // Authenticated admin request succeeds with structured log schema
       const auth = await request.get('http://localhost:3000/api/admin/audit-logs', {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': adminBypassToken },
       });
       expect(auth.status()).toBe(200);
       const data = await auth.json();

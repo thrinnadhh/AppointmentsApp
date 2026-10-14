@@ -23,6 +23,7 @@ const SEED_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
 const SEED_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // Dr. S. K. Murthy
 const INACTIVE_RESOURCE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'; // seeded inactive resource
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111';
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
 
 test.describe('Customer — Edge & Boundary Cases', () => {
   test.beforeEach(async ({ request }) => {

@@ -23,6 +23,7 @@ const SEED_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
 const SEED_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111'; // Sri Venkateswara Dental
 const MERCHANT_B_PROVIDER_ID = '22222222-2222-2222-2222-222222222222'; // Naturals Salon
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
 
 test.describe('Merchant — Edge & Boundary Cases', () => {
 
