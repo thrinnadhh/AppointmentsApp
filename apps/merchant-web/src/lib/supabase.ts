@@ -23,6 +23,12 @@ import {
   AppLogsFilter,
   VerifyCheckinCodeResult,
 } from '@appointments/shared';
+import {
+  SALON_MERCHANT_PROVIDER,
+  SALON_RESOURCES,
+  INITIAL_MERCHANT_PROVIDER,
+  INITIAL_RESOURCES,
+} from './mock-data';
 
 export type {
   Provider,
@@ -644,6 +650,40 @@ export async function fetchTenantContextData(): Promise<{
         });
       } catch (err) {
         console.warn('Auto-link provider note:', err);
+      }
+    }
+  }
+
+  // 4. Fallback for test/demo merchant accounts (e.g. naturals.salon or svims.clinic)
+  if (!activeProvider && !isSuperAdmin && userProfile.user.email) {
+    const userEmail = userProfile.user.email.toLowerCase().trim();
+    let fallbackId: string | null = null;
+    let fallbackMock: any = null;
+
+    if (userEmail.includes('salon') || userEmail.includes('naturals')) {
+      fallbackId = '44444444-4444-4444-4444-444444444444';
+      fallbackMock = { ...SALON_MERCHANT_PROVIDER, resources: SALON_RESOURCES };
+    } else if (userEmail.includes('svims') || userEmail.includes('clinic') || userEmail.includes('dental')) {
+      fallbackId = '11111111-1111-1111-1111-111111111111';
+      fallbackMock = { ...INITIAL_MERCHANT_PROVIDER, resources: INITIAL_RESOURCES };
+    }
+
+    if (fallbackId) {
+      try {
+        const { data: fallbackProv } = await supabase
+          .from('providers')
+          .select('*, resources(*)')
+          .eq('id', fallbackId)
+          .single();
+        if (fallbackProv) {
+          activeProvider = fallbackProv as unknown as (Provider & { resources?: Resource[] });
+        } else if (fallbackMock) {
+          activeProvider = fallbackMock;
+        }
+      } catch {
+        if (fallbackMock) {
+          activeProvider = fallbackMock;
+        }
       }
     }
   }
