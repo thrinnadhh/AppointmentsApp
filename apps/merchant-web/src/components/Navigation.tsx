@@ -154,10 +154,6 @@ export default function Navigation() {
 
     navItems = [
       { href: '/', label: 'Overview', icon: LayoutDashboard },
-      { href: '/demo', label: 'Live Simulator', icon: Sparkles },
-      ...(isSuperAdmin || currentUser?.role === 'admin'
-        ? [{ href: '/admin', label: 'Platform Admin', icon: ShieldCheck }]
-        : []),
       { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },
       { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users },
       { href: '/bookings', label: 'Bookings', icon: CalendarDays },

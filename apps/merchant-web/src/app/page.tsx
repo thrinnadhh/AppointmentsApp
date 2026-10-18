@@ -1305,14 +1305,14 @@ export default function MerchantOverviewPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Provider Switcher or Locked Space Badge */}
+          {/* Provider Space Badge */}
           {isLocked ? (
             <div 
               data-testid="locked-tenant-badge"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800"
             >
               <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Dedicated Space</span>
+              <span>Verified Merchant Space</span>
             </div>
           ) : (
             <div className="relative">
@@ -1328,7 +1328,7 @@ export default function MerchantOverviewPage() {
               >
                 {providers.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} ({p.category_id})
+                    {p.name}
                   </option>
                 ))}
               </select>
@@ -1340,7 +1340,7 @@ export default function MerchantOverviewPage() {
             className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors shadow-xs"
           >
             <Building2 className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-            {isLocked ? 'My Venue Profile' : 'Add Business'}
+            {isLocked ? 'My Venue Profile' : 'Manage Venue'}
           </Link>
 
           <Link
@@ -1352,23 +1352,12 @@ export default function MerchantOverviewPage() {
           </Link>
 
           <Link
-            href="/team"
+            href="/schedule"
             className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors shadow-xs"
           >
-            <Users className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-            Team
+            <Clock className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+            Shift Hours
           </Link>
-
-          {isSuperAdmin && (
-            <Link
-              href="/admin"
-              className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition-colors shadow-xs"
-              title="Super Admin City Rollout & Expansion Hub"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-700" />
-              Platform Admin
-            </Link>
-          )}
 
           <button
             onClick={() => loadData()}
@@ -1394,11 +1383,22 @@ export default function MerchantOverviewPage() {
       {/* ========================================================================= */}
       {/* OPERATIONAL STATUS & CAPACITY CONTROL BAR                                */}
       {/* ========================================================================= */}
-      <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* ========================================================================= */}
+      {/* OPERATIONAL STATUS & CAPACITY CONTROL BAR (DARK ZONE)                    */}
+      {/* ========================================================================= */}
+      <div 
+        className="rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4 border"
+        style={{
+          backgroundColor: '#0f1f17',
+          color: '#d1fae5',
+          borderColor: 'rgba(4, 120, 87, 0.35)',
+          boxShadow: '0 4px 20px rgba(15, 31, 23, 0.4)',
+        }}
+      >
         {/* Left: Active Toggle & Live Venue Status */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">{venueLabel} Status</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400/80">{venueLabel} Ops</span>
             <button
               type="button"
               data-testid="shop-active-toggle"
@@ -1422,10 +1422,10 @@ export default function MerchantOverviewPage() {
             </button>
             <span
               data-testid="shop-status-text"
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono tracking-wide ${
                 isShopActive
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${isShopActive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
@@ -1433,7 +1433,7 @@ export default function MerchantOverviewPage() {
             </span>
           </div>
 
-          <div className="h-5 w-px bg-slate-800 hidden sm:block" />
+          <div className="h-5 w-px bg-emerald-900/60 hidden sm:block" />
 
           {/* Realtime Opening Hours Badge & Tomorrow Preview */}
           <div className="flex flex-wrap items-center gap-2">
@@ -1441,8 +1441,8 @@ export default function MerchantOverviewPage() {
               data-testid="shop-hours-badge"
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium border ${
                 hoursStatus.isOpen
-                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
-                  : 'bg-amber-950/60 text-amber-300 border-amber-800/60'
+                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
+                  : 'bg-amber-950/80 text-amber-300 border-amber-700/60'
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -1450,7 +1450,7 @@ export default function MerchantOverviewPage() {
             </div>
             <span 
               data-testid="shop-tomorrow-preview"
-              className="text-[11px] text-slate-400 hidden sm:inline-block"
+              className="text-[11px] text-emerald-400/70 hidden sm:inline-block font-mono"
             >
               • {hoursStatus.tomorrowPreview}
             </span>
@@ -1458,7 +1458,7 @@ export default function MerchantOverviewPage() {
               type="button"
               onClick={() => setShowHoursModal(true)}
               data-testid="change-hours-btn"
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-2 transition cursor-pointer"
+              className="text-xs text-emerald-400 hover:text-emerald-200 font-semibold underline underline-offset-2 transition cursor-pointer"
               title="Edit Weekly Schedule & Tomorrow's Hours"
             >
               Change Hours
@@ -1468,22 +1468,22 @@ export default function MerchantOverviewPage() {
 
         {/* Right: Auto-Accept Status & Daily Booking Limit */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-800/90 px-3.5 py-1.5 rounded-xl border border-slate-700/80">
+          <div className="flex items-center gap-2 bg-black/40 px-3.5 py-1.5 rounded-xl border border-emerald-900/50">
             <Zap className={`w-4 h-4 ${autoAccept ? 'text-amber-400' : 'text-slate-400'}`} />
             <div className="text-xs">
-              <span className="text-slate-400">Auto-Accept: </span>
+              <span className="text-emerald-400/80">Auto-Accept: </span>
               <span
                 data-testid="auto-accept-status-badge"
-                className={`font-bold ${autoAccept ? 'text-emerald-400' : 'text-slate-400'}`}
+                className={`font-bold font-mono ${autoAccept ? 'text-emerald-300' : 'text-slate-400'}`}
               >
                 {autoAccept ? 'ENABLED' : 'MANUAL'}
               </span>
             </div>
-            <span className="text-slate-600 text-xs">•</span>
+            <span className="text-emerald-800 text-xs">•</span>
             <div className="text-xs" data-testid="daily-limit-badge">
-              <span className="text-slate-400">Daily Cap: </span>
-              <span className="font-bold text-slate-100">{confirmedCount}</span>
-              <span className="text-slate-400">/{dailyLimit}</span>
+              <span className="text-emerald-400/80">Cap: </span>
+              <span className="font-bold text-white font-mono">{confirmedCount}</span>
+              <span className="text-emerald-400/70 font-mono">/{dailyLimit}</span>
             </div>
           </div>
 
@@ -1491,9 +1491,9 @@ export default function MerchantOverviewPage() {
             type="button"
             onClick={() => setShowSettingsModal(true)}
             data-testid="edit-booking-settings-button"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-200 hover:text-white border border-emerald-800/60 transition cursor-pointer"
           >
-            <Settings className="w-3.5 h-3.5 text-slate-400" />
+            <Settings className="w-3.5 h-3.5 text-emerald-400" />
             <span>Rules & Cap</span>
           </button>
 
@@ -1505,18 +1505,8 @@ export default function MerchantOverviewPage() {
             title="Book and admit an offline walk-in patient at clinic reception"
           >
             <UserPlus className="w-3.5 h-3.5" />
-            <span>+ Offline Patient</span>
+            <span>+ Walk-In</span>
           </button>
-
-          <Link
-            href="/customer/dashboard"
-            data-testid="customer-dashboard-link-btn"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-100 transition shadow-sm border border-slate-700"
-            title="View Customer Portal 10-Slot Live Queue & Monthly Attendance Calendar"
-          >
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Customer Portal (10-Slot &amp; Calendar)</span>
-          </Link>
         </div>
       </div>
 
@@ -1572,55 +1562,55 @@ export default function MerchantOverviewPage() {
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmed</span>
-            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-              <CheckCircle2 className="w-5 h-5" />
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900">{confirmedCount}</span>
-            <span className="text-xs text-slate-500 ml-2">slots booked</span>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{confirmedCount}</span>
+            <span className="text-xs text-slate-500">slots booked</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-amber-500/30 transition duration-150">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hold In-Flight</span>
-            <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
-              <Clock className="w-5 h-5" />
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
+              <Clock className="w-5 h-5 text-amber-600" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900">{heldCount}</span>
-            <span className="text-xs text-amber-600 font-medium ml-2">paying deposit now</span>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{heldCount}</span>
+            <span className="text-xs text-amber-600 font-medium">checkout now</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Deposits Captured</span>
-            <div className="p-2 rounded-lg bg-teal-50 text-teal-600">
-              <TrendingUp className="w-5 h-5" />
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+              <TrendingUp className="w-5 h-5 text-emerald-600" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900">₹{totalDepositCollected}</span>
-            <span className="text-xs text-emerald-600 font-medium ml-2">guaranteed funds</span>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">₹{totalDepositCollected.toLocaleString('en-IN')}</span>
+            <span className="text-xs text-emerald-600 font-medium">secured funds</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-slate-300 transition duration-150">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Staff / Units</span>
-            <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
-              <Users className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active {verticalConfig.resourceLabelSingular}s</span>
+            <div className="p-2 rounded-xl bg-slate-100 text-slate-700">
+              <Users className="w-5 h-5 text-slate-600" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900">{activeResources.length}</span>
-            <span className="text-xs text-slate-500 ml-2">in rotation</span>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{activeResources.length}</span>
+            <span className="text-xs text-slate-500">in rotation</span>
           </div>
         </div>
       </div>
@@ -1641,12 +1631,12 @@ export default function MerchantOverviewPage() {
               <div>
                 <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
                   Reception Check-In Desk
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider font-mono">
                     Fast Pass OTP
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Ask arriving patient for their 4-digit booking code to verify and mark present.
+                  Ask arriving customer for their 4-digit booking code to verify and mark present.
                 </p>
               </div>
             </div>
@@ -1776,14 +1766,14 @@ export default function MerchantOverviewPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>🏥 Today&apos;s Hospital Live Queue</span>
+                  <span>Today&apos;s {venueLabel} Live Queue</span>
                   <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                     Tokens #1 to #{todaysBookings.length || 0}
                   </span>
                 </h2>
-                <p className="text-xs text-slate-500">Live hospital OPD roster with presence color states &amp; late queue tracking</p>
+                <p className="text-xs text-slate-500">Live service roster with attendance presence states &amp; late queue tracking</p>
               </div>
-              <span className="text-xs font-semibold text-slate-500 self-start sm:self-center">
+              <span className="text-xs font-semibold text-slate-500 self-start sm:self-center font-mono">
                 Total: {todaysBookings.length} appointments
               </span>
             </div>
@@ -1822,28 +1812,28 @@ export default function MerchantOverviewPage() {
             </div>
 
 
-            {/* Attendance Matrix Subheader & Doctor Filter */}
+            {/* Attendance Matrix Subheader & Resource Filter */}
             <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
                   <Users className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>OPD Patient Attendance Matrix ({todaysBookings.length} Tokens)</span>
+                  <span>Live Queue &amp; Service Matrix ({todaysBookings.length} Tokens)</span>
                 </span>
               </div>
 
-              {/* Doctor filter dropdown */}
+              {/* Resource filter dropdown */}
               {activeResources.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-500">Filter by Doctor:</span>
+                  <span className="text-[11px] font-bold text-slate-500">Filter by {verticalConfig.resourceLabelSingular}:</span>
                   <select
                     value={merchantSelectedDoctorId}
                     onChange={(e) => setMerchantSelectedDoctorId(e.target.value)}
                     className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
-                    <option value="">All Doctors ({activeResources.length})</option>
+                    <option value="">All {verticalConfig.resourceLabelSingular}s ({activeResources.length})</option>
                     {activeResources.map((doc) => (
                       <option key={doc.id} value={doc.id}>
-                        {doc.name} ({doc.department || 'General'})
+                        {doc.name} ({doc.department || 'Active'})
                       </option>
                     ))}
                   </select>
@@ -1853,7 +1843,7 @@ export default function MerchantOverviewPage() {
           </div>
 
           {/* ========================================================================= */}
-          {/* PATIENT QUEUE NUMBER SEQUENCE STRIP (Green = Present, Yellow = Waiting, Red = Absent) */}
+          {/* QUEUE NUMBER SEQUENCE STRIP (Green = Present, Yellow = Waiting, Red = Absent) */}
           {/* ========================================================================= */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1863,13 +1853,13 @@ export default function MerchantOverviewPage() {
                 </span>
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                    <span>Patient Queue Number Sequence</span>
+                    <span>Queue Number Sequence</span>
                     <span className="text-[10px] font-normal normal-case text-slate-500">
-                      (#1 = Patient 1, #2 = Patient 2)
+                      (#1 = Customer 1, #2 = Customer 2)
                     </span>
                   </h4>
                   <p className="text-[11px] text-slate-500">
-                    Live glanceable status: click any patient number to jump directly to their OPD record.
+                    Live glanceable status: click any token number to jump directly to their appointment record.
                   </p>
                 </div>
               </div>
@@ -1898,14 +1888,14 @@ export default function MerchantOverviewPage() {
             {/* Sequence Number Badges */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
               {todaysBookings.length === 0 ? (
-                <span className="text-xs text-slate-400 italic py-1">No patient bookings queued today.</span>
+                <span className="text-xs text-slate-400 italic py-1">No customer bookings queued today.</span>
               ) : (
                 todaysBookings.map((b, idx) => {
                   const isPresent = Boolean(b.is_present || b.status === 'CHECKED_IN');
                   const isAbsent = b.status === 'NO_SHOW';
                   const isLate = Boolean(b.queue_position);
                   const patientNum = isLate ? `L${b.queue_position}` : `${idx + 1}`;
-                  const patientName = b.customer_name || `Patient #${patientNum}`;
+                  const patientName = b.customer_name || `Customer #${patientNum}`;
 
                   return (
                     <button
@@ -1918,7 +1908,7 @@ export default function MerchantOverviewPage() {
                           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
                       }}
-                      title={`Patient #${patientNum}: ${patientName} • ${
+                      title={`Token #${patientNum}: ${patientName} • ${
                         isPresent ? 'Present (Green)' : isAbsent ? 'Absent (Red)' : isLate ? 'Late Queue (Yellow)' : 'Still Waiting (Yellow)'
                       }`}
                       className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono font-bold shrink-0 transition-all cursor-pointer shadow-2xs hover:scale-105 border ${
@@ -1979,7 +1969,7 @@ export default function MerchantOverviewPage() {
                         Attendance Matrix
                       </span>
                       <h3 className="font-bold text-slate-900 text-base tracking-tight">
-                        Live OPD Patient Queue Matrix
+                        Live {venueLabel} Service Queue Matrix
                       </h3>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
@@ -2056,7 +2046,7 @@ export default function MerchantOverviewPage() {
                 {/* THE MATRIX TILES GRID */}
                 {filteredMatrixBookings.length === 0 ? (
                   <div className="py-12 text-center text-slate-400 text-xs italic bg-slate-50 rounded-xl">
-                    No patients matching this filter in today's attendance matrix.
+                    No bookings matching this filter in today&apos;s queue matrix.
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -2286,24 +2276,24 @@ export default function MerchantOverviewPage() {
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
-                  <Stethoscope className="w-4 h-4" />
+                <div className="p-1.5 rounded-xl bg-emerald-50 text-emerald-700">
+                  <Users className="w-4 h-4 text-emerald-600" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-sm">Doctor Shift Status</h3>
+                <h3 className="font-bold text-slate-900 text-sm">{verticalConfig.resourceLabelSingular} Shift &amp; Duty</h3>
               </div>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                {activeResources.length} Doctors
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+                {activeResources.length} Active
               </span>
             </div>
 
             <p className="text-xs text-slate-500">
-              Live clinic duty presence and shift roster for consultation availability.
+              Live staff presence and operational duty status for station availability.
             </p>
 
             <div className="space-y-3">
               {activeResources.length === 0 ? (
                 <div className="p-4 rounded-xl bg-slate-50 text-center text-xs text-slate-500 border border-slate-100">
-                  No active doctors configured yet.
+                  No active {verticalConfig.resourceLabelSingular.toLowerCase()}s configured yet.
                 </div>
               ) : (
                 activeResources.map((doc) => {
@@ -2322,7 +2312,7 @@ export default function MerchantOverviewPage() {
                         <div className="space-y-0.5">
                           <p className="font-bold text-slate-900 text-xs">{doc.name}</p>
                           <p className="text-[11px] text-slate-500">
-                            {doc.department || 'General Medicine'} • {docAppointmentsCount} {docAppointmentsCount === 1 ? 'patient' : 'patients'} today
+                            {doc.department || 'Active'} • {docAppointmentsCount} {docAppointmentsCount === 1 ? 'appointment' : 'appointments'} today
                           </p>
                         </div>
                         <span
@@ -2332,13 +2322,13 @@ export default function MerchantOverviewPage() {
                               : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                           }`}
                         >
-                          {isLeft ? '🚪 Shift Ended' : '🩺 On Duty'}
+                          {isLeft ? 'Away / Off' : 'On Duty'}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
                         <span className="text-[11px] text-slate-500">
-                          {isLeft ? 'Currently Away' : 'Available in Clinic'}
+                          {isLeft ? 'Currently Away' : 'Available for Service'}
                         </span>
                         <button
                           type="button"
@@ -2370,7 +2360,7 @@ export default function MerchantOverviewPage() {
                 href="/resources"
                 className="font-medium text-slate-500 hover:text-slate-700 transition"
               >
-                View Doctors
+                View {verticalConfig.resourceLabelSingular}s
               </Link>
             </div>
           </div>

@@ -101,7 +101,7 @@ export class MerchantPortalPage {
     this.filterConfirmedPill = page.getByRole('button', { name: /^CONFIRMED$/i });
     this.filterCompletedPill = page.getByRole('button', { name: /^COMPLETED$/i });
     this.filterCancelledPill = page.getByRole('button', { name: /^CANCELLED$/i });
-    this.venueSelector = page.locator('select').first();
+    this.venueSelector = page.locator('select#provider-select, select#venue-filter');
     this.bookingCards = page.locator('.divide-y > div');
 
     // Reschedule Modal
