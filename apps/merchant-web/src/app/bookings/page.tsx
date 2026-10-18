@@ -33,7 +33,8 @@ import {
   fetchBookingNotifications,
   manageLateQueueBooking,
   MerchantBookingWithDetails,
-  NotificationLog
+  NotificationLog,
+  admitPatient
 } from '@/lib/supabase';
 import Link from 'next/link';
 import { BookingStatus, Provider, PaymentStatus, maskPhoneNumber } from '@appointments/shared';
@@ -63,6 +64,7 @@ export default function BookingsManagementPage() {
   const [notificationModalBooking, setNotificationModalBooking] = useState<MerchantBookingWithDetails | null>(null);
   const [bookingNotificationLogs, setBookingNotificationLogs] = useState<NotificationLog[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [doctorLeftMap, setDoctorLeftMap] = useState<Record<string, boolean>>({});
 
   // Late Arrival & Buffer Queue State
   const [lateCheckinBooking, setLateCheckinBooking] = useState<MerchantBookingWithDetails | null>(null);
@@ -125,15 +127,23 @@ export default function BookingsManagementPage() {
         ? activeProvider?.id 
         : (selectedProviderId === 'ALL' ? undefined : selectedProviderId);
 
-      const [fetchedProviders, fetchedBookings] = await Promise.all([
+      const [fetchedProviders, fetchedBookings, fetchedResources] = await Promise.all([
         isSuperAdmin ? fetchAllProviders() : Promise.resolve(activeProvider ? [activeProvider] : []),
-        targetProviderId ? fetchMerchantBookings(targetProviderId) : Promise.resolve([])
+        targetProviderId ? fetchMerchantBookings(targetProviderId) : Promise.resolve([]),
+        targetProviderId ? fetchProviderResources(targetProviderId) : Promise.resolve([])
       ]);
 
       if (fetchedProviders) {
         setProviders(fetchedProviders);
       }
       setBookings(fetchedBookings || []);
+      if (fetchedResources) {
+        const leftMap: Record<string, boolean> = {};
+        for (const r of fetchedResources) {
+          leftMap[r.id] = Boolean((r.attributes as Record<string, unknown> | null)?.doctor_left);
+        }
+        setDoctorLeftMap(leftMap);
+      }
     } catch (err) {
       console.warn('Error loading bookings:', err);
       setBookings([]);
@@ -248,21 +258,27 @@ export default function BookingsManagementPage() {
         setFeedbackToast(`Booking updated to ${newStatus} on Supabase`);
       }
       await loadData();
-    } catch (err) {
-      console.error('Supabase error, updating locally:', err);
-      setBookings((prev) =>
-        prev.map((b) => {
-          if (b.id === bookingId) {
-            return {
-              ...b,
-              status: newStatus,
-              payment_status: paymentStatus || (newStatus === 'NO_SHOW' ? 'FORFEITED' : (newStatus === 'CANCELLED' ? 'REFUNDED' : b.payment_status)),
-              updated_at: new Date().toISOString(),
-            };
-          }
-          return b;
-        })
-      );
+    } catch (err: unknown) {
+      console.error('Error changing status:', err);
+      const msg = err instanceof Error ? err.message : 'Error updating booking status.';
+      setFeedbackToast(`⚠️ ${msg}`);
+    } finally {
+      setTimeout(() => setFeedbackToast(null), 4000);
+    }
+  };
+
+  const handleAdmitPatient = async (bookingId: string) => {
+    try {
+      const res = await admitPatient(bookingId);
+      if (res.success) {
+        setFeedbackToast('✓ Patient admitted and marked Present in OPD.');
+        await loadData();
+      } else {
+        setFeedbackToast(`⚠️ ${res.error || 'Failed to admit patient'}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error admitting patient.';
+      setFeedbackToast(`⚠️ ${msg}`);
     } finally {
       setTimeout(() => setFeedbackToast(null), 4000);
     }
@@ -619,6 +635,10 @@ export default function BookingsManagementPage() {
             const slotDate = new Date(booking.slot_start);
             const formattedTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const formattedDate = slotDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', weekday: 'short' });
+            const isPresent = Boolean(booking.is_present || booking.status === 'CHECKED_IN');
+            const isDoctorLeft = Boolean(doctorLeftMap[booking.resource_id]);
+            const isSlotTimeUp = new Date(booking.slot_end).getTime() <= Date.now();
+            const canShowNoShow = isSlotTimeUp && isDoctorLeft && !isPresent && booking.status === 'CONFIRMED';
 
             return (
               <div 
@@ -766,19 +786,25 @@ export default function BookingsManagementPage() {
 
                 {/* Status Action Buttons */}
                 <div className="flex items-center gap-2 self-end md:self-center flex-wrap">
-                  {booking.status === 'CONFIRMED' && (
+                  {(booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN') && (
                     <>
-                      <button
-                        onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
-                        className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs transition ${
-                          booking.is_present
-                            ? 'font-bold bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400/40 shadow-xs'
-                            : 'font-semibold bg-emerald-600 text-white hover:bg-emerald-700'
-                        }`}
-                      >
-                        <Check className="w-3.5 h-3.5 mr-1" />
-                        {booking.is_present ? 'Admit & Complete' : 'Check-In On-Time'}
-                      </button>
+                      {booking.is_present || booking.status === 'CHECKED_IN' ? (
+                        <button
+                          onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400/40 shadow-xs cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                          Done / Complete
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleAdmitPatient(booking.id)}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs cursor-pointer"
+                        >
+                          <UserCheck className="w-3.5 h-3.5 mr-1" />
+                          Admit Patient
+                        </button>
+                      )}
 
                       {/* Late Arrival +2 Buffer Action when slot has started */}
                       {new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
@@ -820,14 +846,25 @@ export default function BookingsManagementPage() {
                         Substitute
                       </button>
 
-                      <button
-                        onClick={() => handleStatusChange(booking.id, 'NO_SHOW', 'FORFEITED')}
-                        className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
-                        title="Customer didn't arrive. First 2 misses receive courtesy refund; 3rd miss forfeits deposit to your shop."
-                      >
-                        <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-500" />
-                        No-Show
-                      </button>
+                      {!isPresent && (
+                        <span 
+                          className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200"
+                          title="Patient must provide reception PIN to be marked present"
+                        >
+                          Awaiting PIN
+                        </span>
+                      )}
+
+                      {canShowNoShow && (
+                        <button
+                          onClick={() => handleStatusChange(booking.id, 'NO_SHOW', 'FORFEITED')}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
+                          title="Slot time is up and assigned doctor has departed hospital. Customer didn't arrive."
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-500" />
+                          No-Show
+                        </button>
+                      )}
 
                       <button
                         onClick={() => handleStatusChange(booking.id, 'CANCELLED', 'REFUNDED')}

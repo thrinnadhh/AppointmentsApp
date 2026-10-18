@@ -80,6 +80,7 @@ export interface Resource {
   deposit_amount: number;
   price?: number | null;
   department?: string | null;
+  department_id?: string | null;
   attributes: Record<string, unknown>;
   is_active: boolean;
   created_at: string;
@@ -134,6 +135,8 @@ export interface Booking {
   checked_in_method?: 'code' | 'manual' | null;
   queue_position?: number | null;
   estimated_wait_minutes?: number | null;
+  department_id?: string | null;
+  department_name?: string | null;
   provider?: Provider;
   resource?: Resource;
 }
@@ -416,7 +419,9 @@ export type CheckinErrorCode =
   | 'RATE_LIMITED'
   | 'UNAUTHORIZED'
   | 'NOT_FOUND'
-  | 'INVALID_STATUS';
+  | 'INVALID_STATUS'
+  | 'UNAUTHORIZED_DEPARTMENT'
+  | 'APPOINTMENT_FUTURE';
 
 export interface VerifyCheckinCodeResult {
   success: boolean;
@@ -430,4 +435,64 @@ export interface VerifyCheckinCodeResult {
   message?: string;
   locked_until?: string;
 }
+
+export type HospitalModule = 'appointments' | 'queue_schedule' | 'check_in' | 'patients';
+
+export interface HospitalDepartment {
+  id: string;
+  merchant_id: string;
+  name: string;
+  is_preset: boolean;
+  is_active?: boolean;
+  allowed_modules: HospitalModule[];
+  member_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DepartmentMemberStatus = 'invited' | 'active' | 'revoked';
+export type HospitalStaffRole = 'consultant' | 'front_desk';
+
+export interface DepartmentMember {
+  id: string;
+  department_id: string;
+  merchant_id: string;
+  email: string;
+  user_id?: string | null;
+  role?: HospitalStaffRole;
+  status: DepartmentMemberStatus;
+  invited_by?: string | null;
+  invited_at: string;
+  accepted_at?: string | null;
+  invite_expires_at: string;
+  created_at: string;
+  updated_at: string;
+  department_name?: string;
+}
+
+export interface HospitalAuditLog {
+  id: string;
+  merchant_id: string;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  actor_email?: string | null;
+  action: string;
+  target: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export type HospitalRole = 'owner' | 'department_member' | 'superadmin' | 'none';
+
+export interface HospitalAccessContext {
+  role: HospitalRole;
+  merchantId: string | null;
+  departmentId: string | null;
+  departmentName?: string | null;
+  allowedModules: HospitalModule[];
+  isHospital: boolean;
+  email?: string | null;
+  userId: string | null;
+}
+
 

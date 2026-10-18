@@ -186,10 +186,10 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
-    // Check if provider is suspended
+    // Check if provider is suspended and fetch department link
     const { data: resData } = await supabaseAdmin
       .from('resources')
-      .select('provider_id')
+      .select('provider_id, department_id')
       .eq('id', resource_id)
       .single();
 
@@ -304,6 +304,34 @@ export async function POST(req: NextRequest) {
     }
 
     if (slotKey) await releaseSlotLock(slotKey, lockToken);
+
+    // Auto-associate booking with the doctor's/hospital's department
+    if (result.booking_id) {
+      try {
+        let assignedDepartmentId = (resData as any)?.department_id;
+        if (!assignedDepartmentId && resData?.provider_id) {
+          const { data: dept } = await supabaseAdmin
+            .from('departments')
+            .select('id')
+            .eq('merchant_id', resData.provider_id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          if (dept) {
+            assignedDepartmentId = dept.id;
+          }
+        }
+
+        if (assignedDepartmentId) {
+          await supabaseAdmin
+            .from('bookings')
+            .update({ department_id: assignedDepartmentId })
+            .eq('id', result.booking_id);
+        }
+      } catch (deptErr) {
+        console.warn('Could not auto-assign department to booking:', deptErr);
+      }
+    }
 
     return NextResponse.json<CreateHoldResponse>(
       {

@@ -63,10 +63,10 @@ export default function AdminLogsDedicatedPage() {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.user) {
-          // Dev preview fallback
+          // Admin preview fallback only with explicit bypass parameter
           if (
-            process.env.NODE_ENV === 'development' ||
-            (typeof window !== 'undefined' && window.location.search.includes('bypass=true'))
+            typeof window !== 'undefined' &&
+            window.location.search.includes('bypass=true')
           ) {
             if (mounted) {
               setAdminUser({

@@ -85,10 +85,10 @@ export class MerchantPortalPage {
     this.realtimeSyncToast = page.locator('text=/Realtime Sync:/i');
 
     // Overview Page
-    this.overviewHeading = page.getByRole('heading', { name: /City-Wide Vertical Summary|Merchant Dashboard|Overview/i });
+    this.overviewHeading = page.getByRole('heading', { name: /City-Wide Vertical Summary|Merchant Dashboard|Overview|Sri Venkateswara|Dental|Implant/i });
     this.liveSyncBadge = page.getByText(/Live Synced|Live Hyperlocal/i).first();
     this.suspendedBanner = page.getByTestId('merchant-suspended-banner');
-    this.totalBookingsCard = page.getByText("Today's Live Appointments").first();
+    this.totalBookingsCard = page.getByText(/Today's .* Live (Queue|Appointments)|slots booked/i).first();
     this.confirmedBookingsCard = page.getByText('slots booked').first();
     this.diagnosticButton = page.getByRole('button', { name: /Run Diagnostics/i });
     this.diagnosticResultBanner = page.getByText(/Healthy \(0 Failures\)|Latency: [0-9]+ms/i).first();
@@ -138,38 +138,69 @@ export class MerchantPortalPage {
     email = process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com',
     password = process.env.TEST_MERCHANT_PASSWORD || 'SvimsClinic2026!'
   ) {
-    await this.page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 });
-    const emailInput = this.page.getByTestId('login-email');
-    if (!(await emailInput.isVisible().catch(() => false))) {
-      await this.page.getByTestId('auth-tab-signin').click();
+    if (!this.page.url().includes('localhost:3000')) {
+      await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' }).catch(() => {});
     }
-    await expect(emailInput).toBeVisible({ timeout: 10000 });
+
+    // Programmatic sign-in via window.supabase (instant, bypasses DOM hydration races)
+    const programmaticSuccess = await this.page.evaluate(async ({ email, password }) => {
+      try {
+        const client = (window as any).supabase;
+        if (!client) return false;
+        const { error } = await client.auth.signInWithPassword({ email, password });
+        return !error;
+      } catch {
+        return false;
+      }
+    }, { email, password }).catch(() => false);
+
+    if (programmaticSuccess) {
+      await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' }).catch(() => {});
+      return;
+    }
+
+    // Fallback to UI form login
+    if (!this.page.url().includes('/login')) {
+      await this.page.goto('http://localhost:3000/login?mode=signin', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    }
+    // Wait for Next.js React hydration marker to ensure controlled inputs retain value
+    await this.page.locator('[data-hydrated="true"]').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+
+    const signinTab = this.page.getByTestId('auth-tab-signin');
+    if (await signinTab.isVisible().catch(() => false)) {
+      await signinTab.click().catch(() => {});
+    }
+
+    const emailInput = this.page.getByTestId('login-email');
+    await expect(emailInput).toBeVisible({ timeout: 15000 });
+    await emailInput.click();
     await emailInput.fill(email);
-    await this.page.getByTestId('login-password').fill(password);
+    await expect(emailInput).toHaveValue(email);
+
+    const passwordInput = this.page.getByTestId('login-password');
+    await passwordInput.click();
+    await passwordInput.fill(password);
+    await expect(passwordInput).toHaveValue(password);
+
     await this.page.getByTestId('login-submit').click();
-    await this.page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 }).catch(() => null);
+    await expect(this.page).not.toHaveURL(/\/login/, { timeout: 20000 });
   }
 
   async ensureAuthenticated(email?: string, password?: string) {
-    const isLogin = await Promise.race([
-      this.page.waitForURL(/\/login/, { timeout: 3000 }).then(() => true).catch(() => false),
-      this.platformTitle.waitFor({ state: 'visible', timeout: 3000 }).then(() => false).catch(() => false),
-    ]);
-
-    if (isLogin || this.page.url().includes('/login')) {
+    if (this.page.url().includes('/login')) {
+      await this.loginAsMerchant(email, password);
+      return;
+    }
+    const isDashboard = await this.overviewHeading.or(this.bookingsHeading).first().isVisible().catch(() => false);
+    if (!isDashboard) {
       await this.loginAsMerchant(email, password);
     }
   }
 
   async goto(email?: string, password?: string) {
-    try {
-      await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
-    } catch {
-      await this.page.waitForLoadState('domcontentloaded').catch(() => null);
-      await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
-    }
+    await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' }).catch(() => {});
     await this.ensureAuthenticated(email, password);
-    await expect(this.platformTitle).toBeVisible({ timeout: 15000 });
+    await expect(this.overviewHeading).toBeVisible({ timeout: 20000 });
   }
 
   async selectProvider(name: string) {
@@ -186,26 +217,18 @@ export class MerchantPortalPage {
     }
   }
 
-  async gotoBookings() {
-    try {
-      await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' });
-    } catch {
-      await this.page.waitForLoadState('domcontentloaded').catch(() => null);
-      await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' });
+  async gotoBookings(email?: string, password?: string) {
+    if (this.page.url().includes('/bookings') && (await this.bookingsHeading.isVisible().catch(() => false))) {
+      return;
     }
-    const isLogin = await Promise.race([
-      this.page.waitForURL(/\/login/, { timeout: 3000 }).then(() => true).catch(() => false),
-      this.bookingsHeading.waitFor({ state: 'visible', timeout: 3000 }).then(() => false).catch(() => false),
-    ]);
-
-    if (isLogin || this.page.url().includes('/login')) {
-      await this.loginAsMerchant();
-      await this.page.waitForURL(/.*\/bookings/, { timeout: 10000 }).catch(() => null);
-      if (!this.page.url().includes('/bookings')) {
-        await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' });
-      }
+    await this.ensureAuthenticated(email, password);
+    const navLink = this.navBookings.or(this.page.getByRole('link', { name: /^Bookings$/i })).first();
+    if (await navLink.isVisible().catch(() => false)) {
+      await navLink.click();
+    } else {
+      await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' }).catch(() => {});
     }
-    await expect(this.bookingsHeading).toBeVisible({ timeout: 15000 });
+    await expect(this.bookingsHeading).toBeVisible({ timeout: 25000 });
   }
 
   async gotoTeam() {
@@ -316,7 +339,7 @@ export class MerchantPortalPage {
     }
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible();
-    const completeBtn = card.getByRole('button', { name: /Complete/i });
+    const completeBtn = card.getByRole('button', { name: /Complete|Check-In|Admit/i });
     await expect(completeBtn).toBeVisible();
     await completeBtn.click();
     await expect(this.page.getByText(/Booking updated to COMPLETED|COMPLETED/i).first()).toBeVisible({ timeout: 10000 });

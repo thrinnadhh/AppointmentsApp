@@ -440,6 +440,9 @@ export default function App() {
       phone: details.phone,
       email: details.email || prev.email,
     }));
+    if (!isAuthenticated) {
+      setIsAuthenticated(true);
+    }
     setDetailsModalVisible(false);
     setCheckoutVisible(true);
   };

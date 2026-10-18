@@ -26,10 +26,10 @@ import {
   Check,
   Calendar,
   Copy,
-  Activity,
-  Terminal,
   UserCheck,
-  Ticket
+  UserPlus,
+  Ticket,
+  Stethoscope
 } from 'lucide-react';
 import { 
   supabase, 
@@ -38,6 +38,7 @@ import {
   manageLateQueueBooking,
   verifyCheckinCodeRpc,
   markPresentManuallyRpc,
+  admitPatient,
   MerchantBookingWithDetails,
   Provider,
   Resource,
@@ -47,6 +48,222 @@ import {
 } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 import { CustomerContactBadge } from '@/components/CustomerContactBadge';
+
+const DEMO_PROVIDER: Provider & { resources?: Resource[] } = {
+  id: 'b66cb1fc-0248-4c13-97d3-73b0519b59f9',
+  name: 'Tirupati Multispecialty Hospital',
+  category_id: 'hospital',
+  city: 'Tirupati',
+  address: 'Near Alipiri Gate, Tirupati, Andhra Pradesh',
+  phone: '+91 877 222 3456',
+  owner_id: '84e3a93b-f60f-4620-be52-505eb397913e',
+  latitude: 13.6288,
+  longitude: 79.4192,
+  opening_time: '09:00',
+  closing_time: '21:00',
+  status: 'ACTIVE',
+  resources: [
+    {
+      id: 'res-dr-suresh',
+      name: 'Dr. Suresh Sharma',
+      type: 'doctor',
+      department: 'Cardiology',
+      provider_id: 'b66cb1fc-0248-4c13-97d3-73b0519b59f9',
+      is_active: true,
+      duration_minutes: 15,
+      capacity: 1,
+      deposit_amount: 100,
+      attributes: { doctor_left: false },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 'res-dr-priya',
+      name: 'Dr. Priya Nair',
+      type: 'doctor',
+      department: 'Pediatrics',
+      provider_id: 'b66cb1fc-0248-4c13-97d3-73b0519b59f9',
+      is_active: true,
+      duration_minutes: 15,
+      capacity: 1,
+      deposit_amount: 100,
+      attributes: { doctor_left: false },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+function getDemoBookings(providerId: string, resources: Resource[]): any[] {
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const doc1 = resources[0]?.id || 'res-dr-suresh';
+  const doc1Name = resources[0]?.name || 'Dr. Suresh Sharma';
+  const doc2 = resources[1]?.id || 'res-dr-priya';
+  const doc2Name = resources[1]?.name || 'Dr. Priya Nair';
+
+  return [
+    {
+      id: 'demo-b-1',
+      customer_id: 'cust-1',
+      customer_name: 'Rajesh Kumar',
+      customer_phone: '+91 98765 43210',
+      provider_id: providerId,
+      resource_id: doc1,
+      resource_name: doc1Name,
+      slot_start: `${todayStr}T09:00:00+05:30`,
+      slot_end: `${todayStr}T09:15:00+05:30`,
+      status: 'CHECKED_IN',
+      is_present: true,
+      customer_arrived_at: `${todayStr}T08:55:00+05:30`,
+      checked_in_at: `${todayStr}T08:55:00+05:30`,
+      deposit_amount: 100,
+      payment_status: 'CAPTURED',
+    },
+    {
+      id: 'demo-b-2',
+      customer_id: 'cust-2',
+      customer_name: 'Lakshmi Narayana',
+      customer_phone: '+91 94401 23456',
+      provider_id: providerId,
+      resource_id: doc1,
+      resource_name: doc1Name,
+      slot_start: `${todayStr}T09:15:00+05:30`,
+      slot_end: `${todayStr}T09:30:00+05:30`,
+      status: 'CHECKED_IN',
+      is_present: true,
+      customer_arrived_at: `${todayStr}T09:10:00+05:30`,
+      checked_in_at: `${todayStr}T09:10:00+05:30`,
+      deposit_amount: 100,
+      payment_status: 'CAPTURED',
+    },
+    {
+      id: 'demo-b-3',
+      customer_id: 'cust-3',
+      customer_name: 'Sravani Reddy',
+      customer_phone: '+91 99887 76655',
+      provider_id: providerId,
+      resource_id: doc2,
+      resource_name: doc2Name,
+      slot_start: `${todayStr}T09:30:00+05:30`,
+      slot_end: `${todayStr}T09:45:00+05:30`,
+      status: 'CHECKED_IN',
+      is_present: true,
+      customer_arrived_at: `${todayStr}T09:25:00+05:30`,
+      checked_in_at: `${todayStr}T09:25:00+05:30`,
+      deposit_amount: 100,
+      payment_status: 'CAPTURED',
+    },
+    {
+      id: 'demo-b-4',
+      customer_id: 'cust-4',
+      customer_name: 'Venkatesh Babu',
+      customer_phone: '+91 91234 56789',
+      provider_id: providerId,
+      resource_id: doc1,
+      resource_name: doc1Name,
+      slot_start: `${todayStr}T09:45:00+05:30`,
+      slot_end: `${todayStr}T10:00:00+05:30`,
+      status: 'CONFIRMED',
+      is_present: false,
+      deposit_amount: 100,
+      payment_status: 'CAPTURED',
+    },
+    {
+      id: 'demo-b-5',
+      customer_id: 'cust-5',
+      customer_name: 'Padmavathi Amma',
+      customer_phone: '+91 98480 11223',
+      provider_id: providerId,
+      resource_id: doc1,
+      resource_name: doc1Name,
+      slot_start: `${todayStr}T10:00:00+05:30`,
+      slot_end: `${todayStr}T10:15:00+05:30`,
+      status: 'CONFIRMED',
+      is_present: false,
+      deposit_amount: 100,
+      payment_status: 'CAPTURED',
+    },
+    {
+      id: 'demo-b-6',
+      customer_id: 'cust-6',
+      customer_name: 'Manoj Prasad',
+      customer_phone: '+91 93910 99887',
+      provider_id: providerId,
+      resource_id: doc2,
+      resource_name: doc2Name,
+      slot_start: `${todayStr}T10:15:00+05:30`,
+      slot_end: `${todayStr}T10:30:00+05:30`,
+      status: 'CONFIRMED',
+      is_present: false,
+      deposit_amount: 100,
+      payment_status: 'CAPTURED',
+    },
+    {
+      id: 'demo-b-7',
+      customer_id: 'cust-7',
+      customer_name: 'Ananya Sharma',
+      customer_phone: '+91 95500 33445',
+      provider_id: providerId,
+      resource_id: doc2,
+      resource_name: doc2Name,
+      slot_start: `${todayStr}T10:30:00+05:30`,
+      slot_end: `${todayStr}T10:45:00+05:30`,
+      status: 'CONFIRMED',
+      is_present: false,
+      deposit_amount: 100,
+      payment_status: 'CAPTURED',
+    },
+    {
+      id: 'demo-b-8',
+      customer_id: 'cust-8',
+      customer_name: 'Karthik Raja',
+      customer_phone: '+91 97000 12345',
+      provider_id: providerId,
+      resource_id: doc1,
+      resource_name: doc1Name,
+      slot_start: `${todayStr}T08:30:00+05:30`,
+      slot_end: `${todayStr}T08:45:00+05:30`,
+      status: 'CONFIRMED',
+      is_present: true,
+      queue_position: 1,
+      estimated_wait_minutes: 15,
+      deposit_amount: 100,
+      payment_status: 'CAPTURED',
+    },
+    {
+      id: 'demo-b-9',
+      customer_id: 'cust-9',
+      customer_name: 'Govind Swamy',
+      customer_phone: '+91 96180 55667',
+      provider_id: providerId,
+      resource_id: doc1,
+      resource_name: doc1Name,
+      slot_start: `${todayStr}T08:15:00+05:30`,
+      slot_end: `${todayStr}T08:30:00+05:30`,
+      status: 'NO_SHOW',
+      is_present: false,
+      deposit_amount: 100,
+      payment_status: 'FORFEITED',
+    },
+    {
+      id: 'demo-b-10',
+      customer_id: 'cust-10',
+      customer_name: 'Sunita Rao',
+      customer_phone: '+91 98490 77889',
+      provider_id: providerId,
+      resource_id: doc2,
+      resource_name: doc2Name,
+      slot_start: `${todayStr}T08:45:00+05:30`,
+      slot_end: `${todayStr}T09:00:00+05:30`,
+      status: 'NO_SHOW',
+      is_present: false,
+      deposit_amount: 100,
+      payment_status: 'FORFEITED',
+    },
+  ];
+}
 
 const DEFAULT_WEEKLY_HOURS: WeeklyHours = {
   monday: { open: '09:00', close: '21:00', is_closed: false },
@@ -127,8 +344,6 @@ export default function MerchantOverviewPage() {
   const loadVersion = useRef(0);
   const tenantProviderId = tenantProvider?.id;
   const [today, setToday] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
-  const [diagnosticResult, setDiagnosticResult] = useState<{ status: string; latency_ms: number } | null>(null);
-  const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false);
 
   // Reception Check-in Desk State
   const [checkinCodeInput, setCheckinCodeInput] = useState('');
@@ -144,19 +359,6 @@ export default function MerchantOverviewPage() {
   const [checkinErrorMessage, setCheckinErrorMessage] = useState<string | null>(null);
   const checkinInputRef = useRef<HTMLInputElement>(null);
 
-
-  const runDiagnostics = async () => {
-    setIsRunningDiagnostics(true);
-    try {
-      const res = await fetch('/api/health');
-      const data = await res.json();
-      setDiagnosticResult({ status: data.status || 'healthy', latency_ms: data.latency_ms || 12 });
-    } catch {
-      setDiagnosticResult({ status: 'healthy', latency_ms: 15 });
-    } finally {
-      setIsRunningDiagnostics(false);
-    }
-  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -182,6 +384,7 @@ export default function MerchantOverviewPage() {
   const [overrideDailyLimit, setOverrideDailyLimit] = useState<number | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showHoursModal, setShowHoursModal] = useState(false);
+  const [hoursActiveTab, setHoursActiveTab] = useState<'today' | 'tomorrow' | 'full_week'>('full_week');
   const [tempAutoAccept, setTempAutoAccept] = useState(true);
   const [tempDailyLimit, setTempDailyLimit] = useState(50);
   const [tempOpeningTime, setTempOpeningTime] = useState('09:00');
@@ -189,8 +392,25 @@ export default function MerchantOverviewPage() {
   const [tempWeeklyHours, setTempWeeklyHours] = useState<WeeklyHours>(DEFAULT_WEEKLY_HOURS);
   const [bulkOpenTime, setBulkOpenTime] = useState('09:00');
   const [bulkCloseTime, setBulkCloseTime] = useState('21:00');
-  const [hoursActiveTab, setHoursActiveTab] = useState<'full_week' | 'tomorrow' | 'today'>('full_week');
   const [isUpdatingOperational, setIsUpdatingOperational] = useState(false);
+
+  // Doctor Shift & Departure Status
+  const [doctorLeftMap, setDoctorLeftMap] = useState<Record<string, boolean>>({});
+
+  // Offline / Walk-in Patient Booking Modal State
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
+  const [offlineName, setOfflineName] = useState('');
+  const [offlinePhone, setOfflinePhone] = useState('');
+  const [offlineDoctorId, setOfflineDoctorId] = useState('');
+  const [offlineTimeOption, setOfflineTimeOption] = useState<'now' | 'custom'>('now');
+  const [offlineCustomTime, setOfflineCustomTime] = useState('');
+  const [offlineMarkPresent, setOfflineMarkPresent] = useState(true);
+  const [isSubmittingOffline, setIsSubmittingOffline] = useState(false);
+
+  // Live Patient Queue Attendance Matrix filter state
+  const [merchantSelectedDoctorId, setMerchantSelectedDoctorId] = useState<string>('');
+  const [matrixFilter, setMatrixFilter] = useState<'ALL' | 'PRESENT' | 'WAITING' | 'ABSENT' | 'LATE'>('ALL');
+  const [selectedMatrixBookingId, setSelectedMatrixBookingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeProvider) {
@@ -522,7 +742,12 @@ export default function MerchantOverviewPage() {
   const loadData = useCallback(async () => {
     const version = ++loadVersion.current;
     if (isTenantLoading) return;
-    if (!isAuthenticated || (!selectedProviderId && !isSuperAdmin)) {
+    const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+    if (!isAuthenticated && !isDemoMode) {
+      setLoading(false);
+      return;
+    }
+    if (!selectedProviderId && !isSuperAdmin && !isDemoMode) {
       setLoading(false);
       return;
     }
@@ -530,27 +755,50 @@ export default function MerchantOverviewPage() {
     setErrorMessage(null);
     try {
       let query = supabase.from('providers').select('*, resources(*)').order('name');
-      if (!isSuperAdmin) query = query.eq('id', selectedProviderId);
+      if (!isSuperAdmin && selectedProviderId) query = query.eq('id', selectedProviderId);
       const { data: fetchedProviders, error: providerError } = await query;
-      if (providerError) throw providerError;
+      if (providerError && !isDemoMode) throw providerError;
       if (version !== loadVersion.current) return;
-      const targetProviderId = selectedProviderId || fetchedProviders?.[0]?.id;
-      setProviders((fetchedProviders || []) as (Provider & { resources?: Resource[] })[]);
+
+      const activeList = (fetchedProviders && fetchedProviders.length > 0)
+        ? (fetchedProviders as (Provider & { resources?: Resource[] })[])
+        : isDemoMode
+        ? [DEMO_PROVIDER]
+        : [];
+
+      setProviders(activeList);
+      const targetProviderId = selectedProviderId || activeList[0]?.id;
+      const initialDoctorMap: Record<string, boolean> = {};
+      activeList.forEach((prov: any) => {
+        (prov.resources || []).forEach((r: any) => {
+          initialDoctorMap[r.id] = Boolean(r.attributes?.doctor_left);
+        });
+      });
+      setDoctorLeftMap((prev) => ({ ...initialDoctorMap, ...prev }));
+
       if (!targetProviderId) {
         setBookings([]);
         return;
       }
       if (!selectedProviderId) {
         setSelectedProviderId(targetProviderId);
-        return;
       }
+
+      let bookingsData: any[] = [];
       const { data, error } = await (supabase as any).from('merchant_bookings')
         .select('*')
         .eq('provider_id', targetProviderId)
         .order('slot_start', { ascending: true });
-      if (error) throw error;
+
+      if (error && !isDemoMode) throw error;
+      if (data && data.length > 0) {
+        bookingsData = data;
+      } else if (isDemoMode) {
+        bookingsData = getDemoBookings(targetProviderId, activeList[0]?.resources || []);
+      }
+
       if (version !== loadVersion.current) return;
-      setBookings((data || []).map((booking: any) => ({
+      setBookings(bookingsData.map((booking: any) => ({
         ...booking,
         customer_name: booking.customer_name || 'Walk-in / Guest',
         customer_phone: booking.customer_phone || 'Not provided',
@@ -572,6 +820,8 @@ export default function MerchantOverviewPage() {
     void loadData();
     return () => { loadVersion.current += 1; };
   }, [loadData]);
+
+
 
   useEffect(() => {
     setIsLiveConnected(false);
@@ -614,6 +864,45 @@ export default function MerchantOverviewPage() {
     .filter((b) => b.payment_status === 'CAPTURED')
     .reduce((acc, curr) => acc + Number(curr.deposit_amount), 0);
 
+  const handleAdmitPatient = async (bookingId: string) => {
+    if (pendingBookingId) return;
+    setPendingBookingId(bookingId);
+    setErrorMessage(null);
+    try {
+      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      if (isDemoMode) {
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === bookingId
+              ? {
+                  ...b,
+                  is_present: true,
+                  status: 'CHECKED_IN',
+                  customer_arrived_at: new Date().toISOString(),
+                  checked_in_at: new Date().toISOString(),
+                }
+              : b
+          )
+        );
+        const patient = bookings.find((b) => b.id === bookingId);
+        setRecentNotification(`✓ Admitted: ${patient?.customer_name || 'Patient'} is now marked Present in OPD.`);
+        return;
+      }
+
+      const res = await admitPatient(bookingId);
+      if (res.success) {
+        setRecentNotification(`✓ Patient admitted and marked Present in OPD.`);
+        await loadData();
+      } else {
+        setErrorMessage(res.error || 'Failed to admit patient');
+      }
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Error admitting patient');
+    } finally {
+      setPendingBookingId(null);
+    }
+  };
+
   const handleStatusChange = async (
     bookingId: string, 
     newStatus: 'COMPLETED' | 'NO_SHOW' | 'CANCELLED'
@@ -622,6 +911,29 @@ export default function MerchantOverviewPage() {
     setPendingBookingId(bookingId);
     setErrorMessage(null);
     try {
+      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      if (isDemoMode) {
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === bookingId
+              ? {
+                  ...b,
+                  status: newStatus,
+                  is_present: newStatus === 'COMPLETED' ? b.is_present : false,
+                }
+              : b
+          )
+        );
+        setRecentNotification(
+          newStatus === 'COMPLETED'
+            ? '✓ Consultation marked as Completed.'
+            : newStatus === 'NO_SHOW'
+            ? '✕ Marked as No-Show.'
+            : '✓ Status updated.'
+        );
+        return;
+      }
+
       const result = newStatus === 'NO_SHOW'
         ? await recordMerchantNoShow(bookingId)
         : await updateBookingStatus(bookingId, newStatus);
@@ -634,6 +946,13 @@ export default function MerchantOverviewPage() {
       if (!confirmed) {
         throw new Error('The booking update was not confirmed.');
       }
+      setRecentNotification(
+        newStatus === 'COMPLETED'
+          ? '✓ Consultation marked as Completed.'
+          : newStatus === 'NO_SHOW'
+          ? '✕ Marked as No-Show.'
+          : '✓ Status updated.'
+      );
       await loadData();
     } catch {
       setErrorMessage('Unable to confirm the booking update. Refresh to check its status before retrying.');
@@ -646,6 +965,28 @@ export default function MerchantOverviewPage() {
     if (pendingBookingId) return;
     setPendingBookingId(bookingId);
     try {
+      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      if (isDemoMode) {
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === bookingId
+              ? {
+                  ...b,
+                  is_present: true,
+                  queue_position: action === 'CHECKIN_LATE' ? (b.queue_position || 1) : undefined,
+                  customer_arrived_at: new Date().toISOString(),
+                }
+              : b
+          )
+        );
+        setRecentNotification(
+          action === 'CHECKIN_LATE'
+            ? `✓ Late check-in assigned: Accommodated after ${bufferOffset} member appointments (Estimated wait: ~${bufferOffset * 15}m)`
+            : '⏳ Patient moved to Standby Queue.'
+        );
+        return;
+      }
+
       const res = await manageLateQueueBooking(bookingId, action, bufferOffset);
       if (res.success) {
         if (action === 'CHECKIN_LATE') {
@@ -678,6 +1019,31 @@ export default function MerchantOverviewPage() {
     setCheckinSuccessData(null);
 
     try {
+      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      if (isDemoMode) {
+        const waitingBooking = bookings.find((b) => !b.is_present && b.status !== 'NO_SHOW' && b.status !== 'CANCELLED');
+        if (waitingBooking) {
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === waitingBooking.id
+                ? { ...b, is_present: true, status: 'CHECKED_IN', checked_in_at: new Date().toISOString() }
+                : b
+            )
+          );
+          setCheckinSuccessData({
+            booking_id: waitingBooking.id,
+            patient_name: waitingBooking.customer_name,
+            service_doctor: waitingBooking.resource_name,
+            slot_time: new Date(waitingBooking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            is_late: false,
+            checked_in_at: new Date().toISOString(),
+          });
+          setCheckinCodeInput('');
+          setRecentNotification(`Checked in: ${waitingBooking.customer_name} (${waitingBooking.resource_name})`);
+          return;
+        }
+      }
+
       const res = await verifyCheckinCodeRpc(selectedProviderId, code);
       if (res.success) {
         setCheckinSuccessData({
@@ -716,20 +1082,103 @@ export default function MerchantOverviewPage() {
     }
   };
 
-  const handleMarkPresentManually = async (bookingId: string) => {
+  const handleToggleDoctorDeparture = async (resourceId: string, currentLeft: boolean) => {
+    if (!activeProvider) return;
+    const nextStatus = !currentLeft;
+    // Optimistic local state update
+    setDoctorLeftMap((prev) => ({ ...prev, [resourceId]: nextStatus }));
+    const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
     try {
-      setPendingBookingId(bookingId);
-      const res = await markPresentManuallyRpc(bookingId);
-      if (res.success) {
-        setRecentNotification(`Marked present: ${res.patient_name || 'Patient'}`);
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData?.session?.access_token;
+      const res = await fetch('/api/merchant/doctor-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          provider_id: activeProvider.id,
+          resource_id: resourceId,
+          doctor_left: nextStatus,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (json?.success) {
+        setRecentNotification(
+          `✓ ${json.doctor_name || 'Doctor'} is now marked as ${nextStatus ? 'Left Hospital (Shift Ended)' : 'On Duty (In Clinic)'}`
+        );
         void loadData();
+      } else if (isDemoMode) {
+        setRecentNotification(
+          `✓ Doctor shift updated: ${nextStatus ? 'Left Hospital (Shift Ended)' : 'On Duty (In Clinic)'}`
+        );
       } else {
-        alert(res.message || 'Failed to mark present manually');
+        setDoctorLeftMap((prev) => ({ ...prev, [resourceId]: currentLeft }));
+        setErrorMessage(json?.error || 'Failed to update doctor status');
       }
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Error marking present manually');
+    } catch {
+      if (isDemoMode) {
+        setRecentNotification(
+          `✓ Doctor shift updated: ${nextStatus ? 'Left Hospital (Shift Ended)' : 'On Duty (In Clinic)'}`
+        );
+      } else {
+        setDoctorLeftMap((prev) => ({ ...prev, [resourceId]: currentLeft }));
+        setErrorMessage('Network error updating doctor status');
+      }
+    }
+  };
+
+  const handleCreateOfflineBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeProvider || !offlineName.trim()) {
+      setErrorMessage('Please enter the patient full name');
+      return;
+    }
+    const selectedDocId = offlineDoctorId || (activeResources[0]?.id || '');
+    if (!selectedDocId) {
+      setErrorMessage('Please select a doctor');
+      return;
+    }
+
+    setIsSubmittingOffline(true);
+    setErrorMessage(null);
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData?.session?.access_token;
+      const res = await fetch('/api/bookings/offline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          provider_id: activeProvider.id,
+          resource_id: selectedDocId,
+          patient_name: offlineName.trim(),
+          patient_phone: offlinePhone.trim(),
+          slot_start_time: offlineTimeOption === 'custom' ? offlineCustomTime : 'now',
+          is_present: offlineMarkPresent,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setRecentNotification(
+          `✓ Offline Walk-In booked for ${json.patient_name} (${json.doctor_name})! Slot: ${new Date(json.slot_start).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}. PIN: ${json.pin}`
+        );
+        setShowOfflineModal(false);
+        setOfflineName('');
+        setOfflinePhone('');
+        setOfflineCustomTime('');
+        await loadData();
+      } else {
+        setErrorMessage(json.error || 'Failed to book offline patient');
+      }
+    } catch {
+      setErrorMessage('Network error booking offline patient');
     } finally {
-      setPendingBookingId(null);
+      setIsSubmittingOffline(false);
     }
   };
 
@@ -910,35 +1359,15 @@ export default function MerchantOverviewPage() {
             Team
           </Link>
 
-          <button
-            type="button"
-            onClick={runDiagnostics}
-            disabled={isRunningDiagnostics}
-            className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors shadow-xs"
-          >
-            <Activity className={`w-3.5 h-3.5 mr-1.5 text-emerald-600 ${isRunningDiagnostics ? 'animate-spin' : ''}`} />
-            Run Diagnostics
-          </button>
-
           {isSuperAdmin && (
-            <>
-              <Link
-                href="/admin"
-                className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition-colors shadow-xs"
-                title="Super Admin City Rollout & Expansion Hub"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-700" />
-                Platform Admin
-              </Link>
-              <Link
-                href="/admin/logs"
-                className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors shadow-xs"
-                title="Observability & Crash Telemetry Console"
-              >
-                <Terminal className="w-3.5 h-3.5 mr-1.5 text-slate-700" />
-                System Logs
-              </Link>
-            </>
+            <Link
+              href="/admin"
+              className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition-colors shadow-xs"
+              title="Super Admin City Rollout & Expansion Hub"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-700" />
+              Platform Admin
+            </Link>
           )}
 
           <button
@@ -961,15 +1390,6 @@ export default function MerchantOverviewPage() {
         </div>
       </div>
 
-      {diagnosticResult && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-3 rounded-2xl text-xs font-medium flex items-center justify-between shadow-xs mb-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Healthy (0 Failures) • Latency: {diagnosticResult.latency_ms}ms • All services operational</span>
-          </div>
-          <button onClick={() => setDiagnosticResult(null)} className="text-emerald-700 hover:text-emerald-900 ml-2 font-bold">✕</button>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* OPERATIONAL STATUS & CAPACITY CONTROL BAR                                */}
@@ -1076,6 +1496,27 @@ export default function MerchantOverviewPage() {
             <Settings className="w-3.5 h-3.5 text-slate-400" />
             <span>Rules & Cap</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowOfflineModal(true)}
+            data-testid="offline-patient-btn"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm cursor-pointer"
+            title="Book and admit an offline walk-in patient at clinic reception"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>+ Offline Patient</span>
+          </button>
+
+          <Link
+            href="/customer/dashboard"
+            data-testid="customer-dashboard-link-btn"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-100 transition shadow-sm border border-slate-700"
+            title="View Customer Portal 10-Slot Live Queue & Monthly Attendance Calendar"
+          >
+            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Customer Portal (10-Slot &amp; Calendar)</span>
+          </Link>
         </div>
       </div>
 
@@ -1379,246 +1820,559 @@ export default function MerchantOverviewPage() {
                 </span>
               </div>
             </div>
+
+
+            {/* Attendance Matrix Subheader & Doctor Filter */}
+            <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                  <Users className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>OPD Patient Attendance Matrix ({todaysBookings.length} Tokens)</span>
+                </span>
+              </div>
+
+              {/* Doctor filter dropdown */}
+              {activeResources.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-500">Filter by Doctor:</span>
+                  <select
+                    value={merchantSelectedDoctorId}
+                    onChange={(e) => setMerchantSelectedDoctorId(e.target.value)}
+                    className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                  >
+                    <option value="">All Doctors ({activeResources.length})</option>
+                    {activeResources.map((doc) => (
+                      <option key={doc.id} value={doc.id}>
+                        {doc.name} ({doc.department || 'General'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-3">
-            {todaysBookings.length === 0 ? (
-              <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center text-slate-500">
-                No active bookings found for this venue today.
+          {/* ========================================================================= */}
+          {/* PATIENT QUEUE NUMBER SEQUENCE STRIP (Green = Present, Yellow = Waiting, Red = Absent) */}
+          {/* ========================================================================= */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
+                  <Ticket className="w-4 h-4" />
+                </span>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                    <span>Patient Queue Number Sequence</span>
+                    <span className="text-[10px] font-normal normal-case text-slate-500">
+                      (#1 = Patient 1, #2 = Patient 2)
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Live glanceable status: click any patient number to jump directly to their OPD record.
+                  </p>
+                </div>
               </div>
-            ) : (
-              todaysBookings.map((booking, index) => {
-                const startTime = new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const endTime = new Date(booking.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const isPresent = Boolean(booking.is_present || booking.status === 'CHECKED_IN');
-                const isLateQueue = Boolean(booking.queue_position);
 
-                return (
-                  <div 
-                    key={booking.id} 
-                    data-testid={`live-booking-card-${booking.id}`}
-                    data-present={isPresent ? 'true' : 'false'}
-                    className={`rounded-2xl p-5 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                      isPresent
-                        ? 'bg-emerald-50/90 border-2 border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
-                        : isLateQueue
-                        ? 'bg-amber-50/90 border-2 border-amber-400 shadow-sm ring-1 ring-amber-300/40'
-                        : 'bg-rose-50/60 border-2 border-rose-300 shadow-xs hover:shadow-md ring-1 ring-rose-200/50'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Sequential Token # Badge */}
-                      <div className={`flex flex-col items-center justify-center min-w-[54px] px-2.5 py-1.5 rounded-xl border font-mono font-bold text-center shrink-0 shadow-2xs ${
+              {/* Status Color Legend */}
+              <div className="flex items-center gap-2.5 flex-wrap text-[11px] font-bold">
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300">
+                  <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">1</span>
+                  <span>Green = Present</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-950 border border-amber-300">
+                  <span className="w-4 h-4 rounded-full bg-amber-300 text-amber-950 flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">2</span>
+                  <span>Yellow = Still Waiting</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-rose-100 text-rose-900 border border-rose-300">
+                  <span className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">3</span>
+                  <span>Red = Absent</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-950 border border-amber-300">
+                  <span className="w-5 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center font-mono text-[8px] shadow-2xs font-black">L1</span>
+                  <span>Late Queue</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Sequence Number Badges */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+              {todaysBookings.length === 0 ? (
+                <span className="text-xs text-slate-400 italic py-1">No patient bookings queued today.</span>
+              ) : (
+                todaysBookings.map((b, idx) => {
+                  const isPresent = Boolean(b.is_present || b.status === 'CHECKED_IN');
+                  const isAbsent = b.status === 'NO_SHOW';
+                  const isLate = Boolean(b.queue_position);
+                  const patientNum = isLate ? `L${b.queue_position}` : `${idx + 1}`;
+                  const patientName = b.customer_name || `Patient #${patientNum}`;
+
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMatrixBookingId(b.id);
+                        const el = document.getElementById(`matrix-tile-${b.id}`);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                      title={`Patient #${patientNum}: ${patientName} • ${
+                        isPresent ? 'Present (Green)' : isAbsent ? 'Absent (Red)' : isLate ? 'Late Queue (Yellow)' : 'Still Waiting (Yellow)'
+                      }`}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono font-bold shrink-0 transition-all cursor-pointer shadow-2xs hover:scale-105 border ${
                         isPresent
-                          ? 'bg-emerald-100/90 border-emerald-400 text-emerald-950'
-                          : isLateQueue
-                          ? 'bg-amber-100/90 border-amber-400 text-amber-950'
-                          : 'bg-rose-100/90 border-rose-300 text-rose-950'
-                      }`}>
-                        <span className="text-[9px] uppercase tracking-wider font-extrabold opacity-75">TOKEN</span>
-                        <span className="text-sm font-black">
-                          {isLateQueue ? `#L${booking.queue_position}` : `#${index + 1}`}
-                        </span>
-                      </div>
+                          ? 'bg-emerald-500 text-white border-emerald-600 ring-1 ring-emerald-300'
+                          : isAbsent
+                          ? 'bg-rose-500 text-white border-rose-600 ring-1 ring-rose-300'
+                          : isLate
+                          ? 'bg-amber-400 text-amber-950 border-amber-500 ring-1 ring-amber-300 font-black'
+                          : 'bg-amber-300 text-amber-950 border-amber-400 ring-1 ring-amber-300'
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-white/25 flex items-center justify-center text-[10px]">
+                        {patientNum}
+                      </span>
+                      <span className="text-[11px] font-sans font-medium truncate max-w-[85px]">
+                        {patientName.split(' ')[0]}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 transition-colors ${
-                        isPresent 
-                          ? 'bg-emerald-200 text-emerald-900 ring-2 ring-emerald-400' 
-                          : isLateQueue
-                          ? 'bg-amber-200 text-amber-900 ring-2 ring-amber-400'
-                          : 'bg-rose-200 text-rose-900 ring-2 ring-rose-300'
-                      }`}>
-                        <User className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-semibold text-slate-900 text-sm">{booking.customer_name}</h4>
-                          {isPresent ? (
-                            <span 
-                              data-testid={`present-badge-${booking.id}`}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs"
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                              <span>✓ PRESENT &amp; READY</span>
-                            </span>
-                          ) : isLateQueue ? (
-                            <span 
-                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-950 border border-amber-400"
-                              title="Accommodated after 2 member appointments due to late arrival"
-                            >
-                              <Clock className="w-3 h-3 text-amber-800" />
-                              <span>⏰ LATE COMERS QUEUE (Turn #{booking.queue_position}) {booking.estimated_wait_minutes ? `(~${booking.estimated_wait_minutes}m wait)` : ''}</span>
-                            </span>
-                          ) : (
-                            <span 
-                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-200 text-rose-950 border border-rose-300"
-                              title="Customer has not yet arrived or given code"
-                            >
-                              <span>✕ NOT PRESENT (AWAITING ARRIVAL)</span>
-                            </span>
-                          )}
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            booking.status === 'CHECKED_IN'
-                              ? 'bg-emerald-600 text-white font-extrabold' :
-                            booking.status === 'CONFIRMED' 
-                              ? (isPresent ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-slate-200 text-slate-800') :
-                            booking.status === 'HELD' ? 'bg-amber-100 text-amber-800' :
-                            booking.status === 'COMPLETED' ? 'bg-teal-100 text-teal-800' :
-                            'bg-slate-100 text-slate-700'
-                          }`}>
-                            {booking.status}
-                          </span>
-                          {booking.is_followup && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
-                              🔄 Free Follow-up
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 flex items-center gap-3 mt-1">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            {startTime} - {endTime}
-                          </span>
-                          <span>•</span>
-                          <span className="font-medium text-slate-700">{booking.resource_name}</span>
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <CustomerContactBadge
-                            phone={booking.customer_phone}
-                            bookingId={booking.id}
-                            bookingStatus={booking.status}
-                            isArrived={Boolean(booking.customer_arrived_at)}
-                          />
-                          {booking.no_show_count ? (
-                            <span className="text-xs text-rose-500 font-medium">({booking.no_show_count} past no-shows)</span>
-                          ) : null}
-                        </div>
-                        {booking.customer_arrived_at && (
-                          <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 mt-1">
-                            <span>✓ Reached Venue at {new Date(booking.customer_arrived_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          </p>
-                        )}
-                      </div>
+          {/* Live Patient Queue Attendance Matrix (Style 3) */}
+          {(() => {
+            const baseBookings = (merchantSelectedDoctorId
+              ? todaysBookings.filter((b) => b.resource_id === merchantSelectedDoctorId)
+              : todaysBookings
+            ).filter((b) => b.status !== 'CANCELLED');
+
+            const matrixCompletedCount = baseBookings.filter((b) => b.status === 'COMPLETED').length;
+            const matrixPresentCount = baseBookings.filter((b) => (b.is_present || b.status === 'CHECKED_IN') && b.status !== 'COMPLETED').length;
+            const matrixAbsentCount = baseBookings.filter((b) => b.status === 'NO_SHOW').length;
+            const matrixLateCount = baseBookings.filter((b) => Boolean(b.queue_position)).length;
+            const matrixWaitingCount = baseBookings.filter((b) => !b.is_present && b.status !== 'CHECKED_IN' && b.status !== 'NO_SHOW' && b.status !== 'COMPLETED').length;
+
+            const filteredMatrixBookings = baseBookings.filter((b) => {
+              const isCompleted = b.status === 'COMPLETED';
+              const isPresent = Boolean(b.is_present || b.status === 'CHECKED_IN') && !isCompleted;
+              const isAbsent = b.status === 'NO_SHOW';
+              const isLate = Boolean(b.queue_position);
+              if (matrixFilter === 'PRESENT') return isPresent;
+              if (matrixFilter === 'WAITING') return !isPresent && !isAbsent && !isCompleted;
+              if (matrixFilter === 'ABSENT') return isAbsent;
+              if (matrixFilter === 'LATE') return isLate;
+              return true;
+            });
+
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4" data-testid="live-attendance-matrix-board">
+                {/* Matrix Header & Status Filters */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
+                        Attendance Matrix
+                      </span>
+                      <h3 className="font-bold text-slate-900 text-base tracking-tight">
+                        Live OPD Patient Queue Matrix
+                      </h3>
                     </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Glanceable matrix grid: 🟢 Green = Present, 🟡 Yellow = Waiting, 🔴 Red = Absent, 🟡 L = Late Queue
+                    </p>
+                  </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                      <div className="text-right sm:mr-2">
-                        <p className="text-xs font-semibold text-slate-900">
-                          {booking.is_followup ? '₹0 (Free Follow-up)' : `₹${booking.deposit_amount}`}
-                        </p>
-                        <p className={`text-[10px] font-medium ${
-                          booking.payment_status === 'CAPTURED' ? 'text-emerald-600' : 'text-amber-600'
-                        }`}>
-                          {booking.payment_status}
-                        </p>
-                      </div>
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setMatrixFilter('ALL')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                        matrixFilter === 'ALL'
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      All ({baseBookings.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMatrixFilter('PRESENT')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                        matrixFilter === 'PRESENT'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Present ({matrixPresentCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMatrixFilter('WAITING')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                        matrixFilter === 'WAITING'
+                          ? 'bg-amber-500 text-white shadow-2xs'
+                          : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      Waiting ({matrixWaitingCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMatrixFilter('ABSENT')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                        matrixFilter === 'ABSENT'
+                          ? 'bg-rose-600 text-white shadow-2xs'
+                          : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                      Absent ({matrixAbsentCount})
+                    </button>
+                    {matrixLateCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setMatrixFilter('LATE')}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                          matrixFilter === 'LATE'
+                            ? 'bg-amber-600 text-white shadow-2xs'
+                            : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        Late ({matrixLateCount})
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-                      {(booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN') && (
-                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                          {/* Fallback "Mark present" manual button when patient phone is dead */}
-                          {!isPresent && (
-                            <button
-                              onClick={() => handleMarkPresentManually(booking.id)}
-                              disabled={pendingBookingId === booking.id}
-                              data-testid={`mark-present-btn-${booking.id}`}
-                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition disabled:opacity-60 flex items-center gap-1 shadow-xs"
-                              title="Customer phone dead or offline — mark present manually"
+                {/* THE MATRIX TILES GRID */}
+                {filteredMatrixBookings.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 text-xs italic bg-slate-50 rounded-xl">
+                    No patients matching this filter in today's attendance matrix.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                    {filteredMatrixBookings.map((booking) => {
+                      const originalIndex = todaysBookings.findIndex((b) => b.id === booking.id);
+                      const isCompleted = booking.status === 'COMPLETED';
+                      const isPresent = Boolean(booking.is_present || booking.status === 'CHECKED_IN') && !isCompleted;
+                      const isAbsent = booking.status === 'NO_SHOW';
+                      const isLate = Boolean(booking.queue_position);
+                      const patientNumber = isLate ? `L${booking.queue_position}` : `${originalIndex + 1}`;
+                      const patientName = booking.customer_name || `Patient #${patientNumber}`;
+                      const isSelected = selectedMatrixBookingId === booking.id;
+
+                      return (
+                        <div
+                          key={booking.id}
+                          id={`matrix-tile-${booking.id}`}
+                          data-testid={`matrix-patient-tile-${booking.id}`}
+                          onClick={() => setSelectedMatrixBookingId(isSelected ? null : booking.id)}
+                          className={`rounded-2xl p-3.5 border-2 transition-all flex flex-col justify-between gap-2.5 cursor-pointer shadow-2xs hover:shadow-md ${
+                            isCompleted
+                              ? 'bg-slate-50/70 border-slate-300 hover:border-slate-400 opacity-80'
+                              : isPresent
+                              ? 'bg-emerald-50/70 border-emerald-500 hover:border-emerald-600 ring-1 ring-emerald-400/20'
+                              : isAbsent
+                              ? 'bg-rose-50/70 border-rose-400 hover:border-rose-500 ring-1 ring-rose-300/20'
+                              : isLate
+                              ? 'bg-amber-50/80 border-amber-400 hover:border-amber-500 ring-1 ring-amber-300/30'
+                              : 'bg-amber-50/50 border-amber-300 hover:border-amber-400 ring-1 ring-amber-200/30'
+                          } ${isSelected ? 'ring-4 ring-emerald-500/30 scale-[1.02]' : ''}`}
+                        >
+                          {/* Tile Top: Number Badge and Status Tag */}
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shadow-2xs shrink-0 ${
+                                isCompleted
+                                  ? 'bg-slate-400 text-white'
+                                  : isPresent
+                                  ? 'bg-emerald-500 text-white ring-1 ring-emerald-600'
+                                  : isAbsent
+                                  ? 'bg-rose-500 text-white ring-1 ring-rose-600'
+                                  : isLate
+                                  ? 'bg-amber-400 text-amber-950 font-black ring-1 ring-amber-500'
+                                  : 'bg-amber-300 text-amber-950 font-bold ring-1 ring-amber-400'
+                              }`}
                             >
-                              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Mark present</span>
-                            </button>
-                          )}
+                              {patientNumber}
+                            </span>
 
-                          {/* If scheduled slot is in the past and patient has not arrived */}
-                          {new Date(booking.slot_start).getTime() < Date.now() && !booking.customer_arrived_at && !isPresent && (
-                            <>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 ${
+                                isCompleted
+                                  ? 'bg-slate-200 text-slate-700'
+                                  : isPresent
+                                  ? 'bg-emerald-600 text-white'
+                                  : isAbsent
+                                  ? 'bg-rose-600 text-white'
+                                  : isLate
+                                  ? 'bg-amber-400 text-amber-950 border border-amber-500 font-black'
+                                  : 'bg-amber-300 text-amber-950 font-bold'
+                              }`}
+                            >
+                              {isCompleted
+                                ? 'DONE'
+                                : isPresent
+                                ? 'PRESENT'
+                                : isAbsent
+                                ? 'ABSENT'
+                                : isLate
+                                ? 'LATE'
+                                : 'WAITING'}
+                            </span>
+                          </div>
+
+                          {/* Tile Middle: Patient Name */}
+                          <div className="py-0.5">
+                            <p className="text-xs font-bold text-slate-900 truncate" title={patientName}>
+                              {patientName}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-medium font-mono">
+                              {new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+
+                          {/* Tile Bottom: Contextual Action */}
+                          <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
+                            {isCompleted ? (
+                              <span className="text-[10px] font-bold text-slate-500 text-center w-full flex items-center justify-center gap-1 py-0.5">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Finished</span>
+                              </span>
+                            ) : isPresent ? (
                               <button
+                                type="button"
+                                onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
+                                disabled={pendingBookingId === booking.id}
+                                className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer flex items-center justify-center gap-1"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>{pendingBookingId === booking.id ? 'Saving…' : 'Done'}</span>
+                              </button>
+                            ) : isAbsent ? (
+                              <span className="text-[10px] font-bold text-rose-600 text-center w-full py-0.5">
+                                ✕ Missed
+                              </span>
+                            ) : isLate ? (
+                              <button
+                                type="button"
                                 onClick={() => handleLateQueueAction(booking.id, 'CHECKIN_LATE', 2)}
                                 disabled={pendingBookingId === booking.id}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition disabled:opacity-60 shadow-xs flex items-center gap-1"
-                                title="Patient arrived after slot time. Accommodate after 2 member appointments."
+                                className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer"
                               >
-                                <Clock className="w-3 h-3" />
-                                <span>Arrived Late (+2)</span>
+                                Arrived Late
                               </button>
-                              {booking.is_present !== false && (
-                                <button
-                                  onClick={() => handleLateQueueAction(booking.id, 'MOVE_TO_STANDBY')}
-                                  disabled={pendingBookingId === booking.id}
-                                  className="px-2 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition disabled:opacity-60"
-                                  title="Patient hasn't arrived. Move to standby queue to free doctor."
-                                >
-                                  Standby
-                                </button>
-                              )}
-                            </>
-                          )}
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleAdmitPatient(booking.id)}
+                                disabled={pendingBookingId === booking.id}
+                                className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer flex items-center justify-center gap-1"
+                              >
+                                <UserCheck className="w-3 h-3" />
+                                <span>{pendingBookingId === booking.id ? 'Admitting…' : 'Admit'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
+                {/* Selected Patient Drawer / Quick Inspector */}
+                {selectedMatrixBookingId && (() => {
+                  const b = todaysBookings.find((item) => item.id === selectedMatrixBookingId);
+                  if (!b) return null;
+                  const isC = b.status === 'COMPLETED';
+                  const isP = Boolean(b.is_present || b.status === 'CHECKED_IN') && !isC;
+                  const isA = b.status === 'NO_SHOW';
+                  const isL = Boolean(b.queue_position);
+                  const pIdx = todaysBookings.findIndex((item) => item.id === b.id);
+                  const pNum = isL ? `L${b.queue_position}` : `${pIdx + 1}`;
+
+                  return (
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/95 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-150">
+                      <div className="flex items-center gap-3">
+                        <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-mono font-black text-sm text-white shadow-2xs ${
+                          isC ? 'bg-slate-400' : isP ? 'bg-emerald-600' : isA ? 'bg-rose-500' : isL ? 'bg-amber-500' : 'bg-amber-400 text-amber-950'
+                        }`}>
+                          {pNum}
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-900">{b.customer_name}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              isC
+                                ? 'bg-slate-200 text-slate-700'
+                                : isP
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : isA
+                                ? 'bg-rose-100 text-rose-800'
+                                : isL
+                                ? 'bg-amber-100 text-amber-900'
+                                : 'bg-amber-100 text-amber-900 border border-amber-300'
+                            }`}>
+                              {isC ? 'Completed' : isP ? 'Present (In OPD)' : isA ? 'Absent (No-Show)' : isL ? 'Late Queue' : 'Still Waiting'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Slot: {new Date(b.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(b.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Doctor: <span className="font-semibold text-slate-700">{b.resource_name}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                        {!isP && !isA && !isC && (
                           <button
-                            onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
-                            disabled={pendingBookingId === booking.id}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-60 ${
-                              isPresent
-                                ? 'bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400/40 shadow-xs font-bold'
-                                : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                            }`}
+                            type="button"
+                            onClick={() => handleAdmitPatient(b.id)}
+                            disabled={pendingBookingId === b.id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
                           >
-                            {pendingBookingId === booking.id ? 'Saving…' : (isPresent ? 'Admit / Complete' : 'Check-In')}
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span>{pendingBookingId === b.id ? 'Admitting…' : 'Admit Patient'}</span>
                           </button>
+                        )}
+                        {isP && !isC && (
                           <button
-                            onClick={() => handleStatusChange(booking.id, 'NO_SHOW')}
-                            disabled={pendingBookingId === booking.id}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-600 hover:bg-rose-100 transition border border-rose-200 disabled:opacity-60"
-                            title="Forfeits deposit to merchant pool"
+                            type="button"
+                            onClick={() => handleStatusChange(b.id, 'COMPLETED')}
+                            disabled={pendingBookingId === b.id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{pendingBookingId === b.id ? 'Saving…' : 'Done / Complete'}</span>
+                          </button>
+                        )}
+                        {!isP && !isA && !isC && (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(b.id, 'NO_SHOW')}
+                            disabled={pendingBookingId === b.id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition disabled:opacity-50 cursor-pointer"
                           >
                             No-Show
                           </button>
-                        </div>
-                      )}
+                        )}
+                        <CustomerContactBadge phone={b.customer_phone} bookingId={b.id} bookingStatus={b.status} isArrived={Boolean(b.customer_arrived_at)} />
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMatrixBookingId(null)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition cursor-pointer"
+                          aria-label="Close details"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
         </div>
 
-        {/* Right 1 Col: Quick Venue Management & Short-cuts */}
+        {/* Right 1 Col: Doctor Shift Status & Duty Management */}
         <div className="space-y-6">
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-            <h3 className="font-bold text-slate-900 text-sm">Venue Department Status</h3>
-            <div className="space-y-3">
-              {activeResources.slice(0, 5).map((resource) => (
-                <div key={resource.id} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50">
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-slate-800">{resource.name}</p>
-                    <p className="text-[11px] text-slate-500">{resource.department || 'General'} • Fee: ₹{resource.price ?? 500}</p>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    resource.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-                  }`}>
-                    {resource.is_active ? 'Available' : 'Paused'}
-                  </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
+                  <Stethoscope className="w-4 h-4" />
                 </div>
-              ))}
+                <h3 className="font-bold text-slate-900 text-sm">Doctor Shift Status</h3>
+              </div>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                {activeResources.length} Doctors
+              </span>
             </div>
 
-            <Link
-              href="/resources"
-              className="w-full mt-2 inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition"
-            >
-              Manage All {verticalConfig.resourceLabelPlural} →
-            </Link>
-          </div>
-
-          <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-200 space-y-3">
-            <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <span>Merchant Anti-No-Show Policy</span>
-            </div>
-            <p className="text-xs text-emerald-800 leading-relaxed">
-              Every customer reservation in Tirupati is confirmed with the total consultation/service fee payable in cash. If a customer fails to arrive, one click on &quot;No-Show&quot; instantly updates booking status and records penalty telemetry.
+            <p className="text-xs text-slate-500">
+              Live clinic duty presence and shift roster for consultation availability.
             </p>
+
+            <div className="space-y-3">
+              {activeResources.length === 0 ? (
+                <div className="p-4 rounded-xl bg-slate-50 text-center text-xs text-slate-500 border border-slate-100">
+                  No active doctors configured yet.
+                </div>
+              ) : (
+                activeResources.map((doc) => {
+                  const isLeft = Boolean(doctorLeftMap[doc.id] ?? (doc.attributes as Record<string, unknown> | null)?.doctor_left);
+                  const docAppointmentsCount = todaysBookings.filter(
+                    (b) => b.resource_id === doc.id && b.status !== 'CANCELLED'
+                  ).length;
+
+                  return (
+                    <div
+                      key={doc.id}
+                      data-testid={`doctor-shift-card-${doc.id}`}
+                      className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-slate-900 text-xs">{doc.name}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {doc.department || 'General Medicine'} • {docAppointmentsCount} {docAppointmentsCount === 1 ? 'patient' : 'patients'} today
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide shrink-0 ${
+                            isLeft
+                              ? 'bg-slate-200 text-slate-700'
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          }`}
+                        >
+                          {isLeft ? '🚪 Shift Ended' : '🩺 On Duty'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+                        <span className="text-[11px] text-slate-500">
+                          {isLeft ? 'Currently Away' : 'Available in Clinic'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleDoctorDeparture(doc.id, isLeft)}
+                          data-testid={`toggle-doctor-duty-${doc.id}`}
+                          className={`text-xs font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                            isLeft
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs'
+                          }`}
+                        >
+                          {isLeft ? 'Mark On Duty' : 'Mark Left'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+              <Link
+                href="/schedule"
+                className="font-bold text-emerald-700 hover:text-emerald-800 transition"
+              >
+                Manage Shift Hours →
+              </Link>
+              <Link
+                href="/resources"
+                className="font-medium text-slate-500 hover:text-slate-700 transition"
+              >
+                View Doctors
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -2166,6 +2920,173 @@ export default function MerchantOverviewPage() {
           </div>
         );
       })()}
+
+      {/* ========================================================================= */}
+      {/* OFFLINE / WALK-IN PATIENT BOOKING MODAL                                     */}
+      {/* ========================================================================= */}
+      {showOfflineModal && (
+        <div 
+          data-testid="offline-patient-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+        >
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">New Offline Patient (Walk-In)</h3>
+                  <p className="text-xs text-slate-500">Allocate a slot and admit a walk-in patient at reception</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOfflineModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOfflineBooking} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Patient Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ramesh Kumar"
+                  value={offlineName}
+                  onChange={(e) => setOfflineName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="e.g. 9876543210 (10-digit mobile)"
+                  value={offlinePhone}
+                  onChange={(e) => setOfflinePhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Doctor / Department *
+                </label>
+                <select
+                  value={offlineDoctorId || activeResources[0]?.id || ''}
+                  onChange={(e) => setOfflineDoctorId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                >
+                  {activeResources.map((res) => (
+                    <option key={res.id} value={res.id}>
+                      {res.name} — {res.department || 'General'} ({res.duration_minutes || 2}m duration)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Time Slot Allocation *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`p-3 rounded-xl border cursor-pointer flex flex-col gap-1 transition ${offlineTimeOption === 'now' ? 'bg-emerald-50/70 border-emerald-500 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="time_opt"
+                        checked={offlineTimeOption === 'now'}
+                        onChange={() => setOfflineTimeOption('now')}
+                        className="text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="text-xs font-bold text-slate-900">Immediate / Now</span>
+                    </div>
+                    <span className="text-[11px] text-slate-500 pl-5">Allocate next immediate window</span>
+                  </label>
+
+                  <label className={`p-3 rounded-xl border cursor-pointer flex flex-col gap-1 transition ${offlineTimeOption === 'custom' ? 'bg-emerald-50/70 border-emerald-500 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="time_opt"
+                        checked={offlineTimeOption === 'custom'}
+                        onChange={() => setOfflineTimeOption('custom')}
+                        className="text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="text-xs font-bold text-slate-900">Custom Time</span>
+                    </div>
+                    <span className="text-[11px] text-slate-500 pl-5">Select a specific time today</span>
+                  </label>
+                </div>
+
+                {offlineTimeOption === 'custom' && (
+                  <div className="pt-2">
+                    <input
+                      type="time"
+                      required={offlineTimeOption === 'custom'}
+                      value={offlineCustomTime}
+                      onChange={(e) => setOfflineCustomTime(e.target.value)}
+                      className="px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Physical presence checkbox */}
+              <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="offline-present"
+                  checked={offlineMarkPresent}
+                  onChange={(e) => setOfflineMarkPresent(e.target.checked)}
+                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                />
+                <label htmlFor="offline-present" className="text-xs text-emerald-950 font-medium cursor-pointer">
+                  <span className="font-bold block">Patient is physically present at reception</span>
+                  Automatically mark as Present &amp; Checked-In so doctor can admit immediately.
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowOfflineModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingOffline}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-md transition disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSubmittingOffline ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Allocating Slot…</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Confirm &amp; Allocate Appointment</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

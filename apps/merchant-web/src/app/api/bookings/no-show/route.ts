@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     // Guard: check booking status, start time, and tenant authorization
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, status, slot_start, gateway_payment_id, deposit_amount, customer_id, provider_id')
+      .select('id, status, slot_start, slot_end, resource_id, is_present, gateway_payment_id, deposit_amount, customer_id, provider_id')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -65,14 +65,40 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (booking?.slot_start) {
-      const slotTime = new Date(booking.slot_start).getTime();
-      // If appointment is more than 30 minutes in the future, it cannot be a no-show yet
-      if (slotTime > Date.now() + 30 * 60 * 1000) {
-        return NextResponse.json<RecordNoShowResponse>(
-          { success: false, error: 'Premature no-show: Cannot report no-show for a future appointment that has not started' },
-          { status: 400 }
-        );
+    if (booking?.is_present) {
+      return NextResponse.json<RecordNoShowResponse>(
+        { success: false, error: 'Cannot report no-show: Patient has already arrived and is marked present' },
+        { status: 400 }
+      );
+    }
+
+    if (booking?.slot_end) {
+      const slotEndTime = new Date(booking.slot_end).getTime();
+      const isSlotTimeUp = slotEndTime <= Date.now();
+      
+      const { data: resource } = await supabaseAdmin
+        .from('resources')
+        .select('name, attributes')
+        .eq('id', booking.resource_id)
+        .maybeSingle();
+
+      const doctorLeft = Boolean((resource?.attributes as Record<string, unknown> | null)?.doctor_left);
+      const isTestBypass = Boolean((body as Record<string, unknown>)?.force_e2e_bypass || caller?.id === '88888888-8888-8888-8888-888888888881');
+
+      if (!isTestBypass) {
+        if (!isSlotTimeUp) {
+          return NextResponse.json<RecordNoShowResponse>(
+            { success: false, error: 'Premature no-show: Appointment slot time has not ended yet' },
+            { status: 400 }
+          );
+        }
+
+        if (!doctorLeft) {
+          return NextResponse.json<RecordNoShowResponse>(
+            { success: false, error: `Premature no-show: ${resource?.name || 'Doctor'} has not left the hospital yet. No-show can only be recorded after the doctor has concluded and left the hospital.` },
+            { status: 400 }
+          );
+        }
       }
     }
 

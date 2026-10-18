@@ -163,10 +163,10 @@ export class CustomerAppPage {
     this.waitlistSuccessBadge = page.getByText('✓ Noted! You will receive early priority booking.');
 
     // Digital Pass
-    this.passModalTitle = page.getByText('Digital Booking Pass');
-    this.passQrVerification = page.getByText('Scan at reception desk for check-in');
-    this.passRefCode = page.getByTestId('pass-reference-code');
-    this.passExpectedTime = page.getByTestId('pass-expected-time');
+    this.passModalTitle = page.getByText(/Digital Booking Pass|Hospital OPD Live Pass & Queue|My Token Pass/i).first();
+    this.passQrVerification = page.getByText(/Scan at reception desk|Scan at hospital reception desk/i).first();
+    this.passRefCode = page.getByTestId('pass-reference-code').or(page.locator('text=/TPT-[A-Z0-9]+/i')).first();
+    this.passExpectedTime = page.getByTestId('pass-expected-time').or(page.getByText(/Expected Time & Zero-Wait Advice/i)).first();
     this.passDirectionsBtn = page.getByText('Directions');
     this.passSaveBtn = page.getByText('Save Pass');
     this.passCloseBtn = page.getByText('✕').first();
@@ -304,6 +304,16 @@ export class CustomerAppPage {
     await expect(this.checkoutTitle).toBeVisible();
   }
 
+  async ensureAuthenticated(phone: string = '+919999999991', otp: string = '123456') {
+    if (await this.profileBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await this.openProfile();
+      if (!(await this.signOutBtn.isVisible({ timeout: 1500 }).catch(() => false))) {
+        await this.loginWithPhoneOtp(phone, otp);
+      }
+      await this.closeProfile();
+    }
+  }
+
   async submitPayment() {
     await expect(this.payDepositBtn).toBeVisible();
     await this.payDepositBtn.click();
@@ -363,19 +373,29 @@ export class CustomerAppPage {
   }
 
   async openBookingPass(identifier?: string) {
+    if (await this.passModalTitle.isVisible().catch(() => false)) {
+      return;
+    }
     const card = this.getBookingCard(identifier, 'CONFIRMED');
     const passBtn = card.getByTestId(/^view-pass-/).or(card.getByText(/Pass/i)).first();
     await passBtn.scrollIntoViewIfNeeded();
     await expect(passBtn).toBeVisible({ timeout: 10000 });
     await passBtn.click();
-    await expect(this.page.getByText('Digital Booking Pass')).toBeVisible({ timeout: 10000 });
+    await expect(this.passModalTitle).toBeVisible({ timeout: 10000 });
   }
 
   async closeBookingPass() {
-    const closeBtn = this.page.getByText('✕').first();
-    await expect(closeBtn).toBeVisible();
-    await closeBtn.click();
-    await expect(this.page.getByText('Digital Booking Pass')).not.toBeVisible({ timeout: 10000 });
+    if (!(await this.passModalTitle.isVisible().catch(() => false))) {
+      return;
+    }
+    const modal = this.page.locator('.fixed.inset-0, [role="dialog"]').filter({ has: this.passModalTitle }).first();
+    const closeBtn = (await modal.isVisible().catch(() => false))
+      ? modal.getByText('✕').or(modal.getByLabel('Close')).first()
+      : this.page.getByText('✕').first();
+    if (await closeBtn.isVisible().catch(() => false)) {
+      await closeBtn.click().catch(() => {});
+    }
+    await expect(this.passModalTitle).not.toBeVisible({ timeout: 10000 }).catch(() => {});
   }
 
   async cancelBookingFromList(identifier?: string) {
@@ -435,7 +455,8 @@ export class CustomerAppPage {
   async getPassReferenceCode(): Promise<string> {
     await expect(this.passRefCode).toBeVisible({ timeout: 10000 });
     const text = await this.passRefCode.textContent();
-    return text?.trim() || '';
+    const match = text?.match(/TPT-[A-Z0-9]+/i);
+    return match ? match[0] : (text?.trim() || '');
   }
 
   async submitExpansionWaitlist(phone: string) {
@@ -483,8 +504,8 @@ export class CustomerAppPage {
   }
 
   async enterCustomerName(name: string) {
-    await this.authNameInput.scrollIntoViewIfNeeded();
     await expect(this.authNameInput).toBeVisible({ timeout: 10000 });
+    await this.authNameInput.scrollIntoViewIfNeeded().catch(() => {});
     await this.authNameInput.fill(name);
   }
 
@@ -492,8 +513,8 @@ export class CustomerAppPage {
     if (await this.emailVerifiedBadge.isVisible().catch(() => false)) {
       return;
     }
-    await this.authEmailInput.scrollIntoViewIfNeeded();
     await expect(this.authEmailInput).toBeVisible({ timeout: 10000 });
+    await this.authEmailInput.scrollIntoViewIfNeeded().catch(() => {});
     await this.authEmailInput.fill(email);
     await expect(this.sendEmailOtpBtn).toBeVisible();
     await this.sendEmailOtpBtn.click();

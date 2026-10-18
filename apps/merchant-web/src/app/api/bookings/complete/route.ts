@@ -59,24 +59,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Mark completed via SECURITY DEFINER RPC
-    const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('complete_booking', {
-      p_booking_id: booking_id,
-    });
+    if (booking.status === 'COMPLETED') {
+      return NextResponse.json({
+        success: true,
+        booking_id,
+        status: 'COMPLETED',
+      });
+    }
 
-    if (rpcError) {
+    if (booking.status !== 'CONFIRMED' && booking.status !== 'CHECKED_IN') {
       return NextResponse.json(
-        { success: false, error: rpcError.message },
-        { status: 500 }
+        { success: false, error: `Invalid transition: Only CONFIRMED or CHECKED_IN bookings can be completed (current: ${booking.status})` },
+        { status: 400 }
       );
     }
 
-    const rpcResult = rpcData as { success: boolean; error?: string };
-    if (!rpcResult?.success) {
-      return NextResponse.json(
-        { success: false, error: rpcResult?.error || 'Failed to complete booking' },
-        { status: 400 }
-      );
+    // Try RPC first if CONFIRMED for backward compatibility
+    let completed = false;
+    if (booking.status === 'CONFIRMED') {
+      try {
+        const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('complete_booking', {
+          p_booking_id: booking_id,
+        });
+        if (!rpcError && (rpcData as any)?.success) {
+          completed = true;
+        }
+      } catch (rpcCatch) {
+        console.warn('RPC complete_booking error, will use admin update:', rpcCatch);
+      }
+    }
+
+    // If not completed via RPC (e.g., status is CHECKED_IN), update directly as service_role
+    if (!completed) {
+      const now = new Date().toISOString();
+      const { error: updateError } = await supabaseAdmin
+        .from('bookings')
+        .update({
+          status: 'COMPLETED',
+          updated_at: now,
+        })
+        .eq('id', booking_id);
+
+      if (updateError) {
+        console.error('Failed to complete booking via supabaseAdmin:', updateError);
+        return NextResponse.json(
+          { success: false, error: updateError.message },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({

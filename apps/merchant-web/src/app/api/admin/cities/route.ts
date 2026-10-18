@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
         id: id.toLowerCase().trim(),
         name: name.trim(),
         state,
-        country,
         status: status as CityStatus,
         latitude: Number(latitude),
         longitude: Number(longitude),

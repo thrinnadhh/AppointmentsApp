@@ -385,7 +385,7 @@ export async function fetchCustomerBookingsFromSupabase(customerId: string = '99
       .eq('customer_id', customerId)
       .order('slot_start', { ascending: false });
 
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
       const rows = data as unknown as CustomerBookingRow[];
       return rows.map((b) => ({
         ...b,

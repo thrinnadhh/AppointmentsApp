@@ -81,7 +81,12 @@ export const test = base.extend<AppTestFixtures>({
   },
 
   merchantPortal: async ({ browser }, use) => {
-    const context = await browser.newContext();
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+    const context = await browser.newContext({
+      extraHTTPHeaders: {
+        'x-merchant-bypass-key': adminToken,
+      },
+    });
     const page = await context.newPage();
     const merchant = new MerchantPortalPage(page);
     await merchant.goto();
@@ -90,7 +95,12 @@ export const test = base.extend<AppTestFixtures>({
   },
 
   adminDashboard: async ({ browser }, use) => {
-    const context = await browser.newContext();
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+    const context = await browser.newContext({
+      extraHTTPHeaders: {
+        'x-admin-bypass-key': adminToken,
+      },
+    });
     const page = await context.newPage();
     const admin = new AdminDashboardPage(page);
     await admin.goto();
@@ -107,6 +117,7 @@ export const test = base.extend<AppTestFixtures>({
   },
 
   bookingApi: async ({ request }, use) => {
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
     const api: BookingApiHelper = {
       async createHold(params) {
         const slotStart = params.slotStart || new Date(Date.now() + 86400000).toISOString();
@@ -117,6 +128,7 @@ export const test = base.extend<AppTestFixtures>({
         const res = await request.post('http://localhost:3000/api/bookings/hold', {
           headers: {
             'x-customer-id': customerId,
+            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
           },
           data: {
             customer_id: customerId,
@@ -146,6 +158,7 @@ export const test = base.extend<AppTestFixtures>({
         const orderRes = await request.post('http://localhost:3000/api/payments/create-order', {
           headers: {
             'x-customer-id': '99999999-9999-9999-9999-999999999991',
+            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
           },
           data: { booking_id: bookingId },
         });
@@ -158,6 +171,7 @@ export const test = base.extend<AppTestFixtures>({
         const res = await request.post('http://localhost:3000/api/bookings/confirm', {
           headers: {
             'x-customer-id': '99999999-9999-9999-9999-999999999991',
+            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
           },
           data: {
             booking_id: bookingId,
@@ -176,6 +190,10 @@ export const test = base.extend<AppTestFixtures>({
 
       async rescheduleBooking(bookingId, newSlotStart, newSlotEnd) {
         const res = await request.post('http://localhost:3000/api/bookings/reschedule', {
+          headers: {
+            'x-customer-id': '99999999-9999-9999-9999-999999999991',
+            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
+          },
           data: {
             booking_id: bookingId,
             new_slot_start: newSlotStart,
@@ -237,12 +255,17 @@ export const test = base.extend<AppTestFixtures>({
   },
 
   multiRole: async ({ browser }, use) => {
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
     const customerContext: BrowserContext = await browser.newContext();
     const customerPage = await customerContext.newPage();
     const customerApp = new CustomerAppPage(customerPage);
     await customerApp.goto();
 
-    const merchantContext: BrowserContext = await browser.newContext();
+    const merchantContext: BrowserContext = await browser.newContext({
+      extraHTTPHeaders: {
+        'x-merchant-bypass-key': adminToken,
+      },
+    });
     const merchantPage = await merchantContext.newPage();
     const merchantPortal = new MerchantPortalPage(merchantPage);
     await merchantPortal.goto();
@@ -259,17 +282,26 @@ export const test = base.extend<AppTestFixtures>({
   },
 
   triRole: async ({ browser }, use) => {
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
     const customerContext: BrowserContext = await browser.newContext();
     const customerPage = await customerContext.newPage();
     const customerApp = new CustomerAppPage(customerPage);
     await customerApp.goto();
 
-    const merchantContext: BrowserContext = await browser.newContext();
+    const merchantContext: BrowserContext = await browser.newContext({
+      extraHTTPHeaders: {
+        'x-merchant-bypass-key': adminToken,
+      },
+    });
     const merchantPage = await merchantContext.newPage();
     const merchantPortal = new MerchantPortalPage(merchantPage);
     await merchantPortal.goto();
 
-    const adminContext: BrowserContext = await browser.newContext();
+    const adminContext: BrowserContext = await browser.newContext({
+      extraHTTPHeaders: {
+        'x-admin-bypass-key': adminToken,
+      },
+    });
     const adminPage = await adminContext.newPage();
     const adminDashboard = new AdminDashboardPage(adminPage);
     await adminDashboard.goto();

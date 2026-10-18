@@ -65,6 +65,10 @@ export const supabase: ReturnType<typeof createClient<Database>> =
     ? (createBrowserClient<Database>(supabaseUrl, supabaseAnonKey) as unknown as ReturnType<typeof createClient<Database>>)
     : createClient<Database>(supabaseUrl, supabaseAnonKey);
 
+if (typeof window !== 'undefined') {
+  (window as any).supabase = supabase;
+}
+
 
 
 // Service-role client for trusted server-only code (webhooks, cron jobs).
@@ -317,17 +321,26 @@ export async function updateBookingStatus(
 
   if (status === 'COMPLETED') {
     try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData?.session?.access_token;
       const resp = await fetch('/api/bookings/complete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
         body: JSON.stringify({ booking_id: bookingId }),
       });
-      if (resp.ok) {
-        const json = await resp.json();
-        if (json.success) return json;
+      const json = await resp.json().catch(() => null);
+      if (resp.ok && json?.success) {
+        return json;
       }
-    } catch {
-      // Fall through to RPC if fetch fails
+      if (json && typeof json === 'object' && json.error) {
+        console.warn('API /api/bookings/complete returned error:', json.error);
+      }
+    } catch (fetchErr) {
+      console.warn('Fetch to /api/bookings/complete threw:', fetchErr);
     }
 
     const { data, error } = await (supabase.rpc as any)('complete_booking', {
@@ -398,29 +411,16 @@ export async function reassignBookingResource(bookingId: string, newResourceId: 
 }
 
 export async function recordMerchantNoShow(bookingId: string) {
-  try {
-    const resp = await fetch('/api/bookings/no-show', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ booking_id: bookingId }),
-    });
-    if (resp.ok) {
-      const json = await resp.json();
-      if (json.success) return json;
-    }
-  } catch {
-    // Fall through to RPC if fetch fails
-  }
-
-  const { data, error } = await supabase.rpc('record_no_show', {
-    p_booking_id: bookingId,
+  const resp = await fetch('/api/bookings/no-show', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking_id: bookingId }),
   });
-
-  if (error) {
-    console.error('Error recording no-show:', error);
-    throw error;
+  const json = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(json.error || 'Failed to record no-show');
   }
-  return data;
+  return json;
 }
 
 export async function fetchAllProfiles() {
@@ -889,7 +889,7 @@ export async function fetchAdminVelocity(
     const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin.rpc('get_admin_velocity_analytics', {
       p_time_window: timeWindow,
-      p_city_id: cityId || null,
+      p_city_id: cityId || undefined,
     });
     if (error) {
       console.warn('get_admin_velocity_analytics error:', error.message);
@@ -1208,10 +1208,28 @@ export async function verifyCheckinCodeRpc(
   shopId: string,
   code: string
 ): Promise<VerifyCheckinCodeResult> {
+  const cleanCode = code.trim();
   try {
+    // 1. Try resilient API endpoint first
+    const apiRes = await fetch('/api/bookings/checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shopId, code: cleanCode }),
+    });
+
+    const apiData = await apiRes.json();
+    if (apiData && typeof apiData === 'object' && ('success' in apiData || 'message' in apiData)) {
+      return apiData as VerifyCheckinCodeResult;
+    }
+  } catch (apiErr) {
+    console.warn('API checkin fallback to client RPC:', apiErr);
+  }
+
+  try {
+    // 2. Direct RPC fallback
     const { data, error } = await (supabase.rpc as any)('verify_checkin_code', {
       p_shop_id: shopId,
-      p_code: code.trim(),
+      p_code: cleanCode,
     });
 
     if (error) {
@@ -1273,5 +1291,37 @@ export async function markPresentManuallyRpc(
   }
 }
 
+export async function admitPatient(
+  bookingId: string
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const { data: authData } = await supabase.auth.getSession();
+    const token = authData?.session?.access_token;
+    const resp = await fetch('/api/bookings/admit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: 'include',
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
+    const json = await resp.json().catch(() => null);
+    if (resp.ok && json?.success) {
+      return json;
+    }
+    if (json && typeof json === 'object' && json.error) {
+      console.warn('API /api/bookings/admit returned error:', json.error);
+    }
+  } catch (err) {
+    console.warn('Fetch to /api/bookings/admit threw:', err);
+  }
 
-
+  // Fallback to markPresentManuallyRpc
+  const rpcRes = await markPresentManuallyRpc(bookingId);
+  return {
+    success: rpcRes.success,
+    error: rpcRes.error,
+    message: rpcRes.message,
+  };
+}

@@ -13,6 +13,8 @@ const PUBLIC_ROUTES = [
   '/refund-policy',
   '/account/delete',
   '/demo',
+  '/ticket',
+  '/customer',
 ];
 
 // Strictly public API endpoints (webhook listeners, auth callbacks, customer checkout, and territory endpoints)
@@ -28,6 +30,8 @@ const PUBLIC_API_ROUTES = [
   '/api/merchant/register-shop',
   '/api/account/delete-public-request',
   '/api/logs/ingest',
+  '/api/ticket/',
+  '/api/customer/',
 ];
 
 function isPrivateIpv4(host: string): boolean {
@@ -201,7 +205,7 @@ export function middleware(req: NextRequest) {
   // 2. Public Page Routes Gate
   if (
     PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) ||
-    (pathname === '/' && req.nextUrl.searchParams.get('demo') === '1') ||
+    ((pathname === '/' || pathname === '/schedule') && req.nextUrl.searchParams.get('demo') === '1') ||
     isE2EBypass
   ) {
     return NextResponse.next();
