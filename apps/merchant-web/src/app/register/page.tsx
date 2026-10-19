@@ -188,9 +188,15 @@ export default function ShopRegistrationPage() {
     setSuccessMsg(null);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (sessionData?.session?.access_token) {
+        headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
+      }
+
       const res = await fetch('/api/merchant/register-shop', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           userId: user.id,
           fullName: fullName.trim() || user.user_metadata?.full_name || 'Merchant Owner',

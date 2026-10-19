@@ -180,6 +180,51 @@ export default function LoginPage() {
     setErrorMsg(null);
     try {
       const redirectOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+      // Check if Google OAuth provider is enabled in local Supabase
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+      let isGoogleEnabled = true;
+      try {
+        const settingsRes = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+          headers: { apikey: supabaseAnonKey },
+        });
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json();
+          isGoogleEnabled = Boolean(settings?.external?.google);
+        }
+      } catch {
+        // Fallback to standard flow if settings cannot be checked
+      }
+
+      if (!isGoogleEnabled) {
+        if (isLocalHost && authMode === 'register') {
+          // Seamless local development provision for testing shop registration
+          const devEmail = `admin.dev.${Date.now().toString().slice(-4)}@test-tirupati.local`;
+          const devPass = 'HospitalTest2026!';
+          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+            email: devEmail,
+            password: devPass,
+            options: {
+              data: { full_name: 'Local Hospital Admin' },
+            },
+          });
+          if (!signUpErr && (signUpData?.session || signUpData?.user)) {
+            setSuccessMsg('Local test account initialized! Launching shop registration...');
+            setTimeout(() => {
+              window.location.href = '/register';
+            }, 500);
+            return;
+          }
+        }
+
+        setErrorMsg('Google OAuth is not enabled in this local Supabase instance. Please sign in below using your registered credentials (e.g. admin.apex@test-tirupati.local / HospitalTest2026!).');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
