@@ -563,7 +563,7 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
   describe('C3: Check-In Code RPC Verification & Isolation', () => {
     it('verifies valid code, rejects wrong code, and rejects cross-department code', async () => {
       // Clear any prior rate limits for test staff
-      await fetch(`${url}/rest/v1/staff_checkin_rate_limits?user_id=eq.${tokens.neuroDesk.user.id}`, {
+      await fetch(`${url}/rest/v1/staff_checkin_rate_limits?user_id=in.(${tokens.neuroDesk.user.id},${tokens.adminBalaji.user.id})`, {
         method: 'DELETE',
         headers: serviceHeaders
       });
@@ -597,7 +597,7 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
       });
       const dataCross = await rpcCrossDept.json();
       assert.equal(dataCross.success, false, 'Cross-department check-in must fail');
-      assert.equal(dataCross.error, 'UNAUTHORIZED_DEPARTMENT', 'Error code is UNAUTHORIZED_DEPARTMENT');
+      assert.equal(dataCross.error, 'INVALID_CODE', 'Error code is uniform INVALID_CODE');
 
       // 3. Cross-shop code rejection
       // Calling verify on Hospital B with Hospital A code
@@ -611,7 +611,7 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
       });
       const dataWrongShop = await rpcWrongShop.json();
       assert.equal(dataWrongShop.success, false, 'Cross-hospital code must fail');
-      assert.equal(dataWrongShop.error, 'WRONG_SHOP', 'Error code is WRONG_SHOP');
+      assert.equal(dataWrongShop.error, 'INVALID_CODE', 'Error code is uniform INVALID_CODE');
 
       // 4. BUG-HOSP-01 Fix Verification: Future-date code check
       const tomorrow = new Date();
@@ -621,7 +621,8 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
       const dd = String(tomorrow.getDate()).padStart(2, '0');
       const futureDateStr = `${yyyy}-${mm}-${dd}`;
 
-      const futureDoc = (await (await fetch(`${url}/rest/v1/resources?provider_id=eq.${hospA.id}`, { headers: serviceHeaders })).json())[0];
+      const allDocs = await (await fetch(`${url}/rest/v1/resources?provider_id=eq.${hospA.id}`, { headers: serviceHeaders })).json();
+      const futureDoc = allDocs.find(d => d.name.includes('Sharma')) || allDocs[0];
       const neuroDeptId = hospA.departments.find(d => d.name === 'Neurology').id;
 
       const futureBookingRes = await fetch(`${url}/rest/v1/bookings`, {
@@ -635,7 +636,7 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
           slot_start: `${futureDateStr}T10:00:00+05:30`,
           slot_end: `${futureDateStr}T10:15:00+05:30`,
           status: 'CONFIRMED',
-          reference_code: 'FUTURE-BUG-TEST',
+          reference_code: `FUTURE-BUG-${Date.now()}`,
           total_amount: 500,
           deposit_amount: 100,
           payment_status: 'CAPTURED'
