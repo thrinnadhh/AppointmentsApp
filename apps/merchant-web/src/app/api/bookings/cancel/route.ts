@@ -8,7 +8,7 @@ import { CancelBookingRequest, CancelBookingResponse } from '@appointments/share
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Partial<CancelBookingRequest>;
-    const { booking_id, reason, initiated_by = 'CUSTOMER' } = body;
+    const { booking_id, reason, initiated_by = 'CUSTOMER', expected_version, expected_updated_at } = body as any;
 
     if (!booking_id) {
       return NextResponse.json<CancelBookingResponse>(
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, status, gateway_payment_id')
+      .select('id, customer_id, provider_id, resource_id, status, gateway_payment_id, version, updated_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -37,6 +37,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<CancelBookingResponse>(
         { success: false, error: 'Booking not found' },
         { status: 404 }
+      );
+    }
+
+    if (expected_version !== undefined && booking.version !== expected_version) {
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: 'Updated by someone else, please refresh' },
+        { status: 409 }
+      );
+    }
+    if (expected_updated_at !== undefined && booking.updated_at && new Date(booking.updated_at).getTime() !== new Date(expected_updated_at).getTime()) {
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: 'Updated by someone else, please refresh' },
+        { status: 409 }
       );
     }
 

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { booking_id } = body;
+    const { booking_id, expected_version, expected_updated_at } = body;
 
     if (!booking_id) {
       return NextResponse.json(
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin();
     const { data: booking, error: fetchError } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, status, is_present, slot_start, slot_end')
+      .select('id, customer_id, provider_id, resource_id, status, is_present, slot_start, slot_end, version, updated_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -44,6 +44,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized: Only authorized merchant staff or administrators can admit this patient' },
         { status: 403 }
+      );
+    }
+
+    // Optimistic concurrency control check
+    if (expected_version !== undefined && booking.version !== expected_version) {
+      return NextResponse.json(
+        { success: false, error: 'Updated by someone else, please refresh', code: 'STALE_VERSION' },
+        { status: 409 }
+      );
+    }
+    if (expected_updated_at !== undefined && booking.updated_at && new Date(booking.updated_at).getTime() !== new Date(expected_updated_at).getTime()) {
+      return NextResponse.json(
+        { success: false, error: 'Updated by someone else, please refresh', code: 'STALE_VERSION' },
+        { status: 409 }
       );
     }
 
@@ -76,14 +90,19 @@ export async function POST(req: NextRequest) {
       });
       if (!rpcError && (rpcData as any)?.success) {
         admitted = true;
+      } else if (rpcData && (rpcData as any)?.error === 'ALREADY_CHECKED_IN') {
+        return NextResponse.json(
+          { success: false, error: 'Updated by someone else, please refresh', code: 'ALREADY_CHECKED_IN' },
+          { status: 409 }
+        );
       }
     } catch (rpcCatch) {
       console.warn('mark_present_manually RPC error, falling back to admin update:', rpcCatch);
     }
 
-    // Fallback: direct service_role update
+    // Fallback: direct service_role conditional update
     if (!admitted) {
-      const { error: updateError } = await supabaseAdmin
+      let updateQuery = supabaseAdmin
         .from('bookings')
         .update({
           status: 'CHECKED_IN',
@@ -94,13 +113,28 @@ export async function POST(req: NextRequest) {
           customer_arrived_at: now,
           updated_at: now,
         })
-        .eq('id', booking_id);
+        .eq('id', booking_id)
+        .eq('status', 'CONFIRMED')
+        .eq('is_present', false);
+
+      if (expected_version !== undefined) {
+        updateQuery = updateQuery.eq('version', expected_version);
+      }
+
+      const { data: updatedRows, error: updateError } = await updateQuery.select('id, version');
 
       if (updateError) {
         console.error('Failed to admit patient via supabaseAdmin:', updateError);
         return NextResponse.json(
           { success: false, error: updateError.message },
           { status: 500 }
+        );
+      }
+
+      if (!updatedRows || updatedRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Updated by someone else, please refresh', code: 'CONCURRENT_UPDATE' },
+          { status: 409 }
         );
       }
     }

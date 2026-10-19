@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,41 +25,21 @@ export async function POST(req: NextRequest) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
-    const { data: booking, error: fetchErr } = await supabaseAdmin
-      .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, status, queue_position')
-      .eq('id', booking_id)
-      .maybeSingle();
-
-    if (fetchErr || !booking) {
-      return NextResponse.json(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
-      );
-    }
-
-    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, false);
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: Caller is not authorized for this doctor queue' },
-        { status: 403 }
-      );
-    }
-
     const targetPos = Math.max(1, parseInt(override_position, 10));
 
-    const { error: updateErr } = await supabaseAdmin
-      .from('bookings')
-      .update({
-        queue_position: targetPos,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', booking_id);
+    const { data: rpcRes, error: rpcErr } = await (supabaseAdmin.rpc as any)('override_hospital_queue_position', {
+      p_booking_id: booking_id,
+      p_override_position: targetPos,
+      p_caller_id: caller.id,
+    });
 
-    if (updateErr) {
+    if (rpcErr || (rpcRes && !rpcRes.success)) {
+      const errorMsg = rpcErr?.message || rpcRes?.error || 'Failed to override queue position';
+      const isAuth = errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden');
+      const isNotFound = errorMsg.includes('not found');
       return NextResponse.json(
-        { success: false, error: updateErr.message },
-        { status: 500 }
+        { success: false, error: errorMsg },
+        { status: isNotFound ? 404 : isAuth ? 403 : 500 }
       );
     }
 
