@@ -269,6 +269,12 @@ export async function seedHospitalTestData() {
 
   console.log(`📅 Seeding 15 appointments for operational day: ${dateStr}`);
 
+  // Clean up any previous test bookings to ensure idempotency
+  await fetch(`${url}/rest/v1/bookings?reference_code=like.TEST-REF-*`, {
+    method: 'DELETE',
+    headers
+  });
+
   const seededBookings = [];
   for (let i = 0; i < 15; i++) {
     const patient = patientIds[i];

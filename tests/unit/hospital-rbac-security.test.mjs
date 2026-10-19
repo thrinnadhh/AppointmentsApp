@@ -562,6 +562,12 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
   // ---------------------------------------------------------------------------
   describe('C3: Check-In Code RPC Verification & Isolation', () => {
     it('verifies valid code, rejects wrong code, and rejects cross-department code', async () => {
+      // Clear any prior rate limits for test staff
+      await fetch(`${url}/rest/v1/staff_checkin_rate_limits?user_id=eq.${tokens.neuroDesk.user.id}`, {
+        method: 'DELETE',
+        headers: serviceHeaders
+      });
+
       // 1. Wrong 4-digit code test
       const rpcWrong = await fetch(`${url}/rest/v1/rpc/verify_checkin_code`, {
         method: 'POST',
