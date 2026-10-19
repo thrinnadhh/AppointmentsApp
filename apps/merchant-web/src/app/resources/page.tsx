@@ -21,7 +21,8 @@ import {
   Search,
   Filter,
   Trash2,
-  CheckCircle2
+  CheckCircle2,
+  Edit3
 } from 'lucide-react';
 import { 
   supabase, 
@@ -76,6 +77,27 @@ function ResourcesManagementContent() {
     capacity: verticalConfig.id === 'gaming' ? 14 : (verticalConfig.id === 'restaurants' ? 4 : 1),
     specialization: '',
   });
+
+  // Edit Resource Modal State
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    type: ResourceType;
+    department: string;
+    price: number;
+    deposit_amount: number;
+    duration_minutes: number;
+    capacity: number;
+  }>({
+    name: '',
+    type: defaultResourceType,
+    department: '',
+    price: verticalConfig.defaultPrice,
+    deposit_amount: verticalConfig.defaultPrice,
+    duration_minutes: verticalConfig.defaultDurationMinutes,
+    capacity: 1,
+  });
+  const [isUpdatingResource, setIsUpdatingResource] = useState(false);
 
   // Keep selectedProviderId and formData in sync with tenant context
   useEffect(() => {
@@ -189,6 +211,61 @@ function ResourcesManagementContent() {
         capacity: verticalConfig.id === 'gaming' ? 14 : (verticalConfig.id === 'restaurants' ? 4 : 1),
         specialization: '',
       });
+      setTimeout(() => setFeedbackToast(null), 5000);
+    }
+  };
+
+  const handleStartEditResource = (res: Resource) => {
+    setEditingResource(res);
+    setEditFormData({
+      name: res.name,
+      type: res.type,
+      department: res.department || '',
+      price: res.price ?? verticalConfig.defaultPrice,
+      deposit_amount: res.deposit_amount ?? verticalConfig.defaultPrice,
+      duration_minutes: res.duration_minutes ?? verticalConfig.defaultDurationMinutes,
+      capacity: res.capacity ?? 1,
+    });
+  };
+
+  const handleUpdateResource = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingResource) return;
+    if (!editFormData.name?.trim()) {
+      setFeedbackToast('Error: Name cannot be empty.');
+      return;
+    }
+
+    setIsUpdatingResource(true);
+    try {
+      const res = await fetch('/api/admin/resources', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingResource.id,
+          name: editFormData.name.trim(),
+          type: editFormData.type,
+          department: editFormData.department.trim() || 'General',
+          price: Number(editFormData.price),
+          depositAmount: Number(editFormData.price),
+          durationMinutes: Number(editFormData.duration_minutes),
+          capacity: Number(editFormData.capacity),
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.error || 'Failed to update resource');
+      }
+
+      setFeedbackToast(`${verticalConfig.resourceLabelSingular} "${editFormData.name}" updated successfully.`);
+      setEditingResource(null);
+      await loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error updating resource';
+      setFeedbackToast(`Error: ${msg}`);
+    } finally {
+      setIsUpdatingResource(false);
       setTimeout(() => setFeedbackToast(null), 5000);
     }
   };
@@ -619,6 +696,146 @@ function ResourcesManagementContent() {
         </div>
       )}
 
+      {/* Edit Doctor / Resource Modal */}
+      {editingResource && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
+                  <Edit3 className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Edit {verticalConfig.resourceLabelSingular} Details</h3>
+                  <p className="text-xs text-slate-500">Update name, department, consultation fee, and slot duration</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingResource(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateResource} className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="edit-doctor-name" className="block text-xs font-semibold text-slate-700 mb-1">
+                  {verticalConfig.resourceLabelSingular} Full Name *
+                </label>
+                <input
+                  id="edit-doctor-name"
+                  type="text"
+                  required
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="edit-doctor-department" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Department / Specialty
+                </label>
+                <input
+                  id="edit-doctor-department"
+                  type="text"
+                  value={editFormData.department}
+                  onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="edit-doctor-fee" className="block text-xs font-semibold text-slate-700 mb-1">
+                    {verticalConfig.actionVerb} Fee (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400 text-sm">₹</span>
+                    <input
+                      id="edit-doctor-fee"
+                      type="number"
+                      min="0"
+                      step="50"
+                      value={editFormData.price}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setEditFormData({ ...editFormData, price: val, deposit_amount: val });
+                      }}
+                      className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold font-mono"
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-500">Applies to future bookings</span>
+                </div>
+
+                <div>
+                  <label htmlFor="edit-doctor-duration" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Slot Duration (Mins)
+                  </label>
+                  <input
+                    id="edit-doctor-duration"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={editFormData.duration_minutes}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setEditFormData({ ...editFormData, duration_minutes: val });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
+                  />
+                  <span className="text-[11px] text-slate-500">Standard consultation length</span>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="edit-doctor-capacity" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Concurrent Capacity
+                </label>
+                <input
+                  id="edit-doctor-capacity"
+                  type="number"
+                  min="1"
+                  value={editFormData.capacity}
+                  onChange={(e) => setEditFormData({ ...editFormData, capacity: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingResource(null)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingResource}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isUpdatingResource ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Resources Cards Grid */}
       {loading ? (
         <div className="py-16 text-center text-slate-500">
@@ -710,16 +927,27 @@ function ResourcesManagementContent() {
                   <span className="text-[11px] text-slate-400 font-mono">
                     ID: {res.id.substring(0, 8)}
                   </span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => toggleActive(res.id, res.is_active)}
-                      className="text-xs font-bold text-slate-600 hover:text-emerald-700 transition-colors"
+                      type="button"
+                      onClick={() => handleStartEditResource(res)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                      title={`Edit ${res.name} details`}
+                      aria-label={`Edit ${res.name}`}
                     >
-                      {res.is_active ? 'Pause Bookings' : 'Reactivate Unit'}
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      type="button"
+                      onClick={() => toggleActive(res.id, res.is_active)}
+                      className="text-xs font-bold text-slate-600 hover:text-emerald-700 transition-colors cursor-pointer"
+                    >
+                      {res.is_active ? 'Pause' : 'Activate'}
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleDeleteResource(res.id, res.name)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                       title={`Delete ${res.name}`}
                       aria-label={`Delete ${res.name}`}
                     >

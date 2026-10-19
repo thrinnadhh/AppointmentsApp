@@ -21,7 +21,12 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
-  Camera
+  Camera,
+  Lock,
+  Edit3,
+  X,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { fetchAllProviders, uploadVenueAsset, getVenueAssetUrl, supabase, Provider, Resource } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
@@ -59,6 +64,81 @@ export default function VenuesPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [uploadingVenueId, setUploadingVenueId] = useState<string | null>(null);
+
+  // Edit Store Profile State (Strictly Restricts Name, Email, Phone)
+  const [editingVenue, setEditingVenue] = useState<ProviderWithResources | null>(null);
+  const [editStoreAddress, setEditStoreAddress] = useState('');
+  const [editStoreDescription, setEditStoreDescription] = useState('');
+  const [editStorePhotos, setEditStorePhotos] = useState<string[]>([]);
+  const [isEditingSubmitting, setIsEditingSubmitting] = useState(false);
+  const [editModalError, setEditModalError] = useState<string | null>(null);
+  const [isUploadingEditPhoto, setIsUploadingEditPhoto] = useState(false);
+
+  const handleStartEditVenue = (venue: ProviderWithResources) => {
+    setEditingVenue(venue);
+    setEditStoreAddress(venue.address || '');
+    setEditStoreDescription(venue.description || '');
+    setEditStorePhotos(venue.photos ? [...venue.photos] : []);
+    setEditModalError(null);
+  };
+
+  const handleRemoveEditPhoto = (indexToRemove: number) => {
+    setEditStorePhotos((prev) => prev.filter((_, i) => i !== indexToRemove));
+  };
+
+  const handleUploadEditPhoto = async (file: File) => {
+    if (!editingVenue) return;
+    setIsUploadingEditPhoto(true);
+    setEditModalError(null);
+    try {
+      const res = await uploadVenueAsset(editingVenue.id, file, file.name, file.type);
+      if (res.success && res.publicUrl) {
+        setEditStorePhotos((prev) => [res.publicUrl!, ...prev]);
+      } else {
+        setEditModalError('Failed to upload storefront photo.');
+      }
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+      setEditModalError('Failed to upload storefront photo.');
+    } finally {
+      setIsUploadingEditPhoto(false);
+    }
+  };
+
+  const handleSaveStoreProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVenue) return;
+    setIsEditingSubmitting(true);
+    setEditModalError(null);
+
+    try {
+      const res = await fetch('/api/merchant/provider', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: editingVenue.id,
+          address: editStoreAddress.trim(),
+          description: editStoreDescription.trim(),
+          photos: editStorePhotos,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to update store profile');
+      }
+
+      setSuccessBanner(`Store profile for "${editingVenue.name}" updated successfully!`);
+      setTimeout(() => setSuccessBanner(null), 4000);
+      setEditingVenue(null);
+      await loadVenues();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error updating store profile';
+      setEditModalError(msg);
+    } finally {
+      setIsEditingSubmitting(false);
+    }
+  };
 
   const handleUploadVenuePhoto = async (venueId: string, file: File) => {
     setUploadingVenueId(venueId);
@@ -431,6 +511,15 @@ export default function VenuesPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditVenue(venue)}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg cursor-pointer transition shadow-2xs"
+                      title="Edit Store Profile (Pictures, Address & Description)"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                      Edit Profile
+                    </button>
                     <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg cursor-pointer transition">
                       <Camera className="w-3.5 h-3.5 text-emerald-600" />
                       {uploadingVenueId === venue.id ? 'Uploading...' : 'Photo'}
@@ -665,6 +754,232 @@ export default function VenuesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Store Profile Modal (Restricted Credentials) */}
+      {editingVenue && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Edit Store Profile</h3>
+                  <p className="text-xs text-slate-500">Update storefront pictures, address, and facility info</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingVenue(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto pr-1 my-4 space-y-4 flex-1">
+              {/* Security & Verification Banner */}
+              <div className="rounded-xl bg-amber-50/80 border border-amber-200 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
+                <Lock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Verified Merchant Credentials Locked</p>
+                  <p className="mt-0.5 text-amber-800 text-[11px] leading-relaxed">
+                    Business Name, Registered Email, and Primary Phone Number are strictly verified and locked. You can update storefront pictures, clinic address, and facility descriptions below.
+                  </p>
+                </div>
+              </div>
+
+              {editModalError && (
+                <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 flex items-start gap-2 text-xs text-rose-700">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{editModalError}</span>
+                </div>
+              )}
+
+              <form id="edit-venue-form" onSubmit={handleSaveStoreProfile} className="space-y-4">
+                {/* Locked Business Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Business / Hospital Name</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                      <Lock className="w-3 h-3 text-slate-400" /> Locked & Verified
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={editingVenue.name}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500 cursor-not-allowed select-none font-medium"
+                  />
+                </div>
+
+                {/* Locked Phone and Email */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Primary Phone</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                        <Lock className="w-3 h-3 text-slate-400" /> Locked
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      value={editingVenue.phone}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Registered Email</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                        <Lock className="w-3 h-3 text-slate-400" /> Locked
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      value={editingVenue.email || 'None on file'}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                {/* Storefront Pictures (Editable) */}
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800">
+                        Storefront Photos & Gallery ({editStorePhotos.length})
+                      </label>
+                      <p className="text-[11px] text-slate-500">
+                        Upload real photographs of clinic entrance, consultation rooms, or reception.
+                      </p>
+                    </div>
+                  </div>
+
+                  {editStorePhotos.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2.5 mb-3">
+                      {editStorePhotos.map((photoUrl, idx) => (
+                        <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                          <Image
+                            src={getVenueAssetUrl(photoUrl, { width: 240, quality: 75 })}
+                            alt={`Store photo ${idx + 1}`}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditPhoto(idx)}
+                            className="absolute top-1.5 right-1.5 bg-slate-900/80 hover:bg-rose-600 text-white p-1 rounded-md transition cursor-pointer shadow-xs"
+                            title="Remove Photo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          {idx === 0 && (
+                            <span className="absolute bottom-1.5 left-1.5 bg-emerald-600/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                              Cover Photo
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 mb-3 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50">
+                      <p className="text-xs text-slate-400">No photos uploaded yet for this storefront.</p>
+                    </div>
+                  )}
+
+                  <label className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100/70 text-xs font-semibold text-emerald-800 cursor-pointer transition shadow-2xs ${isUploadingEditPhoto ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                    {isUploadingEditPhoto ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-700" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                    )}
+                    {isUploadingEditPhoto ? 'Uploading to Supabase Storage...' : 'Upload New Store Picture'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={isUploadingEditPhoto}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadEditPhoto(file);
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {/* Editable Address */}
+                <div className="pt-2 border-t border-slate-100">
+                  <label htmlFor="edit-store-address" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Address & Locality *
+                  </label>
+                  <input
+                    id="edit-store-address"
+                    name="editStoreAddress"
+                    type="text"
+                    required
+                    value={editStoreAddress}
+                    onChange={(e) => setEditStoreAddress(e.target.value)}
+                    placeholder="e.g., Near Leela Mahal Circle, KT Road, Tirupati"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                  />
+                </div>
+
+                {/* Editable Description */}
+                <div>
+                  <label htmlFor="edit-store-description" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Description & Facilities
+                  </label>
+                  <textarea
+                    id="edit-store-description"
+                    name="editStoreDescription"
+                    rows={3}
+                    value={editStoreDescription}
+                    onChange={(e) => setEditStoreDescription(e.target.value)}
+                    placeholder="Multi-speciality outpatient consultations, digital diagnostics, parking..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                  />
+                </div>
+              </form>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setEditingVenue(null)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-venue-form"
+                disabled={isEditingSubmitting}
+                className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+              >
+                {isEditingSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Saving Changes...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Save Store Profile
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

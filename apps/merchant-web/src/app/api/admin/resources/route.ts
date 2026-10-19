@@ -248,3 +248,96 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const authResult = await verifyStaffManagerRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
+    const body = await request.json();
+    const {
+      id,
+      name,
+      type,
+      department,
+      price,
+      depositAmount,
+      durationMinutes,
+      capacity,
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Resource ID is required' }, { status: 400 });
+    }
+
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return NextResponse.json({ error: 'Doctor/Resource name cannot be empty' }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Verify resource exists & get current provider_id
+    const { data: resource, error: resError } = await supabaseAdmin
+      .from('resources')
+      .select('id, provider_id, name')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (resError || !resource) {
+      return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
+    }
+
+    // Verify merchant authorization if caller is not platform admin
+    if (authResult.profile.role === 'merchant') {
+      const isAuthorized = await isCallerAuthorizedForProvider(authResult.user.id, resource.provider_id);
+      if (!isAuthorized) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to edit this resource' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const updatePayload: Record<string, any> = {
+      name: name.trim(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (type) updatePayload.type = type;
+    if (department !== undefined) updatePayload.department = department?.trim() || 'General';
+    if (price !== undefined && !isNaN(Number(price))) {
+      updatePayload.price = Number(price);
+    }
+    if (depositAmount !== undefined && !isNaN(Number(depositAmount))) {
+      updatePayload.deposit_amount = Number(depositAmount);
+    } else if (price !== undefined && !isNaN(Number(price))) {
+      updatePayload.deposit_amount = Number(price);
+    }
+    if (durationMinutes !== undefined && !isNaN(Number(durationMinutes))) {
+      const dur = Math.round(Number(durationMinutes));
+      if (dur > 0) updatePayload.duration_minutes = dur;
+    }
+    if (capacity !== undefined && !isNaN(Number(capacity))) {
+      const cap = Math.round(Number(capacity));
+      if (cap > 0) updatePayload.capacity = cap;
+    }
+
+    const { data: updatedResource, error: updateError } = await (supabaseAdmin
+      .from('resources') as any)
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, resource: updatedResource }, { status: 200 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

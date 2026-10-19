@@ -92,7 +92,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { provider_id, cooling_period_days } = body;
+    const { provider_id, cooling_period_days, photos, description, address, name, email, phone } = body;
 
     if (!provider_id) {
       return NextResponse.json({ error: 'Missing provider_id' }, { status: 400 });
@@ -109,6 +109,16 @@ export async function PATCH(request: NextRequest) {
 
     const isSuperAdmin = profile?.role === 'admin';
     if (!isSuperAdmin) {
+      // Merchants are strictly forbidden from altering registered Business Name, Email, or Phone
+      if (name !== undefined || email !== undefined || phone !== undefined) {
+        return NextResponse.json(
+          { 
+            error: 'Forbidden: Business Name, Registered Email, and Phone Number cannot be modified by merchants. Contact Platform Administration for credential changes.' 
+          },
+          { status: 400 }
+        );
+      }
+
       const { data: memberships } = await supabaseAdmin
         .from('merchant_memberships')
         .select('provider_id')
@@ -133,6 +143,9 @@ export async function PATCH(request: NextRequest) {
 
     const updatePayload: {
       cooling_period_days?: number;
+      photos?: string[];
+      description?: string;
+      address?: string;
       updated_at?: string;
     } = { updated_at: new Date().toISOString() };
     if (cooling_period_days !== undefined) {
@@ -141,6 +154,25 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Cooling period must be between 0 and 365 days' }, { status: 400 });
       }
       updatePayload.cooling_period_days = days;
+    }
+
+    if (photos !== undefined) {
+      if (Array.isArray(photos)) {
+        const validPhotos = photos
+          .filter((p) => typeof p === 'string' && /^https?:\/\//i.test(p.trim()))
+          .map((p) => p.trim());
+        updatePayload.photos = validPhotos;
+      } else if (typeof photos === 'string' && /^https?:\/\//i.test(photos.trim())) {
+        updatePayload.photos = [photos.trim()];
+      }
+    }
+
+    if (description !== undefined && typeof description === 'string') {
+      updatePayload.description = description.trim();
+    }
+
+    if (address !== undefined && typeof address === 'string') {
+      updatePayload.address = address.trim();
     }
 
     const { data: updated, error } = await supabaseAdmin

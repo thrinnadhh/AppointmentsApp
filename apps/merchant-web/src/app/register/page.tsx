@@ -238,17 +238,17 @@ export default function ShopRegistrationPage() {
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-sm mb-3">
-            <Store className="w-6 h-6" />
+            <Building2 className="w-6 h-6" />
           </div>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-            Step 2: Shop Registration
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            Hospital Administrator &amp; Merchant Registration
           </span>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Register Your Business
+            Register Hospital Administrator
           </h1>
-          <p className="mt-1 text-xs text-slate-500">
-            Set up your shop details to activate your isolated merchant workspace
+          <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+            Create the primary hospital admin account. Once registered, only the Hospital Admin can grant access to consultant doctors and front desk managers.
           </p>
         </div>
 
@@ -260,7 +260,7 @@ export default function ShopRegistrationPage() {
                 {user.email.charAt(0).toUpperCase()}
               </div>
               <div className="truncate">
-                <p className="text-[11px] font-semibold text-emerald-900 uppercase tracking-wider">Verified Business Email</p>
+                <p className="text-[11px] font-semibold text-emerald-900 uppercase tracking-wider">Verified Administrator Email</p>
                 <p className="text-xs font-mono font-medium text-slate-700 truncate">{user.email}</p>
               </div>
             </div>
@@ -270,6 +270,33 @@ export default function ShopRegistrationPage() {
             </span>
           </div>
         )}
+
+        {/* Role & Access Hierarchy Notice */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-2">
+          <div className="flex items-center gap-2 font-bold text-slate-800">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Admin-First Staff &amp; Doctor Governance</span>
+          </div>
+          <p className="text-slate-600 text-[11px] leading-relaxed">
+            This initial onboarding creates the <strong>Hospital Administrator / Primary Business Owner</strong> account. Doctors and front desk staff are not added here.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
+            <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-start gap-2">
+              <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</span>
+              <div>
+                <span className="font-semibold text-slate-800">Doctors &amp; OPD Chambers:</span>
+                <p className="text-slate-500 mt-0.5">Configured with fees, duration, and edit options under Doctors &amp; Resources.</p>
+              </div>
+            </div>
+            <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-start gap-2">
+              <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</span>
+              <div>
+                <span className="font-semibold text-slate-800">Front Desk &amp; Staff Logins:</span>
+                <p className="text-slate-500 mt-0.5">Granted restricted credentials post-registration via Team Management.</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Error / Success Alerts */}
         {errorMsg && (
@@ -296,7 +323,7 @@ export default function ShopRegistrationPage() {
           {/* Owner Full Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Owner / Manager Full Name *
+              Hospital Administrator Full Name *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -309,7 +336,7 @@ export default function ShopRegistrationPage() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Dr. Trinadh Reddy"
+                placeholder="e.g. Dr. Trinadh Reddy (Hospital Admin)"
                 className="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -318,7 +345,7 @@ export default function ShopRegistrationPage() {
           {/* Shop / Business Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Shop / Hospital / Venue Name *
+              Hospital / Clinic / Business Name *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -365,7 +392,7 @@ export default function ShopRegistrationPage() {
           {/* Phone Number */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Owner Phone Number *
+              Hospital Administrator Phone Number *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -537,7 +564,7 @@ export default function ShopRegistrationPage() {
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <span>Complete Registration & Open Workspace</span>
+                <span>Register Hospital Administrator &amp; Open Workspace</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
