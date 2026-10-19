@@ -152,6 +152,11 @@ describe('Subtask 1: Hospital Per-Consultant RBAC Gaps Reproduction', () => {
       method: 'DELETE',
       headers: serviceHeaders
     });
+    await fetch(`${url}/rest/v1/bookings?resource_id=eq.${doc2.id}&status=in.(CONFIRMED,CHECKED_IN)`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: JSON.stringify({ status: 'COMPLETED' })
+    });
 
     const b1Res = await fetch(`${url}/rest/v1/bookings`, {
       method: 'POST',
