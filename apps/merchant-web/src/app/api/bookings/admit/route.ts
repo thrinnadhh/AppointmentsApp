@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { validateBookingStatusTransition } from '@/lib/hospital-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,16 +47,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (booking.status === 'CANCELLED') {
+    const transitionCheck = validateBookingStatusTransition(booking.status, 'CHECKED_IN');
+    if (!transitionCheck.valid) {
       return NextResponse.json(
-        { success: false, error: 'Invalid transition: Booking has been cancelled' },
-        { status: 409 }
-      );
-    }
-
-    if (booking.status === 'COMPLETED') {
-      return NextResponse.json(
-        { success: false, error: 'Invalid transition: Appointment is already completed' },
+        { success: false, error: transitionCheck.error },
         { status: 409 }
       );
     }
@@ -95,7 +90,7 @@ export async function POST(req: NextRequest) {
           is_present: true,
           checked_in_at: now,
           checked_in_by: caller.id,
-          checked_in_method: 'merchant_dashboard',
+          checked_in_method: 'manual',
           customer_arrived_at: now,
           updated_at: now,
         })

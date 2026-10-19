@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { initiateRazorpayRefund } from '@/lib/razorpay';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { validateBookingStatusTransition } from '@/lib/hospital-access';
 import { CancelBookingRequest, CancelBookingResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, status, gateway_payment_id')
+      .select('id, customer_id, provider_id, resource_id, status, gateway_payment_id')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -44,6 +45,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<CancelBookingResponse>(
         { success: false, error: 'Unauthorized: Caller is not authorized to cancel this booking' },
         { status: 403 }
+      );
+    }
+
+    const transitionCheck = validateBookingStatusTransition(booking.status, 'CANCELLED');
+    if (!transitionCheck.valid) {
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: transitionCheck.error },
+        { status: 409 }
       );
     }
 

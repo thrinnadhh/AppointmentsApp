@@ -482,7 +482,7 @@ export interface HospitalAuditLog {
   created_at: string;
 }
 
-export type HospitalRole = 'owner' | 'department_member' | 'superadmin' | 'none';
+export type HospitalRole = 'admin' | 'front_desk' | 'consultant' | 'none' | 'owner' | 'department_member' | 'superadmin';
 
 export interface HospitalAccessContext {
   role: HospitalRole;
@@ -493,6 +493,7 @@ export interface HospitalAccessContext {
   isHospital: boolean;
   email?: string | null;
   userId: string | null;
+  assignedDoctorIds: string[];
 }
 
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { validateBookingStatusTransition } from '@/lib/hospital-access';
 import { RescheduleBookingRequest, RescheduleBookingResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, status, slot_start')
+      .select('id, customer_id, provider_id, resource_id, status, slot_start')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -43,6 +44,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<RescheduleBookingResponse>(
         { success: false, error: 'Unauthorized: Caller is not authorized to reschedule this booking' },
         { status: 403 }
+      );
+    }
+
+    const transitionCheck = validateBookingStatusTransition(booking.status, 'CONFIRMED');
+    if (!transitionCheck.valid) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: transitionCheck.error },
+        { status: 409 }
       );
     }
 

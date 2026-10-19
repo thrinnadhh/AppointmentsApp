@@ -11,8 +11,76 @@ export const ALL_HOSPITAL_MODULES: HospitalModule[] = [
 ];
 
 /**
+ * Valid state transitions for bookings across the entire platform.
+ * Terminal states (COMPLETED, CANCELLED, NO_SHOW) cannot transition to any active state.
+ */
+export const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
+  HELD: ['PENDING_PAYMENT', 'CONFIRMED', 'CANCELLED'],
+  PENDING_PAYMENT: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['CHECKED_IN', 'IN_CONSULTATION', 'CANCELLED', 'NO_SHOW', 'CONFIRMED'],
+  CHECKED_IN: ['IN_CONSULTATION', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
+  IN_CONSULTATION: ['COMPLETED', 'CANCELLED'],
+  COMPLETED: [], // Terminal!
+  CANCELLED: [], // Terminal!
+  NO_SHOW: [],   // Terminal!
+};
+
+/**
+ * Central status-transition validator rejecting illegal moves for every role.
+ * (e.g. Completed to Booked, No Show to In Consultation).
+ */
+export function validateBookingStatusTransition(
+  currentStatus: string,
+  nextStatus: string
+): { valid: boolean; error?: string } {
+  const normCurrent = (currentStatus || '').toUpperCase().trim();
+  const normNext = (nextStatus || '').toUpperCase().trim();
+
+  if (!normCurrent || !normNext) {
+    return { valid: false, error: 'Invalid status provided' };
+  }
+
+  // Idempotent transitions are allowed
+  if (normCurrent === normNext) {
+    return { valid: true };
+  }
+
+  if (normCurrent === 'COMPLETED') {
+    return {
+      valid: false,
+      error: `Illegal status transition: Completed booking cannot be moved to ${normNext}`,
+    };
+  }
+
+  if (normCurrent === 'CANCELLED') {
+    return {
+      valid: false,
+      error: `Illegal status transition: Cancelled booking cannot be moved to ${normNext}`,
+    };
+  }
+
+  if (normCurrent === 'NO_SHOW') {
+    return {
+      valid: false,
+      error: `Illegal status transition: No-show booking cannot be moved to ${normNext}`,
+    };
+  }
+
+  const allowed = VALID_STATUS_TRANSITIONS[normCurrent];
+  if (!allowed || !allowed.includes(normNext)) {
+    return {
+      valid: false,
+      error: `Illegal status transition: Cannot transition booking from ${normCurrent} to ${normNext}`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Server-side security helper for Hospital RBAC and multi-tenant access control.
  * Evaluates caller role, active hospital tenancy, department membership, and permitted modules.
+ * Returns role ('admin' | 'front_desk' | 'consultant' | 'none') and assigned doctor IDs.
  * NEVER relies on client-supplied claims alone.
  */
 export async function getAccessContext(
@@ -28,6 +96,7 @@ export async function getAccessContext(
     isHospital: false,
     email: null,
     userId: null,
+    assignedDoctorIds: [],
   };
 
   try {
@@ -39,49 +108,18 @@ export async function getAccessContext(
     const callerEmail = caller.email ? caller.email.toLowerCase().trim() : null;
     const supabaseAdmin = getSupabaseAdmin();
 
-    // 1. Check SuperAdmin override
-    const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', {
-      p_user_id: caller.id,
-    });
-
-    if (isAdmin) {
-      let merchantId = explicitMerchantId || null;
-      let isHospital = true;
-
-      if (merchantId) {
-        const { data: prov } = await supabaseAdmin
-          .from('providers')
-          .select('id, category_id')
-          .eq('id', merchantId)
-          .maybeSingle();
-
-        if (prov) {
-          isHospital =
-            prov.category_id === 'clinics' ||
-            prov.category_id === 'hospital' ||
-            prov.category_id?.includes('clinic') ||
-            prov.category_id?.includes('hospital');
-        }
-      }
-
-      return {
-        role: 'superadmin',
-        merchantId,
-        departmentId: null,
-        departmentName: null,
-        allowedModules: ALL_HOSPITAL_MODULES,
-        isHospital,
-        email: callerEmail,
-        userId: caller.id,
-      };
-    }
-
-    // 2. Resolve Target Merchant / Hospital ID
+    // 1. Resolve Target Merchant / Hospital ID
     let resolvedMerchantId = explicitMerchantId || null;
 
     if (!resolvedMerchantId) {
       // Check query param
-      const urlMerchantId = req.nextUrl?.searchParams?.get('merchant_id') || req.nextUrl?.searchParams?.get('provider_id');
+      let urlMerchantId = req.nextUrl?.searchParams?.get('merchant_id') || req.nextUrl?.searchParams?.get('provider_id');
+      if (!urlMerchantId && req.url) {
+        try {
+          const parsed = new URL(req.url, 'http://localhost');
+          urlMerchantId = parsed.searchParams.get('merchant_id') || parsed.searchParams.get('provider_id');
+        } catch {}
+      }
       if (urlMerchantId) {
         resolvedMerchantId = urlMerchantId;
       }
@@ -132,7 +170,7 @@ export async function getAccessContext(
       };
     }
 
-    // 3. Verify Merchant Venue & Hospital Vertical Gate
+    // 2. Verify Merchant Venue & Hospital Vertical Gate
     const { data: provider, error: provError } = await supabaseAdmin
       .from('providers')
       .select('id, owner_id, category_id, name')
@@ -164,120 +202,83 @@ export async function getAccessContext(
         isHospital: false,
         email: callerEmail,
         userId: caller.id,
+        assignedDoctorIds: [],
       };
     }
 
-    // 4. Role Evaluation: Owner Check (hospital owner cannot be demoted or removed)
-    if (provider.owner_id === caller.id) {
-      return {
-        role: 'owner',
-        merchantId: resolvedMerchantId,
-        departmentId: null,
-        departmentName: null,
-        allowedModules: ALL_HOSPITAL_MODULES,
-        isHospital: true,
-        email: callerEmail,
-        userId: caller.id,
-      };
-    }
+    // 3. Database Single Source of Truth Evaluation via SQL Helpers
+    const { data: roleData, error: roleError } = await (supabaseAdmin.rpc as any)('hospital_role', {
+      p_provider_id: resolvedMerchantId,
+      p_user_id: caller.id,
+    });
 
-    // Also check merchant_memberships for legacy owner mapping if configured
-    const { data: legacyOwnerMembership } = await supabaseAdmin
-      .from('merchant_memberships')
-      .select('role')
-      .eq('user_id', caller.id)
-      .eq('provider_id', resolvedMerchantId)
-      .eq('role', 'owner')
-      .maybeSingle();
+    const role: HospitalRole = (!roleError && roleData) ? (roleData as HospitalRole) : 'none';
 
-    if (legacyOwnerMembership) {
-      return {
-        role: 'owner',
-        merchantId: resolvedMerchantId,
-        departmentId: null,
-        departmentName: null,
-        allowedModules: ALL_HOSPITAL_MODULES,
-        isHospital: true,
-        email: callerEmail,
-        userId: caller.id,
-      };
-    }
+    // Fetch accessible resource IDs
+    const { data: resourceData } = await (supabaseAdmin.rpc as any)('hospital_accessible_resource_ids', {
+      p_provider_id: resolvedMerchantId,
+      p_user_id: caller.id,
+    });
 
-    // 5. Role Evaluation: Department Member Check
-    // Must be status = 'active'
-    let memberQuery = supabaseAdmin
-      .from('department_members')
-      .select('id, department_id, merchant_id, email, user_id, status, invite_expires_at')
-      .eq('merchant_id', resolvedMerchantId);
+    const assignedDoctorIds: string[] = Array.isArray(resourceData) ? resourceData : [];
 
-    if (callerEmail) {
-      memberQuery = memberQuery.or(`user_id.eq.${caller.id},email.eq.${callerEmail}`);
-    } else {
-      memberQuery = memberQuery.eq('user_id', caller.id);
-    }
+    // 4. Resolve Department and Allowed Modules
+    let departmentId: string | null = null;
+    let departmentName: string | null = null;
+    let allowedModules: HospitalModule[] = [];
 
-    const { data: memberRow, error: memberErr } = await memberQuery
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (memberErr || !memberRow) {
-      return {
-        role: 'none',
-        merchantId: resolvedMerchantId,
-        departmentId: null,
-        departmentName: null,
-        allowedModules: [],
-        isHospital: true,
-        email: callerEmail,
-        userId: caller.id,
-      };
-    }
-
-    // Auto-link user_id on accepted login if currently null
-    if (!memberRow.user_id && memberRow.status === 'active') {
-      await supabaseAdmin
+    if (role === 'admin') {
+      allowedModules = ALL_HOSPITAL_MODULES;
+    } else if (role === 'front_desk') {
+      const { data: memberRow } = await supabaseAdmin
         .from('department_members')
-        .update({ user_id: caller.id, updated_at: new Date().toISOString() })
-        .eq('id', memberRow.id);
+        .select('department_id, departments(id, name, allowed_modules)')
+        .eq('merchant_id', resolvedMerchantId)
+        .eq('user_id', caller.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (memberRow) {
+        departmentId = memberRow.department_id;
+        const dept = memberRow.departments as any;
+        departmentName = dept?.name || null;
+        allowedModules = (dept?.allowed_modules as HospitalModule[]) || [
+          'appointments',
+          'queue_schedule',
+          'check_in',
+        ];
+      } else {
+        allowedModules = ['appointments', 'queue_schedule', 'check_in'];
+      }
+    } else if (role === 'consultant') {
+      // Find doctor resource department
+      const { data: docRes } = await supabaseAdmin
+        .from('resources')
+        .select('department_id, departments(id, name, allowed_modules)')
+        .eq('provider_id', resolvedMerchantId)
+        .eq('user_id', caller.id)
+        .maybeSingle();
+
+      if (docRes) {
+        departmentId = docRes.department_id;
+        const dept = docRes.departments as any;
+        departmentName = dept?.name || null;
+      }
+      allowedModules = ['appointments', 'queue_schedule', 'patients'];
     }
-
-    // Enforce active status: Revoked members lose access immediately on every request
-    if (memberRow.status !== 'active') {
-      return {
-        role: 'none',
-        merchantId: resolvedMerchantId,
-        departmentId: null,
-        departmentName: null,
-        allowedModules: [],
-        isHospital: true,
-        email: callerEmail,
-        userId: caller.id,
-      };
-    }
-
-    // 6. Fetch Department and Permitted Modules
-    const { data: dept } = await supabaseAdmin
-      .from('departments')
-      .select('id, name, allowed_modules')
-      .eq('id', memberRow.department_id)
-      .maybeSingle();
-
-    const allowedModules = (dept?.allowed_modules as HospitalModule[]) || [
-      'appointments',
-      'queue_schedule',
-      'check_in',
-    ];
 
     return {
-      role: 'department_member',
+      role,
       merchantId: resolvedMerchantId,
-      departmentId: memberRow.department_id,
-      departmentName: dept?.name || 'Department',
+      departmentId,
+      departmentName,
       allowedModules,
       isHospital: true,
       email: callerEmail,
       userId: caller.id,
+      assignedDoctorIds,
     };
   } catch (err) {
     console.error('getAccessContext error:', err);
@@ -311,11 +312,18 @@ export async function logHospitalAuditEvent(params: {
 }
 
 /**
+ * Checks if the context is a Hospital Administrator
+ */
+export function isHospitalAdmin(ctx: HospitalAccessContext): boolean {
+  return ctx.role === 'admin' || (ctx.role as string) === 'owner' || (ctx.role as string) === 'superadmin';
+}
+
+/**
  * Checks if the context has access to a specific hospital module
  */
 export function hasModuleAccess(ctx: HospitalAccessContext, module: HospitalModule): boolean {
-  if (ctx.role === 'owner' || ctx.role === 'superadmin') return true;
-  if (ctx.role === 'department_member') {
+  if (isHospitalAdmin(ctx)) return true;
+  if (ctx.role === 'front_desk' || ctx.role === 'consultant' || (ctx.role as string) === 'department_member') {
     return ctx.allowedModules.includes(module);
   }
   return false;
@@ -328,8 +336,8 @@ export function canAccessDepartment(
   ctx: HospitalAccessContext,
   departmentId: string | null | undefined
 ): boolean {
-  if (ctx.role === 'owner' || ctx.role === 'superadmin') return true;
-  if (ctx.role === 'department_member') {
+  if (isHospitalAdmin(ctx)) return true;
+  if (ctx.role === 'front_desk' || ctx.role === 'consultant' || (ctx.role as string) === 'department_member') {
     return Boolean(ctx.departmentId && departmentId && ctx.departmentId === departmentId);
   }
   return false;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyStaffManagerRequest } from '@/lib/auth-admin';
+import { verifyStaffManagerRequest, isCallerHospitalAdminForProvider } from '@/lib/auth-admin';
 
 export async function PATCH(
   request: NextRequest,
@@ -34,13 +34,10 @@ export async function PATCH(
 
     // Verify merchant authorization if caller is not platform admin
     if (authResult.profile.role === 'merchant') {
-      const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
-        p_user_id: authResult.user.id,
-      });
-      const authorizedList = Array.isArray(authProviders) ? authProviders : [];
-      if (!authorizedList.includes(resource.provider_id)) {
+      const isHospitalAdmin = await isCallerHospitalAdminForProvider(authResult.user.id, resource.provider_id);
+      if (!isHospitalAdmin) {
         return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to manage this resource' },
+          { error: 'Forbidden: Only the Hospital Administrator can modify resources or services' },
           { status: 403 }
         );
       }

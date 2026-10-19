@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
-import { verifyStaffManagerRequest, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
+import { verifyStaffManagerRequest, isCallerAuthorizedForProvider, isCallerHospitalAdminForProvider } from '@/lib/auth-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +87,8 @@ export async function POST(request: NextRequest) {
       depositAmount,
       durationMinutes,
       capacity,
+      doctorEmail,
+      doctorPassword,
     } = body;
 
     if (!providerId || !name || !type) {
@@ -101,12 +103,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid providerId format' }, { status: 400 });
     }
 
-    // Verify merchant authorization for this venue
+    // Verify hospital administrator authorization for this venue (Only Hospital Admin can add doctors)
     if (authResult.profile.role === 'merchant') {
-      const isAuthorized = await isCallerAuthorizedForProvider(authResult.user.id, providerId);
-      if (!isAuthorized) {
+      const isHospitalAdmin = await isCallerHospitalAdminForProvider(authResult.user.id, providerId);
+      if (!isHospitalAdmin) {
         return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to manage resources for this provider' },
+          { error: 'Forbidden: Only the Hospital Administrator can add doctors or consultation services' },
           { status: 403 }
         );
       }
@@ -189,6 +191,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Provision Doctor Portal Login Account if doctorEmail is provided
+    let doctorUserId: string | null = null;
+    const cleanEmail = (doctorEmail && typeof doctorEmail === 'string') ? doctorEmail.trim().toLowerCase() : null;
+    if (cleanEmail) {
+      if (doctorPassword && typeof doctorPassword === 'string' && doctorPassword.length >= 6) {
+        try {
+          const { data: createdUser, error: authError } = await (supabaseAdmin.rpc as any)('admin_create_user', {
+            p_email: cleanEmail,
+            p_password: doctorPassword,
+            p_full_name: name.trim(),
+            p_role: 'merchant',
+            p_phone: null,
+          });
+
+          if (!authError && createdUser?.id) {
+            doctorUserId = String(createdUser.id);
+            await (supabaseAdmin.from('merchant_memberships' as any) as any).upsert({
+              user_id: doctorUserId,
+              provider_id: providerId,
+              role: 'staff',
+            }, { onConflict: 'user_id, provider_id' });
+          }
+        } catch (authErr) {
+          console.warn('Doctor user provisioning warning:', authErr);
+        }
+      }
+
+      const resourceId = (data as any)?.id;
+      if (resourceId) {
+        await (supabaseAdmin.from('resources') as any).update({
+          attributes: {
+            email: cleanEmail,
+            user_id: doctorUserId,
+          },
+        }).eq('id', resourceId);
+      }
+    }
+
     return NextResponse.json({ success: true, resource: data }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
@@ -224,10 +264,10 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
       }
 
-      const isAuthorized = await isCallerAuthorizedForProvider(authResult.user.id, resource.provider_id);
-      if (!isAuthorized) {
+      const isHospitalAdmin = await isCallerHospitalAdminForProvider(authResult.user.id, resource.provider_id);
+      if (!isHospitalAdmin) {
         return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to delete this resource' },
+          { error: 'Forbidden: Only the Hospital Administrator can delete doctors' },
           { status: 403 }
         );
       }
@@ -266,6 +306,8 @@ export async function PUT(request: NextRequest) {
       depositAmount,
       durationMinutes,
       capacity,
+      doctorEmail,
+      doctorPassword,
     } = body;
 
     if (!id) {
@@ -281,7 +323,7 @@ export async function PUT(request: NextRequest) {
     // Verify resource exists & get current provider_id
     const { data: resource, error: resError } = await supabaseAdmin
       .from('resources')
-      .select('id, provider_id, name')
+      .select('id, provider_id, name, attributes')
       .eq('id', id)
       .maybeSingle();
 
@@ -291,17 +333,50 @@ export async function PUT(request: NextRequest) {
 
     // Verify merchant authorization if caller is not platform admin
     if (authResult.profile.role === 'merchant') {
-      const isAuthorized = await isCallerAuthorizedForProvider(authResult.user.id, resource.provider_id);
-      if (!isAuthorized) {
+      const isHospitalAdmin = await isCallerHospitalAdminForProvider(authResult.user.id, resource.provider_id);
+      if (!isHospitalAdmin) {
         return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to edit this resource' },
+          { error: 'Forbidden: Only the Hospital Administrator can edit doctor details' },
           { status: 403 }
         );
       }
     }
 
+    const currentAttr = (resource as any)?.attributes || {};
+    let doctorUserId = currentAttr.user_id || null;
+
+    if (doctorEmail !== undefined) {
+      const cleanEmail = (doctorEmail || '').trim().toLowerCase();
+      if (doctorPassword && typeof doctorPassword === 'string' && doctorPassword.length >= 6) {
+        try {
+          const { data: createdUser, error: authErr } = await (supabaseAdmin.rpc as any)('admin_create_user', {
+            p_email: cleanEmail,
+            p_password: doctorPassword,
+            p_full_name: name.trim(),
+            p_role: 'merchant',
+            p_phone: null,
+          });
+
+          if (!authErr && createdUser?.id) {
+            doctorUserId = createdUser.id;
+            await supabaseAdmin.from('merchant_memberships').upsert({
+              user_id: doctorUserId,
+              provider_id: resource.provider_id,
+              role: 'staff',
+            }, { onConflict: 'user_id, provider_id' });
+          }
+        } catch (pwErr) {
+          console.warn('Doctor password update warning:', pwErr);
+        }
+      }
+
+      currentAttr.email = cleanEmail || null;
+      if (doctorUserId) currentAttr.user_id = doctorUserId;
+    }
+
     const updatePayload: Record<string, any> = {
       name: name.trim(),
+      attributes: currentAttr,
       updated_at: new Date().toISOString(),
     };
 

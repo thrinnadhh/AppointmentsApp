@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { validateBookingStatusTransition } from '@/lib/hospital-access';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin();
     const { data: booking, error: fetchError } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, status, payment_status')
+      .select('id, customer_id, provider_id, resource_id, status, payment_status')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -44,17 +45,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Edge check: cannot complete a cancelled or no-show booking
-    if (booking.status === 'CANCELLED') {
+    const transitionCheck = validateBookingStatusTransition(booking.status, 'COMPLETED');
+    if (!transitionCheck.valid) {
       return NextResponse.json(
-        { success: false, error: 'Invalid transition: Booking is already cancelled' },
-        { status: 409 }
-      );
-    }
-
-    if (booking.status === 'NO_SHOW') {
-      return NextResponse.json(
-        { success: false, error: 'Invalid transition: Booking is marked as no-show' },
+        { success: false, error: transitionCheck.error },
         { status: 409 }
       );
     }

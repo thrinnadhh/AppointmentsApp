@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getAccessContext, logHospitalAuditEvent } from '@/lib/hospital-access';
+import { getAccessContext, logHospitalAuditEvent, isHospitalAdmin } from '@/lib/hospital-access';
 import { DepartmentMember } from '@appointments/shared';
 
 export const dynamic = 'force-dynamic';
@@ -65,8 +65,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const ctx = await getAccessContext(req);
-    if (ctx.role !== 'owner' && ctx.role !== 'superadmin') {
-      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital owners can invite members' }, { status: 403 });
+    if (!isHospitalAdmin(ctx)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital admin can invite members' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -269,8 +269,8 @@ export async function PUT(req: NextRequest) {
     // ─────────────────────────────────────────────────────────────────────────
     // OWNER ACTIONS: RESEND, CANCEL INVITE, REVOKE
     // ─────────────────────────────────────────────────────────────────────────
-    if (ctx.role !== 'owner' && ctx.role !== 'superadmin') {
-      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital owners can manage members' }, { status: 403 });
+    if (!isHospitalAdmin(ctx)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital admin can manage members' }, { status: 403 });
     }
 
     if (!member_id) {

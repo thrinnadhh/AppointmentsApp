@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getAccessContext, logHospitalAuditEvent } from '@/lib/hospital-access';
+import { getAccessContext, logHospitalAuditEvent, isHospitalAdmin } from '@/lib/hospital-access';
 import { HospitalDepartment, HospitalModule } from '@appointments/shared';
 
 export const dynamic = 'force-dynamic';
@@ -55,8 +55,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const ctx = await getAccessContext(req);
-    if (ctx.role !== 'owner' && ctx.role !== 'superadmin') {
-      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital owners can create departments' }, { status: 403 });
+    if (!isHospitalAdmin(ctx)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital admin can create departments' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -119,8 +119,8 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const ctx = await getAccessContext(req);
-    if (ctx.role !== 'owner' && ctx.role !== 'superadmin') {
-      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital owners can update departments' }, { status: 403 });
+    if (!isHospitalAdmin(ctx)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital admin can update departments' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -203,8 +203,8 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const ctx = await getAccessContext(req);
-    if (ctx.role !== 'owner' && ctx.role !== 'superadmin') {
-      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital owners can delete departments' }, { status: 403 });
+    if (!isHospitalAdmin(ctx)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital admin can delete departments' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
