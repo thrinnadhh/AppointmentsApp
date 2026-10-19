@@ -22,7 +22,12 @@ import {
   Filter,
   Trash2,
   CheckCircle2,
-  Edit3
+  Edit3,
+  KeyRound,
+  Mail,
+  Eye,
+  EyeOff,
+  ShieldCheck
 } from 'lucide-react';
 import { 
   supabase, 
@@ -37,7 +42,7 @@ function ResourcesManagementContent() {
   const searchParams = useSearchParams();
   const providerParam = searchParams.get('providerId');
 
-  const { activeProvider: tenantProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
+  const { activeProvider: tenantProvider, verticalConfig, isSuperAdmin, isHospitalAdmin, isLocked } = useMerchantTenant();
 
   const [providers, setProviders] = useState<Provider[]>(tenantProvider ? [tenantProvider] : []);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
@@ -49,6 +54,8 @@ function ResourcesManagementContent() {
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   const defaultResourceType: ResourceType = (
     verticalConfig.id === 'salons' ? 'stylist' :
@@ -67,6 +74,8 @@ function ResourcesManagementContent() {
     duration_minutes: number;
     capacity: number;
     specialization: string;
+    doctorEmail?: string;
+    doctorPassword?: string;
   }>({
     name: '',
     type: defaultResourceType,
@@ -76,6 +85,8 @@ function ResourcesManagementContent() {
     duration_minutes: verticalConfig.defaultDurationMinutes,
     capacity: verticalConfig.id === 'gaming' ? 14 : (verticalConfig.id === 'restaurants' ? 4 : 1),
     specialization: '',
+    doctorEmail: '',
+    doctorPassword: '',
   });
 
   // Edit Resource Modal State
@@ -88,6 +99,8 @@ function ResourcesManagementContent() {
     deposit_amount: number;
     duration_minutes: number;
     capacity: number;
+    doctorEmail?: string;
+    doctorPassword?: string;
   }>({
     name: '',
     type: defaultResourceType,
@@ -96,6 +109,8 @@ function ResourcesManagementContent() {
     deposit_amount: verticalConfig.defaultPrice,
     duration_minutes: verticalConfig.defaultDurationMinutes,
     capacity: 1,
+    doctorEmail: '',
+    doctorPassword: '',
   });
   const [isUpdatingResource, setIsUpdatingResource] = useState(false);
 
@@ -186,6 +201,8 @@ function ResourcesManagementContent() {
           depositAmount: Number(formData.price),
           durationMinutes: Number(formData.duration_minutes),
           capacity: Number(formData.capacity),
+          doctorEmail: formData.doctorEmail?.trim() || undefined,
+          doctorPassword: formData.doctorPassword || undefined,
         }),
       });
 
@@ -210,12 +227,15 @@ function ResourcesManagementContent() {
         duration_minutes: verticalConfig.defaultDurationMinutes,
         capacity: verticalConfig.id === 'gaming' ? 14 : (verticalConfig.id === 'restaurants' ? 4 : 1),
         specialization: '',
+        doctorEmail: '',
+        doctorPassword: '',
       });
       setTimeout(() => setFeedbackToast(null), 5000);
     }
   };
 
   const handleStartEditResource = (res: Resource) => {
+    const resAttr = (res as any)?.attributes || {};
     setEditingResource(res);
     setEditFormData({
       name: res.name,
@@ -225,6 +245,8 @@ function ResourcesManagementContent() {
       deposit_amount: res.deposit_amount ?? verticalConfig.defaultPrice,
       duration_minutes: res.duration_minutes ?? verticalConfig.defaultDurationMinutes,
       capacity: res.capacity ?? 1,
+      doctorEmail: resAttr.email || '',
+      doctorPassword: '',
     });
   };
 
@@ -250,6 +272,8 @@ function ResourcesManagementContent() {
           depositAmount: Number(editFormData.price),
           durationMinutes: Number(editFormData.duration_minutes),
           capacity: Number(editFormData.capacity),
+          doctorEmail: editFormData.doctorEmail?.trim() || undefined,
+          doctorPassword: editFormData.doctorPassword || undefined,
         }),
       });
 
@@ -367,6 +391,21 @@ function ResourcesManagementContent() {
         </div>
       )}
 
+      {/* Desk Manager Role Banner */}
+      {!isHospitalAdmin && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl flex items-center justify-between text-xs shadow-xs animate-fade-in">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Desk Manager Mode:</strong> Registering new {verticalConfig.resourceLabelPlural.toLowerCase()} is restricted to the primary Hospital Administrator. Desk managers have operational queue access.
+            </span>
+          </div>
+          <span className="px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800 text-[10px] uppercase tracking-wide">
+            View Only
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
@@ -434,13 +473,31 @@ function ResourcesManagementContent() {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
           </button>
 
-          <button
-            onClick={() => setIsAdding(true)}
-            className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Add {verticalConfig.resourceLabelSingular} / Service
-          </button>
+          {isHospitalAdmin ? (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Add {verticalConfig.resourceLabelSingular} / Service
+            </button>
+          ) : (
+            <div className="relative group">
+              <button
+                disabled
+                className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-40 shadow-none transition"
+                title="Restricted: Only Hospital Administrator can add doctors"
+                aria-label="Add doctor disabled for desk managers"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Add {verticalConfig.resourceLabelSingular} / Service
+              </button>
+              <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs rounded-lg shadow-lg whitespace-nowrap z-30">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Only Hospital Administrator can add doctors</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -675,6 +732,68 @@ function ResourcesManagementContent() {
                 </div>
               </div>
 
+              {/* Doctor / Staff Portal Login Credentials */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">
+                      {verticalConfig.resourceLabelSingular} Portal Login Credentials (Optional)
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Provision direct email and password so the {verticalConfig.resourceLabelSingular.toLowerCase()} can log in to their dashboard
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label htmlFor="doctor-email" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Login Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        id="doctor-email"
+                        name="doctorEmail"
+                        type="email"
+                        value={formData.doctorEmail || ''}
+                        onChange={(e) => setFormData({ ...formData, doctorEmail: e.target.value })}
+                        placeholder="doctor@hospital.com"
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="doctor-password" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Temporary Password (min 6 chars)
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="doctor-password"
+                        name="doctorPassword"
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.doctorPassword || ''}
+                        onChange={(e) => setFormData({ ...formData, doctorPassword: e.target.value })}
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2 pr-9 border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
@@ -805,6 +924,68 @@ function ResourcesManagementContent() {
                 />
               </div>
 
+              {/* Doctor Portal Login Credentials Edit */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">
+                      {verticalConfig.resourceLabelSingular} Portal Login Credentials
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Manage or reset {verticalConfig.resourceLabelSingular.toLowerCase()}&apos;s direct login email and OPD console password
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label htmlFor="edit-doctor-email" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Login Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        id="edit-doctor-email"
+                        name="editDoctorEmail"
+                        type="email"
+                        value={editFormData.doctorEmail || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, doctorEmail: e.target.value })}
+                        placeholder="doctor@hospital.com"
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="edit-doctor-password" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      New Password (Optional)
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="edit-doctor-password"
+                        name="editDoctorPassword"
+                        type={showEditPassword ? 'text' : 'password'}
+                        value={editFormData.doctorPassword || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, doctorPassword: e.target.value })}
+                        placeholder="Leave blank to keep current"
+                        className="w-full px-3 py-2 pr-9 border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                        title={showEditPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
@@ -912,6 +1093,23 @@ function ResourcesManagementContent() {
                     </span>
                   </div>
 
+                  {/* Doctor Portal Login Account Status */}
+                  <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                      Login Access:
+                    </span>
+                    {(res as any)?.attributes?.email ? (
+                      <span className="font-mono text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md truncate max-w-[170px]" title={(res as any)?.attributes?.email}>
+                        {(res as any)?.attributes?.email}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 italic">
+                        No login set
+                      </span>
+                    )}
+                  </div>
+
                   {/* Slot Details */}
                   <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                     <span className="flex items-center gap-1">
@@ -922,17 +1120,22 @@ function ResourcesManagementContent() {
                   </div>
                 </div>
 
-                {/* Footer Toggle & Delete */}
+                {/* Footer Toggle & Actions */}
                 <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    ID: {res.id.substring(0, 8)}
-                  </span>
+                  <Link
+                    href={`/team?providerId=${res.provider_id}&doctorId=${res.id}`}
+                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1"
+                    title="Assign Front Desk Managers for this doctor"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Front Desk</span>
+                  </Link>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleStartEditResource(res)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
-                      title={`Edit ${res.name} details`}
+                      title={`Edit ${res.name} details & credentials`}
                       aria-label={`Edit ${res.name}`}
                     >
                       <Edit3 className="w-3.5 h-3.5" />

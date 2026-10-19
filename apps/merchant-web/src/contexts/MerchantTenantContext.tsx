@@ -10,6 +10,8 @@ export interface MerchantTenantContextType {
   verticalConfig: VerticalConfig;
   memberships: MerchantMembership[];
   isSuperAdmin: boolean;
+  isHospitalAdmin: boolean;
+  isDeskManager: boolean;
   isLocked: boolean; // True if merchant is locked to their single venue
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -25,6 +27,8 @@ const MerchantTenantContext = createContext<MerchantTenantContextType>({
   verticalConfig: defaultVerticalConfig,
   memberships: [],
   isSuperAdmin: false,
+  isHospitalAdmin: true,
+  isDeskManager: false,
   isLocked: true,
   isLoading: true,
   isAuthenticated: false,
@@ -37,6 +41,8 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
   const [activeProvider, setActiveProvider] = useState<(Provider & { resources?: Resource[] }) | null>(null);
   const [memberships, setMemberships] = useState<MerchantMembership[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isHospitalAdmin, setIsHospitalAdmin] = useState(true);
+  const [isDeskManager, setIsDeskManager] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +55,18 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
       setIsSuperAdmin(data.isSuperAdmin);
       setMemberships(data.memberships);
       setIsAuthenticated(Boolean(data.user));
+
+      // Calculate Hospital Admin vs Desk Manager status
+      const isOwner = Boolean(data.user && data.activeProvider && data.activeProvider.owner_id === data.user.id);
+      const hasAdminMembership = data.memberships.some((m) => 
+        m.provider_id === data.activeProvider?.id && ((m.role as string) === 'admin' || m.role === 'owner' || m.role === 'manager')
+      );
+      const isStaffMember = data.memberships.some((m) =>
+        m.provider_id === data.activeProvider?.id && m.role === 'staff'
+      );
+      const adminFlag = Boolean(data.isSuperAdmin || isOwner || hasAdminMembership || (!isStaffMember && data.profile?.role === 'merchant'));
+      setIsHospitalAdmin(adminFlag);
+      setIsDeskManager(Boolean(isStaffMember || (!adminFlag && !data.isSuperAdmin)));
 
       if (data.activeProvider) {
         setActiveProvider(data.activeProvider);
@@ -121,6 +139,8 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
         verticalConfig,
         memberships,
         isSuperAdmin,
+        isHospitalAdmin,
+        isDeskManager,
         isLocked,
         isLoading,
         isAuthenticated,

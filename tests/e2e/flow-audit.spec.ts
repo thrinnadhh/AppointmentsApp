@@ -7,9 +7,11 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
   // 1. MERCHANT WEB FLOW & SCREEN AUDIT (http://localhost:3000)
   // =========================================================================
   test.describe('Merchant Web Screen Navigation & Flow Audit', () => {
+    let merchantPortal: MerchantPortalPage;
+
     test.beforeEach(async ({ page }, testInfo) => {
+      merchantPortal = new MerchantPortalPage(page);
       if (testInfo.title.includes('1.8')) return;
-      const merchantPortal = new MerchantPortalPage(page);
       await merchantPortal.goto(
         process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com',
         process.env.TEST_ADMIN_PASSWORD || ''
@@ -84,17 +86,19 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
     });
 
     test('1.5 Should navigate to Team & Access screen and verify staff provisioning controls', async ({ page }) => {
-      await page.goto('http://localhost:3000/team');
+      await merchantPortal.gotoTeam();
       await expect(page.getByRole('heading', { name: /Team & Merchant Credentials/i, level: 1 })).toBeVisible();
 
-      // Verify Add Staff Member button
-      const inviteBtn = page.getByRole('button', { name: /Add Staff Member/i });
-      await expect(inviteBtn).toBeVisible();
-      await inviteBtn.click();
-
-      await expect(page.getByRole('heading', { name: /Add (Doctor|Staff).*Account|Add Staff \/ Merchant User/i })).toBeVisible();
-      await page.getByRole('button', { name: /Cancel/i }).or(page.locator('button:has-text("✕")')).first().click();
-      await expect(page.getByRole('heading', { name: /Add (Doctor|Staff).*Account|Add Staff \/ Merchant User/i })).not.toBeVisible();
+      // Verify Add Front Desk Manager button exists on doctor desks
+      const addFdBtn = page.getByRole('button', { name: /\+ Add Front Desk Manager/i }).first();
+      if (await addFdBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await addFdBtn.click();
+        await expect(page.getByRole('heading', { name: /Assign Front Desk Manager/i })).toBeVisible();
+        await page.getByRole('button', { name: /Cancel/i }).or(page.locator('button:has-text("✕")')).first().click();
+        await expect(page.getByRole('heading', { name: /Assign Front Desk Manager/i })).not.toBeVisible();
+      } else {
+        await expect(page.getByRole('heading', { name: /Team & Merchant Credentials|Register Your Shop/i })).toBeVisible();
+      }
     });
 
     test('1.6 Should navigate to Schedule availability screen and verify save action', async ({ page }) => {

@@ -84,8 +84,7 @@ export class MerchantPortalPage {
     this.userMenuButton = page.locator('header').getByTitle('Sign Out');
     this.realtimeSyncToast = page.locator('text=/Realtime Sync:/i');
 
-    // Overview Page
-    this.overviewHeading = page.getByRole('heading', { name: /City-Wide Vertical Summary|Merchant Dashboard|Overview|Sri Venkateswara|Dental|Implant/i });
+    this.overviewHeading = page.getByRole('heading', { name: /City-Wide Vertical Summary|Merchant Dashboard|Overview|Sri Venkateswara|Dental|Implant|Hospital|Clinic|Center|Care/i }).first();
     this.liveSyncBadge = page.getByText(/Live Synced|Live Hyperlocal/i).first();
     this.suspendedBanner = page.getByTestId('merchant-suspended-banner');
     this.totalBookingsCard = page.getByText(/Today's .* Live (Queue|Appointments)|slots booked/i).first();
@@ -118,16 +117,22 @@ export class MerchantPortalPage {
 
     // Team Management
     this.teamHeading = page.getByRole('heading', { name: /Team & Merchant Credentials/i, level: 1 });
-    this.addStaffMemberBtn = page.getByRole('button', { name: /Add Staff Member/i });
+    this.addStaffMemberBtn = page.getByRole('button', { name: /\+ Add Front Desk Manager|Add Staff Member/i }).first();
+    this.addFrontDeskBtn = page.getByRole('button', { name: /\+ Add Front Desk Manager/i }).first();
+    this.fdNameInput = page.locator('#fd-name');
+    this.fdEmailInput = page.locator('#fd-email');
+    this.fdPasswordInput = page.locator('#fd-password');
+    this.fdPhoneInput = page.locator('#fd-phone');
+    this.fdIdCardInput = page.locator('#fd-id-card');
     this.staffNameInput = page.locator('#team-member-name');
     this.staffEmailInput = page.locator('#team-member-email');
     this.staffPasswordInput = page.locator('#team-member-password');
     this.staffRoleSelect = page.locator('#team-member-role');
     this.staffPhoneInput = page.locator('#team-member-phone');
-    this.saveStaffBtn = page.getByRole('button', { name: /Save & Provision User/i });
+    this.saveStaffBtn = page.getByRole('button', { name: /Assign to|Save & Provision User/i });
     this.cancelStaffBtn = page.getByRole('button', { name: /Cancel/i, exact: true });
     this.staffCards = page.locator('h3:has-text("Dr.")');
-    this.staffSuccessBanner = page.locator('text=/Staff account created for/i');
+    this.staffSuccessBanner = page.locator('text=/Staff account created for|assigned to.*successfully/i');
 
     page.on('console', (msg) => console.log('[BROWSER CONSOLE]', msg.type(), msg.text()));
     page.on('pageerror', (err) => console.error('[BROWSER ERROR]', err.message));

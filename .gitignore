@@ -64,4 +64,5 @@ __agent__/
 scripts/e2e-*.mjs
 *.log
 strix-*.log
+.venv/
 

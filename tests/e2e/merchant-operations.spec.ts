@@ -31,41 +31,42 @@ test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () 
     await allFilter.click();
   });
 
-  test('2. Should invite and provision a new Merchant Staff account', async ({ page }) => {
-    const runId = Date.now();
-    const uniqueStaffName = `Dr. Ananya Reddy ${runId.toString().slice(-4)}`;
-    const uniqueStaffEmail = `staff.${runId}@tirupati.care`;
-    const uniquePhone = `+91 9${runId.toString().slice(-9)}`;
+  test('2. Should invite and provision a new Front Desk Manager with ID card number', async ({ page }) => {
+    const runId = Date.now().toString().slice(-4);
+    const uniqueStaffName = `Desk Manager Kavitha ${runId}`;
+    const uniqueStaffEmail = `frontdesk.${runId}@tirupati.care`;
+    const uniquePhone = `+91 98480 ${runId}`;
+    const uniqueIdCard = `HOSP-FD-${runId}`;
 
     await merchantPortal.gotoTeam();
 
-    // Click Add Staff Member button
-    const addMemberBtn = page.getByRole('button', { name: /Add Staff Member/i });
-    await expect(addMemberBtn).toBeVisible();
-    await addMemberBtn.click();
+    // Look for "+ Add Front Desk Manager" button
+    const addFdBtn = page.getByRole('button', { name: /\+ Add Front Desk Manager/i }).first();
+    await expect(addFdBtn).toBeVisible({ timeout: 15000 });
+    await addFdBtn.click();
 
     // Verify modal is open
-    await expect(page.locator('#team-member-name')).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Add .*Staff Account|Add Staff/i })).toBeVisible();
+    await expect(page.locator('#fd-name')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Assign Front Desk Manager/i })).toBeVisible();
 
-    // Fill form
-    await page.locator('#team-member-name').fill(uniqueStaffName);
-    await page.locator('#team-member-email').fill(uniqueStaffEmail);
-    await page.locator('#team-member-password').fill('SecureStaffPass123!');
-    await page.locator('#team-member-role').selectOption('merchant');
-    await page.locator('#team-member-phone').fill(uniquePhone);
+    // Fill form including optional Staff ID card number
+    await page.locator('#fd-name').fill(uniqueStaffName);
+    await page.locator('#fd-email').fill(uniqueStaffEmail);
+    await page.locator('#fd-password').fill('SecureStaffPass123!');
+    await page.locator('#fd-phone').fill(uniquePhone);
+    await page.locator('#fd-id-card').fill(uniqueIdCard);
 
     // Submit form
-    await page.getByRole('button', { name: /Save & Provision User/i }).click();
+    await page.getByRole('button', { name: /Assign to/i }).click();
 
     // Verify success banner appears
     await expect(
-      page.getByText(new RegExp(`Staff account created for ${uniqueStaffName}`, 'i'))
+      page.getByText(new RegExp(`assigned to.*successfully`, 'i'))
     ).toBeVisible({ timeout: 15000 });
 
-    // Verify new member card in list
+    // Verify new member appears in roster and doctor card
     await expect(page.getByText(uniqueStaffName).first()).toBeVisible();
-    await expect(page.getByText(uniqueStaffEmail).first()).toBeVisible();
+    await expect(page.getByText(uniqueIdCard).first()).toBeVisible();
   });
 
   test('3. Should display Bookings Queue and filter by status tabs and search', async ({ page }) => {
