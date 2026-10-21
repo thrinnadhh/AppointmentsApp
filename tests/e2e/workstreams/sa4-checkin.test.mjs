@@ -134,6 +134,8 @@ describe('Workstream SA4: Check-in', () => {
 
   // Helper to create booking fixtures directly via service role
   async function createFixtureBooking({ customerId, resourceId, slotStart, slotEnd, status = 'CONFIRMED' }) {
+    const doc = tenant.consultants.find(c => c.id === resourceId);
+    const departmentId = doc ? doc.department_id : null;
     const ref = `BOOK-${tenant.prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const res = await fetch(`${url}/rest/v1/bookings`, {
       method: 'POST',
@@ -141,6 +143,7 @@ describe('Workstream SA4: Check-in', () => {
       body: JSON.stringify({
         provider_id: tenant.hospital.id,
         resource_id: resourceId,
+        department_id: departmentId,
         customer_id: customerId,
         slot_start: slotStart,
         slot_end: slotEnd,
@@ -153,6 +156,9 @@ describe('Workstream SA4: Check-in', () => {
       })
     });
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(`createFixtureBooking failed: ${JSON.stringify(data)}`);
+    }
     return Array.isArray(data) ? data[0] : data;
   }
 
@@ -244,15 +250,30 @@ describe('Workstream SA4: Check-in', () => {
       assert.equal(resAlreadyUsed.error, 'ALREADY_CHECKED_IN', 'Reused code returns ALREADY_CHECKED_IN');
 
       // 6. Unauthorized code (unauthorized doctor/shop) returns identical uniform response
-      const unauthCodeRes = await fd.verifyCheckinCode('UNAUTH99');
+      const unauthDoc = tenant.consultants[2]; // Dr. Reddy (Dermatology, unassigned to fd in Neurology)
+      const bUnauth = await createFixtureBooking({
+        customerId: patient.user.id,
+        resourceId: unauthDoc.id,
+        slotStart: slotValid,
+        slotEnd: slotValidEnd,
+      });
+      const codeResUnauth = await fetch(`${url}/rest/v1/appointment_checkin_codes?booking_id=eq.${bUnauth.id}`, { headers: serviceHeaders });
+      const [codeRecUnauth] = await codeResUnauth.json();
+
+      const unauthCodeRes = await fd.verifyCheckinCode(codeRecUnauth.code);
       assert.equal(unauthCodeRes.success, false);
       assert.equal(unauthCodeRes.error, 'INVALID_CODE', 'Unauthorized code returns uniform INVALID_CODE');
+      assert.deepStrictEqual(
+        { success: unauthCodeRes.success, error: unauthCodeRes.error, message: unauthCodeRes.message },
+        { success: resInvalid.success, error: resInvalid.error, message: resInvalid.message },
+        'Unauthorized response must look completely identical to invalid code response'
+      );
 
       writer.addCaseResult({
         caseId: 'D4',
         scenario: 'Invalid, expired, already used, wrong day, too early: the right error each time, and an identical response for an unauthorized code',
         status: 'PASS',
-        evidence: 'Verified exact errors: INVALID_CODE, EXPIRED, APPOINTMENT_FUTURE, TOO_EARLY, ALREADY_CHECKED_IN, and uniform INVALID_CODE for unauthorized.'
+        evidence: 'Verified exact errors: INVALID_CODE, EXPIRED, APPOINTMENT_FUTURE, TOO_EARLY, ALREADY_CHECKED_IN, and unauthorized response looks identical to invalid code.'
       });
     } catch (err) {
       writer.addCaseResult({ caseId: 'D4', scenario: 'Invalid, expired, already used, wrong day, too early: the right error each time, and an identical response for an unauthorized code', status: 'FAIL', evidence: err.message });
@@ -363,7 +384,7 @@ describe('Workstream SA4: Check-in', () => {
   // D8: A patient checks in and then leaves: Front Desk sets No Show and the queue closes the gap
   it('D8: A patient checks in and then leaves: Front Desk sets No Show and the queue closes the gap', async () => {
     try {
-      const doc = tenant.consultants[0];
+      const doc = tenant.consultants[1];
       const p1 = await getCustomerClient(tenant, 1);
       const p2 = await getCustomerClient(tenant, 2);
       const now = await tenant.clock.get();
