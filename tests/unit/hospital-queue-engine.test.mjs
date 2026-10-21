@@ -141,6 +141,12 @@ export class HospitalDepartmentQueueEngine {
           return this.currentConsultation;
         }
       }
+
+      // E8: Doctor would otherwise idle and no Standby patient fits the gap -> Pull in early patient!
+      this.currentConsultation = this.bookings.find(b => b.id === nextOnTime.id);
+      this.currentConsultation.consultationStart = currentTime;
+      this.currentConsultation.pulledInEarly = true;
+      return this.currentConsultation;
     } else if (standbyPatient) {
       // D4 & D7: No waiting queue patient; Standby patient goes in immediately. Doctor never idle!
       this.currentConsultation = this.bookings.find(b => b.id === standbyPatient.id);
@@ -446,4 +452,35 @@ describe('Hospital Vertical: Queue Logic & Arrival Tags Test Suite', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // SCENARIO E8: Early patient idle prevention when no standby fits
+  // ---------------------------------------------------------------------------
+  describe('E8. Early patient idle prevention when no standby fits', () => {
+    it('E8: pulls in early patient when doctor would otherwise idle and no standby patient fits the gap', () => {
+      const engine = new HospitalDepartmentQueueEngine('Neurology');
+      const currTime = '2026-10-20T07:30:00+05:30';
+
+      engine.addBooking({
+        id: 'P_EARLY',
+        patientName: 'Early Booked',
+        slotStart: '2026-10-20T07:50:00+05:30',
+        durationMinutes: 15
+      });
+      engine.checkInPatient('P_EARLY', '2026-10-20T07:25:00+05:30');
+
+      engine.addBooking({
+        id: 'P_STANDBY_LONG',
+        patientName: 'Standby Long',
+        slotStart: '2026-10-20T07:00:00+05:30',
+        durationMinutes: 25
+      });
+      engine.checkInPatient('P_STANDBY_LONG', '2026-10-20T07:28:00+05:30');
+
+      const dispatched = engine.dispatchNext(currTime);
+      assert.ok(dispatched, 'Patient dispatched to prevent idleness');
+      assert.equal(dispatched.id, 'P_EARLY', 'Early patient pulled in since standby did not fit gap');
+    });
+  });
+
 });
+
