@@ -58,7 +58,10 @@ export class SubAgentReportWriter {
     md += `|:---|:---|:---:|:---|\n`;
 
     for (const r of this.results) {
-      const badge = r.status === 'PASS' ? '✅ PASS' : r.status === 'FAIL' ? '❌ FAIL' : '⚠️ BLOCKED';
+      let badge = '⚠️ BLOCKED';
+      if (r.status === 'PASS') badge = '✅ PASS';
+      else if (r.status === 'FAIL') badge = '❌ FAIL';
+      else if (r.status === 'NOT RUN' || r.status === 'NOTRUN') badge = 'NOT RUN';
       const cleanEvidence = (r.evidence || '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
       md += `| **${r.caseId}** | ${r.scenario} | ${badge} | ${cleanEvidence} |\n`;
     }
