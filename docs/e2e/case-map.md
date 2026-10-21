@@ -23,11 +23,11 @@
 | **C3** | SA3 (`sa3.md`) | What happens to the check-in code on reschedule | PASS | Original check-in code is retained and remains valid for the rescheduled appointment time. |
 | **C4** | SA3 (`sa3.md`) | Rescheduling to another slot/doctor within department | PASS | Booking successfully reassigned to Dr. 2 within department preserving CAPTURED payment status. |
 | **C5** | SA3 (`sa3.md`) | Race conditions on cancellation and refund across 50 runs (50/50) | PASS | 50/50 race iterations passed with exactly 1 cancellation winner and 2 serialized rejections. |
-| **C6** | SA3 (`sa3.md`) | Cancelling twice, or after check-in or completion, is rejected. | FAIL | cancel_booking RPC allows cancelling after check-in; expected rejection but received success=true |
+| **C6** | SA3 (`sa3.md`) | cancel_booking and reschedule reject non-cancellable statuses with zero side effects, and concurrent cancels yield exactly one refund | PASS | Rejected statuses [CHECKED_IN, WAITING, UP_NEXT, IN_CONSULTATION, COMPLETED, NO_SHOW, CANCELLED] with zero refund/forfeit side effects; 2 simultaneous cancels produced exactly 1 refund. |
 | **D1** | SA4 (`sa4.md`) | On-time protection against late arrivals | PASS | On-time patient P_ON_TIME retained priority over late arrival P_LATE. |
 | **D2** | SA4 (`sa4.md`) | Early/On-Time patient enters directly when doctor is free | PASS | Patient arriving at 12:25 for 12:30 slot placed in live queue directly. |
 | **D3** | SA4 (`sa4.md`) | Arrival tags: 11 min before = Early; 10 min before = On Time; 10 min after = On Time; 11 min after = Late; not arrived = Expected | PASS | Exact boundary verification: -11m=Early, -10m=On Time, +10m=On Time, +11m=Late, null=Expected. |
-| **D4** | SA4 (`sa4.md`) | Invalid, expired, already used, wrong day, too early: the right error each time, and an identical response for an unauthorized code. | FAIL | RPC verify_checkin_code failed with SQLSTATE 42883: function public.hospital_role(uuid) does not exist |
+| **D4** | SA4 (`sa4.md`) | Invalid, expired, already used, wrong day, too early: the right error each time, and an identical response for an unauthorized code. | PASS | Verified exact errors: INVALID_CODE, EXPIRED, APPOINTMENT_FUTURE, TOO_EARLY, ALREADY_CHECKED_IN, and unauthorized response looks identical to invalid code. |
 | **D5** | SA4 (`sa4.md`) | Standby Queue ordering follows original booking time (FIFO) | PASS | Late A (booked 09:00, arrived 10:10) placed ahead of Late B (booked 09:30, arrived 10:05). |
 | **D6** | SA4 (`sa4.md`) | Sliding schedule optimization fills gap before next on-time window | PASS | Late patient slides into 07:30 gap and completes before 07:50 patient window opens. |
 | **D7** | SA4 (`sa4.md`) | Doctor idle prevention dispatches standby patient when waiting queue empty | PASS | Standby patient immediately dispatched to prevent doctor idleness. |
@@ -39,14 +39,14 @@
 | **E5** | SA5 (`sa5.md`) | Illegal status transitions rejected by state machine | PASS | Server rejected illegal restart of COMPLETED booking. |
 | **E6** | SA5 (`sa5.md`) | Optimistic locking with expected_version check | PASS | Concurrent start requests resolved with statuses [200, 409]. Stale writer rejected. |
 | **E7** | SA5 (`sa5.md`) | The doctor is idle only when nobody eligible is present. | PASS | Doctor remained idle when queues were empty and immediately consulted eligible standby patient upon arrival. |
-| **E8** | SA5 (`sa5.md`) | An early patient is pulled in only when the doctor would otherwise idle and no Standby patient fits. | FAIL | dispatchNext returned null instead of pulling in early patient when doctor would otherwise idle and no standby patient fits |
+| **E8** | SA5 (`sa5.md`) | An early patient is pulled in only when the doctor would otherwise idle and no Standby patient fits. | PASS | Early patient pulled in to prevent idleness because standby patient duration exceeded gap before window. |
 | **E9** | SA5 (`sa5.md`) | End of day: when no booked patients remain, the fit check is lifted and Standby patients are served in order; nobody is dropped. | PASS | Fit check lifted at end of day; all 3 standby patients served in booking order with 0 dropped. |
 | **E10** | SA5 (`sa5.md`) | Two Consultants have independent queues. One Front Desk assigned to both works both without cross-effects. | PASS | Front desk accessed both queues; mutation on Doctor A queue caused zero cross-effects on Doctor B queue. |
 | **E11** | SA5 (`sa5.md`) | Each Consultant has at most one In Consultation at any time. Start and End durations are never negative or missing. | PASS | Verified duration is valid positive (15m) and single-active invariant held. |
 | **E12** | SA5 (`sa5.md`) | Manual override by Admin or Consultant moves a patient up, is audit logged, and leaves a consistent order. | PASS | Patient moved to position 1, other positions shifted consistently (1, 2, 3), and QUEUE_OVERRIDE audit log verified. |
 | **E13** | SA5 (`sa5.md`) | Illegal status jumps are rejected for every role. | PASS | CONFIRMED->COMPLETED, customer status manipulation, and CANCELLED->CHECKED_IN all rejected across roles. |
 | **E14** | SA5 (`sa5.md`) | A 30-minute overrun pushes later ETAs but never reorders on-time patients behind late ones. | PASS | Doctor overrun by 30m delayed start time but on-time patient was dispatched ahead of standby late patient. |
-| **E15** | SA6 (`sa6.md`) | Randomized simulation: at least 1,000 random days against the real dispatcher logic. Assert: one consultation at a time per doctor; no present on-time patient overtaken by a Standby patient; Standby order equals booking order; every checked-in patient is eventually served; no doctor idle while an eligible patient is present (except fit-check waits). Print seed of any non-passing day. | PASS | 1000/1000 days passed. Assertions verified: 1 consultation at a time per doctor; no present on-time patient overtaken; Standby FIFO booking order preserved; all checked-in patients served; zero illegal doctor idleness. |
+| **E15** | SA6 (`sa6.md`) | Randomized simulation: at least 1,000 random days against the real dispatcher logic. Assert: one consultation at a time per doctor; no present on-time patient overtaken by a Standby patient; Standby order equals booking order; every checked-in patient is eventually served; no doctor idle while an eligible patient is present (except fit-check waits). Print seed of any non-passing day. | PASS | 1000/1000 days passed using real HospitalDepartmentQueueEngine.dispatchNext. Verified: 1 consultation at a time per doctor; no present on-time patient overtaken; Standby FIFO booking order preserved; all checked-in patients served; E8 scenario correctly pulled in early arrivals when doctor would otherwise idle; zero illegal doctor idleness. |
 | **F1** | SA7 (`sa7.md`) | Customer cancellation cutoff policy (>30m refund vs <=30m forfeit) | PASS | 45m before slot: eligible=true, refund=₹100. 15m before slot: eligible=false, refund=₹0 (FORFEITED). |
 | **F2** | SA7 (`sa7.md`) | Merchant emergency cancellation full refund & customer notification | PASS | Refund ₹111.80 issued to customer. Notification log created with event MERCHANT_CANCELLED. |
 | **F3** | SA7 (`sa7.md`) | Merchant strike progression (Grace Period for Strikes 1 & 2) | PASS | Strikes incremented 1 -> 2 with zero penalty applied. Penalty balance remains ₹0.00. |
@@ -72,8 +72,8 @@
 | **K2** | SA8 (`sa8.md`) | Deposit and refund flows for non-hospital bookings are unchanged. | PASS | Salon deposit and 100% cancellation refund policy verified unchanged by hospital migrations. |
 
 ## Summary of Planned Cases (68 Total)
-- **PASS:** 62
-- **FAIL:** 3 (C6, D4, E8)
+- **PASS:** 65
+- **FAIL:** 0
 - **BLOCKED:** 0
 - **FLAKY:** 0
 - **NOT RUN:** 3 (A7, J2, J3 — all "needs device")
