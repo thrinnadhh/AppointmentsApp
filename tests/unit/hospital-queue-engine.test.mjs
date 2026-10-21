@@ -11,161 +11,15 @@ import assert from 'node:assert/strict';
  * Uses an injectable Mock Clock (IST Asia/Kolkata).
  */
 
-// =============================================================================
-// PURE SPECIFICATION LOGIC HARNESS (Injectable Clock & Queue Engine)
-// =============================================================================
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  calculateArrivalTag,
+  HospitalDepartmentQueueEngine,
+} from '../../packages/shared/src/queue-engine.ts';
 
-export function calculateArrivalTag(slotStart, arrivedAt) {
-  if (!arrivedAt) return 'Expected';
-  const startMs = new Date(slotStart).getTime();
-  const arrMs = new Date(arrivedAt).getTime();
-  const diffMinutes = (arrMs - startMs) / (60 * 1000);
-
-  if (diffMinutes < -10) return 'Early';
-  if (diffMinutes >= -10 && diffMinutes <= 10) return 'On Time';
-  return 'Late';
-}
-
-export class HospitalDepartmentQueueEngine {
-  constructor(departmentName = 'Neurology') {
-    this.departmentName = departmentName;
-    this.bookings = []; // { id, patientName, slotStart, slotEnd, durationMinutes, isCheckedIn, arrivedAt, originalBookingTime }
-    this.currentConsultation = null;
-    this.completedAppointments = [];
-  }
-
-  addBooking(booking) {
-    this.bookings.push({
-      ...booking,
-      durationMinutes: booking.durationMinutes || 15,
-      originalBookingTime: booking.originalBookingTime || booking.slotStart,
-      isCheckedIn: Boolean(booking.isCheckedIn),
-      arrivedAt: booking.arrivedAt || null,
-    });
-    // Sort bookings by slotStart
-    this.bookings.sort((a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime());
-  }
-
-  checkInPatient(bookingId, checkinTime) {
-    const b = this.bookings.find(item => item.id === bookingId);
-    if (!b) throw new Error(`Booking ${bookingId} not found`);
-    b.isCheckedIn = true;
-    b.arrivedAt = checkinTime;
-    b.arrivalTag = calculateArrivalTag(b.slotStart, checkinTime);
-  }
-
-  /**
-   * Evaluates the current state of queues at simulated `currentTime`
-   * Returns: { liveQueue, waitingQueue, standbyQueue, doctorStatus, currentServing }
-   */
-  evaluateQueues(currentTime) {
-    const currMs = new Date(currentTime).getTime();
-
-    // 1. Separate checked-in patients into Waiting Queue vs Standby Queue
-    const checkedIn = this.bookings.filter(b => b.isCheckedIn && !b.isCompleted && b !== this.currentConsultation);
-    
-    // On-Time & Early go to Waiting Queue
-    const waitingQueue = checkedIn.filter(b => {
-      const tag = b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt);
-      return tag === 'On Time' || tag === 'Early';
-    }).sort((a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime());
-
-    // Late arrivals go to Standby Queue (Ordered by ORIGINAL BOOKING TIME / FIFO)
-    const standbyQueue = checkedIn.filter(b => {
-      const tag = b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt);
-      return tag === 'Late';
-    }).sort((a, b) => new Date(a.originalBookingTime).getTime() - new Date(b.originalBookingTime).getTime());
-
-    // 2. Doctor Consultation Dispatch Logic
-    let doctorStatus = 'IDLE';
-    let currentServing = this.currentConsultation;
-
-    // Next upcoming on-time patient
-    const nextOnTime = waitingQueue[0];
-    const nextOnTimeStartMs = nextOnTime ? new Date(nextOnTime.slotStart).getTime() : null;
-
-    // Check if on-time patient has reached their +/- 10 min window
-    const isOnTimeInWindow = nextOnTime && (currMs >= nextOnTimeStartMs - 10 * 60 * 1000);
-
-    return {
-      departmentName: this.departmentName,
-      doctorStatus,
-      currentServing,
-      liveQueue: currentServing ? [currentServing] : (waitingQueue.slice(0, 1)),
-      upNext: currentServing ? (waitingQueue[0] || standbyQueue[0] || null) : (waitingQueue[1] || standbyQueue[0] || null),
-      waitingQueue,
-      standbyQueue,
-      nextOnTime,
-      isOnTimeInWindow,
-      nextOnTimeStartMs
-    };
-  }
-
-  /**
-   * Dispatches the next patient to consultation according to strict hospital rules
-   */
-  dispatchNext(currentTime) {
-    const state = this.evaluateQueues(currentTime);
-    const currMs = new Date(currentTime).getTime();
-
-    if (this.currentConsultation) {
-      // Doctor is currently busy
-      return this.currentConsultation;
-    }
-
-    const nextOnTime = state.waitingQueue[0];
-    const standbyPatient = state.standbyQueue[0];
-
-    if (nextOnTime) {
-      const startMs = new Date(nextOnTime.slotStart).getTime();
-      const inWindow = currMs >= (startMs - 10 * 60 * 1000);
-
-      if (inWindow) {
-        // D1 & D2: On-time patient in window goes straight in! Never delayed by standby.
-        this.currentConsultation = this.bookings.find(b => b.id === nextOnTime.id);
-        this.currentConsultation.consultationStart = currentTime;
-        return this.currentConsultation;
-      }
-
-      // Next on-time patient is early and NOT yet in window (e.g. booked at 7:50, current time 7:30)
-      // Can a standby patient fit into the gap?
-      if (standbyPatient) {
-        const standbyDurationMs = (standbyPatient.durationMinutes || 15) * 60 * 1000;
-        // D6: Does standby patient finish before or at on-time window start?
-        const onTimeWindowStartMs = startMs - 10 * 60 * 1000;
-        if (currMs + standbyDurationMs <= onTimeWindowStartMs + 10 * 60 * 1000) {
-          // Fits safely in gap! Late patient takes free time
-          this.currentConsultation = this.bookings.find(b => b.id === standbyPatient.id);
-          this.currentConsultation.consultationStart = currentTime;
-          this.currentConsultation.servedInGap = true;
-          return this.currentConsultation;
-        }
-      }
-
-      // E8: Doctor would otherwise idle and no Standby patient fits the gap -> Pull in early patient!
-      this.currentConsultation = this.bookings.find(b => b.id === nextOnTime.id);
-      this.currentConsultation.consultationStart = currentTime;
-      this.currentConsultation.pulledInEarly = true;
-      return this.currentConsultation;
-    } else if (standbyPatient) {
-      // D4 & D7: No waiting queue patient; Standby patient goes in immediately. Doctor never idle!
-      this.currentConsultation = this.bookings.find(b => b.id === standbyPatient.id);
-      this.currentConsultation.consultationStart = currentTime;
-      return this.currentConsultation;
-    }
-
-    return null;
-  }
-
-  completeCurrentConsultation(finishTime) {
-    if (this.currentConsultation) {
-      this.currentConsultation.isCompleted = true;
-      this.currentConsultation.completedAt = finishTime;
-      this.completedAppointments.push(this.currentConsultation);
-      this.currentConsultation = null;
-    }
-  }
-}
+// Re-export for any legacy test references
+export { calculateArrivalTag, HospitalDepartmentQueueEngine };
 
 // =============================================================================
 // TEST SUITE: SCENARIOS C1 & D1 TO D12
@@ -479,6 +333,58 @@ describe('Hospital Vertical: Queue Logic & Arrival Tags Test Suite', () => {
       const dispatched = engine.dispatchNext(currTime);
       assert.ok(dispatched, 'Patient dispatched to prevent idleness');
       assert.equal(dispatched.id, 'P_EARLY', 'Early patient pulled in since standby did not fit gap');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // ARCHITECTURE INVARIANT: No second copy of queue logic in tests
+  // ---------------------------------------------------------------------------
+  describe('Architecture Invariant: Single Source of Truth for Queue Logic', () => {
+    it('proves no second copy of HospitalDepartmentQueueEngine or calculateArrivalTag exists in tests', () => {
+      const testsDir = path.resolve('tests');
+      const files = [];
+
+      function walk(dir) {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            walk(fullPath);
+          } else if (/\.(mjs|js|ts)$/.test(entry.name)) {
+            files.push(fullPath);
+          }
+        }
+      }
+      walk(testsDir);
+
+      const targetClassName = 'HospitalDepartment' + 'QueueEngine';
+      const targetFuncName = 'calculateArrival' + 'Tag';
+      const classPattern = new RegExp('\\bclass\\s+' + targetClassName + '\\b');
+      const funcPattern = new RegExp('\\bfunction\\s+' + targetFuncName + '\\s*\\(');
+
+      const duplicateClassDefs = [];
+      const duplicateFuncDefs = [];
+
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        // Match actual class or function declarations
+        if (classPattern.test(content)) {
+          duplicateClassDefs.push(path.relative(process.cwd(), file));
+        }
+        if (funcPattern.test(content)) {
+          duplicateFuncDefs.push(path.relative(process.cwd(), file));
+        }
+      }
+
+      assert.deepEqual(
+        duplicateClassDefs,
+        [],
+        `Found duplicate class definitions in tests: ${duplicateClassDefs.join(', ')}. All tests must import from packages/shared/src/queue-engine.ts!`
+      );
+      assert.deepEqual(
+        duplicateFuncDefs,
+        [],
+        `Found duplicate function definitions in tests: ${duplicateFuncDefs.join(', ')}. All tests must import from packages/shared/src/queue-engine.ts!`
+      );
     });
   });
 

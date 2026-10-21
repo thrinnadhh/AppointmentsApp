@@ -17,7 +17,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
-import { HospitalDepartmentQueueEngine } from '../../unit/hospital-queue-engine.test.mjs';
+import { HospitalDepartmentQueueEngine } from '../../../packages/shared/src/queue-engine.ts';
 
 // Seedable PRNG (Mulberry32)
 function createPrng(seed) {

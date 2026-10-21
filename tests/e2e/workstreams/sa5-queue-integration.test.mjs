@@ -26,7 +26,7 @@ import fs from 'fs';
 import { createTenant, cleanupTenant } from '../harness/tenant-factory.mjs';
 import { SubAgentReportWriter } from '../harness/report-writer.mjs';
 import { getAdminClient, getConsultantClient, getFrontDeskClient, getCustomerClient } from '../harness/client-helpers.mjs';
-import { HospitalDepartmentQueueEngine } from '../../unit/hospital-queue-engine.test.mjs';
+import { HospitalDepartmentQueueEngine } from '../../../packages/shared/src/queue-engine.ts';
 
 function getDbConfig() {
   const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');

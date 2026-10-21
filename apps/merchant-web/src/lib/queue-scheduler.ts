@@ -14,6 +14,22 @@
  * 7. Monthly Patient Attendance: Present (Green) vs Absent / No-Show (Red) calendar matrix.
  */
 
+import {
+  HospitalDepartmentQueueEngine,
+  calculateArrivalTag,
+  type ArrivalTag,
+  type HospitalQueueBooking,
+  type EvaluatedQueuesState,
+} from '@appointments/shared/queue-engine';
+
+export {
+  HospitalDepartmentQueueEngine,
+  calculateArrivalTag,
+  type ArrivalTag,
+  type HospitalQueueBooking,
+  type EvaluatedQueuesState,
+};
+
 export type QueueSlotType = 
   | 'SERVING'
   | 'BOOKED_PRESENT'
@@ -95,6 +111,9 @@ export interface ScheduledBookingInput {
   customer_id?: string | null;
   queue_position?: number | null;
   is_late_queue?: boolean;
+  checked_in_at?: string | null;
+  arrival_tag?: ArrivalTag;
+  original_booking_time?: string;
 }
 
 /**
@@ -120,10 +139,37 @@ export function buildRollingTenSlotQueue(params: {
     .filter((b) => b.status !== 'CANCELLED' && b.status !== 'NO_SHOW')
     .sort((a, b) => new Date(a.slot_start).getTime() - new Date(b.slot_start).getTime());
 
+  // Model underlying HospitalDepartmentQueueEngine instance
+  const departmentEngine = new HospitalDepartmentQueueEngine('OPD Clinic');
+  for (const b of activeBookings) {
+    departmentEngine.addBooking({
+      id: b.id,
+      patientName: b.customer_name || undefined,
+      slotStart: b.slot_start,
+      slotEnd: b.slot_end,
+      durationMinutes: slotDurationMinutes,
+      isCheckedIn: Boolean(b.is_present || b.status === 'CHECKED_IN'),
+      arrivedAt: b.checked_in_at || null,
+      originalBookingTime: b.original_booking_time || b.slot_start,
+      arrivalTag: b.arrival_tag,
+    });
+  }
+
   // Separate normal on-time bookings from late/standby queue bookings
-  const lateQueuePatients = activeBookings.filter(
-    (b) => Boolean(b.is_late_queue || (b.queue_position && !b.is_present))
-  );
+  const lateQueuePatients = activeBookings.filter((b) => {
+    if (b.is_late_queue) return true;
+    if (b.queue_position && !b.is_present) return true;
+    if (b.arrival_tag === 'Late') return true;
+    if (b.checked_in_at) {
+      return calculateArrivalTag(b.slot_start, b.checked_in_at) === 'Late';
+    }
+    return false;
+  }).sort((a, b) => {
+    const aTime = new Date(a.original_booking_time || a.slot_start).getTime();
+    const bTime = new Date(b.original_booking_time || b.slot_start).getTime();
+    return aTime - bTime;
+  });
+
   const onTimeBookings = activeBookings.filter(
     (b) => !lateQueuePatients.some((l) => l.id === b.id)
   );

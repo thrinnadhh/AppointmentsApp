@@ -3,16 +3,16 @@
 **Sub-Agent Workstream:** SA5
 **Status:** ALL PASS
 **Summary:** 14/14 passed (100.0%), 0 failed, 0 blocked
-**Execution Time:** 2026-10-21T07:58:17.947Z
+**Execution Time:** 2026-10-21T08:26:50.886Z
 
 ## 1. Test Case Execution Results
 
 | Case ID | Scenario | Status | Evidence |
 |:---|:---|:---:|:---|
-| **E1** | Consultant starts consultation moving booking to IN_CONSULTATION | ✅ PASS | Booking d45efda9-1abd-46ee-8e35-5fcc9a49d87e transitioned from CHECKED_IN to IN_CONSULTATION. |
+| **E1** | Consultant starts consultation moving booking to IN_CONSULTATION | ✅ PASS | Booking d189a6e0-ad51-4ef2-81eb-0967b8ce74d5 transitioned from CHECKED_IN to IN_CONSULTATION. |
 | **E2** | Single active consultation constraint across 50 runs (idx_single_in_consultation_per_doctor) | ✅ PASS | 50/50 runs passed. Doctor strictly prohibited from having >1 concurrent IN_CONSULTATION. |
-| **E3** | End consultation moving booking to COMPLETED | ✅ PASS | Booking ee509ec7-539b-49b3-80e1-f93342448212 transitioned to COMPLETED status. |
-| **E4** | Front Desk admits patient to queue | ✅ PASS | Booking e47bd146-eec5-4ee6-9e7a-d6d50b2c53dd admitted successfully by assigned Front Desk. |
+| **E3** | End consultation moving booking to COMPLETED | ✅ PASS | Booking 7a13a12c-3616-4ad2-8b4c-893857999f6e transitioned to COMPLETED status. |
+| **E4** | Front Desk admits patient to queue | ✅ PASS | Booking b30bd42c-8bed-43b0-8c05-07930e44e6ea admitted successfully by assigned Front Desk. |
 | **E5** | Illegal status transitions rejected by state machine | ✅ PASS | Server rejected illegal restart of COMPLETED booking. |
 | **E6** | Optimistic locking with expected_version check | ✅ PASS | Concurrent start requests resolved with statuses [200, 409]. Stale writer rejected. |
 | **E7** | The doctor is idle only when nobody eligible is present. | ✅ PASS | Doctor remained idle when queues were empty and immediately consulted eligible standby patient upon arrival. |
