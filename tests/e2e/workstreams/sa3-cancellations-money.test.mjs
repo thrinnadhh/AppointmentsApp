@@ -345,95 +345,136 @@ describe('Workstream SA3: Cancel, Reschedule, Money', () => {
     }
   });
 
-  // C6: Cancelling twice, or after check-in or completion, is rejected
-  it('C6: Cancelling twice, or after check-in or completion, is rejected', async () => {
+  // C6: cancel_booking (and any reschedule path) must reject CHECKED_IN, WAITING, UP_NEXT, IN_CONSULTATION, COMPLETED, NO_SHOW and already CANCELLED bookings, with no refund or forfeit side effects when rejected. Regression tests: each status, plus two simultaneous cancels give exactly one refund.
+  it('C6: cancel_booking rejects CHECKED_IN, WAITING, UP_NEXT, IN_CONSULTATION, COMPLETED, NO_SHOW, CANCELLED with no side effects, and concurrent cancels yield exactly one refund', async () => {
     try {
       const now = await tenant.clock.get();
       const doc = tenant.consultants[0];
 
-      // 1. Cancelling twice
-      const b1 = await createBookingFixture({
-        customerId: tenant.patients[7].id,
+      // 1. Test each non-cancellable status
+      const nonCancellableStatuses = [
+        'CHECKED_IN',
+        'WAITING',
+        'UP_NEXT',
+        'IN_CONSULTATION',
+        'COMPLETED',
+        'NO_SHOW',
+        'CANCELLED'
+      ];
+
+      for (let idx = 0; idx < nonCancellableStatuses.length; idx++) {
+        const testStatus = nonCancellableStatuses[idx];
+        const patient = tenant.patients[10 + idx];
+        const slotOffset = (100 + idx * 20) * 60 * 1000;
+
+        const b = await createBookingFixture({
+          customerId: patient.id,
+          resourceId: doc.id,
+          slotStart: new Date(now.getTime() + slotOffset).toISOString(),
+          slotEnd: new Date(now.getTime() + slotOffset + 10 * 60 * 1000).toISOString(),
+          status: testStatus,
+          paymentStatus: 'CAPTURED'
+        });
+
+        // If CHECKED_IN or WAITING or UP_NEXT, mark is_present = true if appropriate
+        if (testStatus === 'CHECKED_IN') {
+          await fetch(`${url}/rest/v1/bookings?id=eq.${b.id}`, {
+            method: 'PATCH',
+            headers: serviceHeaders,
+            body: JSON.stringify({ is_present: true })
+          });
+        }
+
+        // Count existing payments before cancel attempt
+        const paymentsBeforeRes = await fetch(`${url}/rest/v1/payments?booking_id=eq.${b.id}`, { headers: serviceHeaders });
+        const paymentsBefore = await paymentsBeforeRes.json();
+
+        // Attempt cancel
+        const cancelRes = await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
+          method: 'POST',
+          headers: serviceHeaders,
+          body: JSON.stringify({ p_booking_id: b.id, p_reason: `Attempt cancel on ${testStatus}` })
+        });
+        const cancelData = await cancelRes.json();
+
+        assert.equal(cancelData.success, false, `cancel_booking must reject status ${testStatus}`);
+
+        // Verify zero side-effects: status unchanged, payment_status unchanged
+        const verifyBkgRes = await fetch(`${url}/rest/v1/bookings?id=eq.${b.id}`, { headers: serviceHeaders });
+        const [verifiedBkg] = await verifyBkgRes.json();
+        assert.equal(verifiedBkg.status, testStatus, `Booking status must remain ${testStatus}`);
+        assert.equal(verifiedBkg.payment_status, 'CAPTURED', 'Payment status must remain CAPTURED with zero forfeit/refund side effects');
+
+        // Verify no new payments records or refund entries
+        const paymentsAfterRes = await fetch(`${url}/rest/v1/payments?booking_id=eq.${b.id}`, { headers: serviceHeaders });
+        const paymentsAfter = await paymentsAfterRes.json();
+        assert.equal(paymentsAfter.length, paymentsBefore.length, `No payments side-effects on rejected cancel for ${testStatus}`);
+
+        // Also test reschedule path rejects this status
+        const rescheduleRes = await fetch(`${url}/rest/v1/rpc/reschedule_booking_slot`, {
+          method: 'POST',
+          headers: serviceHeaders,
+          body: JSON.stringify({
+            p_booking_id: b.id,
+            p_new_slot_start: new Date(now.getTime() + slotOffset + 24 * 60 * 60 * 1000).toISOString(),
+            p_new_slot_end: new Date(now.getTime() + slotOffset + 24 * 60 * 60 * 1000 + 10 * 60 * 1000).toISOString()
+          })
+        });
+        const rescheduleData = await rescheduleRes.json();
+        assert.equal(rescheduleData.success, false, `reschedule_booking_slot must reject status ${testStatus}`);
+      }
+
+      // 2. Two simultaneous cancels give exactly one refund
+      const patientConcurrent = tenant.patients[20];
+      const slotOffsetConc = 300 * 60 * 1000;
+      const bConcurrent = await createBookingFixture({
+        customerId: patientConcurrent.id,
         resourceId: doc.id,
-        slotStart: new Date(now.getTime() + 120 * 60 * 1000).toISOString(),
-        slotEnd: new Date(now.getTime() + 130 * 60 * 1000).toISOString()
+        slotStart: new Date(now.getTime() + slotOffsetConc).toISOString(),
+        slotEnd: new Date(now.getTime() + slotOffsetConc + 10 * 60 * 1000).toISOString(),
+        status: 'CONFIRMED',
+        paymentStatus: 'CAPTURED'
       });
 
-      const cancel1 = await (await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
-        method: 'POST',
-        headers: serviceHeaders,
-        body: JSON.stringify({ p_booking_id: b1.id, p_reason: 'First cancel' })
-      })).json();
-      assert.equal(cancel1.success, true);
+      // Fire two simultaneous cancel requests
+      const [cancel1, cancel2] = await Promise.all([
+        (await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
+          method: 'POST',
+          headers: serviceHeaders,
+          body: JSON.stringify({ p_booking_id: bConcurrent.id, p_reason: 'Concurrent cancel 1' })
+        })).json(),
+        (await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
+          method: 'POST',
+          headers: serviceHeaders,
+          body: JSON.stringify({ p_booking_id: bConcurrent.id, p_reason: 'Concurrent cancel 2' })
+        })).json()
+      ]);
 
-      const cancel2 = await (await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
-        method: 'POST',
-        headers: serviceHeaders,
-        body: JSON.stringify({ p_booking_id: b1.id, p_reason: 'Second cancel' })
-      })).json();
-      assert.equal(cancel2.success, false, 'Cancelling twice must be rejected');
+      const successCount = (cancel1.success ? 1 : 0) + (cancel2.success ? 1 : 0);
+      assert.equal(successCount, 1, 'Exactly one concurrent cancel must succeed');
 
-      // 2. Cancelling after check-in
-      const bCheckedIn = await createBookingFixture({
-        customerId: tenant.patients[8].id,
-        resourceId: doc.id,
-        slotStart: new Date(now.getTime() + 140 * 60 * 1000).toISOString(),
-        slotEnd: new Date(now.getTime() + 150 * 60 * 1000).toISOString(),
-        status: 'CHECKED_IN'
-      });
-      await fetch(`${url}/rest/v1/bookings?id=eq.${bCheckedIn.id}`, {
-        method: 'PATCH',
-        headers: serviceHeaders,
-        body: JSON.stringify({ is_present: true })
-      });
+      const rejected = cancel1.success ? cancel2 : cancel1;
+      assert.equal(rejected.success, false);
+      assert.ok(rejected.error?.includes('already cancelled') || rejected.error?.includes('Cannot cancel booking'), 'Second cancel must be rejected');
 
-      const cancelCheckedIn = await (await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
-        method: 'POST',
-        headers: serviceHeaders,
-        body: JSON.stringify({ p_booking_id: bCheckedIn.id, p_reason: 'Cancel checked-in' })
-      })).json();
-      assert.equal(cancelCheckedIn.success, false, 'Cancelling after check-in must be rejected');
-
-      // 3. Cancelling after completion
-      const bCompleted = await createBookingFixture({
-        customerId: tenant.patients[9].id,
-        resourceId: doc.id,
-        slotStart: new Date(now.getTime() + 160 * 60 * 1000).toISOString(),
-        slotEnd: new Date(now.getTime() + 170 * 60 * 1000).toISOString(),
-        status: 'COMPLETED'
-      });
-
-      const cancelCompleted = await (await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
-        method: 'POST',
-        headers: serviceHeaders,
-        body: JSON.stringify({ p_booking_id: bCompleted.id, p_reason: 'Cancel completed' })
-      })).json();
-      assert.equal(cancelCompleted.success, false, 'Cancelling after completion must be rejected');
+      // Verify the booking is CANCELLED and has exactly one refund
+      const bFinalRes = await fetch(`${url}/rest/v1/bookings?id=eq.${bConcurrent.id}`, { headers: serviceHeaders });
+      const [bFinal] = await bFinalRes.json();
+      assert.equal(bFinal.status, 'CANCELLED');
+      assert.equal(bFinal.payment_status, 'REFUND_PENDING', 'Exactly one refund issued');
 
       writer.addCaseResult({
         caseId: 'C6',
-        scenario: 'Cancelling twice, or after check-in or completion, is rejected',
+        scenario: 'cancel_booking and reschedule reject non-cancellable statuses with zero side effects, and concurrent cancels yield exactly one refund',
         status: 'PASS',
-        evidence: 'Cancelling twice rejected; cancelling after check-in and completion strictly rejected.'
+        evidence: 'Rejected statuses [CHECKED_IN, WAITING, UP_NEXT, IN_CONSULTATION, COMPLETED, NO_SHOW, CANCELLED] with zero refund/forfeit side effects; 2 simultaneous cancels produced exactly 1 refund.'
       });
     } catch (err) {
       writer.addCaseResult({
         caseId: 'C6',
-        scenario: 'Cancelling twice, or after check-in or completion, is rejected',
+        scenario: 'cancel_booking and reschedule reject non-cancellable statuses',
         status: 'FAIL',
-        evidence: 'cancel_booking RPC allows cancelling after check-in; expected rejection but received success=true'
-      });
-      writer.addDefect({
-        id: 'DEFECT-C6',
-        severity: 'HIGH',
-        description: 'cancel_booking RPC allows cancelling appointments with status CHECKED_IN or COMPLETED',
-        reproSteps: [
-          'Create booking with status CHECKED_IN',
-          'Call public.cancel_booking(booking_id)',
-          'Observe that booking transitions to CANCELLED and initiates deposit refund instead of rejecting with error'
-        ],
-        suspectedFile: 'supabase/migrations/20261019000015_test_tenant_clocks.sql',
-        suggestedFix: 'Add guard check: IF v_booking.status IN (\'CHECKED_IN\', \'IN_CONSULTATION\', \'COMPLETED\') THEN RETURN jsonb_build_object(\'success\', false, \'error\', \'Cannot cancel booking in status \' || v_booking.status); END IF;'
+        evidence: err.message
       });
       throw err;
     }

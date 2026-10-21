@@ -18,8 +18,8 @@ export const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
   HELD: ['PENDING_PAYMENT', 'CONFIRMED', 'CANCELLED'],
   PENDING_PAYMENT: ['CONFIRMED', 'CANCELLED'],
   CONFIRMED: ['CHECKED_IN', 'IN_CONSULTATION', 'CANCELLED', 'NO_SHOW', 'CONFIRMED'],
-  CHECKED_IN: ['IN_CONSULTATION', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
-  IN_CONSULTATION: ['COMPLETED', 'CANCELLED'],
+  CHECKED_IN: ['IN_CONSULTATION', 'COMPLETED', 'NO_SHOW'],
+  IN_CONSULTATION: ['COMPLETED'],
   COMPLETED: [], // Terminal!
   CANCELLED: [], // Terminal!
   NO_SHOW: [],   // Terminal!
@@ -253,17 +253,20 @@ export async function getAccessContext(
         allowedModules = ['appointments', 'queue_schedule', 'check_in'];
       }
     } else if (role === 'consultant') {
-      // Find doctor resource department
-      const { data: docRes } = await supabaseAdmin
-        .from('resources')
+      // Find doctor resource department from department_members
+      const { data: memberRow } = await supabaseAdmin
+        .from('department_members')
         .select('department_id, departments(id, name, allowed_modules)')
-        .eq('provider_id', resolvedMerchantId)
+        .eq('merchant_id', resolvedMerchantId)
         .eq('user_id', caller.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (docRes) {
-        departmentId = docRes.department_id;
-        const dept = docRes.departments as any;
+      if (memberRow) {
+        departmentId = memberRow.department_id;
+        const dept = memberRow.departments as any;
         departmentName = dept?.name || null;
       }
       allowedModules = ['appointments', 'queue_schedule', 'patients'];
