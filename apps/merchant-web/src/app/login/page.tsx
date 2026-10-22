@@ -386,24 +386,29 @@ export default function LoginPage() {
           </div>
 
           {/* Alerts */}
-          {errorMsg && (
-            <div style={{
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-error-bg)',
-              border: '1px solid var(--color-error-border)',
-              padding: '12px 14px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 10,
-              marginBottom: 20,
-            }}>
-              <AlertCircle style={{ width: 16, height: 16, flexShrink: 0, color: 'var(--color-error)', marginTop: 1 }} />
-              <div>
-                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-error)', margin: '0 0 2px' }}>Authentication failed</p>
-                <p style={{ fontSize: 12, color: '#9f1239', margin: 0, lineHeight: 1.5 }}>{errorMsg}</p>
+          {errorMsg && (() => {
+            const isNotice = errorMsg.includes('Google OAuth is not configured');
+            return (
+              <div style={{
+                borderRadius: 'var(--radius-md)',
+                background: isNotice ? 'var(--color-accent-amber-bg)' : 'var(--color-error-bg)',
+                border: `1px solid ${isNotice ? '#fde68a' : 'var(--color-error-border)'}`,
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                marginBottom: 20,
+              }}>
+                <AlertCircle style={{ width: 16, height: 16, flexShrink: 0, color: isNotice ? 'var(--color-accent-amber)' : 'var(--color-error)', marginTop: 1 }} />
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: isNotice ? 'var(--color-accent-amber)' : 'var(--color-error)', margin: '0 0 2px' }}>
+                    {isNotice ? 'Local Development Notice' : 'Authentication failed'}
+                  </p>
+                  <p style={{ fontSize: 12, color: isNotice ? '#92400e' : '#9f1239', margin: 0, lineHeight: 1.5 }}>{errorMsg}</p>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {successMsg && (
             <div style={{
@@ -687,8 +692,8 @@ export default function LoginPage() {
                 </div>
                 <ol style={{ listStyle: 'none', padding: 0, margin: '0 0 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {[
-                    { n: 1, label: 'Create Account:', desc: 'Register with your official business email address and password.' },
-                    { n: 2, label: 'Venue Profile & Setup:', desc: 'Enter your clinic or business details, timings, and storefront photo.' },
+                    { n: 1, label: 'Step 1: Admin Account (Current Screen):', desc: 'Enter your name, email, and password in the form above and click Create Account.' },
+                    { n: 2, label: 'Step 2: Venue Details & Storefront Photo (Next Screen):', desc: 'Enter your hospital/business name, contact, address, and upload your storefront picture.' },
                   ].map(({ n, label, desc }) => (
                     <li key={n} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                       <span style={{
