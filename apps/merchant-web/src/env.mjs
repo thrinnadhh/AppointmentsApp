@@ -159,13 +159,13 @@ const isBuildPhase =
   process.env.npm_lifecycle_event === 'build' ||
   Boolean(process.env.CI && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN);
 
-// Production Security Assertion: Never permit payment mocking in production environments
-if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
-  throw new Error('FATAL SECURITY VIOLATION: ALLOW_MOCK_PAYMENTS cannot be set to "true" in production environments.');
-}
-
 // Auto-validate on startup unless explicitly opted out (e.g. for lightweight scripts or build phase)
 if (process.env.SKIP_ENV_VALIDATION !== 'true') {
+  // Production Security Assertion: Never permit payment mocking in production environments
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
+    throw new Error('FATAL SECURITY VIOLATION: ALLOW_MOCK_PAYMENTS cannot be set to "true" in production environments.');
+  }
+
   validateEnv(process.env, {
     throwOnError: process.env.NODE_ENV === 'production' && !isBuildPhase,
     isProduction: process.env.NODE_ENV === 'production' && !isBuildPhase,
