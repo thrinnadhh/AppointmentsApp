@@ -182,11 +182,23 @@ type RawBookingRow = Database['public']['Tables']['bookings']['Row'] & {
   providers?: { name: string } | null;
 };
 
-export async function fetchMerchantBookings(providerId?: string): Promise<MerchantBookingWithDetails[]> {
+export async function fetchMerchantBookings(
+  providerId?: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<MerchantBookingWithDetails[]> {
   let query = (supabase as any)
     .from('merchant_bookings')
-    .select('*')
-    .order('slot_start', { ascending: true });
+    .select(`
+      id, reference_code, customer_id, provider_id, resource_id, department_id,
+      slot_start, slot_end, status, payment_status, deposit_amount, platform_fee,
+      total_amount, is_followup, followup_original_booking_id, gateway_payment_id,
+      hold_expires_at, created_at, updated_at, attachment_url, reminder_1h_sent_at,
+      reminder_30m_sent_at, is_present, customer_name, customer_phone, no_show_count,
+      resource_name, resource_type, provider_name
+    `)
+    .order('slot_start', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (providerId) {
     query = query.eq('provider_id', providerId);
@@ -654,7 +666,7 @@ export async function fetchTenantContextData(): Promise<{
     }
   }
 
-  // 4. Fallback for test/demo merchant accounts (e.g. naturals.salon or svims.clinic)
+  // 4. Fallback for test/demo merchant accounts (e.g. naturals.salon or svims.clinic) — non-production only
   if (!activeProvider && !isSuperAdmin && userProfile.user.email) {
     const userEmail = userProfile.user.email.toLowerCase().trim();
     let fallbackId: string | null = null;
@@ -662,10 +674,14 @@ export async function fetchTenantContextData(): Promise<{
 
     if (userEmail.includes('salon') || userEmail.includes('naturals')) {
       fallbackId = '44444444-4444-4444-4444-444444444444';
-      fallbackMock = { ...SALON_MERCHANT_PROVIDER, resources: SALON_RESOURCES };
+      if (process.env.NODE_ENV !== 'production') {
+        fallbackMock = { ...SALON_MERCHANT_PROVIDER, resources: SALON_RESOURCES };
+      }
     } else if (userEmail.includes('svims') || userEmail.includes('clinic') || userEmail.includes('dental')) {
       fallbackId = '11111111-1111-1111-1111-111111111111';
-      fallbackMock = { ...INITIAL_MERCHANT_PROVIDER, resources: INITIAL_RESOURCES };
+      if (process.env.NODE_ENV !== 'production') {
+        fallbackMock = { ...INITIAL_MERCHANT_PROVIDER, resources: INITIAL_RESOURCES };
+      }
     }
 
     if (fallbackId) {
@@ -677,11 +693,11 @@ export async function fetchTenantContextData(): Promise<{
           .single();
         if (fallbackProv) {
           activeProvider = fallbackProv as unknown as (Provider & { resources?: Resource[] });
-        } else if (fallbackMock) {
+        } else if (process.env.NODE_ENV !== 'production' && fallbackMock) {
           activeProvider = fallbackMock;
         }
       } catch {
-        if (fallbackMock) {
+        if (process.env.NODE_ENV !== 'production' && fallbackMock) {
           activeProvider = fallbackMock;
         }
       }
@@ -1054,7 +1070,7 @@ export async function fetchAdminAuditLogs(
       console.warn('Error fetching admin audit logs via RPC, falling back to direct table:', error.message);
       const { data: tableData, error: tableError } = await supabaseAdmin
         .from('admin_audit_logs' as any)
-        .select('*')
+        .select('id, admin_id, admin_email, action, target_type, target_id, details, ip_address, created_at')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -1146,20 +1162,47 @@ export async function fetchAdminAppLogs(
     const supabaseAdmin = getSupabaseAdmin();
     let query = supabaseAdmin
       .from('app_logs' as any)
-      .select('*')
+      .select('id, created_at, platform, level, severity, category, source, component, message, stack_trace, error_code, metadata, device_info, user_id, session_id, role, city_id, vertical, appointment_id, app_version, platform_os, device_model, environment, fingerprint, duplicate_count')
       .order('created_at', { ascending: false });
 
-    if (filter.level && filter.level !== 'all') {
+    if (filter.severity && filter.severity !== 'all') {
+      query = query.eq('severity', filter.severity);
+    } else if (filter.level && filter.level !== 'all') {
       query = query.eq('level', filter.level);
     }
-    if (filter.platform && filter.platform !== 'all') {
+
+    if (filter.category && filter.category !== 'all') {
+      query = query.eq('category', filter.category);
+    }
+
+    if (filter.source && filter.source !== 'all') {
+      query = query.eq('source', filter.source);
+    } else if (filter.platform && filter.platform !== 'all') {
       query = query.eq('platform', filter.platform);
     }
+
     if (filter.component && filter.component.trim()) {
       query = query.ilike('component', `%${filter.component.trim()}%`);
     }
+
     if (filter.search && filter.search.trim()) {
-      query = query.or(`message.ilike.%${filter.search.trim()}%,component.ilike.%${filter.search.trim()}%`);
+      query = query.or(`message.ilike.%${filter.search.trim()}%,component.ilike.%${filter.search.trim()}%,fingerprint.ilike.%${filter.search.trim()}%`);
+    }
+
+    // Date range filtering
+    if (filter.dateRange && filter.dateRange !== 'all') {
+      const now = new Date();
+      let cutoff: Date;
+      if (filter.dateRange === 'today') {
+        cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (filter.dateRange === '24h') {
+        cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      } else if (filter.dateRange === '7d') {
+        cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else {
+        cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+      query = query.gte('created_at', cutoff.toISOString());
     }
 
     const limit = Math.min(Math.max(filter.limit || 50, 1), 200);
@@ -1173,7 +1216,27 @@ export async function fetchAdminAppLogs(
       return [];
     }
 
-    return (data || []) as unknown as AppLogEntry[];
+    // Fetch duplicate occurrences from crash_alert_dedup for badges
+    const rawLogs = (data || []) as unknown as AppLogEntry[];
+    const fingerprints = Array.from(new Set(rawLogs.map((l) => l.fingerprint).filter(Boolean))) as string[];
+    
+    let dedupMap: Record<string, number> = {};
+    if (fingerprints.length > 0) {
+      const { data: dedupRows } = await supabaseAdmin
+        .from('crash_alert_dedup' as any)
+        .select('fingerprint, occurrence_count')
+        .in('fingerprint', fingerprints);
+      if (dedupRows) {
+        dedupMap = Object.fromEntries(
+          (dedupRows as any[]).map((r) => [r.fingerprint, r.occurrence_count || 1])
+        );
+      }
+    }
+
+    return rawLogs.map((log) => ({
+      ...log,
+      duplicate_count: log.fingerprint ? (dedupMap[log.fingerprint] || 1) : 1,
+    }));
   } catch (err) {
     console.warn('Error in fetchAdminAppLogs:', err);
     return [];

@@ -224,7 +224,7 @@ export async function fetchNearbyProviders(
     const { data, error } = await supabase.rpc('get_nearby_providers', {
       p_lat: lat,
       p_lng: lng,
-      p_category: categoryId && categoryId !== 'all' ? resolveCategoryId(categoryId) : null,
+      p_category: categoryId && categoryId !== 'all' ? resolveCategoryId(categoryId) : undefined,
       p_radius_meters: radiusMeters,
     });
 
@@ -372,18 +372,26 @@ interface CustomerBookingRow extends Booking {
   resources?: { name: string } | null;
 }
 
-export async function fetchCustomerBookingsFromSupabase(customerId: string = '99999999-9999-9999-9999-999999999991') {
+export async function fetchCustomerBookingsFromSupabase(
+  customerId: string = '99999999-9999-9999-9999-999999999991',
+  limit: number = 20,
+  offset: number = 0
+) {
   try {
-    // Fast direct query to Supabase (50ms response)
+    // Fast direct query to Supabase (50ms response, paginated with explicit columns)
     const { data, error } = await supabase
       .from('bookings')
       .select(`
-        *,
+        id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
+        status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
+        checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
+        created_at, updated_at,
         providers ( name ),
         resources ( name )
       `)
       .eq('customer_id', customerId)
-      .order('slot_start', { ascending: false });
+      .order('slot_start', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (!error && data && data.length > 0) {
       const rows = data as unknown as CustomerBookingRow[];
@@ -1351,9 +1359,9 @@ export async function syncCustomerProfile(
 ): Promise<{ success: boolean; profile?: unknown; error?: string }> {
   try {
     const { data, error } = await supabase.rpc('sync_customer_profile', {
-      p_full_name: fullName || null,
-      p_phone: phone || null,
-      p_email: email || null,
+      p_full_name: fullName || undefined,
+      p_phone: phone || undefined,
+      p_email: email || undefined,
     });
 
     if (error) {
@@ -1532,6 +1540,7 @@ export async function joinCityWaitlist(
     const cityName = cityId.charAt(0).toUpperCase() + cityId.slice(1).toLowerCase();
     const { error } = await supabase.from('city_waitlist').insert({
       city_id: cityId,
+      city_name: cityName,
       contact_info: contactInfo.trim(),
       role_interest: roleInterest,
       notes: notes || null,
