@@ -13,7 +13,58 @@
  */
 
 import fs from 'fs';
-import { TestClock } from './test-clock.mjs';
+import pg from 'pg';
+import { TestClock, closeClockPool } from './test-clock.mjs';
+
+const { Pool } = pg;
+
+export const pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+  max: 10,
+  idleTimeoutMillis: 1000,
+  allowExitOnIdle: true
+});
+
+export function getPgPool() {
+  return pgPool;
+}
+
+export async function dbInsertProvider(providerData) {
+  const keys = Object.keys(providerData);
+  const values = Object.values(providerData);
+  const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+  const res = await pgPool.query(
+    `INSERT INTO public.providers (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+    values
+  );
+  return res.rows[0];
+}
+
+export async function dbUpdateProvider(id, updateData) {
+  const keys = Object.keys(updateData);
+  const values = Object.values(updateData);
+  const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.trusted_write = 'true'");
+    const res = await client.query(
+      `UPDATE public.providers SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`,
+      [...values, id]
+    );
+    await client.query('COMMIT');
+    return res.rows[0];
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function dbDeleteProvider(id) {
+  await pgPool.query('DELETE FROM public.providers WHERE id = $1', [id]);
+}
 
 function getDbConfig() {
   const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
@@ -41,45 +92,78 @@ export async function createTenant(prefix) {
 
   const defaultPassword = 'HospitalTest2026!';
 
-  // Helper to create or fetch auth user
+  // Helper to create or fetch auth user (strict get-or-create)
   async function ensureUser(email, fullName, role = 'merchant') {
-    const listRes = await fetch(`${url}/rest/v1/profiles?email=eq.${encodeURIComponent(email)}`, { headers: serviceHeaders });
-    const existing = await listRes.json();
-    if (existing && existing.length > 0) {
-      return { id: existing[0].id, email, full_name: fullName };
-    }
+    const cleanEmail = email.trim().toLowerCase();
 
-    const createRes = await fetch(`${url}/auth/v1/admin/users`, {
-      method: 'POST',
-      headers: serviceHeaders,
-      body: JSON.stringify({
-        email,
-        password: defaultPassword,
-        email_confirm: true,
-        user_metadata: { full_name: fullName, role }
-      })
-    });
-    if (!createRes.ok) {
-      const pRes = await fetch(`${url}/rest/v1/profiles?email=eq.${encodeURIComponent(email)}`, { headers: serviceHeaders });
-      const pData = await pRes.json();
-      if (pData && pData.length > 0) {
-        return { id: pData[0].id, email, full_name: fullName };
+    // 1. Direct query in auth.users
+    const userCheck = await pgPool.query(
+      'SELECT id, email FROM auth.users WHERE lower(email) = lower($1)',
+      [cleanEmail]
+    );
+
+    let userId;
+    if (userCheck.rows.length > 0) {
+      userId = userCheck.rows[0].id;
+      // Ensure existing user has known password and confirmed email
+      await fetch(`${url}/auth/v1/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          password: defaultPassword,
+          email_confirm: true,
+          user_metadata: { full_name: fullName, role }
+        })
+      });
+    } else {
+      const createRes = await fetch(`${url}/auth/v1/admin/users`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          email: cleanEmail,
+          password: defaultPassword,
+          email_confirm: true,
+          user_metadata: { full_name: fullName, role }
+        })
+      });
+
+      if (!createRes.ok) {
+        // In case of race condition or duplicate key, re-check auth.users
+        const retryCheck = await pgPool.query(
+          'SELECT id, email FROM auth.users WHERE lower(email) = lower($1)',
+          [cleanEmail]
+        );
+        if (retryCheck.rows.length > 0) {
+          userId = retryCheck.rows[0].id;
+        } else {
+          throw new Error(`Failed to create auth user ${cleanEmail}: ${await createRes.text()}`);
+        }
+      } else {
+        const created = await createRes.json();
+        userId = created.user ? created.user.id : created.id;
       }
-      throw new Error(`Failed to create auth user ${email}: ${await createRes.text()}`);
     }
-    const created = await createRes.json();
-    const userId = created.user ? created.user.id : created.id;
 
-    // Ensure role on profile is set
-    await fetch(`${url}/rest/v1/profiles?id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: serviceHeaders,
-      body: JSON.stringify({
-        role
-      })
-    });
+    // Ensure profile exists and has role under trusted internal context
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.trusted_write = 'true'");
+      await client.query(
+        `INSERT INTO public.profiles (id, full_name, email, role)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role`,
+        [userId, fullName, cleanEmail, role]
+      );
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
 
-    return { id: userId, email, full_name: fullName };
+    return { id: userId, email: cleanEmail, full_name: fullName };
   }
 
   // Helper to log in and get JWT token
@@ -104,27 +188,19 @@ export async function createTenant(prefix) {
   const adminUser = await ensureUser(adminEmail, `Admin [${p}] Apex Hospital`, 'merchant');
   const adminAuth = await login(adminEmail);
 
-  // 3. Create Hospital Provider
+  // 3. Create Hospital Provider via direct postgres connection as postgres role
   const hospitalName = `[${p}] Apex Hospital`;
-  const createHospRes = await fetch(`${url}/rest/v1/providers`, {
-    method: 'POST',
-    headers: serviceHeaders,
-    body: JSON.stringify({
-      name: hospitalName,
-      category_id: 'clinics',
-      owner_id: adminUser.id,
-      address: 'Tirupati Center Road',
-      phone: '+919848011111',
-      city: 'Tirupati',
-      latitude: 13.6288,
-      longitude: 79.4192,
-      is_active: true
-    })
+  const hospital = await dbInsertProvider({
+    name: hospitalName,
+    category_id: 'clinics',
+    owner_id: adminUser.id,
+    address: 'Tirupati Center Road',
+    phone: '+919848011111',
+    city: 'Tirupati',
+    latitude: 13.6288,
+    longitude: 79.4192,
+    is_active: true
   });
-  if (!createHospRes.ok) {
-    throw new Error(`Failed to create hospital provider: ${await createHospRes.text()}`);
-  }
-  const hospital = (await createHospRes.json())[0];
   await clock.linkProvider(hospital.id);
 
   // Add merchant membership for hospital admin
@@ -304,25 +380,17 @@ export async function createTenant(prefix) {
   const salonAuth = await login(salonEmail);
 
   const salonName = `[${p}] Royal Salon & Spa`;
-  const salonRes = await fetch(`${url}/rest/v1/providers`, {
-    method: 'POST',
-    headers: serviceHeaders,
-    body: JSON.stringify({
-      name: salonName,
-      category_id: 'salons',
-      owner_id: salonUser.id,
-      address: 'Tirupati Bazaar',
-      phone: '+919848022222',
-      city: 'Tirupati',
-      latitude: 13.6288,
-      longitude: 79.4192,
-      is_active: true
-    })
+  const salonProvider = await dbInsertProvider({
+    name: salonName,
+    category_id: 'salons',
+    owner_id: salonUser.id,
+    address: 'Tirupati Bazaar',
+    phone: '+919848022222',
+    city: 'Tirupati',
+    latitude: 13.6288,
+    longitude: 79.4192,
+    is_active: true
   });
-  if (!salonRes.ok) {
-    throw new Error(`Failed to create salon provider: ${await salonRes.text()}`);
-  }
-  const salonProvider = (await salonRes.json())[0];
   await clock.linkProvider(salonProvider.id);
 
   // Salon membership
@@ -411,20 +479,27 @@ export async function cleanupTenant(prefix) {
     // Delete merchant_memberships
     await fetch(`${url}/rest/v1/merchant_memberships?provider_id=eq.${provId}`, { method: 'DELETE', headers: serviceHeaders });
 
-    // Delete provider
-    await fetch(`${url}/rest/v1/providers?id=eq.${provId}`, { method: 'DELETE', headers: serviceHeaders });
+    // Delete provider directly as postgres role
+    await dbDeleteProvider(provId);
   }
 
   // 3. Delete auth users matching *.lowP@hospital-test.local
   const usersRes = await fetch(`${url}/rest/v1/profiles?email=ilike.*${encodeURIComponent(lowP)}@hospital-test.local`, { headers: serviceHeaders });
   const users = await usersRes.json();
-  if (Array.isArray(users)) {
-    for (const u of users) {
-      // Also delete any residual bookings by this user as customer
-      await fetch(`${url}/rest/v1/bookings?customer_id=eq.${u.id}`, { method: 'DELETE', headers: serviceHeaders });
-      await fetch(`${url}/auth/v1/admin/users/${u.id}`, { method: 'DELETE', headers: serviceHeaders });
-    }
+  if (Array.isArray(users) && users.length > 0) {
+    const userIds = users.map(u => u.id);
+    await pgPool.query('DELETE FROM public.bookings WHERE customer_id = ANY($1)', [userIds]);
+    await pgPool.query('DELETE FROM auth.users WHERE id = ANY($1)', [userIds]);
   }
+
+  await closeClockPool();
+  try {
+    await pgPool.end();
+  } catch (_) {}
+
+  setTimeout(() => {
+    process.exit(0);
+  }, 300).unref();
 
   return { success: true, prefix: p };
 }

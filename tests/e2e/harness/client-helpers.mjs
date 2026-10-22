@@ -111,8 +111,8 @@ export class RoleClient {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({
-        bookingId,
-        expectedVersion
+        booking_id: bookingId,
+        expected_version: expectedVersion
       })
     });
     return {
@@ -126,8 +126,8 @@ export class RoleClient {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({
-        bookingId,
-        expectedVersion
+        booking_id: bookingId,
+        expected_version: expectedVersion
       })
     });
     return {
@@ -141,8 +141,8 @@ export class RoleClient {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({
-        bookingId,
-        expectedVersion
+        booking_id: bookingId,
+        expected_version: expectedVersion
       })
     });
     return {

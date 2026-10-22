@@ -43,6 +43,8 @@ export interface HospitalQueueBooking {
   completedAt?: string;
   servedInGap?: boolean;
   pulledInEarly?: boolean;
+  isExpired?: boolean;
+  expiredAt?: string;
   [key: string]: any;
 }
 
@@ -54,6 +56,7 @@ export interface EvaluatedQueuesState {
   upNext: HospitalQueueBooking | null;
   waitingQueue: HospitalQueueBooking[];
   standbyQueue: HospitalQueueBooking[];
+  expiredStandbyQueue: HospitalQueueBooking[];
   nextOnTime: HospitalQueueBooking | null;
   isOnTimeInWindow: boolean;
   nextOnTimeStartMs: number | null;
@@ -75,12 +78,14 @@ export class HospitalDepartmentQueueEngine {
   bookings: HospitalQueueBooking[];
   currentConsultation: HospitalQueueBooking | null;
   completedAppointments: HospitalQueueBooking[];
+  standbyExpiryMinutes: number | null;
 
-  constructor(departmentName = 'Neurology') {
+  constructor(departmentName = 'Neurology', standbyExpiryMinutes: number | null = null) {
     this.departmentName = departmentName;
     this.bookings = [];
     this.currentConsultation = null;
     this.completedAppointments = [];
+    this.standbyExpiryMinutes = standbyExpiryMinutes;
   }
 
   addBooking(booking: HospitalQueueBooking): void {
@@ -105,7 +110,7 @@ export class HospitalDepartmentQueueEngine {
 
   /**
    * Evaluates the current state of queues at simulated currentTime
-   * Returns: { liveQueue, waitingQueue, standbyQueue, doctorStatus, currentServing, upNext, ... }
+   * Returns: { liveQueue, waitingQueue, standbyQueue, expiredStandbyQueue, doctorStatus, currentServing, upNext, ... }
    */
   evaluateQueues(currentTime: string): EvaluatedQueuesState {
     const currMs = new Date(currentTime).getTime();
@@ -124,7 +129,7 @@ export class HospitalDepartmentQueueEngine {
       .sort((a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime());
 
     // Late arrivals go to Standby Queue (Ordered by ORIGINAL BOOKING TIME / FIFO)
-    const standbyQueue = checkedIn
+    const lateArrivals = checkedIn
       .filter((b) => {
         const tag = b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt);
         return tag === 'Late';
@@ -134,6 +139,22 @@ export class HospitalDepartmentQueueEngine {
           new Date(a.originalBookingTime || a.slotStart).getTime() -
           new Date(b.originalBookingTime || b.slotStart).getTime()
       );
+
+    // 45-Minute Standby Auto-Expiry: Filter out standby patients whose wait time exceeds threshold
+    const standbyQueue: HospitalQueueBooking[] = [];
+    const expiredStandbyQueue: HospitalQueueBooking[] = [];
+
+    for (const b of lateArrivals) {
+      const arrivalMs = new Date(b.arrivedAt || b.slotStart).getTime();
+      const waitMinutes = (currMs - arrivalMs) / (60 * 1000);
+      if (this.standbyExpiryMinutes !== null && waitMinutes > this.standbyExpiryMinutes) {
+        b.isExpired = true;
+        b.expiredAt = currentTime;
+        expiredStandbyQueue.push(b);
+      } else {
+        standbyQueue.push(b);
+      }
+    }
 
     // 2. Doctor Consultation Dispatch Logic
     const doctorStatus: 'IDLE' | 'BUSY' = this.currentConsultation ? 'BUSY' : 'IDLE';
@@ -158,6 +179,7 @@ export class HospitalDepartmentQueueEngine {
         : waitingQueue[1] || standbyQueue[0] || null,
       waitingQueue,
       standbyQueue,
+      expiredStandbyQueue,
       nextOnTime,
       isOnTimeInWindow,
       nextOnTimeStartMs,

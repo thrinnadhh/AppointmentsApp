@@ -2,23 +2,23 @@
 node_modules/
 .pnpm-store/
 
-# Next.js
+# Next.js & Build Outputs
 .next/
 out/
 build/
 dist/
+**/build/
+**/bin/
+**/.kotlin/
+.vercel
 
 # Expo / React Native
 .expo/
 .expo-shared/
 
 # Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.env
+.env*
+!.env.example
 
 # TypeScript
 *.tsbuildinfo
@@ -49,8 +49,6 @@ supabase/.temp/
 .opencode.json
 opencode*.json
 .mcp.json
-.vercel
-.env*
 .gradle/
 audit/
 strix_runs/
@@ -65,4 +63,4 @@ scripts/e2e-*.mjs
 *.log
 strix-*.log
 .venv/
-
+scratch/

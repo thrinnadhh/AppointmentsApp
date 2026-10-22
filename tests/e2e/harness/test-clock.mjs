@@ -6,6 +6,22 @@
  */
 
 import fs from 'fs';
+import pg from 'pg';
+
+const { Pool } = pg;
+
+const pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+  max: 5,
+  idleTimeoutMillis: 1000,
+  allowExitOnIdle: true
+});
+
+export async function closeClockPool() {
+  try {
+    await pgPool.end();
+  } catch (_) {}
+}
 
 function getDbConfig() {
   const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
@@ -95,34 +111,19 @@ export class TestClock {
    * Links a provider UUID to this tenant's virtual clock.
    */
   async linkProvider(providerId) {
-    const res = await fetch(`${this.url}/rest/v1/test_provider_clock_links`, {
-      method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify({
-        provider_id: providerId,
-        tenant_prefix: this.prefix
-      })
-    });
-    if (!res.ok && res.status !== 409) {
-      // 409 Conflict is fine if already linked
-      const errText = await res.text();
-      if (!errText.includes('duplicate key')) {
-        throw new Error(`Failed to link provider ${providerId} to clock ${this.prefix}: ${errText}`);
-      }
-    }
+    await pgPool.query(
+      `INSERT INTO public.test_provider_clock_links (provider_id, tenant_prefix)
+       VALUES ($1, $2)
+       ON CONFLICT (provider_id) DO UPDATE SET tenant_prefix = EXCLUDED.tenant_prefix`,
+      [providerId, this.prefix]
+    );
   }
 
   /**
    * Cleans up clock records for this tenant.
    */
   async cleanup() {
-    await fetch(`${this.url}/rest/v1/test_tenant_clocks?tenant_prefix=eq.${this.prefix}`, {
-      method: 'DELETE',
-      headers: this.headers
-    });
-    await fetch(`${this.url}/rest/v1/test_provider_clock_links?tenant_prefix=eq.${this.prefix}`, {
-      method: 'DELETE',
-      headers: this.headers
-    });
+    await pgPool.query('DELETE FROM public.test_provider_clock_links WHERE tenant_prefix = $1', [this.prefix]);
+    await pgPool.query('DELETE FROM public.test_tenant_clocks WHERE tenant_prefix = $1', [this.prefix]);
   }
 }
