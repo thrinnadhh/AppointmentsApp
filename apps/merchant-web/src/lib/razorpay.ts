@@ -141,6 +141,9 @@ export function isTestMode(): boolean {
  * Strictly forbidden in production; requires explicit opt-in via ALLOW_MOCK_PAYMENTS.
  */
 export function canMockPayments(): boolean {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
+    throw new Error('FATAL SECURITY VIOLATION: ALLOW_MOCK_PAYMENTS cannot be set to "true" in production environments.');
+  }
   return process.env.ALLOW_MOCK_PAYMENTS === 'true' && process.env.NODE_ENV !== 'production';
 }
 
