@@ -40,10 +40,34 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export function getApiBaseUrl(): string {
+  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  const isRelease = (typeof __DEV__ !== 'undefined' && !__DEV__) || process.env.NODE_ENV === 'production';
+
+  if (isRelease) {
+    if (!envUrl) {
+      throw new Error(
+        'Missing EXPO_PUBLIC_API_BASE_URL: Release and production mobile builds must have EXPO_PUBLIC_API_BASE_URL explicitly configured. LAN and cleartext fallbacks are strictly prohibited.'
+      );
+    }
+    if (!envUrl.startsWith('https://')) {
+      throw new Error(
+        `Insecure EXPO_PUBLIC_API_BASE_URL: Release builds require HTTPS, got "${envUrl}". Cleartext and LAN endpoints are prohibited in production.`
+      );
+    }
+    return envUrl;
+  }
+
+  // Development environment: use environment variable if set, otherwise local development server
+  if (envUrl) {
+    return envUrl;
+  }
+
   if (typeof window !== 'undefined' && window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:3000';
   }
-  return process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.31.112:3000';
+
+  // Prohibit hardcoded LAN IPs; default strictly to localhost in development
+  return 'http://localhost:3000';
 }
 
 
