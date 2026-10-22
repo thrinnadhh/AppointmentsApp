@@ -228,13 +228,19 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Rule 6: Check for active or future appointments
-    const { count: bookingCount } = await supabaseAdmin
+    const { data: deptBookings } = await supabaseAdmin
       .from('bookings')
-      .select('id', { count: 'exact', head: true })
+      .select('id, status, hold_expires_at')
       .eq('department_id', id)
       .in('status', ['HELD', 'CONFIRMED', 'CHECKED_IN']);
 
-    if (bookingCount && bookingCount > 0) {
+    const nowMs = Date.now();
+    const activeDeptBookings = (deptBookings || []).filter(
+      (b) => b.status !== 'HELD' || (b.hold_expires_at && new Date(b.hold_expires_at).getTime() >= nowMs)
+    );
+    const bookingCount = activeDeptBookings.length;
+
+    if (bookingCount > 0) {
       return NextResponse.json(
         {
           success: false,

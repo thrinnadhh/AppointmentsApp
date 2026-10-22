@@ -237,15 +237,21 @@ export async function POST(req: NextRequest) {
         const slotDayStart = new Date(`${istDateStr}T00:00:00.000+05:30`);
         const slotDayEnd = new Date(`${istDateStr}T23:59:59.999+05:30`);
 
-        const { count: slotDayBookingsCount } = await supabaseAdmin
+        const { data: slotDayBookings } = await supabaseAdmin
           .from('bookings')
-          .select('id', { count: 'exact', head: true })
+          .select('id, status, hold_expires_at')
           .eq('provider_id', resData.provider_id)
           .gte('slot_start', slotDayStart.toISOString())
           .lte('slot_start', slotDayEnd.toISOString())
           .in('status', ['HELD', 'CONFIRMED', 'COMPLETED']);
 
-        if ((slotDayBookingsCount || 0) >= dailyLimit) {
+        const nowMs = Date.now();
+        const activeDailyBookings = (slotDayBookings || []).filter(
+          (b) => b.status !== 'HELD' || (b.hold_expires_at && new Date(b.hold_expires_at).getTime() >= nowMs)
+        );
+        const slotDayBookingsCount = activeDailyBookings.length;
+
+        if (slotDayBookingsCount >= dailyLimit) {
           if (slotKey) await releaseSlotLock(slotKey, lockToken);
           return NextResponse.json<CreateHoldResponse>(
             {
