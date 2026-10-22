@@ -233,7 +233,12 @@ export default function CustomerDetailsModal({
                   style={styles.textInput}
                   value={phone}
                   onChangeText={(val) => {
-                    setPhone(val);
+                    let cleaned = val.replace(/[^0-9+\s-]/g, '');
+                    if (cleaned.includes('+')) {
+                      const hasLeading = cleaned.startsWith('+');
+                      cleaned = (hasLeading ? '+' : '') + cleaned.replace(/\+/g, '');
+                    }
+                    setPhone(cleaned);
                     if (errorMessage) setErrorMessage(null);
                   }}
                   placeholder="+91 99999 99991"

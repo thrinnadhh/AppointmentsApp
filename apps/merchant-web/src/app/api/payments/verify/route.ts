@@ -105,14 +105,117 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if slot hold has expired
-    if (booking.status === 'HELD' && booking.hold_expires_at) {
-      if (new Date(booking.hold_expires_at).getTime() < Date.now()) {
-        return NextResponse.json<VerifyRazorpayPaymentResponse>(
-          { success: false, error: 'Slot hold has expired and is no longer held' },
-          { status: 410 }
+    // Check if slot hold has expired or was cancelled
+    const isHoldExpired =
+      (booking.status === 'HELD' && booking.hold_expires_at && new Date(booking.hold_expires_at).getTime() < Date.now()) ||
+      booking.status === 'CANCELLED';
+
+    if (isHoldExpired) {
+      // Late payment arrived after hold expiry:
+      // Capture payment into ledger and transition booking to REFUND_PENDING, then initiate automatic refund.
+      const depositInInr = Number(booking.deposit_amount || 0);
+      await supabaseAdmin.from('payments').upsert(
+        {
+          booking_id: booking.id,
+          gateway_payment_id: razorpay_payment_id,
+          amount: depositInInr,
+          currency: 'INR',
+          status: 'CAPTURED',
+          metadata: {
+            reason: 'Late payment after hold expiry',
+            order_id: razorpay_order_id,
+            captured_at: new Date().toISOString(),
+          },
+        },
+        { onConflict: 'gateway_payment_id' }
+      );
+
+      await supabaseAdmin
+        .from('bookings')
+        .update({
+          status: 'CANCELLED',
+          payment_status: 'REFUND_PENDING',
+          gateway_payment_id: razorpay_payment_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', booking.id);
+
+      // Trigger automatic refund
+      try {
+        const { initiateRazorpayRefund } = await import('@/lib/razorpay');
+        const refundResult = await initiateRazorpayRefund({
+          paymentId: razorpay_payment_id,
+          amount: Math.round(depositInInr * 100),
+          notes: {
+            booking_id: booking.id,
+            reason: 'Hold expired before payment completion',
+          },
+        });
+
+        await supabaseAdmin
+          .from('bookings')
+          .update({
+            payment_status: 'REFUNDED',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id);
+
+        await supabaseAdmin.from('payments').insert({
+          booking_id: booking.id,
+          gateway_payment_id: refundResult.id,
+          amount: depositInInr,
+          currency: 'INR',
+          status: 'REFUNDED',
+          metadata: {
+            original_payment_id: razorpay_payment_id,
+            reason: 'Hold expired before payment completion',
+          },
+        });
+      } catch (refundErr) {
+        const errorMsg = refundErr instanceof Error ? refundErr.message : String(refundErr);
+        await supabaseAdmin
+          .from('bookings')
+          .update({ payment_status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+          .eq('id', booking.id);
+
+        await supabaseAdmin
+          .from('payments')
+          .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+          .eq('gateway_payment_id', razorpay_payment_id);
+
+        console.error(
+          '\n====================================================================\n' +
+          '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
+          `Booking ID: ${booking.id}\n` +
+          `Payment ID: ${razorpay_payment_id}\n` +
+          `Refund Amount: ₹${depositInInr}\n` +
+          `Error: ${errorMsg}\n` +
+          'Action: Manual investigation required in Razorpay Dashboard.\n' +
+          '====================================================================\n'
         );
+
+        await supabaseAdmin.from('admin_audit_logs').insert({
+          admin_id: null,
+          action: 'REFUND_MANUAL_INTERVENTION_REQUIRED',
+          target_type: 'bookings',
+          target_id: booking.id,
+          details: {
+            error: errorMsg,
+            gateway_payment_id: razorpay_payment_id,
+            refund_amount: depositInInr,
+            reason: 'Hold expired before payment completion',
+            failed_at: new Date().toISOString(),
+          },
+        });
       }
+
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        {
+          success: false,
+          error: 'Slot hold has expired and is no longer held. An automatic deposit refund has been initiated to your original payment method.',
+        },
+        { status: 410 }
+      );
     }
 
     // Strictly assert booking.gateway_order_id is non-null and strictly equals the incoming razorpay_order_id

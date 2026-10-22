@@ -653,10 +653,24 @@ export default function VenuesPage() {
                     id="venue-phone"
                     name="venuePhone"
                     aria-label="Phone Number"
-                    type="text"
+                    type="tel"
+                    inputMode="tel"
+                    pattern="[0-9+\s-]*"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      let cleaned = e.target.value.replace(/[^0-9+\s-]/g, '');
+                      if (cleaned.includes('+')) {
+                        const hasLeading = cleaned.startsWith('+');
+                        cleaned = (hasLeading ? '+' : '') + cleaned.replace(/\+/g, '');
+                      }
+                      setPhone(cleaned);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="+91 877 2233445"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />

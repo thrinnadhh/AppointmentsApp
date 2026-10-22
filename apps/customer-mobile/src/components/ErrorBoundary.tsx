@@ -28,12 +28,13 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    mobileLogger.forComponent('MobileErrorBoundary').error(
+    mobileLogger.forComponent('MobileErrorBoundary', 'UI_CRASH').critical(
       error.message || 'React Native component crashed',
       error,
       {
         componentStack: errorInfo.componentStack,
-      }
+      },
+      'UI_CRASH'
     );
   }
 

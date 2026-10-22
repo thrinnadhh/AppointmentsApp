@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       if (orderId) {
         const { data: bByOrder } = await supabaseAdmin
           .from('bookings')
-          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, gateway_payment_id, gateway_order_id')
+          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, gateway_payment_id, gateway_order_id, hold_expires_at')
           .eq('gateway_order_id', orderId)
           .maybeSingle();
         booking = bByOrder;
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       if (!booking && bookingIdFromNotes) {
         const { data: bById } = await supabaseAdmin
           .from('bookings')
-          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, gateway_payment_id, gateway_order_id')
+          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, gateway_payment_id, gateway_order_id, hold_expires_at')
           .eq('id', bookingIdFromNotes)
           .maybeSingle();
         booking = bById;
@@ -123,7 +123,118 @@ export async function POST(req: NextRequest) {
       }
 
       const payableStatuses = ['HELD', 'PENDING_PAYMENT', 'PENDING'];
-      if (!payableStatuses.includes(booking.status)) {
+      const isHoldExpired =
+        booking.status === 'HELD' &&
+        (booking as any).hold_expires_at &&
+        new Date((booking as any).hold_expires_at).getTime() < Date.now();
+
+      if (!payableStatuses.includes(booking.status) || isHoldExpired) {
+        if (booking.status === 'CANCELLED' || isHoldExpired) {
+          // Late payment arrived for cancelled or expired hold:
+          // Record payment into ledger, mark booking as REFUND_PENDING, and trigger automated refund.
+          const depositInInr = rawAmount ? rawAmount / 100 : Number(booking.deposit_amount || 0);
+          await supabaseAdmin.from('payments').upsert(
+            {
+              booking_id: booking.id,
+              gateway_payment_id: paymentId,
+              amount: depositInInr,
+              currency: paymentCurrency,
+              status: 'CAPTURED',
+              metadata: {
+                gateway: 'razorpay',
+                order_id: orderId || booking.gateway_order_id,
+                event,
+                reason: 'Late payment received after booking hold expired or cancelled',
+                captured_at: new Date().toISOString(),
+              },
+            },
+            { onConflict: 'gateway_payment_id' }
+          );
+
+          await supabaseAdmin
+            .from('bookings')
+            .update({
+              status: 'CANCELLED',
+              payment_status: 'REFUND_PENDING',
+              gateway_payment_id: paymentId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', booking.id);
+
+          try {
+            const { initiateRazorpayRefund } = await import('@/lib/razorpay');
+            const refundResult = await initiateRazorpayRefund({
+              paymentId,
+              amount: Math.round(depositInInr * 100),
+              notes: {
+                booking_id: booking.id,
+                reason: 'Hold expired before payment completion',
+              },
+            });
+
+            await supabaseAdmin
+              .from('bookings')
+              .update({
+                payment_status: 'REFUNDED',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', booking.id);
+
+            await supabaseAdmin.from('payments').insert({
+              booking_id: booking.id,
+              gateway_payment_id: refundResult.id,
+              amount: depositInInr,
+              currency: paymentCurrency,
+              status: 'REFUNDED',
+              metadata: {
+                original_payment_id: paymentId,
+                reason: 'Hold expired before payment completion',
+              },
+            });
+          } catch (refundErr) {
+            const errorMsg = refundErr instanceof Error ? refundErr.message : String(refundErr);
+            await supabaseAdmin
+              .from('bookings')
+              .update({ payment_status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+              .eq('id', booking.id);
+
+            await supabaseAdmin
+              .from('payments')
+              .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+              .eq('gateway_payment_id', paymentId);
+
+            console.error(
+              '\n====================================================================\n' +
+              '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
+              `Booking ID: ${booking.id}\n` +
+              `Payment ID: ${paymentId}\n` +
+              `Refund Amount: ₹${depositInInr}\n` +
+              `Error: ${errorMsg}\n` +
+              'Action: Manual investigation required in Razorpay Dashboard.\n' +
+              '====================================================================\n'
+            );
+
+            await supabaseAdmin.from('admin_audit_logs').insert({
+              admin_id: null,
+              action: 'REFUND_MANUAL_INTERVENTION_REQUIRED',
+              target_type: 'bookings',
+              target_id: booking.id,
+              details: {
+                error: errorMsg,
+                gateway_payment_id: paymentId,
+                refund_amount: depositInInr,
+                reason: 'Hold expired before payment completion (webhook)',
+                failed_at: new Date().toISOString(),
+              },
+            });
+          }
+
+          return NextResponse.json(
+            { success: true, received: true, event, booking_id: booking.id, status: 'CANCELLED', payment_status: 'REFUND_PENDING' },
+            { status: 200 }
+          );
+        }
+
         return NextResponse.json(
           { error: `Cannot confirm booking in state: ${booking.status}` },
           { status: 400 }

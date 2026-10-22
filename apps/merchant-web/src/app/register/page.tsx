@@ -404,9 +404,23 @@ export default function ShopRegistrationPage() {
                 id="phone"
                 data-testid="register-phone"
                 type="tel"
+                inputMode="tel"
+                pattern="[0-9+\s-]*"
                 required
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  let cleaned = e.target.value.replace(/[^0-9+\s-]/g, '');
+                  if (cleaned.includes('+')) {
+                    const hasLeading = cleaned.startsWith('+');
+                    cleaned = (hasLeading ? '+' : '') + cleaned.replace(/\+/g, '');
+                  }
+                  setPhone(cleaned);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 placeholder="e.g. +91 98765 43210"
                 className="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />

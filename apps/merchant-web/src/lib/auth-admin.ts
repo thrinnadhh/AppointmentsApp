@@ -105,7 +105,7 @@ export function getClientIp(req: Request | NextRequest): string | undefined {
  */
 export async function verifyAuthenticatedUser(
   request: NextRequest
-): Promise<{ id: string; email?: string; isTestCustomer?: boolean } | null> {
+): Promise<{ id: string; email?: string; isTestCustomer?: boolean; isLocalTestCaller?: boolean } | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

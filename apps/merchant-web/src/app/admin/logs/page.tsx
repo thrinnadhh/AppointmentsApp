@@ -26,10 +26,20 @@ import {
   ExternalLink,
   Clock,
   Layers,
-  Database
+  Database,
+  Flame,
+  Send,
+  Zap,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import type { AppLogEntry, AppPlatform, AppLogLevel } from '@appointments/shared';
+import type {
+  AppLogEntry,
+  AppPlatform,
+  AppLogLevel,
+  AppSeverity,
+  AppLogCategory,
+  AppLogSource,
+} from '@appointments/shared';
 
 export default function AdminLogsDedicatedPage() {
   const router = useRouter();
@@ -44,12 +54,16 @@ export default function AdminLogsDedicatedPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [purging, setPurging] = useState(false);
+  const [testingAlert, setTestingAlert] = useState(false);
+  const [testAlertFeedback, setTestAlertFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Filters State
-  const [platformFilter, setPlatformFilter] = useState<AppPlatform | 'all'>('all');
-  const [levelFilter, setLogLevelFilter] = useState<AppLogLevel | 'all'>('all');
+  const [severityFilter, setSeverityFilter] = useState<AppSeverity | 'all'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<AppLogCategory | 'all'>('all');
+  const [sourceFilter, setSourceFilter] = useState<AppLogSource | 'all'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | '24h' | '7d' | '30d'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -63,11 +77,7 @@ export default function AdminLogsDedicatedPage() {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.user) {
-          // Admin preview fallback only with explicit bypass parameter
-          if (
-            typeof window !== 'undefined' &&
-            window.location.search.includes('bypass=true')
-          ) {
+          if (process.env.NODE_ENV === 'development') {
             if (mounted) {
               setAdminUser({
                 email: 'admin@appointments-tirupati.com',
@@ -89,7 +99,6 @@ export default function AdminLogsDedicatedPage() {
           .maybeSingle();
 
         if (error || !profile || profile.role !== 'admin') {
-          // Fallback for designated Super Admin in development
           if (
             session.user.id === '88888888-8888-8888-8888-888888888881' ||
             session.user.email === 'admin@appointments-tirupati.com'
@@ -147,9 +156,11 @@ export default function AdminLogsDedicatedPage() {
       }
 
       const params = new URLSearchParams({
-        limit: '100',
-        platform: platformFilter,
-        level: levelFilter,
+        limit: '150',
+        severity: severityFilter,
+        category: categoryFilter,
+        source: sourceFilter,
+        dateRange: dateFilter,
       });
 
       if (searchQuery.trim()) {
@@ -170,7 +181,7 @@ export default function AdminLogsDedicatedPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [platformFilter, levelFilter, searchQuery]);
+  }, [severityFilter, categoryFilter, sourceFilter, dateFilter, searchQuery]);
 
   // Initial fetch once authenticated
   useEffect(() => {
@@ -188,9 +199,43 @@ export default function AdminLogsDedicatedPage() {
     return () => clearInterval(interval);
   }, [autoRefresh, authChecking, unauthorizedRole, fetchLogs]);
 
-  // Purge logs older than 30 days
+  // Trigger test CRITICAL alert
+  const handleTriggerTestAlert = async () => {
+    try {
+      setTestingAlert(true);
+      setTestAlertFeedback('Emitting test CRITICAL exception...');
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch('/api/admin/app-logs/test-alert', {
+        method: 'POST',
+        headers,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to trigger test alert');
+      }
+
+      const data = await res.json();
+      setTestAlertFeedback(`✓ Dispatched CRITICAL alert! Fingerprint: ${data.fingerprint}`);
+      await fetchLogs();
+      setTimeout(() => setTestAlertFeedback(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Alert failed';
+      setTestAlertFeedback(`⚠️ ${msg}`);
+      setTimeout(() => setTestAlertFeedback(null), 5000);
+    } finally {
+      setTestingAlert(false);
+    }
+  };
+
+  // Purge logs older than retention period
   const handlePurge = async () => {
-    if (!window.confirm('Are you sure you want to prune application logs older than 30 days? This action is permanent.')) {
+    if (!window.confirm('Are you sure you want to run the automated tiered log retention purge (DEBUG/INFO >30d, WARN >60d, ERROR/CRITICAL >180d)?')) {
       return;
     }
 
@@ -212,7 +257,7 @@ export default function AdminLogsDedicatedPage() {
       }
 
       const result = await res.json();
-      alert(`Pruned ${result.deleted_count ?? 0} application logs older than 30 days.`);
+      alert(`Pruned ${result.deleted_count ?? 0} application logs matching retention expiration criteria.`);
       void fetchLogs();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to prune logs.');
@@ -222,38 +267,24 @@ export default function AdminLogsDedicatedPage() {
   };
 
   const copyToClipboard = (text: string, id: string) => {
-    void navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    if (typeof navigator !== 'undefined') {
+      void navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
-  // Metrics
-  const errorCount = logs.filter((l) => l.level === 'error').length;
-  const warnCount = logs.filter((l) => l.level === 'warn').length;
-  const infoCount = logs.filter((l) => l.level === 'info').length;
-  const uniqueComponents = new Set(logs.map((l) => l.component).filter(Boolean)).size;
-
-  // Filtered view
-  const filteredLogs = logs.filter((log) => {
-    if (platformFilter !== 'all' && log.platform !== platformFilter) return false;
-    if (levelFilter !== 'all' && log.level !== levelFilter) return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      log.message.toLowerCase().includes(q) ||
-      (log.component && log.component.toLowerCase().includes(q)) ||
-      (log.stack_trace && log.stack_trace.toLowerCase().includes(q)) ||
-      JSON.stringify(log.metadata || {}).toLowerCase().includes(q)
-    );
-  });
+  // KPI Metrics
+  const criticalCount = logs.filter((l) => (l.severity || '').toUpperCase() === 'CRITICAL').length;
+  const errorCount = logs.filter((l) => (l.severity || '').toUpperCase() === 'ERROR').length;
+  const warnCount = logs.filter((l) => (l.severity || '').toUpperCase() === 'WARN').length;
+  const uniqueFingerprints = new Set(logs.map((l) => l.fingerprint).filter(Boolean)).size;
 
   if (authChecking) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-100">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-400 font-medium">Verifying Administrator Authority...</p>
-        </div>
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white space-y-4">
+        <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-slate-300">Authorizing Super Administrator Observability Radar...</p>
       </div>
     );
   }
@@ -261,53 +292,38 @@ export default function AdminLogsDedicatedPage() {
   if (unauthorizedRole) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800 border border-rose-500/30 p-8 rounded-2xl text-center shadow-2xl">
-          <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white">Access Prohibited</h2>
-          <p className="text-sm text-slate-400 mt-2">
-            This observability console is restricted strictly to Super Administrators. Your current role is{' '}
-            <span className="font-mono text-rose-300 font-bold uppercase">{unauthorizedRole}</span>.
-          </p>
-          <div className="mt-6 flex flex-col gap-2">
-            <Link
-              href="/admin/login"
-              className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all"
-            >
-              Sign In as Platform Owner
-            </Link>
-            <Link
-              href="/"
-              className="py-2.5 px-4 rounded-xl border border-slate-700 hover:bg-slate-700/50 text-slate-300 text-sm font-semibold transition-all"
-            >
-              Return to Merchant Hub
-            </Link>
+        <div className="max-w-md w-full bg-slate-800 border border-rose-800/60 p-8 rounded-2xl shadow-2xl text-center">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-4">
+            <Lock className="w-8 h-8" />
           </div>
+          <h2 className="text-xl font-bold text-white mb-2">403 Restricted Console</h2>
+          <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+            Application logs and crash telemetry contain confidential system execution metrics and are restricted strictly to platform administrators.
+          </p>
+          <button
+            onClick={() => router.push('/admin/login?redirect=/admin/logs')}
+            className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-sm"
+          >
+            Authenticate as Super Admin
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
-      {/* Top Fixed Header */}
-      <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-6 lg:px-8 py-3.5">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-white pb-12">
+      {/* Top Banner Navigation */}
+      <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
               href="/admin"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700/80 bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 text-xs font-semibold transition-all shadow-xs group"
               title="Return to Super Admin Hub"
             >
-              <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform text-slate-400" />
+              <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
               <span>Admin Hub</span>
-            </Link>
-
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700/80 bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 text-xs font-semibold transition-all shadow-xs group"
-              title="Return to Merchant Dashboard"
-            >
-              <span>Merchant App</span>
             </Link>
 
             <div className="h-4 w-px bg-slate-800"></div>
@@ -318,13 +334,13 @@ export default function AdminLogsDedicatedPage() {
               </div>
               <div>
                 <h1 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
-                  Observability & Crash Telemetry Console
+                  Observability & Crash Alert Console
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                     LIVE
                   </span>
                 </h1>
                 <p className="text-[11px] text-slate-400 hidden sm:block">
-                  Centralized error logging, component exceptions, and API failure traces (Auto-pruned &gt;30d)
+                  Classified severity, categories, deduplicated fingerprints, and automated crash alerting
                 </p>
               </div>
             </div>
@@ -332,6 +348,17 @@ export default function AdminLogsDedicatedPage() {
 
           {/* Action Bar */}
           <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {/* Test CRITICAL Alert */}
+            <button
+              onClick={handleTriggerTestAlert}
+              disabled={testingAlert}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-rose-500/40 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 disabled:opacity-50"
+              title="Emit a test CRITICAL error to verify database ingestion and edge alert dispatch"
+            >
+              <Zap className={`w-3.5 h-3.5 text-rose-400 ${testingAlert ? 'animate-bounce' : ''}`} />
+              <span>{testingAlert ? 'Emitting...' : 'Test CRITICAL Alert'}</span>
+            </button>
+
             {/* Auto-Refresh Toggle */}
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
@@ -357,15 +384,15 @@ export default function AdminLogsDedicatedPage() {
               <span>Refresh</span>
             </button>
 
-            {/* Prune >30d */}
+            {/* Tiered Prune */}
             <button
               onClick={handlePurge}
               disabled={purging}
-              className="inline-flex items-center px-3 py-1.5 rounded-lg border border-rose-500/30 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
-              title="Purge logs older than 30 days"
+              className="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-700/80 bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
+              title="Purge expired logs per retention tier"
             >
-              <Trash2 className={`w-3.5 h-3.5 mr-1.5 text-rose-400 ${purging ? 'animate-spin' : ''}`} />
-              <span>Prune &gt;30d</span>
+              <Trash2 className={`w-3.5 h-3.5 mr-1.5 text-slate-400 ${purging ? 'animate-spin' : ''}`} />
+              <span>Prune Expired</span>
             </button>
           </div>
         </div>
@@ -373,97 +400,142 @@ export default function AdminLogsDedicatedPage() {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Test Alert Feedback Banner */}
+        {testAlertFeedback && (
+          <div className="p-3 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-emerald-400" />
+              <span>{testAlertFeedback}</span>
+            </div>
+            <button
+              onClick={() => setTestAlertFeedback(null)}
+              className="text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* KPI Telemetry Banner */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between text-slate-400 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Total Recorded</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Total Logs</span>
               <Database className="w-4 h-4 text-slate-400" />
             </div>
             <p className="text-2xl font-black text-white">{logs.length}</p>
             <p className="text-[10px] text-slate-500 mt-1">Telemetry window</p>
           </div>
 
-          <div className="bg-slate-900/90 border border-rose-500/20 rounded-xl p-4 shadow-sm">
+          <div className="bg-slate-900/90 border border-rose-500/30 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between text-rose-400 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Errors</span>
-              <XCircle className="w-4 h-4 text-rose-400" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">Critical Events</span>
+              <Flame className="w-4 h-4 text-rose-400" />
             </div>
-            <p className="text-2xl font-black text-rose-400">{errorCount}</p>
-            <p className="text-[10px] text-slate-500 mt-1">Crashes & unhandled</p>
+            <p className="text-2xl font-black text-rose-400">{criticalCount}</p>
+            <p className="text-[10px] text-slate-500 mt-1">Alerted immediately</p>
           </div>
 
           <div className="bg-slate-900/90 border border-amber-500/20 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between text-amber-400 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Warnings</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Errors & Warnings</span>
               <AlertTriangle className="w-4 h-4 text-amber-400" />
             </div>
-            <p className="text-2xl font-black text-amber-400">{warnCount}</p>
-            <p className="text-[10px] text-slate-500 mt-1">Degraded states</p>
+            <p className="text-2xl font-black text-amber-400">{errorCount + warnCount}</p>
+            <p className="text-[10px] text-slate-500 mt-1">Digest queue ({errorCount} errors, {warnCount} warns)</p>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm">
+          <div className="bg-slate-900/90 border border-emerald-500/20 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between text-slate-400 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Components</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Distinct Fingerprints</span>
               <Layers className="w-4 h-4 text-emerald-400" />
             </div>
-            <p className="text-2xl font-black text-emerald-400">{uniqueComponents}</p>
-            <p className="text-[10px] text-slate-500 mt-1">Distinct client scopes</p>
+            <p className="text-2xl font-black text-emerald-400">{uniqueFingerprints}</p>
+            <p className="text-[10px] text-slate-500 mt-1">Deduped crash signatures</p>
           </div>
         </div>
 
         {/* Filter & Search Console */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
-          {/* Filter Pills */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Platform Select */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <Globe className="w-3.5 h-3.5 text-slate-500" />
-                Platform:
-              </span>
-              <div className="inline-flex bg-slate-950 p-1 rounded-lg border border-slate-800">
-                {(['all', 'web', 'mobile', 'backend'] as const).map((plt) => (
-                  <button
-                    key={plt}
-                    onClick={() => setPlatformFilter(plt)}
-                    className={`px-3 py-1 rounded-md text-xs font-bold capitalize transition-all ${
-                      platformFilter === plt
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {plt}
-                  </button>
-                ))}
-              </div>
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-4 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Severity Select */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Severity:
+              </label>
+              <select
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="all">All Severities</option>
+                <option value="CRITICAL">🚨 CRITICAL (App Crash / Security / Payment)</option>
+                <option value="ERROR">❌ ERROR</option>
+                <option value="WARN">⚠️ WARN</option>
+                <option value="INFO">ℹ️ INFO</option>
+                <option value="DEBUG">🔍 DEBUG</option>
+              </select>
             </div>
 
-            {/* Level Select */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <Filter className="w-3.5 h-3.5 text-slate-500" />
-                Level:
-              </span>
-              <div className="inline-flex bg-slate-950 p-1 rounded-lg border border-slate-800">
-                {(['all', 'error', 'warn', 'info'] as const).map((lvl) => (
-                  <button
-                    key={lvl}
-                    onClick={() => setLogLevelFilter(lvl)}
-                    className={`px-3 py-1 rounded-md text-xs font-bold capitalize transition-all ${
-                      levelFilter === lvl
-                        ? lvl === 'error'
-                          ? 'bg-rose-600 text-white shadow-xs'
-                          : lvl === 'warn'
-                          ? 'bg-amber-600 text-white shadow-xs'
-                          : 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {lvl}
-                  </button>
-                ))}
-              </div>
+            {/* Category Select */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Category:
+              </label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="all">All Categories</option>
+                <option value="UI_CRASH">UI_CRASH (React Native / Web Crashes)</option>
+                <option value="PAYMENT">PAYMENT (Gateway / Refunds)</option>
+                <option value="BOOKING">BOOKING (Hold / Confirmation / Collisions)</option>
+                <option value="AUTH">AUTH (OTP / Tokens / Sessions)</option>
+                <option value="SECURITY">SECURITY (RLS / Tenant Isolation)</option>
+                <option value="HOSPITAL_QUEUE">HOSPITAL_QUEUE (OP / Bed / Triage)</option>
+                <option value="NOTIFICATION">NOTIFICATION (WhatsApp / SMS / Push)</option>
+                <option value="DATABASE">DATABASE (PostgreSQL / Constraints)</option>
+                <option value="NETWORK">NETWORK (API / Latency)</option>
+                <option value="OTHER">OTHER</option>
+              </select>
+            </div>
+
+            {/* Source Select */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Source:
+              </label>
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="all">All Sources</option>
+                <option value="customer-mobile">customer-mobile (Expo / React Native)</option>
+                <option value="merchant-web">merchant-web (Next.js)</option>
+                <option value="admin-web">admin-web (Control Center)</option>
+                <option value="edge-function">edge-function (Deno)</option>
+                <option value="database">database (Postgres Triggers)</option>
+              </select>
+            </div>
+
+            {/* Date Range Select */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Time Window:
+              </label>
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="all">All Time (Up to 180 Days)</option>
+                <option value="today">Today (Since Midnight IST)</option>
+                <option value="24h">Past 24 Hours</option>
+                <option value="7d">Past 7 Days</option>
+                <option value="30d">Past 30 Days</option>
+              </select>
             </div>
           </div>
 
@@ -472,10 +544,10 @@ export default function AdminLogsDedicatedPage() {
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
             <input
               type="text"
-              placeholder="Search component, message, stack..."
+              placeholder="Search by message, component, fingerprint hash, or error code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 w-full sm:w-72 shadow-inner"
+              className="pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 w-full shadow-inner"
             />
           </div>
         </div>
@@ -495,31 +567,32 @@ export default function AdminLogsDedicatedPage() {
               <thead>
                 <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   <th className="py-3 px-4">Timestamp (IST)</th>
-                  <th className="py-3 px-4">Platform</th>
-                  <th className="py-3 px-4">Level</th>
-                  <th className="py-3 px-4">Component</th>
+                  <th className="py-3 px-4">Severity</th>
+                  <th className="py-3 px-4">Category</th>
+                  <th className="py-3 px-4">Source</th>
                   <th className="py-3 px-4">Message</th>
-                  <th className="py-3 px-4 text-right">Diagnostic</th>
+                  <th className="py-3 px-4 text-center">Duplicates</th>
+                  <th className="py-3 px-4 text-right">Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
+                    <td colSpan={7} className="py-12 text-center text-slate-500 font-sans">
                       <RefreshCw className="w-5 h-5 mx-auto mb-2 animate-spin text-emerald-500" />
                       Loading live observability telemetry...
                     </td>
                   </tr>
-                ) : filteredLogs.length === 0 ? (
+                ) : logs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
+                    <td colSpan={7} className="py-12 text-center text-slate-500 font-sans">
                       <Terminal className="w-8 h-8 mx-auto mb-2 text-slate-600" />
                       <p className="font-semibold text-slate-400">No telemetry logs found matching filter criteria</p>
                       <p className="text-xs text-slate-600 mt-1">Application events and errors will automatically appear here</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredLogs.map((log, index) => {
+                  logs.map((log, index) => {
                     const rowId = log.id || `log-${index}`;
                     const isExpanded = expandedLogId === rowId;
                     const dateFormatted = log.created_at
@@ -533,6 +606,10 @@ export default function AdminLogsDedicatedPage() {
                         })
                       : 'N/A';
 
+                    const severityUpper = (log.severity || log.level || 'INFO').toUpperCase();
+                    const categoryUpper = (log.category || 'OTHER').toUpperCase();
+                    const sourceText = log.source || (log.platform === 'mobile' ? 'customer-mobile' : 'merchant-web');
+
                     return (
                       <React.Fragment key={rowId}>
                         <tr
@@ -544,69 +621,85 @@ export default function AdminLogsDedicatedPage() {
                           <td className="py-3 px-4 text-slate-400 text-[11px] whitespace-nowrap">
                             {dateFormatted}
                           </td>
+
+                          {/* Severity Badge */}
                           <td className="py-3 px-4 whitespace-nowrap">
                             <span
                               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                log.platform === 'mobile'
-                                  ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
-                                  : log.platform === 'web'
-                                  ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800/60'
-                                  : 'bg-blue-950/60 text-blue-400 border border-blue-800/60'
+                                severityUpper === 'CRITICAL'
+                                  ? 'bg-rose-950/80 text-rose-300 border border-rose-500/80 shadow-xs animate-pulse'
+                                  : severityUpper === 'ERROR'
+                                  ? 'bg-rose-950/50 text-rose-400 border border-rose-800/60'
+                                  : severityUpper === 'WARN'
+                                  ? 'bg-amber-950/50 text-amber-400 border border-amber-800/60'
+                                  : 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/60'
                               }`}
                             >
-                              {log.platform === 'mobile' ? (
-                                <Smartphone className="w-3 h-3" />
-                              ) : (
-                                <Globe className="w-3 h-3" />
-                              )}
-                              {log.platform}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                log.level === 'error'
-                                  ? 'bg-rose-950/60 text-rose-400 border border-rose-800/60'
-                                  : log.level === 'warn'
-                                  ? 'bg-amber-950/60 text-amber-400 border border-amber-800/60'
-                                  : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
-                              }`}
-                            >
-                              {log.level === 'error' ? (
+                              {severityUpper === 'CRITICAL' ? (
+                                <Flame className="w-3 h-3 text-rose-400" />
+                              ) : severityUpper === 'ERROR' ? (
                                 <XCircle className="w-3 h-3" />
-                              ) : log.level === 'warn' ? (
+                              ) : severityUpper === 'WARN' ? (
                                 <AlertTriangle className="w-3 h-3" />
                               ) : (
                                 <Info className="w-3 h-3" />
                               )}
-                              {log.level}
+                              {severityUpper}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-slate-300 font-semibold whitespace-nowrap text-[11px]">
-                            {log.component || <span className="text-slate-600 font-sans italic">global</span>}
+
+                          {/* Category Badge */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                              {categoryUpper}
+                            </span>
                           </td>
-                          <td className="py-3 px-4 text-slate-200 font-sans max-w-md truncate text-xs">
-                            {log.message}
-                          </td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <span className="inline-flex items-center text-[11px] font-semibold text-emerald-400 hover:text-emerald-300">
-                              {isExpanded ? (
-                                <>
-                                  Close <ChevronDown className="w-3.5 h-3.5 ml-1" />
-                                </>
+
+                          {/* Source Badge */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-slate-400 bg-slate-900 border border-slate-800">
+                              {sourceText.includes('mobile') ? (
+                                <Smartphone className="w-3 h-3 text-emerald-400" />
                               ) : (
-                                <>
-                                  Inspect <ChevronRight className="w-3.5 h-3.5 ml-1" />
-                                </>
+                                <Globe className="w-3 h-3 text-cyan-400" />
                               )}
+                              {sourceText}
                             </span>
+                          </td>
+
+                          {/* Message */}
+                          <td className="py-3 px-4 max-w-xs sm:max-w-md truncate text-slate-200">
+                            <span className="font-semibold text-slate-300 mr-2">[{log.component || 'App'}]</span>
+                            <span>{log.message}</span>
+                          </td>
+
+                          {/* Deduplication Count Badge */}
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            {(log.duplicate_count || 1) > 1 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                                x{log.duplicate_count}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-600 font-mono">1x</span>
+                            )}
+                          </td>
+
+                          {/* Expand Icon */}
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button className="text-slate-500 hover:text-slate-300 p-1">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-emerald-400" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </button>
                           </td>
                         </tr>
 
                         {/* Expandable Diagnostic Drawer */}
                         {isExpanded && (
                           <tr className="bg-slate-950/90 border-b border-slate-800 font-sans">
-                            <td colSpan={6} className="p-5">
+                            <td colSpan={7} className="p-5">
                               <div className="space-y-4">
                                 <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                                   <div className="flex items-center gap-2">
@@ -615,28 +708,35 @@ export default function AdminLogsDedicatedPage() {
                                       Diagnostic Inspection • ID: {log.id || 'N/A'}
                                     </h4>
                                   </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      copyToClipboard(
-                                        JSON.stringify(log, null, 2),
-                                        `copy-${rowId}`
-                                      );
-                                    }}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 font-mono transition-colors"
-                                  >
-                                    {copiedId === `copy-${rowId}` ? (
-                                      <>
-                                        <Check className="w-3 h-3 text-emerald-400" />
-                                        <span className="text-emerald-400">Copied</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy className="w-3 h-3" />
-                                        <span>Copy JSON</span>
-                                      </>
+                                  <div className="flex items-center gap-2">
+                                    {log.fingerprint && (
+                                      <span className="text-[10px] font-mono bg-slate-900 border border-slate-700 px-2 py-0.5 rounded text-slate-400">
+                                        Fingerprint: <strong className="text-emerald-400">{log.fingerprint}</strong>
+                                      </span>
                                     )}
-                                  </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        copyToClipboard(
+                                          JSON.stringify(log, null, 2),
+                                          `copy-${rowId}`
+                                        );
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 font-mono transition-colors"
+                                    >
+                                      {copiedId === `copy-${rowId}` ? (
+                                        <>
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                          <span className="text-emerald-400">Copied</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3 h-3" />
+                                          <span>Copy JSON</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {/* Stack Trace */}
@@ -651,34 +751,49 @@ export default function AdminLogsDedicatedPage() {
                                   </div>
                                 )}
 
-                                {/* Metadata & Environment Details */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div>
-                                    <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                                      Redacted Payload & Context
+                                {/* Context Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                      Business Context
                                     </h5>
-                                    <pre className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto max-h-48">
-                                      {JSON.stringify(log.metadata || {}, null, 2)}
-                                    </pre>
+                                    <p className="text-xs text-slate-300">Role: <strong className="text-white">{log.role || 'N/A'}</strong></p>
+                                    <p className="text-xs text-slate-300">City ID: <strong className="text-white">{log.city_id || 'N/A'}</strong></p>
+                                    <p className="text-xs text-slate-300">Vertical: <strong className="text-white">{log.vertical || 'N/A'}</strong></p>
+                                    <p className="text-xs text-slate-300">Appointment ID: <strong className="text-white">{log.appointment_id || 'N/A'}</strong></p>
                                   </div>
 
-                                  <div>
-                                    <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                                      Device & Session Environment
+                                  <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                      Environment & Build
                                     </h5>
-                                    <pre className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto max-h-48">
-                                      {JSON.stringify(
-                                        {
-                                          session_id: log.session_id,
-                                          user_id: log.user_id,
-                                          device_info: log.device_info || {},
-                                        },
-                                        null,
-                                        2
-                                      )}
-                                    </pre>
+                                    <p className="text-xs text-slate-300">App Version: <strong className="text-white">{log.app_version || '1.0.0'}</strong></p>
+                                    <p className="text-xs text-slate-300">Platform OS: <strong className="text-white">{log.platform_os || 'N/A'}</strong></p>
+                                    <p className="text-xs text-slate-300">Device Model: <strong className="text-white">{log.device_model || 'N/A'}</strong></p>
+                                    <p className="text-xs text-slate-300">Environment: <strong className="text-emerald-400">{log.environment || 'dev'}</strong></p>
+                                  </div>
+
+                                  <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                      Session & Identity
+                                    </h5>
+                                    <p className="text-xs text-slate-300 font-mono">User ID: {log.user_id || 'anonymous'}</p>
+                                    <p className="text-xs text-slate-300 font-mono truncate">Session ID: {log.session_id || 'none'}</p>
+                                    <p className="text-xs text-slate-300 font-mono">Error Code: {log.error_code || 'NONE'}</p>
                                   </div>
                                 </div>
+
+                                {/* Sanitized Metadata */}
+                                {log.metadata && Object.keys(log.metadata).length > 0 && (
+                                  <div>
+                                    <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                                      Sanitized Metadata Payload (PII Redacted)
+                                    </h5>
+                                    <pre className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto max-h-48">
+                                      {JSON.stringify(log.metadata, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>

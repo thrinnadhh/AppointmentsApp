@@ -12,10 +12,11 @@ export default function RootGlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    webLogger.forComponent('RootGlobalError').error(
+    webLogger.forComponent('RootGlobalError', 'UI_CRASH').critical(
       error.message || 'Fatal root layout crash',
       error,
-      { digest: error.digest }
+      { digest: error.digest },
+      'UI_CRASH'
     );
   }, [error]);
 

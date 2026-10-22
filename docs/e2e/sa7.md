@@ -2,14 +2,14 @@
 
 **Sub-Agent Workstream:** SA7
 **Status:** ALL PASS
-**Summary:** 7/7 passed (100.0%), 0 failed, 0 blocked
-**Execution Time:** 2026-10-21T07:58:36.038Z
+**Summary:** 7/7 passed (100.0%), 0 failed, 0 blocked, 0 not run
+**Execution Time:** 2026-10-22T17:24:31.960Z
 
 ## 1. Test Case Execution Results
 
 | Case ID | Scenario | Status | Evidence |
 |:---|:---|:---:|:---|
-| **F1** | Customer cancellation cutoff policy (>30m refund vs <=30m forfeit) | ✅ PASS | 45m before slot: eligible=true, refund=₹100. 15m before slot: eligible=false, refund=₹0 (FORFEITED). |
+| **F1** | Customer cancellation cutoff policy (>=60m refund eligible vs <=59:59 forfeited) | ✅ PASS | 60m before slot: eligible=true, refund=₹100. 59:59 before slot: eligible=false, refund=₹0 (FORFEITED). 15m before slot: eligible=false, refund=₹0 (FORFEITED). |
 | **F2** | Merchant emergency cancellation full refund & customer notification | ✅ PASS | Refund ₹111.80 issued to customer. Notification log created with event MERCHANT_CANCELLED. |
 | **F3** | Merchant strike progression (Grace Period for Strikes 1 & 2) | ✅ PASS | Strikes incremented 1 -> 2 with zero penalty applied. Penalty balance remains ₹0.00. |
 | **F4** | Merchant Strike 3 penalty debit (₹100) | ✅ PASS | Strike 3 reached. ₹100 penalty debited to hospital penalty_balance. |

@@ -29,6 +29,7 @@ async function getAuthenticatedCaller(req: NextRequest): Promise<{ id: string; e
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (token) {
+      try {
         const directClient = createClient(supabaseUrl, supabaseAnonKey);
         const { data, error } = await directClient.auth.getUser(token);
         if (!error && data?.user) {

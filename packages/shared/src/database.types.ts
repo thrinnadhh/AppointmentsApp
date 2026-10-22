@@ -294,6 +294,7 @@ export type Database = {
           total_amount: number | null
           total_charged: number | null
           updated_at: string
+          version: number
         }
         Insert: {
           attachment_url?: string | null
@@ -332,6 +333,7 @@ export type Database = {
           total_amount?: number | null
           total_charged?: number | null
           updated_at?: string
+          version?: number
         }
         Update: {
           attachment_url?: string | null
@@ -370,6 +372,7 @@ export type Database = {
           total_amount?: number | null
           total_charged?: number | null
           updated_at?: string
+          version?: number
         }
         Relationships: [
           {
@@ -1750,6 +1753,8 @@ export type Database = {
         | "CANCELLED"
         | "NO_SHOW"
         | "CHECKED_IN"
+        | "IN_CONSULTATION"
+        | "ADMITTED"
       payment_status:
         | "PENDING"
         | "CAPTURED"
@@ -1897,6 +1902,8 @@ export const Constants = {
         "CANCELLED",
         "NO_SHOW",
         "CHECKED_IN",
+        "IN_CONSULTATION",
+        "ADMITTED",
       ],
       payment_status: [
         "PENDING",

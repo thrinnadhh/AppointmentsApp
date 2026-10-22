@@ -266,9 +266,23 @@ export default function SettingsPage() {
                     id="support-phone-input"
                     name="supportPhone"
                     aria-label="Support Telephone"
-                    type="text"
+                    type="tel"
+                    inputMode="tel"
+                    pattern="[0-9+\s-]*"
                     value={supportPhone}
-                    onChange={(e) => setSupportPhone(e.target.value)}
+                    onChange={(e) => {
+                      let cleaned = e.target.value.replace(/[^0-9+\s-]/g, '');
+                      if (cleaned.includes('+')) {
+                        const hasLeading = cleaned.startsWith('+');
+                        cleaned = (hasLeading ? '+' : '') + cleaned.replace(/\+/g, '');
+                      }
+                      setSupportPhone(cleaned);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>

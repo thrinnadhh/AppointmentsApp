@@ -97,6 +97,40 @@ function TeamManagementContent() {
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Helper to sanitize phone input: strip letters, allow digits and leading +
+  const sanitizePhoneInput = (val: string) => {
+    let cleaned = val.replace(/[^0-9+\s-]/g, '');
+    if (cleaned.includes('+')) {
+      const startsWithPlus = cleaned.startsWith('+');
+      cleaned = (startsWithPlus ? '+' : '') + cleaned.replace(/\+/g, '');
+    }
+    return cleaned;
+  };
+
+  // Helper to find any existing ID card number already associated with a staff user
+  const getExistingStaffIdCard = useCallback((userId: string): string | null => {
+    if (!userId) return null;
+    for (const doc of doctors) {
+      const match = doc.front_desk_managers?.find((fd) => fd.user_id === userId);
+      if (match?.id_card_number) {
+        return match.id_card_number;
+      }
+    }
+    return null;
+  }, [doctors]);
+
+  // Helper to identify if a roster member is a doctor (should not appear in staff assignment list)
+  const isDoctorUser = useCallback((member: TeamMember) => {
+    if (member.membershipRole === 'doctor') return true;
+    if (member.full_name?.toLowerCase().startsWith('dr.') || member.full_name?.toLowerCase().startsWith('dr ')) return true;
+    return doctors.some(
+      (doc) =>
+        doc.id === member.id ||
+        (doc as any)?.attributes?.user_id === member.id ||
+        (doc.doctor_email && doc.doctor_email.toLowerCase() === (member.email || '').toLowerCase())
+    );
+  }, [doctors]);
+
   const loadTeam = useCallback(async () => {
     setLoading(true);
     try {
@@ -183,14 +217,23 @@ function TeamManagementContent() {
         doctorId: selectedDoctorForAssignment.id,
       };
 
+      const requiresIdCard = (selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1;
+
       if (assignmentModalMode === 'existing') {
         if (!assignExistingUserId) {
           setAssignError('Please select a staff member to assign.');
           setIsAssigning(false);
           return;
         }
+        const existingStaffId = getExistingStaffIdCard(assignExistingUserId);
+        const finalIdCard = (existingStaffId || newFdIdCard).trim();
+        if (requiresIdCard && !finalIdCard) {
+          setAssignError(`Staff ID Card Number is mandatory because Dr. ${selectedDoctorForAssignment.name} has more than 1 front desk manager.`);
+          setIsAssigning(false);
+          return;
+        }
         payload.userId = assignExistingUserId;
-        payload.idCardNumber = newFdIdCard.trim() || undefined;
+        payload.idCardNumber = finalIdCard || undefined;
       } else {
         if (!newFdName || !newFdEmail || !newFdPassword) {
           setAssignError('Full Name, Email, and Password are required.');
@@ -199,6 +242,11 @@ function TeamManagementContent() {
         }
         if (newFdPassword.length < 6) {
           setAssignError('Password must be at least 6 characters.');
+          setIsAssigning(false);
+          return;
+        }
+        if (requiresIdCard && !newFdIdCard.trim()) {
+          setAssignError(`Staff ID Card Number is mandatory because Dr. ${selectedDoctorForAssignment.name} has more than 1 front desk manager.`);
           setIsAssigning(false);
           return;
         }
@@ -1111,9 +1159,16 @@ function TeamManagementContent() {
                       </label>
                       <input
                         id="fd-phone"
-                        type="text"
+                        type="tel"
+                        inputMode="tel"
+                        pattern="[0-9+\s-]*"
                         value={newFdPhone}
-                        onChange={(e) => setNewFdPhone(e.target.value)}
+                        onChange={(e) => setNewFdPhone(sanitizePhoneInput(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                            e.preventDefault();
+                          }
+                        }}
                         placeholder="+91 98480 12345"
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono text-xs"
                       />
@@ -1121,24 +1176,38 @@ function TeamManagementContent() {
 
                     <div>
                       <label htmlFor="fd-id-card" className="block text-xs font-semibold text-slate-700 mb-1">
-                        Staff ID Card Number (Optional)
+                        Staff ID Card Number {(selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1 ? '*' : '(Optional)'}
                       </label>
                       <div className="relative">
                         <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                         <input
                           id="fd-id-card"
                           type="text"
+                          required={(selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1}
                           value={newFdIdCard}
-                          onChange={(e) => setNewFdIdCard(e.target.value)}
-                          placeholder="e.g. HOSP-FD-104"
-                          className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono text-xs uppercase"
+                          onChange={(e) => setNewFdIdCard(e.target.value.toUpperCase())}
+                          placeholder={
+                            (selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1
+                              ? "e.g. HOSP-FD-104 (Required)"
+                              : "e.g. HOSP-FD-104 (Optional)"
+                          }
+                          className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono text-xs uppercase ${
+                            (selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1 && !newFdIdCard.trim()
+                              ? 'border-amber-300 bg-amber-50/20'
+                              : 'border-slate-300'
+                          }`}
                         />
                       </div>
+                      {(selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1 && (
+                        <p className="text-[11px] text-amber-700 mt-1">
+                          * Staff ID is mandatory because Dr. {selectedDoctorForAssignment.name} has multiple receptionists.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
                     <label htmlFor="existing-staff-select" className="block text-xs font-semibold text-slate-700 mb-1">
                       Select Staff Member to Assign *
@@ -1146,12 +1215,27 @@ function TeamManagementContent() {
                     <select
                       id="existing-staff-select"
                       value={assignExistingUserId}
-                      onChange={(e) => setAssignExistingUserId(e.target.value)}
+                      onChange={(e) => {
+                        const uid = e.target.value;
+                        setAssignExistingUserId(uid);
+                        const existingId = getExistingStaffIdCard(uid);
+                        if (existingId) {
+                          setNewFdIdCard(existingId);
+                        } else {
+                          setNewFdIdCard('');
+                        }
+                      }}
                       className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
                     >
                       <option value="">-- Choose a staff member --</option>
                       {allRosterMembers
-                        .filter((m) => !m.id.startsWith('doc-') && !m.id.startsWith('fd-') && !selectedDoctorForAssignment.front_desk_managers.some((fd) => fd.user_id === m.id))
+                        .filter(
+                          (m) =>
+                            !m.id.startsWith('doc-') &&
+                            !m.id.startsWith('fd-') &&
+                            !isDoctorUser(m) &&
+                            !selectedDoctorForAssignment.front_desk_managers.some((fd) => fd.user_id === m.id)
+                        )
                         .map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.full_name || 'Staff'} ({m.email || 'No email'})
@@ -1160,22 +1244,73 @@ function TeamManagementContent() {
                     </select>
                   </div>
 
-                  <div>
-                    <label htmlFor="existing-fd-id-card" className="block text-xs font-semibold text-slate-700 mb-1">
-                      Staff ID Card Number (Optional)
-                    </label>
-                    <div className="relative">
-                      <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                      <input
-                        id="existing-fd-id-card"
-                        type="text"
-                        value={newFdIdCard}
-                        onChange={(e) => setNewFdIdCard(e.target.value)}
-                        placeholder="e.g. HOSP-FD-104"
-                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono text-xs uppercase"
-                      />
-                    </div>
-                  </div>
+                  {assignExistingUserId && (
+                    <>
+                      {getExistingStaffIdCard(assignExistingUserId) ? (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <CreditCard className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div>
+                              <p className="font-semibold text-emerald-950">Existing Verified Staff ID</p>
+                              <p className="font-mono text-emerald-700 text-sm font-bold mt-0.5">
+                                {getExistingStaffIdCard(assignExistingUserId)}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full">
+                            Preserved
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-slate-400 shrink-0" />
+                              <span>No existing ID card found for this staff member</span>
+                            </div>
+                            {(selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1 ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full">
+                                ID Required
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-medium">Optional</span>
+                            )}
+                          </div>
+
+                          <div>
+                            <label htmlFor="existing-fd-id-card" className="block text-xs font-semibold text-slate-700 mb-1">
+                              Staff ID Card Number {(selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1 ? '*' : '(Optional)'}
+                            </label>
+                            <div className="relative">
+                              <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                              <input
+                                id="existing-fd-id-card"
+                                type="text"
+                                required={(selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1}
+                                value={newFdIdCard}
+                                onChange={(e) => setNewFdIdCard(e.target.value.toUpperCase())}
+                                placeholder={
+                                  (selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1
+                                    ? "e.g. HOSP-FD-104 (Required for multiple desks)"
+                                    : "e.g. HOSP-FD-104 (Optional)"
+                                }
+                                className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono text-xs uppercase ${
+                                  (selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1 && !newFdIdCard.trim()
+                                    ? 'border-amber-300 bg-amber-50/20'
+                                    : 'border-slate-300'
+                                }`}
+                              />
+                            </div>
+                            {(selectedDoctorForAssignment.front_desk_managers?.length || 0) >= 1 && (
+                              <p className="text-[11px] text-amber-700 mt-1">
+                                * Staff ID is mandatory because Dr. {selectedDoctorForAssignment.name} has more than 1 front desk manager.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 

@@ -15,6 +15,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const platform = (searchParams.get('platform') || 'all') as AppPlatform | 'all';
     const level = (searchParams.get('level') || 'all') as AppLogLevel | 'all';
+    const severity = (searchParams.get('severity') || 'all') as any;
+    const category = (searchParams.get('category') || 'all') as any;
+    const source = (searchParams.get('source') || 'all') as any;
+    const dateRange = (searchParams.get('dateRange') || 'all') as any;
     const component = searchParams.get('component') || undefined;
     const search = searchParams.get('search') || undefined;
     const limit = parseInt(searchParams.get('limit') || '50', 10);
@@ -23,6 +27,10 @@ export async function GET(request: NextRequest) {
     const logs = await fetchAdminAppLogs({
       platform,
       level,
+      severity,
+      category,
+      source,
+      dateRange,
       component,
       search,
       limit: isNaN(limit) ? 50 : limit,

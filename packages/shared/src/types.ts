@@ -1,4 +1,4 @@
-export type UserRole = 'customer' | 'merchant' | 'admin';
+export type UserRole = 'customer' | 'merchant' | 'admin' | 'city_director';
 
 export type ProviderStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED';
 
@@ -9,7 +9,9 @@ export type BookingStatus =
   | 'CHECKED_IN'
   | 'COMPLETED'
   | 'CANCELLED'
-  | 'NO_SHOW';
+  | 'NO_SHOW'
+  | 'IN_CONSULTATION'
+  | 'ADMITTED';
 
 export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'FORFEITED';
 
@@ -137,6 +139,7 @@ export interface Booking {
   estimated_wait_minutes?: number | null;
   department_id?: string | null;
   department_name?: string | null;
+  version?: number;
   provider?: Provider;
   resource?: Resource;
 }
@@ -159,6 +162,7 @@ export interface UserProfile {
   email?: string | null;
   full_name?: string | null;
   role: UserRole;
+  assigned_city_id?: string | null;
   no_show_count: number;
   is_flagged: boolean;
   created_at: string;
@@ -377,25 +381,62 @@ export interface CoolingPeriodEligibilityResult {
 export type AppPlatform = 'web' | 'mobile' | 'backend' | 'edge';
 export type AppLogLevel = 'error' | 'warn' | 'info';
 
+export type AppSeverity = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';
+export type AppLogCategory =
+  | 'AUTH'
+  | 'BOOKING'
+  | 'PAYMENT'
+  | 'HOSPITAL_QUEUE'
+  | 'NOTIFICATION'
+  | 'DATABASE'
+  | 'NETWORK'
+  | 'UI_CRASH'
+  | 'SECURITY'
+  | 'OTHER';
+export type AppLogSource =
+  | 'customer-mobile'
+  | 'merchant-web'
+  | 'admin-web'
+  | 'edge-function'
+  | 'database';
+
 export interface AppLogEntry {
   id?: string;
   created_at?: string;
   platform: AppPlatform;
   level: AppLogLevel;
+  severity?: AppSeverity;
+  category?: AppLogCategory;
+  source?: AppLogSource;
   component?: string;
   message: string;
   stack_trace?: string;
+  error_code?: string | null;
   metadata?: Record<string, unknown>;
   device_info?: Record<string, unknown>;
   user_id?: string | null;
   session_id?: string | null;
+  role?: string | null;
+  city_id?: string | null;
+  vertical?: string | null;
+  appointment_id?: string | null;
+  app_version?: string | null;
+  platform_os?: string | null;
+  device_model?: string | null;
+  environment?: 'dev' | 'test' | 'prod';
+  fingerprint?: string | null;
+  duplicate_count?: number;
 }
 
 export interface AppLogsFilter {
   platform?: AppPlatform | 'all';
   level?: AppLogLevel | 'all';
+  severity?: AppSeverity | 'all';
+  category?: AppLogCategory | 'all';
+  source?: AppLogSource | 'all';
   component?: string;
   search?: string;
+  dateRange?: 'all' | 'today' | '24h' | '7d' | '30d';
   limit?: number;
   offset?: number;
 }

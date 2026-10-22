@@ -209,8 +209,8 @@ export default function AdminDashboardPage() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session?.user) {
-          // In local preview without session, allow dev fallback or redirect
-          if (process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.location.search.includes('bypass=true'))) {
+          // In local preview without session, allow dev fallback only in development environment
+          if (process.env.NODE_ENV === 'development') {
             if (mounted) {
               setAdminUser({
                 email: 'admin@appointments-tirupati.com',
@@ -239,15 +239,33 @@ export default function AdminDashboardPage() {
           return;
         }
 
-        const { data: profile, error } = await supabase
+        let { data: profile, error } = await supabase
           .from('profiles')
           .select('id, email, full_name, role')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
-        if (error || !profile || profile.role !== 'admin') {
+        // Safe fallback for platform Super Admin if client RLS propagation lagged
+        if (!profile && session.user.email === 'admin@appointments-tirupati.com') {
+          profile = {
+            id: session.user.id,
+            email: session.user.email,
+            full_name: 'Platform Owner (Super Admin)',
+            role: 'admin',
+          };
+        }
+
+        if (!profile) {
+          // Stale session (e.g. user was wiped from database) -> clean up and redirect to login
+          console.warn('[Admin] Stale session with no profile in database. Resetting session...');
+          await supabase.auth.signOut();
+          router.push('/admin/login?redirect=/admin');
+          return;
+        }
+
+        if (profile.role !== 'admin') {
           if (mounted) {
-            setUnauthorizedRole(profile?.role || 'unauthorized');
+            setUnauthorizedRole(profile.role || 'unauthorized');
             setAuthChecking(false);
           }
           return;
@@ -294,8 +312,26 @@ export default function AdminDashboardPage() {
   }, [authChecking, adminUser, selectedWindow, selectedCityFilter, loadDashboardData]);
 
   const handleAdminSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Sign out error:', e);
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth'))) {
+            localStorage.removeItem(key);
+          }
+        }
+        document.cookie.split(';').forEach((c) => {
+          document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+        });
+      } catch {}
+    }
     router.push('/admin/login');
+    router.refresh();
   };
 
   const handleUnenrollFactor = async (factorId: string) => {

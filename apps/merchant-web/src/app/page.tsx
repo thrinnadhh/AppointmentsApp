@@ -3013,9 +3013,23 @@ export default function MerchantOverviewPage() {
                 </label>
                 <input
                   type="tel"
+                  inputMode="tel"
+                  pattern="[0-9+\s-]*"
                   placeholder="e.g. 9876543210 (10-digit mobile)"
                   value={offlinePhone}
-                  onChange={(e) => setOfflinePhone(e.target.value)}
+                  onChange={(e) => {
+                    let cleaned = e.target.value.replace(/[^0-9+\s-]/g, '');
+                    if (cleaned.includes('+')) {
+                      const hasLeading = cleaned.startsWith('+');
+                      cleaned = (hasLeading ? '+' : '') + cleaned.replace(/\+/g, '');
+                    }
+                    setOfflinePhone(cleaned);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
                 />
               </div>
