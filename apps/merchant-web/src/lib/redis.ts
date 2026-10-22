@@ -23,22 +23,35 @@ setInterval(() => {
   }
 }, 60000).unref();
 
-const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
-const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+function getIsUpstashConfigured(): boolean {
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+}
 
-const isUpstashConfigured = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
+/**
+ * Asserts that Upstash Redis credentials are present in production environments.
+ * Throws in production if UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN is missing.
+ */
+export function assertRedisConfiguredInProduction(): void {
+  if (process.env.NODE_ENV === 'production' && !getIsUpstashConfigured()) {
+    throw new Error(
+      'FATAL CONFIGURATION ERROR: Upstash Redis credentials (UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN) are required in production for distributed locking and rate limiting.'
+    );
+  }
+}
 
 /**
  * Execute command against Upstash REST API
  */
 async function upstashCommand<T = unknown>(...args: (string | number)[]): Promise<T | null> {
-  if (!isUpstashConfigured) return null;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
 
   try {
-    const res = await fetch(`${UPSTASH_URL}`, {
+    const res = await fetch(`${url}`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${UPSTASH_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(args),
@@ -76,7 +89,7 @@ export async function acquireSlotLock(
   const key = `lock:slot:${slotKey}`;
   const token = lockToken || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
 
-  if (isUpstashConfigured) {
+  if (getIsUpstashConfigured()) {
     const result = await upstashCommand<string>('SET', key, token, 'EX', ttlSeconds, 'NX');
     if (result === 'OK') {
       return { acquired: true, token };
@@ -85,6 +98,12 @@ export async function acquireSlotLock(
       console.error('[Redis] Upstash lock acquisition failed (fail-closed to prevent double-booking)');
       return { acquired: false, token: '' };
     }
+    return { acquired: false, token: '' };
+  }
+
+  // In production, missing Upstash credentials MUST fail-closed to prevent cross-process double-booking
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[Redis] Upstash Redis credentials missing in production: lock acquisition failing closed');
     return { acquired: false, token: '' };
   }
 
@@ -110,7 +129,7 @@ export async function acquireSlotLock(
 export async function releaseSlotLock(slotKey: string, lockToken?: string): Promise<boolean> {
   const key = `lock:slot:${slotKey}`;
 
-  if (isUpstashConfigured) {
+  if (getIsUpstashConfigured()) {
     if (lockToken) {
       const script = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
       const result = await upstashCommand<number>('EVAL', script, 1, key, lockToken);
@@ -141,7 +160,8 @@ export async function releaseSlotLock(slotKey: string, lockToken?: string): Prom
  * in-memory store. On Vercel serverless each invocation is a fresh process —
  * the in-memory store is always empty, making it a zero-protection bypass.
  *
- * In-memory store is only used when Upstash is NOT configured (local dev).
+ * In-memory store is only used when Upstash is NOT configured in local development.
+ * In production, missing Upstash credentials FAILS CLOSED to prevent brute-force attacks.
  */
 export async function checkRateLimit(
   identifier: string,
@@ -151,7 +171,7 @@ export async function checkRateLimit(
   const key = `ratelimit:${identifier}`;
   const now = Date.now();
 
-  if (isUpstashConfigured) {
+  if (getIsUpstashConfigured()) {
     const current = await upstashCommand<number>('INCR', key);
     if (current === 1) {
       await upstashCommand('EXPIRE', key, windowSeconds);
@@ -172,6 +192,12 @@ export async function checkRateLimit(
       console.error('[Redis] Upstash unreachable — rate limit defaulting to BLOCK');
       return { allowed: false, remaining: 0, reset: Math.floor(now / 1000) + windowSeconds };
     }
+  }
+
+  // In production, missing Upstash credentials MUST fail-closed to protect OTP, checkout, and critical routes
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[Redis] Upstash Redis credentials missing in production: rate limiter failing closed');
+    return { allowed: false, remaining: 0, reset: Math.floor(now / 1000) + windowSeconds };
   }
 
   // ── Local dev in-memory fallback (Upstash not configured) ──────────────────
@@ -203,9 +229,10 @@ export function getRedisStatus(): {
   configured: boolean;
   active_locks_count: number;
 } {
+  const configured = getIsUpstashConfigured();
   return {
-    provider: isUpstashConfigured ? 'upstash' : 'in-memory',
-    configured: isUpstashConfigured,
+    provider: configured ? 'upstash' : 'in-memory',
+    configured,
     active_locks_count: memoryStore.size,
   };
 }
