@@ -82,9 +82,9 @@ export async function POST(req: NextRequest) {
       const currentSlotTime = new Date(booking.slot_start).getTime();
       const now = Date.now();
       const minutesToSlot = (currentSlotTime - now) / (60 * 1000);
-      if (minutesToSlot <= 30) {
+      if (minutesToSlot < 60) {
         return NextResponse.json<RescheduleBookingResponse>(
-          { success: false, error: 'Late reschedule: appointments within 30 minutes of their slot cannot be rescheduled.' },
+          { success: false, error: 'Late reschedule: appointments within 60 minutes of their slot cannot be rescheduled.' },
           { status: 400 }
         );
       }

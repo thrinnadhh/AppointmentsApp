@@ -44,13 +44,26 @@ describe('Workstream SA3: Cancel, Reschedule, Money', () => {
   before(async () => {
     writer = new SubAgentReportWriter('SA3', 'Cancel, reschedule, money');
     console.log('[SA3] Setting up isolated tenant SA3...');
-    tenant = await createTenant('SA3');
+    try {
+      tenant = await createTenant('SA3');
+    } catch (err) {
+      if (writer) writer.markSetupFailed(err);
+      throw err;
+    }
   });
 
   after(async () => {
     console.log('[SA3] Generating test report and tearing down tenant SA3...');
-    writer.save();
-    await cleanupTenant('SA3');
+    try {
+      if (writer) writer.save();
+    } catch (e) {
+      console.error('[SA3] Error saving report:', e);
+    }
+    try {
+      await cleanupTenant('SA3');
+    } catch (e) {
+      console.error('[SA3] Error cleaning up tenant:', e);
+    }
   });
 
   async function createBookingFixture({ customerId, resourceId, slotStart, slotEnd, status = 'CONFIRMED' }) {
@@ -77,20 +90,20 @@ describe('Workstream SA3: Cancel, Reschedule, Money', () => {
     return Array.isArray(data) ? data[0] : data;
   }
 
-  // C1: 30-Minute Cancellation Cutoff Policy
-  it('C1: Customer cancellation honors 30m cutoff (>30m refund vs <=30m forfeit)', async () => {
+  // C1: 60-Minute Cancellation Cutoff Policy
+  it('C1: Customer cancellation honors 60m cutoff (>=60m refund vs <=59:59 forfeit)', async () => {
     try {
       const now = await tenant.clock.get();
       const doc = tenant.consultants[0];
 
-      // Booking 1: 45 min in future (> 30 min cutoff)
-      const slotStart45 = new Date(now.getTime() + 45 * 60 * 1000).toISOString();
-      const slotEnd45 = new Date(now.getTime() + 55 * 60 * 1000).toISOString();
+      // Booking 1 (Exact boundary): 60 min in future (>= 60 min cutoff -> 100% full refund)
+      const slotStart60 = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+      const slotEnd60 = new Date(now.getTime() + 70 * 60 * 1000).toISOString();
       const b1 = await createBookingFixture({
         customerId: tenant.patients[0].id,
         resourceId: doc.id,
-        slotStart: slotStart45,
-        slotEnd: slotEnd45
+        slotStart: slotStart60,
+        slotEnd: slotEnd60
       });
 
       const cancelRpc1 = await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
@@ -98,7 +111,7 @@ describe('Workstream SA3: Cancel, Reschedule, Money', () => {
         headers: serviceHeaders,
         body: JSON.stringify({
           p_booking_id: b1.id,
-          p_reason: 'Plans changed early',
+          p_reason: 'Plans changed early at 60m boundary',
           p_initiated_by: 'CUSTOMER'
         })
       });
@@ -107,14 +120,14 @@ describe('Workstream SA3: Cancel, Reschedule, Money', () => {
       assert.equal(c1.refund_eligible, true);
       assert.equal(c1.refund_amount, 100);
 
-      // Booking 2: 15 min in future (<= 30 min cutoff)
-      const slotStart15 = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
-      const slotEnd15 = new Date(now.getTime() + 25 * 60 * 1000).toISOString();
+      // Booking 2 (Exact boundary): 59:59 in future (< 60 min cutoff -> forfeit)
+      const slotStart5959 = new Date(now.getTime() + (59 * 60 + 59) * 1000).toISOString();
+      const slotEnd5959 = new Date(now.getTime() + 70 * 60 * 1000).toISOString();
       const b2 = await createBookingFixture({
         customerId: tenant.patients[1].id,
         resourceId: doc.id,
-        slotStart: slotStart15,
-        slotEnd: slotEnd15
+        slotStart: slotStart5959,
+        slotEnd: slotEnd5959
       });
 
       const cancelRpc2 = await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
@@ -122,7 +135,7 @@ describe('Workstream SA3: Cancel, Reschedule, Money', () => {
         headers: serviceHeaders,
         body: JSON.stringify({
           p_booking_id: b2.id,
-          p_reason: 'Late cancellation',
+          p_reason: 'Late cancellation at 59:59',
           p_initiated_by: 'CUSTOMER'
         })
       });
@@ -131,11 +144,35 @@ describe('Workstream SA3: Cancel, Reschedule, Money', () => {
       assert.equal(c2.refund_eligible, false);
       assert.equal(c2.refund_amount, 0);
 
+      // Booking 3: 15 min in future (<= 60 min cutoff -> forfeit)
+      const slotStart15 = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+      const slotEnd15 = new Date(now.getTime() + 25 * 60 * 1000).toISOString();
+      const b3 = await createBookingFixture({
+        customerId: tenant.patients[2].id,
+        resourceId: doc.id,
+        slotStart: slotStart15,
+        slotEnd: slotEnd15
+      });
+
+      const cancelRpc3 = await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          p_booking_id: b3.id,
+          p_reason: 'Late cancellation 15m',
+          p_initiated_by: 'CUSTOMER'
+        })
+      });
+      const c3 = await cancelRpc3.json();
+      assert.equal(c3.success, true);
+      assert.equal(c3.refund_eligible, false);
+      assert.equal(c3.refund_amount, 0);
+
       writer.addCaseResult({
         caseId: 'C1',
-        scenario: 'Customer cancellation cutoff policy (>30m refund vs <=30m forfeit)',
+        scenario: 'Customer cancellation cutoff policy (>=60m refund vs <=59:59 forfeit)',
         status: 'PASS',
-        evidence: '45m before slot: eligible=true, refund=₹100. 15m before slot: eligible=false, refund=₹0 (FORFEITED).'
+        evidence: '60m before slot: eligible=true, refund=₹100. 59:59 before slot: eligible=false, refund=₹0 (FORFEITED). 15m before slot: eligible=false, refund=₹0 (FORFEITED).'
       });
     } catch (err) {
       writer.addCaseResult({ caseId: 'C1', scenario: 'Customer cancellation cutoff policy', status: 'FAIL', evidence: err.message });

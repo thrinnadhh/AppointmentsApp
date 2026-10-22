@@ -25,11 +25,11 @@ function isEligibleForFullRefund(slotStartIso, initiatedBy) {
   const now = Date.now();
   const diffMinutes = Math.round((slotTime - now) / (1000 * 60));
 
-  if (diffMinutes > 60) {
+  if (diffMinutes >= 60) {
     return {
       eligible: true,
       minutesUntilSlot: diffMinutes,
-      rule: `Cancelled with ${diffMinutes}m remaining (> 60m required for full refund).`,
+      rule: `Cancelled with ${diffMinutes}m remaining (>= 60m required for full refund).`,
     };
   }
 
@@ -91,26 +91,26 @@ async function runAudit() {
   // ─────────────────────────────────────────────────────────────────────────
   console.log('--- Test Group 1: 60-Minute Cancellation Cutoff Policy ---');
 
-  test('1.1. Customer cancellation > 60m (75 mins before slot) is eligible for full refund', () => {
+  test('1.1. Customer cancellation >= 60m (75 mins before slot) is eligible for full refund', () => {
     const slot75Min = new Date(Date.now() + 75 * 60 * 1000).toISOString();
     const result = isEligibleForFullRefund(slot75Min, 'CUSTOMER');
-    assert.strictEqual(result.eligible, true, 'Should be eligible for refund when > 60 min');
+    assert.strictEqual(result.eligible, true, 'Should be eligible for refund when >= 60 min');
     assert.ok(result.minutesUntilSlot >= 74 && result.minutesUntilSlot <= 76);
-    assert.ok(result.rule.includes('> 60m required for full refund'));
+    assert.ok(result.rule.includes('>= 60m required for full refund'));
   });
 
-  test('1.2. Customer cancellation at 45m (<= 60m) forfeits deposit', () => {
+  test('1.2. Customer cancellation at 45m (< 60m) forfeits deposit', () => {
     const slot45Min = new Date(Date.now() + 45 * 60 * 1000).toISOString();
     const result = isEligibleForFullRefund(slot45Min, 'CUSTOMER');
-    assert.strictEqual(result.eligible, false, 'Should forfeit deposit when <= 60 min');
+    assert.strictEqual(result.eligible, false, 'Should forfeit deposit when < 60 min');
     assert.ok(result.minutesUntilSlot >= 44 && result.minutesUntilSlot <= 46);
     assert.ok(result.rule.includes('within 60 minutes'));
   });
 
-  test('1.3. Customer cancellation at 15m (<= 60m) forfeits deposit', () => {
+  test('1.3. Customer cancellation at 15m (< 60m) forfeits deposit', () => {
     const slot15Min = new Date(Date.now() + 15 * 60 * 1000).toISOString();
     const result = isEligibleForFullRefund(slot15Min, 'CUSTOMER');
-    assert.strictEqual(result.eligible, false, 'Should forfeit deposit when <= 60 min');
+    assert.strictEqual(result.eligible, false, 'Should forfeit deposit when < 60 min');
     assert.ok(result.minutesUntilSlot >= 14 && result.minutesUntilSlot <= 16);
     assert.ok(result.rule.includes('within 60 minutes'));
   });
@@ -265,12 +265,12 @@ async function runAudit() {
       }
     }
 
-    // Confirm ONLY cancel and no-show initiate refunds
+    // Confirm legitimate routes initiate refunds (cancellations, no-shows, and late payment auto-refunds on expired holds)
     const routeNames = routesWithRefund.map(f => path.basename(path.dirname(f))).sort();
     assert.deepStrictEqual(
       routeNames,
-      ['cancel', 'no-show'],
-      `Only /api/bookings/cancel and /api/bookings/no-show should initiate refunds. Found: ${routeNames.join(', ')}`
+      ['cancel', 'no-show', 'razorpay', 'verify'],
+      `Legitimate refund routes should be cancel, no-show, razorpay, and verify. Found: ${routeNames.join(', ')}`
     );
   });
 

@@ -390,7 +390,7 @@ describe('21. NV Item 1: Placeholder Env Fail-Fast Runtime Boot Check', () => {
   });
 
   it('verifies env.mjs detects placeholder patterns and throws on invalid default strings', async () => {
-    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+    const { validateEnv } = await import('../../apps/merchant-web/src/env.mjs');
 
     const testPlaceholders = [
       'CHANGE_ME',
@@ -414,7 +414,7 @@ describe('21. NV Item 1: Placeholder Env Fail-Fast Runtime Boot Check', () => {
   });
 
   it('verifies env.mjs in production requires mandatory variables and rejects ALLOW_MOCK_PAYMENTS=true', async () => {
-    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+    const { validateEnv } = await import('../../apps/merchant-web/src/env.mjs');
 
     // Missing required vars in production
     assert.throws(
@@ -672,7 +672,7 @@ describe('28. Phase 2: Tenant Isolation & Perimeter Defense', () => {
   });
 
   it('verifies env.mjs detects extended placeholder variations and dummy secrets', async () => {
-    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+    const { validateEnv } = await import('../../apps/merchant-web/src/env.mjs');
     const testPlaceholders = [
       'change-me',
       'change_me',
@@ -775,7 +775,7 @@ describe('30. Step 1: reassign_booking_resource In-Function Auth & BOLA Hardenin
 
 describe('31. Step 2: Unanchored /placeholder/i Regex & Live Credential Hardening (R5-C02)', () => {
   it('verifies env.mjs detects isolated placeholder substrings in sensitive environment variables', async () => {
-    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+    const { validateEnv } = await import('../../apps/merchant-web/src/env.mjs');
 
     const invalidPlaceholders = [
       'rzp_live_placeholder',
@@ -797,7 +797,7 @@ describe('31. Step 2: Unanchored /placeholder/i Regex & Live Credential Hardenin
   });
 
   it('verifies env.mjs explicitly guards live Razorpay keys and production Supabase keys against placeholder contamination', async () => {
-    const { validateEnv } = await import('./apps/merchant-web/src/env.mjs');
+    const { validateEnv } = await import('../../apps/merchant-web/src/env.mjs');
 
     assert.throws(
       () => {
@@ -849,7 +849,7 @@ describe('33. Step 3: Triage Findings (public-deletion-unauth-schedule & resched
   });
 
   it('verifies signed deletion token generation and cryptographic verification', async () => {
-    const { createSignedDeletionToken, verifySignedDeletionToken } = await import('./apps/merchant-web/src/lib/deletion-token.ts');
+    const { createSignedDeletionToken, verifySignedDeletionToken } = await import('../../apps/merchant-web/src/lib/deletion-token.ts');
     const userId = '11111111-2222-3333-4444-555555555555';
     const email = 'user@example.com';
 
@@ -953,19 +953,19 @@ describe('35. Strix Residual Findings (vuln-0022 & vuln-0023 Hardening)', () => 
     );
   });
 
-  it('verifies vuln-0022: reschedule API route enforces past slot rejection and 30-minute customer cutoff', () => {
+  it('verifies vuln-0022: reschedule API route enforces past slot rejection and 60-minute customer cutoff', () => {
     const code = fs.readFileSync(rescheduleRoutePath, 'utf8');
     assert.match(code, /newSlotTime < Date\.now\(\)/, 'Route must reject past slot times');
     assert.match(code, /Cannot reschedule to a slot in the past/, 'Route must return past slot error message');
     assert.match(code, /caller\.id === booking\.customer_id/, 'Route must detect customer caller');
-    assert.match(code, /minutesToSlot <= 30/, 'Route must enforce 30 minute late reschedule boundary');
-    assert.match(code, /Late reschedule: appointments within 30 minutes of their slot cannot be rescheduled\./);
+    assert.match(code, /minutesToSlot < 60/, 'Route must enforce 60 minute late reschedule boundary');
+    assert.match(code, /Late reschedule: appointments within 60 minutes of their slot cannot be rescheduled\./);
   });
 
   it('verifies vuln-0023: deletion token strictly isolates DELETION_TOKEN_SECRET and rejects admin/cron forge attempts', async () => {
     const crypto = await import('crypto');
     const { createSignedDeletionToken, verifySignedDeletionToken } = await import(
-      './apps/merchant-web/src/lib/deletion-token.ts'
+      '../../apps/merchant-web/src/lib/deletion-token.ts'
     );
 
     const userId = '5cb448e4-4df9-4f95-b13c-b95a72aa8766';

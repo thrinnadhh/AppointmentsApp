@@ -828,7 +828,7 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
           headers,
           body: JSON.stringify({
             booking_id: bookingId,
-            reason: isLate ? 'Customer cancelled (<30 min)' : 'Customer cancelled (>30 min)',
+            reason: isLate ? 'Customer cancelled (<60 min)' : 'Customer cancelled (>=60 min)',
           }),
         });
         if (resp.ok) {
@@ -842,7 +842,7 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
 
     const { data: rpcData, error: rpcError } = await supabase.rpc('cancel_booking', {
       p_booking_id: bookingId,
-      p_reason: isLate ? 'Customer cancelled (<30 min)' : 'Customer cancelled (>30 min)',
+      p_reason: isLate ? 'Customer cancelled (<60 min)' : 'Customer cancelled (>=60 min)',
     });
     if (!rpcError) {
       return { data: rpcData, isLate };

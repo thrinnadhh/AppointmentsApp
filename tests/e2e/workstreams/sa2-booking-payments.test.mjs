@@ -19,7 +19,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
-import { createTenant, cleanupTenant } from '../harness/tenant-factory.mjs';
+import { createTenant, cleanupTenant, getPgPool } from '../harness/tenant-factory.mjs';
 import { SubAgentReportWriter } from '../harness/report-writer.mjs';
 import { getAdminClient, getCustomerClient } from '../harness/client-helpers.mjs';
 
@@ -48,13 +48,26 @@ describe('Sub-Agent SA2: Booking & Payment Lifecycle (B1-B9, G1)', () => {
   before(async () => {
     writer = new SubAgentReportWriter('SA2', 'Booking & Payments');
     console.log('[SA2] Setting up isolated tenant SA2...');
-    tenant = await createTenant('SA2');
+    try {
+      tenant = await createTenant('SA2');
+    } catch (err) {
+      if (writer) writer.markSetupFailed(err);
+      throw err;
+    }
   });
 
   after(async () => {
     console.log('[SA2] Generating test report and tearing down tenant SA2...');
-    writer.save();
-    await cleanupTenant('SA2');
+    try {
+      if (writer) writer.save();
+    } catch (e) {
+      console.error('[SA2] Error saving report:', e);
+    }
+    try {
+      await cleanupTenant('SA2');
+    } catch (e) {
+      console.error('[SA2] Error cleaning up tenant:', e);
+    }
   });
 
   // B1: 7-Minute Hold Expiry
@@ -341,14 +354,14 @@ describe('Sub-Agent SA2: Booking & Payment Lifecycle (B1-B9, G1)', () => {
     }
   });
 
-  // B5: Customer Cancellation Cutoff Policy (>30m vs <=30m)
-  it('B5: Customer cancellation refund cutoff policy (>30m vs <=30m)', async () => {
+  // B5: Customer Cancellation Cutoff Policy (>=60m vs <=59:59)
+  it('B5: Customer cancellation refund cutoff policy (>=60m vs <=59:59)', async () => {
     try {
       const doc = tenant.consultants[4];
       const patient = tenant.patients[12];
       const now = await tenant.clock.get();
 
-      // Case A: Cancelled > 30 mins before slot -> Full deposit refund (₹100)
+      // Case A (Exact boundary): Cancelled exactly 60 mins before slot -> Full deposit refund (₹100)
       const slotAStart = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
       const slotAEnd = new Date(now.getTime() + 70 * 60 * 1000).toISOString();
       const resA = await fetch(`${url}/rest/v1/bookings`, {
@@ -380,11 +393,12 @@ describe('Sub-Agent SA2: Booking & Payment Lifecycle (B1-B9, G1)', () => {
         })
       });
       const refundA = await cancelARes.json();
-      assert.equal(refundA.refund_amount, 100, 'Customer gets full refund when cancelling >30m before slot');
+      assert.equal(refundA.refund_eligible, true, 'Customer gets refund_eligible=true at >=60m boundary');
+      assert.equal(refundA.refund_amount, 100, 'Customer gets full refund when cancelling >=60m before slot');
 
-      // Case B: Cancelled <= 30 mins before slot -> No refund (₹0)
-      const slotBStart = new Date(now.getTime() + 20 * 60 * 1000).toISOString();
-      const slotBEnd = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+      // Case B (Exact boundary): Cancelled at 59:59 before slot -> Forfeited (₹0)
+      const slotBStart = new Date(now.getTime() + (59 * 60 + 59) * 1000).toISOString();
+      const slotBEnd = new Date(now.getTime() + 70 * 60 * 1000).toISOString();
       const resB = await fetch(`${url}/rest/v1/bookings`, {
         method: 'POST',
         headers: serviceHeaders,
@@ -409,18 +423,53 @@ describe('Sub-Agent SA2: Booking & Payment Lifecycle (B1-B9, G1)', () => {
         headers: serviceHeaders,
         body: JSON.stringify({
           p_booking_id: bookingB.id,
-          p_reason: 'Late cancellation',
+          p_reason: 'Late cancellation 59:59',
           p_initiated_by: 'CUSTOMER'
         })
       });
       const refundB = await cancelBRes.json();
-      assert.equal(refundB.refund_amount, 0, 'Customer receives ₹0 refund when cancelling <=30m before slot');
+      assert.equal(refundB.refund_eligible, false, 'Customer gets refund_eligible=false at 59:59 boundary');
+      assert.equal(refundB.refund_amount, 0, 'Customer receives ₹0 refund when cancelling at 59:59 before slot');
+
+      // Case C: Cancelled at 20 mins before slot -> Forfeited (₹0)
+      const slotCStart = new Date(now.getTime() + 20 * 60 * 1000).toISOString();
+      const slotCEnd = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+      const resC = await fetch(`${url}/rest/v1/bookings`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          provider_id: tenant.hospital.id,
+          resource_id: doc.id,
+          customer_id: patient.id,
+          slot_start: slotCStart,
+          slot_end: slotCEnd,
+          status: 'CONFIRMED',
+          deposit_amount: 100,
+          total_amount: 500,
+          payment_status: 'CAPTURED',
+          reference_code: `SA2-CANC-C-${Date.now()}`,
+          version: 1
+        })
+      });
+      const bookingC = (await resC.json())[0];
+
+      const cancelCRes = await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          p_booking_id: bookingC.id,
+          p_reason: 'Late cancellation 20m',
+          p_initiated_by: 'CUSTOMER'
+        })
+      });
+      const refundC = await cancelCRes.json();
+      assert.equal(refundC.refund_amount, 0, 'Customer receives ₹0 refund when cancelling <=30m before slot');
 
       writer.addCaseResult({
         caseId: 'B5',
-        scenario: 'Customer cancellation refund cutoff policy (>30m vs <=30m)',
+        scenario: 'Customer cancellation refund cutoff policy (>=60m vs <=59:59)',
         status: 'PASS',
-        evidence: `>30m cutoff refunded ₹${refundA.refund_amount}; <=30m cutoff refunded ₹${refundB.refund_amount}`
+        evidence: `>=60m cutoff refunded ₹${refundA.refund_amount}; 59:59 cutoff refunded ₹${refundB.refund_amount}; 20m refunded ₹${refundC.refund_amount}`
       });
     } catch (err) {
       writer.addCaseResult({
@@ -463,10 +512,10 @@ describe('Sub-Agent SA2: Booking & Payment Lifecycle (B1-B9, G1)', () => {
       });
       const booking = (await res.json())[0];
 
+      const pool = getPgPool();
       // Initial strikes count
-      const provBeforeRes = await fetch(`${url}/rest/v1/providers?id=eq.${tenant.hospital.id}`, { headers: serviceHeaders });
-      const provBefore = (await provBeforeRes.json())[0];
-      const strikesBefore = provBefore.cancellation_strikes || 0;
+      const provBeforeRes = await pool.query('SELECT cancellation_strikes FROM public.providers WHERE id = $1', [tenant.hospital.id]);
+      const strikesBefore = provBeforeRes.rows[0]?.cancellation_strikes || 0;
 
       // Merchant initiates cancellation
       const cancelRes = await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
@@ -484,15 +533,15 @@ describe('Sub-Agent SA2: Booking & Payment Lifecycle (B1-B9, G1)', () => {
       assert.equal(Number(refund.refund_amount), Number(booking.total_charged), 'Merchant cancellation gives 100% full refund including fees');
 
       // Provider strikes incremented by 2 for <=30m cancellation
-      const provAfterRes = await fetch(`${url}/rest/v1/providers?id=eq.${tenant.hospital.id}`, { headers: serviceHeaders });
-      const provAfter = (await provAfterRes.json())[0];
-      assert.equal(provAfter.cancellation_strikes, strikesBefore + 2, 'Provider cancellation strikes incremented by 2 for late cancellation');
+      const provAfterRes = await pool.query('SELECT cancellation_strikes FROM public.providers WHERE id = $1', [tenant.hospital.id]);
+      const strikesAfter = provAfterRes.rows[0]?.cancellation_strikes || 0;
+      assert.equal(strikesAfter, strikesBefore + 2, 'Provider cancellation strikes incremented by 2 for late cancellation');
 
       writer.addCaseResult({
         caseId: 'B6',
         scenario: 'Merchant cancellation gives 100% refund and increments provider strike',
         status: 'PASS',
-        evidence: `Refund: ₹${refund.refund_amount} (100% of ₹${booking.total_charged}); provider strikes increased from ${strikesBefore} to ${provAfter.cancellation_strikes}.`
+        evidence: `Refund: ₹${refund.refund_amount} (100% of ₹${booking.total_charged}); provider strikes increased from ${strikesBefore} to ${strikesAfter}.`
       });
     } catch (err) {
       writer.addCaseResult({

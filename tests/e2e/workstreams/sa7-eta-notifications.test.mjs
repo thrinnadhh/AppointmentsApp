@@ -16,7 +16,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
-import { createTenant, cleanupTenant } from '../harness/tenant-factory.mjs';
+import { createTenant, cleanupTenant, dbUpdateProvider, getPgPool } from '../harness/tenant-factory.mjs';
 import { SubAgentReportWriter } from '../harness/report-writer.mjs';
 
 function getDbConfig() {
@@ -43,24 +43,37 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
   before(async () => {
     writer = new SubAgentReportWriter('SA7', 'ETA and notifications');
     console.log('[SA7] Setting up isolated tenant SA7...');
-    tenant = await createTenant('SA7');
+    try {
+      tenant = await createTenant('SA7');
+    } catch (err) {
+      if (writer) writer.markSetupFailed(err);
+      throw err;
+    }
   });
 
   after(async () => {
     console.log('[SA7] Generating test report and tearing down tenant SA7...');
-    writer.save();
-    await cleanupTenant('SA7');
+    try {
+      if (writer) writer.save();
+    } catch (e) {
+      console.error('[SA7] Error saving report:', e);
+    }
+    try {
+      await cleanupTenant('SA7');
+    } catch (e) {
+      console.error('[SA7] Error cleaning up tenant:', e);
+    }
   });
 
   // F1: Customer Cancellation Cutoff
-  it('F1: Customer cancellation honors 30m cutoff (>30m refund eligible vs <=30m forfeited)', async () => {
+  it('F1: Customer cancellation honors 60m cutoff (>=60m refund eligible vs <=59:59 forfeited)', async () => {
     try {
       const doc = tenant.consultants[0];
       const now = await tenant.clock.get();
 
-      // Booking 1: 45 min in future (> 30 min cutoff)
-      const slotStart45 = new Date(now.getTime() + 45 * 60 * 1000).toISOString();
-      const slotEnd45 = new Date(now.getTime() + 55 * 60 * 1000).toISOString();
+      // Booking 1 (Exact boundary): 60 min in future (>= 60 min cutoff)
+      const slotStart60 = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+      const slotEnd60 = new Date(now.getTime() + 70 * 60 * 1000).toISOString();
       const bRes1 = await fetch(`${url}/rest/v1/bookings`, {
         method: 'POST',
         headers: serviceHeaders,
@@ -69,8 +82,8 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
           department_id: doc.department_id,
           resource_id: doc.id,
           customer_id: tenant.patients[0].id,
-          slot_start: slotStart45,
-          slot_end: slotEnd45,
+          slot_start: slotStart60,
+          slot_end: slotEnd60,
           status: 'CONFIRMED',
           deposit_amount: 100,
           total_amount: 500,
@@ -87,7 +100,7 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
         headers: serviceHeaders,
         body: JSON.stringify({
           p_booking_id: b1.id,
-          p_reason: 'Plans changed early',
+          p_reason: 'Plans changed early at 60m boundary',
           p_initiated_by: 'CUSTOMER'
         })
       });
@@ -96,9 +109,9 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
       assert.equal(c1.refund_eligible, true);
       assert.equal(Number(c1.refund_amount), 100);
 
-      // Booking 2: 15 min in future (<= 30 min cutoff)
-      const slotStart15 = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
-      const slotEnd15 = new Date(now.getTime() + 25 * 60 * 1000).toISOString();
+      // Booking 2 (Exact boundary): 59:59 in future (< 60 min cutoff)
+      const slotStart5959 = new Date(now.getTime() + (59 * 60 + 59) * 1000).toISOString();
+      const slotEnd5959 = new Date(now.getTime() + 70 * 60 * 1000).toISOString();
       const bRes2 = await fetch(`${url}/rest/v1/bookings`, {
         method: 'POST',
         headers: serviceHeaders,
@@ -107,8 +120,8 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
           department_id: doc.department_id,
           resource_id: doc.id,
           customer_id: tenant.patients[1].id,
-          slot_start: slotStart15,
-          slot_end: slotEnd15,
+          slot_start: slotStart5959,
+          slot_end: slotEnd5959,
           status: 'CONFIRMED',
           deposit_amount: 100,
           total_amount: 500,
@@ -125,7 +138,7 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
         headers: serviceHeaders,
         body: JSON.stringify({
           p_booking_id: b2.id,
-          p_reason: 'Late cancellation',
+          p_reason: 'Late cancellation 59:59',
           p_initiated_by: 'CUSTOMER'
         })
       });
@@ -134,14 +147,52 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
       assert.equal(c2.refund_eligible, false);
       assert.equal(Number(c2.refund_amount), 0);
 
+      // Booking 3: 15 min in future (<= 60 min cutoff)
+      const slotStart15 = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+      const slotEnd15 = new Date(now.getTime() + 25 * 60 * 1000).toISOString();
+      const bRes3 = await fetch(`${url}/rest/v1/bookings`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          provider_id: tenant.hospital.id,
+          department_id: doc.department_id,
+          resource_id: doc.id,
+          customer_id: tenant.patients[2].id,
+          slot_start: slotStart15,
+          slot_end: slotEnd15,
+          status: 'CONFIRMED',
+          deposit_amount: 100,
+          total_amount: 500,
+          payment_status: 'CAPTURED',
+          reference_code: `SA7-CUTOFF-3-${Date.now()}`
+        })
+      });
+      const b3 = (await bRes3.json())[0];
+      assert.ok(b3?.id, 'Booking 3 created');
+
+      // Cancel Booking 3 as customer
+      const cancelRpc3 = await fetch(`${url}/rest/v1/rpc/cancel_booking`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          p_booking_id: b3.id,
+          p_reason: 'Late cancellation 15m',
+          p_initiated_by: 'CUSTOMER'
+        })
+      });
+      const c3 = await cancelRpc3.json();
+      assert.equal(c3.success, true);
+      assert.equal(c3.refund_eligible, false);
+      assert.equal(Number(c3.refund_amount), 0);
+
       writer.addCaseResult({
         caseId: 'F1',
-        scenario: 'Customer cancellation cutoff policy (>30m refund vs <=30m forfeit)',
+        scenario: 'Customer cancellation cutoff policy (>=60m refund eligible vs <=59:59 forfeited)',
         status: 'PASS',
-        evidence: `45m before slot: eligible=true, refund=₹100. 15m before slot: eligible=false, refund=₹0 (FORFEITED).`
+        evidence: `60m before slot: eligible=true, refund=₹100. 59:59 before slot: eligible=false, refund=₹0 (FORFEITED). 15m before slot: eligible=false, refund=₹0 (FORFEITED).`
       });
     } catch (err) {
-      writer.addCaseResult({ caseId: 'F1', scenario: 'Customer cancellation cutoff policy (>30m refund vs <=30m forfeit)', status: 'FAIL', evidence: err.message });
+      writer.addCaseResult({ caseId: 'F1', scenario: 'Customer cancellation cutoff policy (>=60m refund eligible vs <=59:59 forfeited)', status: 'FAIL', evidence: err.message });
       throw err;
     }
   });
@@ -192,11 +243,12 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
       assert.equal(cancelData.payment_status, 'REFUND_PENDING');
 
       // Verify notification log
-      const notifRes = await fetch(`${url}/rest/v1/notification_logs?booking_id=eq.${booking.id}&event_type=eq.MERCHANT_CANCELLED`, {
-        headers: serviceHeaders
-      });
-      const notifs = await notifRes.json();
-      assert.ok(notifs.length >= 1, 'Customer notified of merchant cancellation');
+      const pool = getPgPool();
+      const notifRes = await pool.query(
+        'SELECT * FROM public.notification_logs WHERE booking_id = $1 AND event_type = $2',
+        [booking.id, 'MERCHANT_CANCELLED']
+      );
+      assert.ok(notifRes.rows.length >= 1, 'Customer notified of merchant cancellation');
 
       writer.addCaseResult({
         caseId: 'F2',
@@ -217,11 +269,7 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
       const now = await tenant.clock.get();
 
       // Reset provider strikes to 0 for tenant
-      await fetch(`${url}/rest/v1/providers?id=eq.${tenant.hospital.id}`, {
-        method: 'PATCH',
-        headers: serviceHeaders,
-        body: JSON.stringify({ cancellation_strikes: 0, penalty_balance: 0, is_booking_frozen: false })
-      });
+      await dbUpdateProvider(tenant.hospital.id, { cancellation_strikes: 0, penalty_balance: 0, is_booking_frozen: false });
 
       // Cancellation 1 (>30m advance -> +1 strike)
       const slotStart1 = new Date(now.getTime() + 80 * 60 * 1000).toISOString();
@@ -368,11 +416,7 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
       const now = await tenant.clock.get();
 
       // Reset to 0 strikes to test clean 2x increment
-      await fetch(`${url}/rest/v1/providers?id=eq.${tenant.hospital.id}`, {
-        method: 'PATCH',
-        headers: serviceHeaders,
-        body: JSON.stringify({ cancellation_strikes: 0, penalty_balance: 0 })
-      });
+      await dbUpdateProvider(tenant.hospital.id, { cancellation_strikes: 0, penalty_balance: 0 });
 
       // Slot is 15 minutes away (<= 30m)
       const slotStart = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
@@ -423,11 +467,7 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
       const now = await tenant.clock.get();
 
       // Set hospital to 4 strikes
-      await fetch(`${url}/rest/v1/providers?id=eq.${tenant.hospital.id}`, {
-        method: 'PATCH',
-        headers: serviceHeaders,
-        body: JSON.stringify({ cancellation_strikes: 4, is_booking_frozen: false })
-      });
+      await dbUpdateProvider(tenant.hospital.id, { cancellation_strikes: 4, is_booking_frozen: false });
 
       // Cancellation taking hospital to 5 strikes
       const slotStart = new Date(now.getTime() + 180 * 60 * 1000).toISOString();
@@ -508,11 +548,12 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
       const assignment = (await asRes.json())[0];
 
       // Check audit_logs for doctor_front_desk_assignments
-      const auditRes = await fetch(`${url}/rest/v1/audit_logs?merchant_id=eq.${tenant.hospital.id}&target=eq.doctor_front_desk_assignments`, {
-        headers: serviceHeaders
-      });
-      const audits = await auditRes.json();
-      assert.ok(Array.isArray(audits) && audits.length > 0, 'Audit log recorded for assignment creation');
+      const pool = getPgPool();
+      const auditRes = await pool.query(
+        'SELECT * FROM public.audit_logs WHERE merchant_id = $1 AND target = $2',
+        [tenant.hospital.id, 'doctor_front_desk_assignments']
+      );
+      assert.ok(auditRes.rows.length > 0, 'Audit log recorded for assignment creation');
 
       // Cleanup test assignment
       await fetch(`${url}/rest/v1/doctor_front_desk_assignments?id=eq.${assignment.id}`, {
@@ -524,7 +565,7 @@ describe('Sub-Agent SA7: ETA, Notifications & Governance (F1-F6, G5)', () => {
         caseId: 'G5',
         scenario: 'Audit logging on doctor-front desk assignment changes',
         status: 'PASS',
-        evidence: `Audit log recorded action=ASSIGNMENT_CREATED for user ${fd.email} -> doc ${doc.name}. Total logs: ${audits.length}.`
+        evidence: `Audit log recorded action=ASSIGNMENT_CREATED for user ${fd.email} -> doc ${doc.name}. Total logs: ${auditRes.rows.length}.`
       });
     } catch (err) {
       writer.addCaseResult({ caseId: 'G5', scenario: 'Audit logging on doctor-front desk assignment changes', status: 'FAIL', evidence: err.message });
