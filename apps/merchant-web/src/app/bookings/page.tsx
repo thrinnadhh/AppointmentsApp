@@ -112,6 +112,27 @@ export default function BookingsManagementPage() {
     }
   };
 
+  const handleExpireStaleStandby = async () => {
+    try {
+      const targetProvider = selectedProviderId !== 'ALL' ? selectedProviderId : undefined;
+      const { data, error } = await supabase.rpc('expire_stale_standby_queue', {
+        p_threshold_minutes: 45,
+        p_provider_id: targetProvider
+      });
+      if (error) {
+        setFeedbackToast(`⚠️ ${error.message}`);
+      } else {
+        const res = data as any;
+        setFeedbackToast(`🧹 Standby Sweep: Expired ${res.expired_count} overdue patients (>45m wait).`);
+        await loadData();
+      }
+    } catch {
+      setFeedbackToast('⚠️ Error running standby sweep.');
+    } finally {
+      setTimeout(() => setFeedbackToast(null), 4000);
+    }
+  };
+
   // Sync selected provider when active provider changes
   useEffect(() => {
     if (activeProvider?.id && !isSuperAdmin) {
@@ -155,20 +176,33 @@ export default function BookingsManagementPage() {
   useEffect(() => {
     loadData();
 
+    if (!selectedProviderId) return;
+
     const channel = supabase
-      .channel(`bookings-mgmt-realtime-${selectedProviderId || 'all'}`)
+      .channel(`bookings-mgmt-realtime-${selectedProviderId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'bookings',
-          filter: selectedProviderId ? `provider_id=eq.${selectedProviderId}` : undefined,
+          filter: `provider_id=eq.${selectedProviderId}`,
         },
         (payload) => {
-          const newStatus = (payload.new as { status?: string })?.status;
+          const eventType = payload.eventType;
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
+          const newStatus = newRec?.status;
           setFeedbackToast((current) => current || `Realtime Sync: Slot ${newStatus || 'updated'}`);
-          loadData();
+
+          if (eventType === 'INSERT' && newRec) {
+            setBookings((prev) => (prev.some((b) => b.id === newRec.id) ? prev : [newRec, ...prev]));
+          } else if (eventType === 'UPDATE' && newRec) {
+            setBookings((prev) => prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b)));
+          } else if (eventType === 'DELETE' && oldRec?.id) {
+            setBookings((prev) => prev.filter((b) => b.id !== oldRec.id));
+          }
+
           setTimeout(() => setFeedbackToast(null), 4000);
         }
       )
@@ -504,6 +538,16 @@ export default function BookingsManagementPage() {
               </select>
             </div>
           )}
+
+          <button
+            onClick={handleExpireStaleStandby}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+            title="Auto-expire patients in Standby Queue waiting longer than 45 minutes"
+          >
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
+            <span>Sweep Standby (&gt;45m)</span>
+          </button>
 
           <button
             onClick={() => loadData()}

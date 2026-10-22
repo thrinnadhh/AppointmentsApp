@@ -188,7 +188,14 @@ export default function App() {
             setConfirmationToast('Appointment Confirmed on Supabase! Status is now CONFIRMED.');
             setTimeout(() => setConfirmationToast(null), 10000);
           }
-          loadBookings();
+
+          if (payload.eventType === 'UPDATE' && (newRec as any)?.id) {
+            setCustomerBookings((prev) =>
+              prev.map((b) => (b.id === (newRec as any).id ? { ...b, ...(newRec as any) } : b))
+            );
+          } else {
+            loadBookings();
+          }
         }
       )
       .subscribe();

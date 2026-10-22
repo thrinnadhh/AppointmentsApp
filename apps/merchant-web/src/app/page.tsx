@@ -836,9 +836,20 @@ export default function MerchantOverviewPage() {
         { event: '*', schema: 'public', table: 'bookings', filter: `provider_id=eq.${selectedProviderId}` },
         (payload) => {
           if (!active) return;
-          const newStatus = (payload.new as { status?: string })?.status;
+          const eventType = payload.eventType;
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
+          const newStatus = newRec?.status;
           setRecentNotification(`Realtime update: Booking ${newStatus || 'updated'}`);
-          void loadData();
+
+          if (eventType === 'INSERT' && newRec) {
+            setBookings((prev) => (prev.some((b) => b.id === newRec.id) ? prev : [newRec, ...prev]));
+          } else if (eventType === 'UPDATE' && newRec) {
+            setBookings((prev) => prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b)));
+          } else if (eventType === 'DELETE' && oldRec?.id) {
+            setBookings((prev) => prev.filter((b) => b.id !== oldRec.id));
+          }
+
           clearTimeout(notificationTimer);
           notificationTimer = setTimeout(() => setRecentNotification(null), 5000);
         }
@@ -852,7 +863,7 @@ export default function MerchantOverviewPage() {
       clearTimeout(notificationTimer);
       void supabase.removeChannel(channel);
     };
-  }, [loadData, selectedProviderId, isAuthenticated, isTenantLoading]);
+  }, [selectedProviderId, isAuthenticated, isTenantLoading]);
 
   // Venue Appointment Metrics
   const todaysBookings = bookings.filter((booking) => booking.provider_id === selectedProviderId &&
