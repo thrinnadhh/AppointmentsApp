@@ -9,7 +9,8 @@ import {
   ArrowRight, 
   AlertCircle, 
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  User
 } from 'lucide-react';
 import { supabase, fetchTenantContextData } from '@/lib/supabase';
 
@@ -36,6 +37,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // Register Form State
+  const [regFullName, setRegFullName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+
   // UI State
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -46,6 +53,9 @@ export default function LoginPage() {
     setMounted(true);
 
     if (typeof window !== 'undefined') {
+      // Clear any stale test/mock merchant session storage keys
+      window.sessionStorage.removeItem('test_merchant_user');
+
       const params = new URLSearchParams(window.location.search);
       const modeParam = params.get('mode');
       if (modeParam === 'signin' || modeParam === 'register') {
@@ -175,6 +185,62 @@ export default function LoginPage() {
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = regFullName.trim();
+    const cleanEmail = regEmail.trim().toLowerCase();
+
+    if (!cleanName || !cleanEmail || !regPassword) {
+      setErrorMsg('Please enter your full name, email, and password.');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setErrorMsg('Passwords do not match. Please verify your password confirmation.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem('test_merchant_user');
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: regPassword,
+        options: {
+          data: {
+            full_name: cleanName,
+            role: 'merchant',
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user || data.session) {
+        setSuccessMsg('Account registered successfully! Redirecting to venue setup...');
+        setTimeout(() => {
+          window.location.href = '/register';
+        }, 500);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -200,27 +266,11 @@ export default function LoginPage() {
       }
 
       if (!isGoogleEnabled) {
-        if (isLocalHost && authMode === 'register') {
-          // Seamless local development provision for testing shop registration
-          const devEmail = `admin.dev.${Date.now().toString().slice(-4)}@test-tirupati.local`;
-          const devPass = 'HospitalTest2026!';
-          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-            email: devEmail,
-            password: devPass,
-            options: {
-              data: { full_name: 'Local Hospital Admin' },
-            },
-          });
-          if (!signUpErr && (signUpData?.session || signUpData?.user)) {
-            setSuccessMsg('Local test account initialized! Launching shop registration...');
-            setTimeout(() => {
-              window.location.href = '/register';
-            }, 500);
-            return;
-          }
-        }
-
-        setErrorMsg('Google OAuth is not enabled in this local Supabase instance. Please sign in below using your registered credentials (e.g. admin.apex@test-tirupati.local / HospitalTest2026!).');
+        setErrorMsg(
+          authMode === 'register'
+            ? 'Google OAuth is not configured in this environment. Please register your account directly below using your email and password.'
+            : 'Google OAuth is not configured in this environment. Please sign in below using your registered email and password.'
+        );
         setLoading(false);
         return;
       }
@@ -429,7 +479,7 @@ export default function LoginPage() {
                 color: 'var(--color-ink-tertiary)',
                 background: 'var(--color-surface-raised)',
               }}>
-                {authMode === 'signin' ? 'Or sign in with password' : 'How registration works'}
+                {authMode === 'signin' ? 'Or sign in with password' : 'Or register with email & password'}
               </span>
             </div>
           </div>
@@ -452,7 +502,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="owner@tirupati-clinic.com"
+                    placeholder="name@company.com"
                     className="input"
                     style={{ paddingLeft: 34 }}
                   />
@@ -506,55 +556,171 @@ export default function LoginPage() {
             </form>
           )}
 
-          {/* Register Explanation */}
+          {/* Business Registration Form */}
           {authMode === 'register' && (
-            <div style={{
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-primary-muted)',
-              background: 'var(--color-primary-light)',
-              padding: '20px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
-                <Sparkles style={{ width: 15, height: 15, color: 'var(--color-primary)' }} />
-                <h4 style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
-                  Two-Step Business Registration
-                </h4>
-              </div>
-              <ol style={{ listStyle: 'none', padding: 0, margin: '0 0 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[
-                  { n: 1, label: 'Verify Email with Google:', desc: 'Click "Register with Google" above to link your official business email address.' },
-                  { n: 2, label: 'Shop Profile & Photo Setup:', desc: 'Enter your venue name, owner contact, address, and upload your storefront photo.' },
-                ].map(({ n, label, desc }) => (
-                  <li key={n} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <span style={{
-                      flexShrink: 0,
-                      width: 20,
-                      height: 20,
-                      borderRadius: '50%',
-                      background: n === 1 ? 'var(--color-primary)' : 'var(--color-primary-muted)',
-                      color: n === 1 ? '#fff' : 'var(--color-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      fontFamily: 'var(--font-mono)',
-                    }}>{n}</span>
-                    <div style={{ fontSize: 13, color: 'var(--color-ink-secondary)', lineHeight: 1.5 }}>
-                      <strong style={{ color: 'var(--color-ink)', fontWeight: 600 }}>{label}</strong>{' '}{desc}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <div style={{ borderTop: '1px solid var(--color-primary-muted)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: 'var(--color-ink-tertiary)' }}>Already have an account?</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <form style={{ display: 'flex', flexDirection: 'column', gap: 14 }} onSubmit={handleRegister}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-ink-secondary)', marginBottom: 6 }}>
+                    Administrator / Owner Full Name *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <User style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'var(--color-ink-tertiary)', pointerEvents: 'none' }} />
+                    <input
+                      id="register-full-name"
+                      name="registerFullName"
+                      data-testid="register-full-name"
+                      aria-label="Administrator Full Name"
+                      type="text"
+                      required
+                      value={regFullName}
+                      onChange={(e) => setRegFullName(e.target.value)}
+                      placeholder="e.g. Dr. Rajesh Kumar"
+                      className="input"
+                      style={{ paddingLeft: 34 }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-ink-secondary)', marginBottom: 6 }}>
+                    Business or Hospital Email *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Mail style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'var(--color-ink-tertiary)', pointerEvents: 'none' }} />
+                    <input
+                      id="register-email"
+                      name="registerEmail"
+                      data-testid="register-email"
+                      aria-label="Business Email"
+                      type="email"
+                      required
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="e.g. contact@cityhospital.com"
+                      className="input"
+                      style={{ paddingLeft: 34 }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label htmlFor="register-password" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ink-secondary)' }}>
+                      Create Password *
+                    </label>
+                    <span style={{ fontSize: 11, color: 'var(--color-ink-tertiary)' }}>Min 6 characters</span>
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <Lock style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'var(--color-ink-tertiary)', pointerEvents: 'none' }} />
+                    <input
+                      id="register-password"
+                      name="registerPassword"
+                      data-testid="register-password"
+                      aria-label="Password"
+                      type="password"
+                      required
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="••••••••••"
+                      className="input"
+                      style={{ paddingLeft: 34 }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="register-confirm-password" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-ink-secondary)', marginBottom: 6 }}>
+                    Confirm Password *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Lock style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'var(--color-ink-tertiary)', pointerEvents: 'none' }} />
+                    <input
+                      id="register-confirm-password"
+                      name="registerConfirmPassword"
+                      data-testid="register-confirm-password"
+                      aria-label="Confirm Password"
+                      type="password"
+                      required
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      placeholder="••••••••••"
+                      className="input"
+                      style={{ paddingLeft: 34 }}
+                    />
+                  </div>
+                </div>
+
                 <button
-                  type="button"
-                  onClick={() => setAuthMode('signin')}
-                  style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  type="submit"
+                  data-testid="register-submit"
+                  disabled={loading}
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', padding: '11px 20px', fontSize: 14, marginTop: 4 }}
                 >
-                  Sign In →
+                  {loading ? (
+                    <>
+                      <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} />
+                      Registering Account...
+                    </>
+                  ) : (
+                    <>
+                      Create Account &amp; Proceed to Venue Setup
+                      <ArrowRight style={{ width: 15, height: 15 }} />
+                    </>
+                  )}
                 </button>
+              </form>
+
+              {/* Register Explanation */}
+              <div style={{
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--color-primary-muted)',
+                background: 'var(--color-primary-light)',
+                padding: '16px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+                  <Sparkles style={{ width: 15, height: 15, color: 'var(--color-primary)' }} />
+                  <h4 style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-success)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
+                    Two-Step Business Registration
+                  </h4>
+                </div>
+                <ol style={{ listStyle: 'none', padding: 0, margin: '0 0 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { n: 1, label: 'Create Account:', desc: 'Register with your official business email address and password.' },
+                    { n: 2, label: 'Venue Profile & Setup:', desc: 'Enter your clinic or business details, timings, and storefront photo.' },
+                  ].map(({ n, label, desc }) => (
+                    <li key={n} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <span style={{
+                        flexShrink: 0,
+                        width: 18,
+                        height: 18,
+                        borderRadius: '50%',
+                        background: n === 1 ? 'var(--color-primary)' : 'var(--color-primary-muted)',
+                        color: n === 1 ? '#fff' : 'var(--color-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        fontFamily: 'var(--font-mono)',
+                      }}>{n}</span>
+                      <div style={{ fontSize: 12, color: 'var(--color-ink-secondary)', lineHeight: 1.4 }}>
+                        <strong style={{ color: 'var(--color-ink)', fontWeight: 600 }}>{label}</strong>{' '}{desc}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <div style={{ borderTop: '1px solid var(--color-primary-muted)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-ink-tertiary)' }}>Already registered?</span>
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode('signin'); setErrorMsg(null); }}
+                    style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    Sign In →
+                  </button>
+                </div>
               </div>
             </div>
           )}

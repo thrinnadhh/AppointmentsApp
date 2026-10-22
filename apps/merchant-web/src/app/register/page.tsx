@@ -75,18 +75,14 @@ export default function ShopRegistrationPage() {
               authUser = JSON.parse(testUserRaw);
             } catch {}
           }
-          if (!authUser && window.location.search.includes('dev=true')) {
-            authUser = {
-              id: 'mock-first-time-dev-user',
-              email: 'new.owner@tirupati-appointments.com',
-              user_metadata: { full_name: 'Dr. Trinadh Reddy' },
-            };
+          if (!authUser && isNonProduction && window.location.search.includes('dev=true')) {
+            authUser = null;
           }
         }
 
         if (!authUser) {
-          // Not authenticated yet -> Must log in through Google first to verify email
-          router.replace('/login');
+          // Not authenticated yet -> Must log in or register first
+          router.replace('/login?mode=register');
           return;
         }
 
@@ -342,7 +338,7 @@ export default function ShopRegistrationPage() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Dr. Trinadh Reddy (Hospital Admin)"
+                placeholder="e.g. Dr. Rajesh Kumar (Hospital Admin)"
                 className="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -364,7 +360,7 @@ export default function ShopRegistrationPage() {
                 required
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
-                placeholder="e.g. Venkateswara Super Specialty Hospital"
+                placeholder="e.g. City Multi-Specialty Hospital"
                 className="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold"
               />
             </div>
@@ -411,7 +407,7 @@ export default function ShopRegistrationPage() {
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="e.g. +91 98480 12345"
+                placeholder="e.g. +91 98765 43210"
                 className="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -433,7 +429,7 @@ export default function ShopRegistrationPage() {
                 required
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="e.g. AIR Bypass Road, Near Alipiri, Tirupati"
+                placeholder="e.g. Medical College Road, Tirupati"
                 className="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
