@@ -1570,34 +1570,40 @@ export async function joinCityWaitlist(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const cityName = cityId.charAt(0).toUpperCase() + cityId.slice(1).toLowerCase();
-    const { error } = await supabase.from('city_waitlist').insert({
-      city_id: cityId,
-      city_name: cityName,
-      contact_info: contactInfo.trim(),
-      role_interest: roleInterest,
-      notes: notes || null,
+
+    // 1. Invoke SECURITY DEFINER RPC with input validation & deduplication
+    const { data, error } = await (supabase.rpc as any)('submit_city_waitlist', {
+      p_city_name: cityName,
+      p_phone: contactInfo.trim(),
+      p_vertical_interest: roleInterest,
+      p_notes: notes || null,
     });
 
-    if (error) {
-      console.warn('Supabase waitlist insert error:', error.message);
-      if (API_BASE_URL) {
-        try {
-          const res = await fetch(`${API_BASE_URL}/api/admin/waitlist`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
-          });
-          if (res.ok) return { success: true };
-        } catch (fErr) {
-          console.warn('Waitlist fallback fetch failed:', fErr);
-        }
-      }
+    if (!error && data?.success) {
       return { success: true };
+    }
+
+    // 2. Server API route fallback
+    if (API_BASE_URL) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/waitlist`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
+        });
+        if (res.ok) return { success: true };
+      } catch (fErr) {
+        console.warn('Waitlist fallback fetch failed:', fErr);
+      }
+    }
+
+    if (error) {
+      return { success: false, error: error.message };
     }
     return { success: true };
   } catch (err: unknown) {
-    console.warn('Waitlist exception:', err);
-    return { success: true };
+    const msg = err instanceof Error ? err.message : 'Waitlist submission error';
+    return { success: false, error: msg };
   }
 }
 
