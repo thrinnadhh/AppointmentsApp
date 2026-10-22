@@ -25,6 +25,8 @@ import { supabase } from '@/lib/supabase';
 interface TicketData {
   booking: {
     id: string;
+    resource_id?: string;
+    provider_id?: string;
     reference_code: string;
     slot_start: string;
     slot_end: string;
@@ -34,6 +36,7 @@ interface TicketData {
     is_present: boolean;
     checked_in_at: string | null;
     checked_in_method: string | null;
+    queue_position?: number | null;
   };
   customer: {
     name: string;
@@ -46,6 +49,7 @@ interface TicketData {
     phone: string;
   };
   doctor: {
+    id?: string;
     name: string;
     department: string;
     duration_minutes: number;
@@ -112,11 +116,40 @@ export default function CustomerTicketPage({
     }
   };
 
+  // Determine if patient is within next 3 positions or ETA is <= 30 minutes
+  const isNearPatientTurn = () => {
+    // 1. Check position in current rolling queue
+    const patientSlotIdx = queueSlots.findIndex(
+      (s) => s.bookingId === id || s.isCurrentPatient
+    );
+    if (patientSlotIdx !== -1 && patientSlotIdx <= 3) {
+      return true;
+    }
+
+    // 2. Check booking queue_position from DB
+    if (data?.booking?.queue_position != null && data.booking.queue_position <= 3) {
+      return true;
+    }
+
+    // 3. Check ETA within 30 minutes
+    if (data?.booking?.slot_start) {
+      const nowMs = Date.now();
+      const slotStartMs = new Date(data.booking.slot_start).getTime();
+      const etaMinutes = (slotStartMs - nowMs) / (60 * 1000);
+      if (etaMinutes <= 30 && etaMinutes >= -60) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // 1. Initial fetch & direct row realtime subscription
   useEffect(() => {
     fetchTicket(true);
     fetchQueueAndHistory();
 
-    // Realtime subscription for instant status/check-in updates for this booking
+    // Direct row subscription for own booking changes (check-in PIN verified, payment, cancellation)
     const channel = supabase
       .channel(`ticket-live-${id}`)
       .on(
@@ -142,6 +175,7 @@ export default function CustomerTicketPage({
                   is_present: updated.is_present ?? prev.booking.is_present,
                   checked_in_at: updated.checked_in_at ?? prev.booking.checked_in_at,
                   checked_in_method: updated.checked_in_method ?? prev.booking.checked_in_method,
+                  queue_position: updated.queue_position ?? prev.booking.queue_position,
                 },
               };
             });
@@ -152,34 +186,85 @@ export default function CustomerTicketPage({
       )
       .subscribe();
 
-    // Slow fallback poll (45 seconds) that pauses when the tab is hidden
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        return;
-      }
-      fetchTicket(false);
-      fetchQueueAndHistory();
-    }, 45000);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
 
-    // Visibility listener: refetch immediately when switching back to tab
+  // 2. No-PII Realtime Broadcast channel per doctor and day (anonymous-safe)
+  useEffect(() => {
+    const doctorId = data?.doctor?.id || data?.booking?.resource_id;
+    const dateStr = data?.booking?.slot_start
+      ? data.booking.slot_start.slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
+
+    if (!doctorId) return;
+
+    const channelName = `doctor-queue-${doctorId}-${dateStr}`;
+    const broadcastChannel = supabase.channel(channelName, {
+      config: { broadcast: { self: false } },
+    });
+
+    broadcastChannel
+      .on('broadcast', { event: 'queue_update' }, () => {
+        fetchTicket(false);
+        fetchQueueAndHistory();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(broadcastChannel);
+    };
+  }, [data?.doctor?.id, data?.booking?.resource_id, data?.booking?.slot_start]);
+
+  // 3. Adaptive Refresh: 6s when within next 3 positions or ETA <= 30m, 35s otherwise, paused when hidden
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isMounted = true;
+
+    const scheduleNextPoll = () => {
+      if (!isMounted) return;
+      const nearTurn = isNearPatientTurn();
+      // 5-10s (6000ms) near patient turn / <=30m ETA, 30-60s (35000ms) otherwise
+      const pollDelayMs = nearTurn ? 6000 : 35000;
+
+      timeoutId = setTimeout(async () => {
+        if (!isMounted) return;
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+          // Paused while tab is hidden
+          return;
+        }
+        await Promise.all([fetchTicket(false), fetchQueueAndHistory()]);
+        if (isMounted) {
+          scheduleNextPoll();
+        }
+      }, pollDelayMs);
+    };
+
+    scheduleNextPoll();
+
+    // Visibility change handler: pause when hidden, immediately refetch and restart loop on visible
     const handleVisibilityChange = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         fetchTicket(false);
         fetchQueueAndHistory();
+        if (timeoutId) clearTimeout(timeoutId);
+        scheduleNextPoll();
       }
     };
+
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
 
     return () => {
-      supabase.removeChannel(channel);
-      clearInterval(interval);
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
     };
-  }, [id]);
+  }, [data, queueSlots, id]);
 
   const handleCopyCode = () => {
     if (!data?.checkin_code) return;
@@ -233,7 +318,7 @@ export default function CustomerTicketPage({
       <div className="flex items-center justify-between mb-4 text-xs text-gray-500">
         <span className="flex items-center gap-1.5 font-medium text-emerald-800">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Live Reception Sync Active
+          {isNearPatientTurn() ? 'Priority Queue Sync Active (6s)' : 'Live Reception Sync Active'}
         </span>
         <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
       </div>

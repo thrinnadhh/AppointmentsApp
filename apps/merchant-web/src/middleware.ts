@@ -32,6 +32,7 @@ const PUBLIC_API_ROUTES = [
   '/api/logs/ingest',
   '/api/ticket/',
   '/api/customer/',
+  '/api/queue/',
 ];
 
 function isPrivateIpv4(host: string): boolean {

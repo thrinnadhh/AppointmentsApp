@@ -44,7 +44,7 @@ export async function GET(
     // 4. Fetch resource / doctor
     const { data: resource } = await supabaseAdmin
       .from('resources')
-      .select('name, department, duration_minutes, price')
+      .select('id, name, department, duration_minutes, price')
       .eq('id', booking.resource_id)
       .maybeSingle();
 
@@ -59,6 +59,8 @@ export async function GET(
       success: true,
       booking: {
         id: booking.id,
+        resource_id: booking.resource_id,
+        provider_id: booking.provider_id,
         reference_code: booking.reference_code,
         slot_start: booking.slot_start,
         slot_end: booking.slot_end,
@@ -80,6 +82,7 @@ export async function GET(
         phone: provider?.phone || ''
       },
       doctor: {
+        id: resource?.id || booking.resource_id,
         name: resource?.name || 'Consultant Doctor',
         department: resource?.department || 'General',
         duration_minutes: resource?.duration_minutes || 2,
