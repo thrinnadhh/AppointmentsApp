@@ -30,7 +30,7 @@ import { HospitalAccessContext } from '@appointments/shared';
 export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
-  const { activeProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
+  const { activeProvider, verticalConfig, isSuperAdmin, isHospitalAdmin, isLocked } = useMerchantTenant();
 
   const [currentUser, setCurrentUser] = useState<{
     email?: string;
@@ -148,9 +148,15 @@ export default function Navigation() {
         : []),
     ];
   } else {
-    // Owner / Admin / General Merchant navigation
-    // Team page strictly gated: ONLY for hospital owners and superadmins
-    const canSeeTeam = isHospitalVenue && (isSuperAdmin || currentUser?.role === 'admin' || hospitalContext?.role === 'owner');
+    // Team page accessible for hospital administrators, owners, and superadmins
+    const canSeeTeam =
+      isHospitalVenue &&
+      (isSuperAdmin ||
+        isHospitalAdmin ||
+        currentUser?.role === 'admin' ||
+        currentUser?.role === 'merchant' ||
+        hospitalContext?.role === 'owner' ||
+        hospitalContext?.role === 'admin');
 
     navItems = [
       { href: '/', label: 'Overview', icon: LayoutDashboard },

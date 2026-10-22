@@ -435,6 +435,17 @@ export async function isCallerHospitalAdminForProvider(
     return true;
   }
 
+  // 4. Check hospital_role RPC
+  try {
+    const { data: hRole } = await (supabaseAdmin.rpc as any)('hospital_role', {
+      p_provider_id: providerId,
+      p_user_id: callerId,
+    });
+    if (hRole === 'admin' || hRole === 'owner') {
+      return true;
+    }
+  } catch {}
+
   return false;
 }
 

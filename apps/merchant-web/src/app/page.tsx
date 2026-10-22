@@ -368,6 +368,15 @@ export default function MerchantOverviewPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-dismiss floating notifications without layout shifts
+  useEffect(() => {
+    if (!recentNotification) return;
+    const timer = setTimeout(() => {
+      setRecentNotification(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [recentNotification]);
+
   // Sync selected provider when tenant context changes
   useEffect(() => {
     setSelectedProviderId(tenantProviderId || '');
@@ -1249,16 +1258,21 @@ export default function MerchantOverviewPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Live Sync Toast */}
+      {/* Floating Bottom Corner Toast Notification (Zero layout shift) */}
       {recentNotification && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl flex items-center justify-between text-sm animate-pulse shadow-xs">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-600" />
-            <span className="font-semibold">{recentNotification}</span>
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="doctor-status-toast"
+          className="fixed bottom-6 right-6 z-50 max-w-sm w-auto bg-slate-900/95 text-white backdrop-blur-md px-4 py-3 rounded-xl shadow-xl border border-slate-700/60 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 pointer-events-auto"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="text-xs sm:text-sm font-medium text-slate-100">{recentNotification}</span>
           </div>
           <button
             onClick={() => setRecentNotification(null)}
-            className="text-emerald-700 hover:text-emerald-900 p-1 text-xs"
+            className="text-slate-400 hover:text-white p-1 rounded-md transition-colors shrink-0 ml-2"
             aria-label="Dismiss notification"
           >
             ✕

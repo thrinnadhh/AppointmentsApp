@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { 
   Users, 
+  UserPlus,
   Plus, 
   Clock, 
   Check, 
@@ -506,6 +507,17 @@ function ResourcesManagementContent() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
           </button>
+
+          {isHospitalAdmin && selectedVenue && (
+            <Link
+              href={`/team?providerId=${selectedVenue.id}`}
+              className="inline-flex items-center px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition shadow-xs"
+              title="Manage Team & Assign Front Desk Managers to Doctors"
+            >
+              <UserPlus className="w-4 h-4 mr-1.5 text-emerald-700" />
+              Manage Team & Desk Assignments
+            </Link>
+          )}
 
           {isHospitalAdmin ? (
             <button
@@ -1158,11 +1170,11 @@ function ResourcesManagementContent() {
                 <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                   <Link
                     href={`/team?providerId=${res.provider_id}&doctorId=${res.id}`}
-                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200/70 transition-colors shadow-2xs"
                     title="Assign Front Desk Managers for this doctor"
                   >
-                    <Users className="w-3.5 h-3.5" />
-                    <span>Front Desk</span>
+                    <UserPlus className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Assign Front Desk</span>
                   </Link>
                   <div className="flex items-center gap-2">
                     <button

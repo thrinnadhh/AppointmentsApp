@@ -1150,11 +1150,11 @@ function TeamManagementContent() {
                       className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
                     >
                       <option value="">-- Choose a staff member --</option>
-                      {members
-                        .filter((m) => !selectedDoctorForAssignment.front_desk_managers.some((fd) => fd.user_id === m.id))
+                      {allRosterMembers
+                        .filter((m) => !m.id.startsWith('doc-') && !m.id.startsWith('fd-') && !selectedDoctorForAssignment.front_desk_managers.some((fd) => fd.user_id === m.id))
                         .map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.full_name || 'Staff'} ({m.email})
+                            {m.full_name || 'Staff'} ({m.email || 'No email'})
                           </option>
                         ))}
                     </select>
