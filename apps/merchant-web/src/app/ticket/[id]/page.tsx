@@ -20,6 +20,7 @@ import {
 import { RollingTenSlotQueue } from '@/components/RollingTenSlotQueue';
 import { MonthlyAttendanceCalendar } from '@/components/MonthlyAttendanceCalendar';
 import { QueueSlot, MonthlyAttendanceSummary } from '@/lib/queue-scheduler';
+import { supabase } from '@/lib/supabase';
 
 interface TicketData {
   booking: {
@@ -114,12 +115,70 @@ export default function CustomerTicketPage({
   useEffect(() => {
     fetchTicket(true);
     fetchQueueAndHistory();
-    // Poll every 3 seconds for instant live updates when reception checks in
+
+    // Realtime subscription for instant status/check-in updates for this booking
+    const channel = supabase
+      .channel(`ticket-live-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `id=eq.${id}`,
+        },
+        (payload) => {
+          if (payload.new && typeof payload.new === 'object') {
+            const updated = payload.new as any;
+            setData((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                booking: {
+                  ...prev.booking,
+                  status: updated.status ?? prev.booking.status,
+                  payment_status: updated.payment_status ?? prev.booking.payment_status,
+                  deposit_amount: updated.deposit_amount ?? prev.booking.deposit_amount,
+                  is_present: updated.is_present ?? prev.booking.is_present,
+                  checked_in_at: updated.checked_in_at ?? prev.booking.checked_in_at,
+                  checked_in_method: updated.checked_in_method ?? prev.booking.checked_in_method,
+                },
+              };
+            });
+            setLastUpdated(new Date());
+          }
+          fetchQueueAndHistory();
+        }
+      )
+      .subscribe();
+
+    // Slow fallback poll (45 seconds) that pauses when the tab is hidden
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
       fetchTicket(false);
       fetchQueueAndHistory();
-    }, 3000);
-    return () => clearInterval(interval);
+    }, 45000);
+
+    // Visibility listener: refetch immediately when switching back to tab
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchTicket(false);
+        fetchQueueAndHistory();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
   }, [id]);
 
   const handleCopyCode = () => {
