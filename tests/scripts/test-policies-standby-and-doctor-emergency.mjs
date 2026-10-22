@@ -100,8 +100,8 @@ async function runPolicyVerificationSuite() {
     const prov = provRes.rows[0];
     const docRes = await client.query(`SELECT id FROM public.resources WHERE provider_id = $1 LIMIT 1`, [prov.id]);
     const doc = docRes.rows[0];
-    const custRes = await client.query(`SELECT id, full_name FROM public.profiles WHERE role = 'customer' LIMIT 2`);
-    const [c1, c2] = custRes.rows;
+    const custRes = await client.query(`SELECT id, full_name FROM public.profiles WHERE role = 'customer' LIMIT 3`);
+    const [c1, c2, c3] = custRes.rows;
 
     await client.query("SET LOCAL app.trusted_write = 'true'");
 
@@ -120,9 +120,10 @@ async function runPolicyVerificationSuite() {
 
     await client.query("DELETE FROM public.bookings WHERE provider_id = $1 AND status IN ('WAITING', 'UP_NEXT')", [prov.id]);
 
-    // Create 2 standby bookings:
-    // b1: checked in at 09:00 IST (60 mins ago at 10:00 -> EXPIRED)
-    // b2: checked in at 09:30 IST (30 mins ago at 10:00 -> NOT EXPIRED)
+    // Create 3 bookings:
+    // b1 (Standby): checked in at 09:00 IST for 08:50 slot (late arrival; 60 mins ago at 10:00 -> EXPIRED)
+    // b2 (Standby): checked in at 09:30 IST for 09:20 slot (late arrival; 30 mins ago at 10:00 -> NOT EXPIRED)
+    // b3 (On-Time): checked in at 08:45 IST for 08:50 slot (on-time early arrival; 75 mins ago at 10:00 -> MUST NOT EXPIRE!)
     const b1Res = await client.query(
       `INSERT INTO public.bookings (
         customer_id, provider_id, resource_id, slot_start, slot_end,
@@ -147,23 +148,41 @@ async function runPolicyVerificationSuite() {
     );
     const b2Id = b2Res.rows[0].id;
 
+    const b3Res = await client.query(
+      `INSERT INTO public.bookings (
+        customer_id, provider_id, resource_id, slot_start, slot_end,
+        status, payment_status, deposit_amount, is_present, checked_in_at
+      ) VALUES (
+        $1, $2, $3, '2026-10-22T08:50:00+05:30', '2026-10-22T09:05:00+05:30',
+        'WAITING', 'CAPTURED', 100, true, '2026-10-22T08:45:00+05:30'
+      ) RETURNING id`,
+      [(c3 || c1).id, prov.id, doc.id]
+    );
+    const b3Id = b3Res.rows[0].id;
+
     // Call public.expire_stale_standby_queue(45, prov.id)
     const rpcRes = await client.query(`SELECT public.expire_stale_standby_queue(45, $1) AS result`, [prov.id]);
     const rpcResult = rpcRes.rows[0].result;
 
     assert.equal(rpcResult.success, true, 'RPC returned success');
-    assert.equal(rpcResult.expired_count, 1, 'Exactly 1 booking expired');
+    assert.equal(rpcResult.expired_count, 1, 'Exactly 1 booking expired (only overdue standby b1)');
     assert.ok(rpcResult.expired_booking_ids.includes(b1Id), 'b1 is in expired IDs');
+    assert.ok(!rpcResult.expired_booking_ids.includes(b3Id), 'b3 (on-time delayed patient) must NOT be expired');
 
-    // Verify b1 status in DB
+    // Verify b1 status in DB (expired standby)
     const b1Check = await client.query(`SELECT status, is_present FROM public.bookings WHERE id = $1`, [b1Id]);
     assert.equal(b1Check.rows[0].status, 'NO_SHOW', 'b1 status transitioned to NO_SHOW');
     assert.equal(b1Check.rows[0].is_present, false, 'b1 is_present is now false');
 
-    // Verify b2 status in DB (remains waiting)
+    // Verify b2 status in DB (active standby, remains waiting)
     const b2Check = await client.query(`SELECT status, is_present FROM public.bookings WHERE id = $1`, [b2Id]);
     assert.equal(b2Check.rows[0].status, 'WAITING', 'b2 remains in WAITING status');
     assert.equal(b2Check.rows[0].is_present, true, 'b2 remains present');
+
+    // Verify b3 status in DB (on-time delayed patient, strictly preserved!)
+    const b3Check = await client.query(`SELECT status, is_present FROM public.bookings WHERE id = $1`, [b3Id]);
+    assert.equal(b3Check.rows[0].status, 'WAITING', 'b3 remains in WAITING status despite 75m doctor delay');
+    assert.equal(b3Check.rows[0].is_present, true, 'b3 remains present');
 
     // Verify notification log
     const notifCheck = await client.query(
@@ -171,7 +190,7 @@ async function runPolicyVerificationSuite() {
       [b1Id]
     );
     assert.equal(notifCheck.rows.length, 1, 'Notification log generated for expired standby patient');
-    console.log('✅ PASS: RPC expire_stale_standby_queue cleanly updated b1 to NO_SHOW and emitted customer notification');
+    console.log('✅ PASS: RPC expire_stale_standby_queue cleanly updated b1 to NO_SHOW, preserved active b2, and protected on-time delayed patient b3');
 
 
     // ─────────────────────────────────────────────────────────────────────────────
