@@ -195,7 +195,8 @@ export async function fetchMerchantBookings(
       total_amount, is_followup, followup_original_booking_id, gateway_payment_id,
       hold_expires_at, created_at, updated_at, attachment_url, reminder_1h_sent_at,
       reminder_30m_sent_at, is_present, customer_name, customer_phone, no_show_count,
-      resource_name, resource_type, provider_name
+      resource_name, resource_type, provider_name, department_name, queue_position,
+      estimated_wait_minutes, checked_in_at
     `)
     .order('slot_start', { ascending: true })
     .range(offset, offset + limit - 1);
@@ -219,6 +220,39 @@ export async function fetchMerchantBookings(
     resource_type: b.resource_type || 'slot',
     provider_name: b.provider_name || 'Merchant Venue',
   }));
+}
+
+export async function fetchMerchantBookingById(
+  bookingId: string
+): Promise<MerchantBookingWithDetails | null> {
+  const { data, error } = await (supabase as any)
+    .from('merchant_bookings')
+    .select(`
+      id, reference_code, customer_id, provider_id, resource_id, department_id,
+      slot_start, slot_end, status, payment_status, deposit_amount, platform_fee,
+      total_amount, is_followup, followup_original_booking_id, gateway_payment_id,
+      hold_expires_at, created_at, updated_at, attachment_url, reminder_1h_sent_at,
+      reminder_30m_sent_at, is_present, customer_name, customer_phone, no_show_count,
+      resource_name, resource_type, provider_name, department_name, queue_position,
+      estimated_wait_minutes, checked_in_at
+    `)
+    .eq('id', bookingId)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) console.error('Error fetching single booking from merchant_bookings view:', error);
+    return null;
+  }
+
+  return {
+    ...data,
+    customer_name: data.customer_name || 'Walk-in / Guest',
+    customer_phone: data.customer_phone || 'Not provided',
+    no_show_count: data.no_show_count ?? 0,
+    resource_name: data.resource_name || 'Standard Unit',
+    resource_type: data.resource_type || 'slot',
+    provider_name: data.provider_name || 'Merchant Venue',
+  };
 }
 
 export async function revealCustomerContact(bookingId: string): Promise<{

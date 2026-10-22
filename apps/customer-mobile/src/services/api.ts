@@ -439,6 +439,38 @@ export async function fetchCustomerBookingsFromSupabase(
   }
 }
 
+export async function fetchSingleCustomerBookingFromSupabase(
+  bookingId: string
+): Promise<(Booking & { provider_name?: string; resource_name?: string }) | null> {
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(`
+        id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
+        status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
+        checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
+        queue_position, estimated_wait_minutes,
+        created_at, updated_at,
+        providers ( name ),
+        resources ( name )
+      `)
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (!error && data) {
+      const b = data as unknown as CustomerBookingRow;
+      return {
+        ...b,
+        provider_name: b.providers?.name || 'Tirupati Business',
+        resource_name: b.resources?.name || 'Assigned Staff / Unit',
+      };
+    }
+  } catch (err) {
+    console.warn('Failed to query single booking:', err);
+  }
+  return null;
+}
+
 export async function searchDirectoryOnSupabase(query: string): Promise<ProviderWithDetails[]> {
   try {
     const { data, error } = await supabase.rpc('search_directory', {

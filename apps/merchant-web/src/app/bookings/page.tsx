@@ -33,6 +33,7 @@ import {
   fetchBookingNotifications,
   manageLateQueueBooking,
   MerchantBookingWithDetails,
+  fetchMerchantBookingById,
   NotificationLog,
   admitPatient
 } from '@/lib/supabase';
@@ -188,19 +189,43 @@ export default function BookingsManagementPage() {
           table: 'bookings',
           filter: `provider_id=eq.${selectedProviderId}`,
         },
-        (payload) => {
+        async (payload) => {
           const eventType = payload.eventType;
           const newRec = payload.new as any;
           const oldRec = payload.old as any;
           const newStatus = newRec?.status;
           setFeedbackToast((current) => current || `Realtime Sync: Slot ${newStatus || 'updated'}`);
 
-          if (eventType === 'INSERT' && newRec) {
-            setBookings((prev) => (prev.some((b) => b.id === newRec.id) ? prev : [newRec, ...prev]));
-          } else if (eventType === 'UPDATE' && newRec) {
-            setBookings((prev) => prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b)));
-          } else if (eventType === 'DELETE' && oldRec?.id) {
+          if (eventType === 'DELETE' && oldRec?.id) {
             setBookings((prev) => prev.filter((b) => b.id !== oldRec.id));
+          } else if (newRec?.id) {
+            // If joined fields are missing, fetch only the one changed row by id instead of reloading the list
+            const hasJoinedFields = Boolean(newRec.customer_name && newRec.resource_name);
+            if (!hasJoinedFields) {
+              const fullRow = await fetchMerchantBookingById(newRec.id);
+              if (fullRow) {
+                setBookings((prev) => {
+                  const exists = prev.some((b) => b.id === fullRow.id);
+                  return exists
+                    ? prev.map((b) => (b.id === fullRow.id ? { ...b, ...fullRow } : b))
+                    : [fullRow, ...prev];
+                });
+              } else {
+                setBookings((prev) => {
+                  const exists = prev.some((b) => b.id === newRec.id);
+                  return exists
+                    ? prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                    : [newRec, ...prev];
+                });
+              }
+            } else {
+              setBookings((prev) => {
+                const exists = prev.some((b) => b.id === newRec.id);
+                return exists
+                  ? prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                  : [newRec, ...prev];
+              });
+            }
           }
 
           setTimeout(() => setFeedbackToast(null), 4000);

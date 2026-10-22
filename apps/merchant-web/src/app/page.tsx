@@ -39,6 +39,7 @@ import {
   verifyCheckinCodeRpc,
   markPresentManuallyRpc,
   admitPatient,
+  fetchMerchantBookingById,
   MerchantBookingWithDetails,
   Provider,
   Resource,
@@ -834,7 +835,7 @@ export default function MerchantOverviewPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookings', filter: `provider_id=eq.${selectedProviderId}` },
-        (payload) => {
+        async (payload) => {
           if (!active) return;
           const eventType = payload.eventType;
           const newRec = payload.new as any;
@@ -842,12 +843,38 @@ export default function MerchantOverviewPage() {
           const newStatus = newRec?.status;
           setRecentNotification(`Realtime update: Booking ${newStatus || 'updated'}`);
 
-          if (eventType === 'INSERT' && newRec) {
-            setBookings((prev) => (prev.some((b) => b.id === newRec.id) ? prev : [newRec, ...prev]));
-          } else if (eventType === 'UPDATE' && newRec) {
-            setBookings((prev) => prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b)));
-          } else if (eventType === 'DELETE' && oldRec?.id) {
+          if (eventType === 'DELETE' && oldRec?.id) {
             setBookings((prev) => prev.filter((b) => b.id !== oldRec.id));
+          } else if (newRec?.id) {
+            // If joined fields are missing, fetch only the one changed row by id instead of reloading the list
+            const hasJoinedFields = Boolean(newRec.customer_name && newRec.resource_name);
+            if (!hasJoinedFields) {
+              const fullRow = await fetchMerchantBookingById(newRec.id);
+              if (active) {
+                if (fullRow) {
+                  setBookings((prev) => {
+                    const exists = prev.some((b) => b.id === fullRow.id);
+                    return exists
+                      ? prev.map((b) => (b.id === fullRow.id ? { ...b, ...fullRow } : b))
+                      : [fullRow, ...prev];
+                  });
+                } else {
+                  setBookings((prev) => {
+                    const exists = prev.some((b) => b.id === newRec.id);
+                    return exists
+                      ? prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                      : [newRec, ...prev];
+                  });
+                }
+              }
+            } else {
+              setBookings((prev) => {
+                const exists = prev.some((b) => b.id === newRec.id);
+                return exists
+                  ? prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                  : [newRec, ...prev];
+              });
+            }
           }
 
           clearTimeout(notificationTimer);

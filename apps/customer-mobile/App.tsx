@@ -31,6 +31,7 @@ import AccountScreen from './src/screens/AccountScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import {
   fetchCustomerBookingsFromSupabase,
+  fetchSingleCustomerBookingFromSupabase,
   cancelBookingOnSupabase,
   rescheduleBookingOnSupabase,
   markBookingReached,
@@ -175,9 +176,10 @@ export default function App() {
           table: 'bookings',
           filter: `customer_id=eq.${activeCustomerId}`,
         },
-        (payload) => {
+        async (payload) => {
           const newStatus = (payload.new as { status?: string })?.status;
-          const newRec = payload.new as { status?: string; reminder_1h_sent_at?: string };
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
           if (newStatus === 'COMPLETED') {
             setConfirmationToast('🎉 Consultation Complete! Status changed to COMPLETED. In-app & email notification delivered.');
             setTimeout(() => setConfirmationToast(null), 12000);
@@ -189,12 +191,33 @@ export default function App() {
             setTimeout(() => setConfirmationToast(null), 10000);
           }
 
-          if (payload.eventType === 'UPDATE' && (newRec as any)?.id) {
-            setCustomerBookings((prev) =>
-              prev.map((b) => (b.id === (newRec as any).id ? { ...b, ...(newRec as any) } : b))
-            );
-          } else {
-            loadBookings();
+          if (payload.eventType === 'DELETE' && oldRec?.id) {
+            setCustomerBookings((prev) => prev.filter((b) => b.id !== oldRec.id));
+          } else if (newRec?.id) {
+            // If fields are missing (e.g. INSERT or partial payload), fetch only the one changed row by id
+            const hasJoinedFields = Boolean(newRec.provider_name && newRec.resource_name);
+            if (!hasJoinedFields) {
+              const fullRow = await fetchSingleCustomerBookingFromSupabase(newRec.id);
+              if (fullRow) {
+                setCustomerBookings((prev) => {
+                  const exists = prev.some((b) => b.id === fullRow.id);
+                  return exists
+                    ? prev.map((b) => (b.id === fullRow.id ? { ...b, ...fullRow } : b))
+                    : [fullRow, ...prev];
+                });
+              } else {
+                setCustomerBookings((prev) =>
+                  prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                );
+              }
+            } else {
+              setCustomerBookings((prev) => {
+                const exists = prev.some((b) => b.id === newRec.id);
+                return exists
+                  ? prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                  : [newRec, ...prev];
+              });
+            }
           }
         }
       )
