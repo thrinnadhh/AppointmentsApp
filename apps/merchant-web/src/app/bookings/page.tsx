@@ -116,7 +116,7 @@ export default function BookingsManagementPage() {
   const handleExpireStaleStandby = async () => {
     try {
       const targetProvider = selectedProviderId !== 'ALL' ? selectedProviderId : undefined;
-      const { data, error } = await supabase.rpc('expire_stale_standby_queue', {
+      const { data, error } = await (supabase.rpc as any)('expire_stale_standby_queue', {
         p_threshold_minutes: 45,
         p_provider_id: targetProvider
       });

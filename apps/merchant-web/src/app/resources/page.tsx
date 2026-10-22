@@ -27,7 +27,8 @@ import {
   Mail,
   Eye,
   EyeOff,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   supabase, 
@@ -113,6 +114,39 @@ function ResourcesManagementContent() {
     doctorPassword: '',
   });
   const [isUpdatingResource, setIsUpdatingResource] = useState(false);
+
+  // Doctor Emergency Cancellation Modal State
+  const [emergencyResource, setEmergencyResource] = useState<Resource | null>(null);
+  const [emergencyReason, setEmergencyReason] = useState('Doctor Acute Medical Emergency / Unscheduled Departure');
+  const [isEmergencySubmitting, setIsEmergencySubmitting] = useState(false);
+
+  const handleConfirmEmergencyCancel = async () => {
+    if (!emergencyResource) return;
+    setIsEmergencySubmitting(true);
+    try {
+      const res = await fetch('/api/doctor/emergency-cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctor_resource_id: emergencyResource.id,
+          reason: emergencyReason
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedbackToast(`🚨 Emergency cancelled ${data.cancelled_count} appointments for ${emergencyResource.name}. 100% full refund initiated.`);
+        setEmergencyResource(null);
+        await loadData();
+      } else {
+        setFeedbackToast(`⚠️ ${data.error || 'Failed to execute emergency cancellation'}`);
+      }
+    } catch (e: any) {
+      setFeedbackToast(`⚠️ Error: ${e.message}`);
+    } finally {
+      setIsEmergencySubmitting(false);
+      setTimeout(() => setFeedbackToast(null), 5000);
+    }
+  };
 
   // Keep selectedProviderId and formData in sync with tenant context
   useEffect(() => {
@@ -1133,6 +1167,15 @@ function ResourcesManagementContent() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => setEmergencyResource(res)}
+                      className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition-colors cursor-pointer"
+                      title={`Doctor Emergency Cancellation for ${res.name}`}
+                      aria-label={`Emergency Cancel for ${res.name}`}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleStartEditResource(res)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
                       title={`Edit ${res.name} details & credentials`}
@@ -1161,6 +1204,76 @@ function ResourcesManagementContent() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Doctor Emergency Cancellation Confirmation Modal */}
+      {emergencyResource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900">
+                  Doctor Emergency Cancellation
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Unscheduled Medical Departure for <span className="font-bold text-slate-800">{emergencyResource.name}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setEmergencyResource(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-950 space-y-1.5">
+              <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                <span>⚠️ Force Majeure Medical Exception</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-amber-900">
+                This will immediately cancel all remaining appointments for this doctor today.
+                Every affected patient receives an automated SMS and a <span className="font-bold underline">100% full refund</span>.
+                Because this is an authorized medical emergency, <span className="font-bold">ZERO merchant cancellation strikes</span> will be applied to your clinic.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Reason for Emergency Cancellation
+              </label>
+              <input
+                type="text"
+                value={emergencyReason}
+                onChange={(e) => setEmergencyReason(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+                placeholder="Reason provided to patients"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setEmergencyResource(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                disabled={isEmergencySubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEmergencyCancel}
+                disabled={isEmergencySubmitting}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isEmergencySubmitting ? 'Cancelling Schedule...' : 'Confirm Emergency Cancellation'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

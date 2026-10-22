@@ -142,20 +142,49 @@ export default function App() {
 
   const [confirmationToast, setConfirmationToast] = useState<string | null>(null);
 
+  const [hasMoreBookings, setHasMoreBookings] = useState(false);
+  const [isLoadingMoreBookings, setIsLoadingMoreBookings] = useState(false);
+
   const loadBookings = useCallback(async () => {
     try {
-      const data = await fetchCustomerBookingsFromSupabase(activeCustomerId);
+      const data = await fetchCustomerBookingsFromSupabase(activeCustomerId, 20, 0);
       if (data && data.length > 0) {
         setCustomerBookings((prev) => {
           const remoteIds = new Set(data.map((d) => d.id));
           const localOnly = prev.filter((p) => !remoteIds.has(p.id));
           return [...data, ...localOnly];
         });
+        setHasMoreBookings(data.length === 20);
+      } else {
+        setHasMoreBookings(false);
       }
     } catch (e) {
       console.warn('Error loading customer bookings from Supabase:', e);
     }
   }, [activeCustomerId]);
+
+  const handleLoadMoreBookings = useCallback(async () => {
+    if (isLoadingMoreBookings) return;
+    setIsLoadingMoreBookings(true);
+    try {
+      const offset = customerBookings.length;
+      const data = await fetchCustomerBookingsFromSupabase(activeCustomerId, 20, offset);
+      if (data && data.length > 0) {
+        setCustomerBookings((prev) => {
+          const remoteIds = new Set(prev.map((d) => d.id));
+          const newUnique = data.filter((d) => !remoteIds.has(d.id));
+          return [...prev, ...newUnique];
+        });
+        setHasMoreBookings(data.length === 20);
+      } else {
+        setHasMoreBookings(false);
+      }
+    } catch (e) {
+      console.warn('Error loading more customer bookings:', e);
+    } finally {
+      setIsLoadingMoreBookings(false);
+    }
+  }, [activeCustomerId, customerBookings.length, isLoadingMoreBookings]);
 
   useEffect(() => {
     if (currentScreen === 'MY_BOOKINGS') {
@@ -638,6 +667,9 @@ export default function App() {
           onCancelBooking={handleCancelBooking}
           onRescheduleBooking={handleRescheduleBooking}
           onMarkReached={handleMarkReached}
+          onLoadMore={handleLoadMoreBookings}
+          hasMore={hasMoreBookings}
+          isLoadingMore={isLoadingMoreBookings}
         />
       )}
 

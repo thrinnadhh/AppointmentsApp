@@ -21,6 +21,9 @@ interface MyBookingsScreenProps {
   onCancelBooking: (bookingId: string) => void;
   onRescheduleBooking?: (bookingId: string, newSlotStart: string, newSlotEnd: string) => Promise<void>;
   onMarkReached?: (bookingId: string) => Promise<void>;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 export default function MyBookingsScreen({
@@ -29,6 +32,9 @@ export default function MyBookingsScreen({
   onCancelBooking,
   onRescheduleBooking,
   onMarkReached,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
 }: MyBookingsScreenProps) {
   const [selectedPassBooking, setSelectedPassBooking] = useState<
     (Booking & { provider_name?: string; resource_name?: string }) | null
@@ -82,19 +88,19 @@ export default function MyBookingsScreen({
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const confirmMessage =
-        diffMinutes > 60
-          ? 'Cancel Appointment: You are cancelling more than 1 hour in advance. Your deposit will be refunded in full. Confirm cancellation?'
-          : 'Late Cancellation Warning: You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
+        diffMinutes > 30
+          ? 'Cancel Appointment: You are cancelling more than 30 minutes in advance. Your deposit will be refunded in full. Confirm cancellation?'
+          : 'Late Cancellation Warning: You are cancelling inside the 30-minute window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
       if (window.confirm(confirmMessage)) {
         onCancelBooking(bookingId);
       }
       return;
     }
 
-    if (diffMinutes > 60) {
+    if (diffMinutes > 30) {
       Alert.alert(
         'Cancel Appointment',
-        'You are cancelling more than 1 hour in advance. Your deposit will be refunded in full.',
+        'You are cancelling more than 30 minutes in advance. Your deposit will be refunded in full.',
         [
           { text: 'Keep Booking', style: 'cancel' },
           { text: 'Confirm & Refund', style: 'destructive', onPress: () => onCancelBooking(bookingId) },
@@ -103,7 +109,7 @@ export default function MyBookingsScreen({
     } else {
       Alert.alert(
         'Late Cancellation Warning',
-        'You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited to the business.',
+        'You are cancelling inside the 30-minute window. Under the policy, your deposit will be forfeited to the business.',
         [
           { text: 'Keep Booking', style: 'cancel' },
           { text: 'Forfeit & Cancel', style: 'destructive', onPress: () => onCancelBooking(bookingId) },
@@ -338,6 +344,21 @@ export default function MyBookingsScreen({
               </View>
             );
           })
+        )}
+
+        {hasMore && (
+          <TouchableOpacity
+            style={styles.loadMoreBtn}
+            onPress={onLoadMore}
+            disabled={isLoadingMore}
+            accessibilityRole="button"
+            accessibilityLabel="Load more bookings"
+            testID="load-more-bookings-btn"
+          >
+            <Text style={styles.loadMoreBtnText}>
+              {isLoadingMore ? 'Loading Older Appointments...' : 'Load More Bookings (Older) ↓'}
+            </Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
 
@@ -911,5 +932,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#92400e',
     lineHeight: 15,
+  },
+  loadMoreBtn: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#cbd5e1',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreBtnText: {
+    color: '#334155',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
