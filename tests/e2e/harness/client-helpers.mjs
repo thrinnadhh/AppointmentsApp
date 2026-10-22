@@ -9,6 +9,18 @@
 import fs from 'fs';
 
 function getBaseUrl() {
+  const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+  const isLocalDb = dbUrl.includes('127.0.0.1') || dbUrl.includes('localhost');
+
+  if (isLocalDb && !process.env.USE_REMOTE_TEST_AUTH) {
+    return {
+      supabaseUrl: 'http://127.0.0.1:54321',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+      serviceKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
+      appUrl: 'http://localhost:3000'
+    };
+  }
+
   const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
   const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
   const anonKeyMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="([^"]+)"/);
@@ -18,6 +30,22 @@ function getBaseUrl() {
     anonKey: anonKeyMatch ? anonKeyMatch[1] : '',
     serviceKey: serviceKeyMatch ? serviceKeyMatch[1] : '',
     appUrl: 'http://localhost:3000'
+  };
+}
+
+export function getDbConfig() {
+  const { supabaseUrl, anonKey, serviceKey, appUrl } = getBaseUrl();
+  return {
+    url: supabaseUrl,
+    appUrl,
+    serviceHeaders: {
+      'apikey': serviceKey,
+      'Authorization': `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      'x-test-local-db': 'true'
+    },
+    anonKey
   };
 }
 
@@ -35,7 +63,8 @@ export class RoleClient {
       'apikey': anonKey,
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
+      'Prefer': 'return=representation',
+      'x-test-local-db': 'true'
     };
   }
 

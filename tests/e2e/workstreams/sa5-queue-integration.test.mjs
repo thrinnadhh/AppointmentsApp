@@ -23,28 +23,10 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
-import { createTenant, cleanupTenant } from '../harness/tenant-factory.mjs';
+import { createTenant, cleanupTenant, getPgPool } from '../harness/tenant-factory.mjs';
 import { SubAgentReportWriter } from '../harness/report-writer.mjs';
-import { getAdminClient, getConsultantClient, getFrontDeskClient, getCustomerClient } from '../harness/client-helpers.mjs';
+import { getAdminClient, getConsultantClient, getFrontDeskClient, getCustomerClient, getDbConfig } from '../harness/client-helpers.mjs';
 import { HospitalDepartmentQueueEngine } from '../../../packages/shared/src/queue-engine.ts';
-
-function getDbConfig() {
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const url = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/)[1];
-  const serviceKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/)[1];
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-  return {
-    url,
-    appUrl: 'http://localhost:3000',
-    serviceHeaders: {
-      'apikey': serviceKey,
-      'Authorization': `Bearer ${serviceKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    },
-    anonKey
-  };
-}
 
 describe('Workstream SA5: Queue Integration', () => {
   let tenant;
@@ -54,13 +36,26 @@ describe('Workstream SA5: Queue Integration', () => {
   before(async () => {
     writer = new SubAgentReportWriter('SA5', 'Queue integration');
     console.log('[SA5] Setting up isolated tenant SA5...');
-    tenant = await createTenant('SA5');
+    try {
+      tenant = await createTenant('SA5');
+    } catch (err) {
+      if (writer) writer.markSetupFailed(err);
+      throw err;
+    }
   });
 
   after(async () => {
     console.log('[SA5] Generating test report and tearing down tenant SA5...');
-    writer.save();
-    await cleanupTenant('SA5');
+    try {
+      if (writer) writer.save();
+    } catch (e) {
+      console.error('[SA5] Error saving report:', e);
+    }
+    try {
+      await cleanupTenant('SA5');
+    } catch (e) {
+      console.error('[SA5] Error cleaning up tenant:', e);
+    }
   });
 
   function userHeaders(authToken) {
@@ -68,7 +63,8 @@ describe('Workstream SA5: Queue Integration', () => {
       'apikey': anonKey,
       'Authorization': `Bearer ${authToken}`,
       'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
+      'Prefer': 'return=representation',
+      'x-test-local-db': 'true'
     };
   }
 
@@ -752,10 +748,12 @@ describe('Workstream SA5: Queue Integration', () => {
       assert.equal(filtered[2].queue_position, 3);
 
       // Verify audit log entry
-      const auditRes = await fetch(`${url}/rest/v1/audit_logs?merchant_id=eq.${tenant.hospital.id}&action=eq.QUEUE_OVERRIDE&order=created_at.desc&limit=1`, {
-        headers: serviceHeaders
-      });
-      const auditLogs = await auditRes.json();
+      const pg = getPgPool();
+      const auditRes = await pg.query(
+        `SELECT * FROM public.audit_logs WHERE merchant_id = $1 AND action = 'QUEUE_OVERRIDE' ORDER BY created_at DESC LIMIT 1`,
+        [tenant.hospital.id]
+      );
+      const auditLogs = auditRes.rows;
       assert.ok(auditLogs.length > 0, 'Audit log entry created for QUEUE_OVERRIDE');
       assert.equal(auditLogs[0].action, 'QUEUE_OVERRIDE');
 

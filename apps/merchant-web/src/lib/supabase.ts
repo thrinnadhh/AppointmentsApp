@@ -71,15 +71,40 @@ if (typeof window !== 'undefined') {
 
 
 
-// Service-role client for trusted server-only code (webhooks, cron jobs).
+let _localCheckFn: (() => boolean) | null = null;
+export function registerLocalCheckFn(fn: () => boolean) {
+  _localCheckFn = fn;
+}
+
 // NEVER import this in a component that ships to the browser — the service
 // role key bypasses RLS entirely. SUPABASE_SERVICE_ROLE_KEY must not have a
 // NEXT_PUBLIC_ prefix, or it would be bundled into client-side JS.
 // Built lazily on first use so importing this module never throws for code
 // that only needs the plain `supabase` client above.
 let _supabaseAdmin: (typeof supabase) | null = null;
+let _localSupabaseAdmin: (typeof supabase) | null = null;
 
-export function getSupabaseAdmin(): typeof supabase {
+export function getLocalSupabaseAdmin(): typeof supabase {
+  if (!_localSupabaseAdmin) {
+    const localKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+    _localSupabaseAdmin = createClient<Database>('http://127.0.0.1:54321', localKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }) as unknown as typeof supabase;
+  }
+  return _localSupabaseAdmin;
+}
+
+export function getSupabaseAdmin(callerOrReq?: any): typeof supabase {
+  if (process.env.NODE_ENV !== 'production') {
+    if (
+      callerOrReq?.isLocalTestCaller ||
+      callerOrReq?.headers?.get?.('x-test-local-db') === 'true' ||
+      _localCheckFn?.() === true
+    ) {
+      return getLocalSupabaseAdmin();
+    }
+  }
+
   if (!_supabaseAdmin) {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!key) {

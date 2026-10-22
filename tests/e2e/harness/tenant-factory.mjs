@@ -67,6 +67,26 @@ export async function dbDeleteProvider(id) {
 }
 
 function getDbConfig() {
+  const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+  const isLocalDb = dbUrl.includes('127.0.0.1') || dbUrl.includes('localhost');
+
+  if (isLocalDb && !process.env.USE_REMOTE_TEST_AUTH) {
+    const localUrl = 'http://127.0.0.1:54321';
+    const localServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+    const localAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+    return {
+      url: localUrl,
+      anonKey: localAnonKey,
+      serviceKey: localServiceKey,
+      serviceHeaders: {
+        'apikey': localServiceKey,
+        'Authorization': `Bearer ${localServiceKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      }
+    };
+  }
+
   const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
   const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
   const anonKeyMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="([^"]+)"/);

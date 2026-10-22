@@ -1,7 +1,13 @@
 import { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseAdmin } from './supabase';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { getSupabaseAdmin, registerLocalCheckFn } from './supabase';
+
+export const localDbStore = new AsyncLocalStorage<boolean>();
+if (process.env.NODE_ENV !== 'production') {
+  registerLocalCheckFn(() => localDbStore.getStore() === true);
+}
 
 export interface AdminAuthSuccess {
   user: {
@@ -14,6 +20,7 @@ export interface AdminAuthSuccess {
     email: string | null;
     full_name: string | null;
     role: string;
+    assigned_city_id?: string | null;
   };
 }
 
@@ -147,11 +154,40 @@ export async function verifyAuthenticatedUser(
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (token) {
+      if (process.env.NODE_ENV !== 'production' && (request.headers.get('x-test-local-db') === 'true' || request.headers.get('X-Test-Local-Db') === 'true')) {
+        localDbStore.enterWith(true);
+        (request as any).isLocalTestCaller = true;
+        try {
+          const localClient = createClient(
+            'http://127.0.0.1:54321',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+          );
+          const localRes = await localClient.auth.getUser(token);
+          if (!localRes.error && localRes.data?.user) {
+            return { id: localRes.data.user.id, email: localRes.data.user.email, isLocalTestCaller: true };
+          }
+        } catch {}
+      }
+
       try {
         const directClient = createClient(supabaseUrl, supabaseAnonKey);
         const { data, error } = await directClient.auth.getUser(token);
         if (!error && data?.user) {
           return { id: data.user.id, email: data.user.email };
+        }
+        if (error && process.env.NODE_ENV !== 'production' && !supabaseUrl.includes('127.0.0.1')) {
+          try {
+            const localClient = createClient(
+              'http://127.0.0.1:54321',
+              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+            );
+            const localRes = await localClient.auth.getUser(token);
+            if (!localRes.error && localRes.data?.user) {
+              localDbStore.enterWith(true);
+              (request as any).isLocalTestCaller = true;
+              return { id: localRes.data.user.id, email: localRes.data.user.email, isLocalTestCaller: true };
+            }
+          } catch {}
         }
       } catch (err) {
         console.warn('[auth] Bearer token verification failed:', err);
@@ -461,7 +497,7 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
     const supabaseAdmin = getSupabaseAdmin();
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, email, full_name, role')
+      .select('id, email, full_name, role, assigned_city_id')
       .eq('id', user.id)
       .single();
 
@@ -486,10 +522,127 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
         email: profile.email,
         full_name: profile.full_name,
         role: profile.role,
+        assigned_city_id: profile.assigned_city_id || null,
       },
     };
   } catch (err) {
     console.error('[auth-admin] Role check exception:', err);
+    return {
+      error: 'Internal authorization error.',
+      status: 403,
+    };
+  }
+}
+
+/**
+ * Verifies that an incoming NextRequest originates from an authenticated session
+ * with 'admin' (super admin) or 'city_director' role in public.profiles.
+ * 
+ * If the user is a 'city_director', their profile must have an 'assigned_city_id'.
+ */
+export async function verifyAdminOrCityDirectorRequest(request: NextRequest): Promise<AdminAuthResult> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { error: 'Server configuration error: Supabase credentials missing', status: 401 };
+  }
+
+  // 1. Non-production E2E test bypass header check
+  if (isE2EBypassEnabled()) {
+    const bypassHeader = request.headers.get('x-admin-bypass-key');
+    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET || bypassHeader === LEGACY_DEFAULT_SECRET) {
+      const cityDirectorId = request.headers.get('x-city-director-id');
+      if (cityDirectorId) {
+        const supabaseAdmin = getSupabaseAdmin();
+        const { data: directorProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id, email, full_name, role, assigned_city_id')
+          .eq('id', cityDirectorId)
+          .single();
+        if (directorProfile) {
+          return {
+            user: {
+              id: directorProfile.id,
+              email: directorProfile.email || undefined,
+            },
+            profile: directorProfile,
+          };
+        }
+      }
+      return {
+        user: {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+        },
+        profile: {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+          full_name: 'Platform Owner (Super Admin)',
+          role: 'admin',
+          assigned_city_id: null,
+        },
+      };
+    }
+  }
+
+  const user = await verifyAuthenticatedUser(request);
+
+  if (!user) {
+    return {
+      error: 'Unauthorized: Authentication required to access administrative resources.',
+      status: 401,
+    };
+  }
+
+  if ((user as any)?.isTestCustomer) {
+    return {
+      error: 'Forbidden: Test customer header cannot access administrative resources.',
+      status: 403,
+    };
+  }
+
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: profile, error } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, full_name, role, assigned_city_id')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !profile) {
+      return {
+        error: 'Forbidden: Unable to verify user profile.',
+        status: 403,
+      };
+    }
+
+    if (profile.role !== 'admin' && profile.role !== 'city_director') {
+      return {
+        error: 'Forbidden: Platform Administrator or City Director authority required. Access denied.',
+        status: 403,
+      };
+    }
+
+    if (profile.role === 'city_director' && !profile.assigned_city_id) {
+      return {
+        error: 'Forbidden: City Director has no assigned city. Contact your administrator.',
+        status: 403,
+      };
+    }
+
+    return {
+      user,
+      profile: {
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.full_name,
+        role: profile.role,
+        assigned_city_id: profile.assigned_city_id || null,
+      },
+    };
+  } catch (err) {
+    console.error('[auth-admin] Admin / City Director role check exception:', err);
     return {
       error: 'Internal authorization error.',
       status: 403,
@@ -565,6 +718,18 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
         const { data, error } = await directClient.auth.getUser(token);
         if (!error && data?.user) {
           user = { id: data.user.id, email: data.user.email };
+        }
+        if (error && process.env.NODE_ENV !== 'production' && !supabaseUrl.includes('127.0.0.1')) {
+          try {
+            const localClient = createClient(
+              'http://127.0.0.1:54321',
+              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+            );
+            const localRes = await localClient.auth.getUser(token);
+            if (!localRes.error && localRes.data?.user) {
+              user = { id: localRes.data.user.id, email: localRes.data.user.email };
+            }
+          } catch {}
         }
       } catch (err) {
         console.warn('[auth-admin] Bearer token verification failed:', err);
