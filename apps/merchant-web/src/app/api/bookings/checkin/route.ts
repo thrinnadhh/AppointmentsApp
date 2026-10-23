@@ -40,22 +40,7 @@ export async function POST(req: NextRequest) {
       query = query.eq('provider_id', shopId);
     }
 
-    let { data: codeRecords, error: codeErr } = await query;
-
-    // Fallback: If not found for the given shopId, check if it belongs to any shop the user is authorized for
-    if ((!codeRecords || codeRecords.length === 0) && shopId) {
-      const { data: fallbackRecords } = await supabaseAdmin
-        .from('appointment_checkin_codes')
-        .select('id, booking_id, provider_id, customer_id, code, appointment_date')
-        .eq('code', code)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (fallbackRecords && fallbackRecords.length > 0) {
-        codeRecords = fallbackRecords;
-        shopId = fallbackRecords[0].provider_id;
-      }
-    }
+    const { data: codeRecords, error: codeErr } = await query;
 
     if (codeErr || !codeRecords || codeRecords.length === 0) {
       return NextResponse.json(
@@ -73,7 +58,20 @@ export async function POST(req: NextRequest) {
         p_user_id: caller.id,
       });
       const allowedList = Array.isArray(authProviders) ? authProviders : [];
-      if (!allowedList.includes(targetProviderId)) {
+      let isAuthorized = allowedList.includes(targetProviderId);
+
+      if (!isAuthorized) {
+        // Also check if caller has a valid hospital role for this provider
+        const { data: hospRole } = await (supabaseAdmin.rpc as any)('hospital_role', {
+          p_provider_id: targetProviderId,
+          p_user_id: caller.id,
+        });
+        if (hospRole && ['admin', 'front_desk', 'consultant'].includes(hospRole)) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
         return NextResponse.json(
           { success: false, error: 'UNAUTHORIZED', message: 'You are not authorized for this clinic or hospital' },
           { status: 403 }
@@ -93,6 +91,25 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'INVALID_CODE', message: 'Associated appointment not found' },
         { status: 404 }
       );
+    }
+
+    // Front Desk assignment scoping: staff can only check in patients for their assigned doctors
+    const { data: callerRole } = await (supabaseAdmin.rpc as any)('hospital_role', {
+      p_provider_id: targetProviderId,
+      p_user_id: caller.id,
+    });
+    if (callerRole === 'front_desk' && booking.resource_id) {
+      const { data: accessibleResources } = await (supabaseAdmin.rpc as any)('hospital_accessible_resource_ids', {
+        p_provider_id: targetProviderId,
+        p_user_id: caller.id,
+      });
+      const accessibleList = Array.isArray(accessibleResources) ? accessibleResources : [];
+      if (!accessibleList.includes(booking.resource_id)) {
+        return NextResponse.json(
+          { success: false, error: 'UNAUTHORIZED', message: 'You are not assigned to this doctor' },
+          { status: 403 }
+        );
+      }
     }
 
     // Fetch patient name & doctor name
