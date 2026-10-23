@@ -381,7 +381,14 @@ describe('Phase 5c: Hospital Front Desk Reception Screens & Security Suite', () 
         assert.equal(res.status, 200);
         const data = await res.json();
         assert.equal(data.success, true);
-        assert.equal(data.is_present, true);
+
+        // Verify in DB that booking was marked present
+        const updated = await (
+          await fetch(`${supabaseUrl}/rest/v1/bookings?id=eq.${targetBooking.id}`, {
+            headers: serviceHeaders,
+          })
+        ).json();
+        assert.equal(updated[0].is_present, true);
       }
     });
   });
