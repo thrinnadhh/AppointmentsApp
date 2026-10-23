@@ -154,6 +154,20 @@ function UpcomingLiveCard({ booking, onOpenPass, onMarkReached, onOpenMyBookings
   const timeStr = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = isToday ? 'Today' : slotDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
+  const arrivalWindowStart = new Date(slotMs - 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const arrivalWindowEnd = new Date(slotMs + 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const arrivalWindowString = `${arrivalWindowStart} – ${arrivalWindowEnd}`;
+
+  const [isNotificationDenied, setIsNotificationDenied] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
+      if (Notification.permission === 'denied') {
+        setIsNotificationDenied(true);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     if (booking.id) {
@@ -202,8 +216,21 @@ function UpcomingLiveCard({ booking, onOpenPass, onMarkReached, onOpenMyBookings
           <Text style={styles.liveTimeText}>
             🕒 {dateStr} at <Text style={{ fontWeight: '800', color: '#0f172a' }}>{timeStr}</Text>
           </Text>
+          <Text style={styles.liveArrivalWindowText}>
+            ⏱️ Arrival Window: <Text style={{ fontWeight: '700', color: '#047857' }}>{arrivalWindowString}</Text> (±10m)
+          </Text>
         </View>
       </View>
+
+      {/* Push Notifications Denied Notice */}
+      {isNotificationDenied && (
+        <View style={styles.homePushDeniedBanner} testID="home-push-denied-notice">
+          <Text style={{ fontSize: 13 }}>🔔</Text>
+          <Text style={styles.homePushDeniedText}>
+            Push notifications disabled. All updates and PIN codes will be sent via WhatsApp &amp; SMS.
+          </Text>
+        </View>
+      )}
 
       {/* Permanent Lifetime PIN Box */}
       <View style={styles.livePinBox} testID="live-checkin-pin-box">
@@ -1065,6 +1092,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748b',
     marginTop: 4,
+  },
+  liveArrivalWindowText: {
+    fontSize: 12,
+    color: '#334155',
+    marginTop: 3,
+    fontWeight: '500',
+  },
+  homePushDeniedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 10,
+  },
+  homePushDeniedText: {
+    fontSize: 11,
+    color: '#475569',
+    flex: 1,
+    lineHeight: 14,
   },
   livePinBox: {
     backgroundColor: '#ecfdf5',

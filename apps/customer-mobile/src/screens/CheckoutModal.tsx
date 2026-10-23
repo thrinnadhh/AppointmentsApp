@@ -209,6 +209,21 @@ export default function CheckoutModal({
       })
     : '';
 
+  const slotStartMs = slot ? new Date(slot.start_time).getTime() : 0;
+  const arrivalWindowStart = slotStartMs
+    ? new Date(slotStartMs - 10 * 60 * 1000).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+  const arrivalWindowEnd = slotStartMs
+    ? new Date(slotStartMs + 10 * 60 * 1000).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+  const arrivalWindowString = `${arrivalWindowStart} – ${arrivalWindowEnd}`;
+
   const handleAttachPrescription = async () => {
     setIsUploadingAttachment(true);
     try {
@@ -609,6 +624,12 @@ export default function CheckoutModal({
                 </Text>
               </View>
               <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Arrival Window</Text>
+                <Text style={[styles.summaryValue, { color: '#047857', fontWeight: '700' }]}>
+                  {arrivalWindowString} (±10m)
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Duration</Text>
                 <Text style={styles.summaryValue}>{resource.duration_minutes} mins</Text>
               </View>
@@ -830,14 +851,15 @@ export default function CheckoutModal({
             </View>
 
             {/* Cancellation Policy — Consumer Protection (E-Commerce) Rules 2020 */}
-            <View style={styles.policyCard}>
+            <View style={styles.policyCard} testID="cancellation-policy-card">
               <Text style={styles.policyTitle}>🛡️ Cancellation & Refund Policy</Text>
               <Text style={styles.policyText}>
-                {'✅ Free cancellation up to 1 hour before your slot — full deposit refunded.\n'}
-                {'↩️  Reschedule free within the same window — deposit carries over.\n'}
-                {'⚠️  Two times no-show — No issue or penalty (100% deposit refunded).\n'}
-                {'⚠️  3rd to 5th no-show — ₹60 penalty (₹50 to hospital, ₹10 to Appointments app), rest refunded.\n'}
-                {'🚫  Exceeding 5 no-shows — Account blocked for 7 days.'}
+                {'✅ Free cancellation & reschedule up to 60 minutes before slot — 100% deposit refunded.\n'}
+                {'⚠️  Within 60 minutes of slot: Deposit is forfeited to the clinic.\n'}
+                {'🛡️ Business/Emergency cancellation: 100% full refund (deposit + platform fee).\n'}
+                {'ℹ️  Two times no-show: 100% courtesy deposit refund, no penalty.\n'}
+                {'⚠️  3rd to 5th no-show: ₹60 penalty (₹50 to hospital, ₹10 to Appointments app), rest refunded.\n'}
+                {'🚫  Exceeding 5 no-shows: Account blocked for 7 days.'}
               </Text>
               <Text style={styles.policyLinkText}
                 onPress={() => Linking.openURL('https://appointments4u.in/refund-policy')}
@@ -846,27 +868,28 @@ export default function CheckoutModal({
               </Text>
             </View>
 
-            {/* Late Arrival Grace Policy (+2 Token Rule) */}
-            <View style={styles.lateArrivalCard} testID="late-arrival-notice">
+            {/* Hospital OPD Arrival Window (±10 Mins) & Standby Policy */}
+            <View style={styles.lateArrivalCard} testID="arrival-window-notice">
               <View style={styles.lateArrivalHeader}>
                 <Text style={styles.lateArrivalIcon}>⏱️</Text>
-                <Text style={styles.lateArrivalTitle}>Late Arrival Grace Policy (+2 Token Buffer)</Text>
+                <Text style={styles.lateArrivalTitle}>Arrival Window: Booked Time ± 10 Minutes</Text>
               </View>
               <Text style={styles.lateArrivalSubtitle}>
-                Running late? Don't worry — your appointment remains valid if not cancelled:
+                Your expected arrival window for this appointment is:
               </Text>
+              <View style={styles.arrivalWindowHighlightBox} testID="arrival-window-box">
+                <Text style={styles.arrivalWindowRangeText}>{arrivalWindowString}</Text>
+                <Text style={styles.arrivalWindowBadge}>±10 MIN WINDOW</Text>
+              </View>
               <View style={styles.lateArrivalRuleBox}>
                 <Text style={styles.lateArrivalRuleText}>
-                  • When you arrive at the venue, tap <Text style={{ fontWeight: '700', color: '#059669' }}>"Say Reached"</Text> in the app.
+                  • <Text style={{ fontWeight: '700', color: '#047857' }}>Ceiling Rule:</Text> The booked time ({timeString}) is a ceiling. Starting earlier is always allowed when you are present and the doctor is free.
                 </Text>
                 <Text style={styles.lateArrivalRuleText}>
-                  • You will automatically be queued <Text style={{ fontWeight: '700', color: '#0f172a' }}>2 tokens after the ongoing token</Text> so current visitors are not disrupted.
+                  • <Text style={{ fontWeight: '700', color: '#0284c7' }}>On-Time Priority:</Text> Arriving within your window ({arrivalWindowString}) guarantees priority over late arrivals.
                 </Text>
-              </View>
-              <View style={styles.lateArrivalExampleBox}>
-                <Text style={styles.lateArrivalExampleTitle}>💡 Exact Example:</Text>
-                <Text style={styles.lateArrivalExampleText}>
-                  If your scheduled token was <Text style={styles.boldHighlight}>#2</Text>, but you arrive while token <Text style={styles.boldHighlight}>#10</Text> is ongoing, you will be placed at token <Text style={styles.boldHighlight}>#12</Text> upon arrival.
+                <Text style={styles.lateArrivalRuleText}>
+                  • <Text style={{ fontWeight: '700', color: '#b45309' }}>Standby Queue (Late Arrivals):</Text> Arriving &gt;10 minutes late places you in the Standby Queue in original booking order. The doctor will see you between on-time patients when a slot fits. Nobody is dropped!
                 </Text>
               </View>
             </View>
@@ -1524,6 +1547,34 @@ const styles = StyleSheet.create({
     color: '#78350f',
     marginBottom: 8,
     fontWeight: '500',
+  },
+  arrivalWindowHighlightBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  arrivalWindowRangeText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#92400e',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  arrivalWindowBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#047857',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   lateArrivalRuleBox: {
     backgroundColor: '#fef3c7',

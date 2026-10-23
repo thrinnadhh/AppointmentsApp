@@ -58,6 +58,7 @@ interface TicketData {
   is_window_open?: boolean;
   window_opens_at?: string;
   checkin_code: string | null;
+  is_doctor_ahead?: boolean;
 }
 
 export default function CustomerTicketPage({
@@ -71,6 +72,26 @@ export default function CustomerTicketPage({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [justReconnected, setJustReconnected] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => {
+      setIsOnline(true);
+      setJustReconnected(true);
+      setTimeout(() => setJustReconnected(false), 4000);
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Live 10-Slot Queue & Monthly Attendance State
   const [queueSlots, setQueueSlots] = useState<QueueSlot[]>([]);
@@ -310,12 +331,27 @@ export default function CustomerTicketPage({
   const timeFormatted = `${slotStart.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })} – ${slotEnd.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
   const dateFormatted = slotStart.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
+  const arrivalStart = new Date(slotStart.getTime() - 10 * 60 * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const arrivalEnd = new Date(slotStart.getTime() + 10 * 60 * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const arrivalWindowFormatted = `${arrivalStart} – ${arrivalEnd}`;
+
   // Status mapping
   const isCheckedIn = booking.status === 'CHECKED_IN' || booking.is_present;
   const isCompleted = booking.status === 'COMPLETED';
 
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 space-y-6">
+      {/* Network / Reconnection Banner */}
+      {!isOnline ? (
+        <div data-testid="ticket-network-status-banner" className="bg-red-50 border border-red-200 text-red-800 text-xs px-4 py-2.5 rounded-2xl flex items-center gap-2">
+          <span>⚠️</span> Offline mode — showing cached ticket data. Reconnect to refresh live queue.
+        </div>
+      ) : justReconnected ? (
+        <div data-testid="ticket-network-status-banner" className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-2.5 rounded-2xl flex items-center gap-2 animate-fade-in">
+          <span>🟢</span> Reconnected — live queue status updated!
+        </div>
+      ) : null}
+
       {/* Top Breadcrumb & Live Refresh indicator */}
       <div className="flex items-center justify-between mb-4 text-xs text-gray-500">
         <span className="flex items-center gap-1.5 font-medium text-emerald-800">
@@ -482,6 +518,53 @@ export default function CustomerTicketPage({
               <p className="text-sm font-semibold text-emerald-300">{dateFormatted}</p>
             </div>
           </div>
+
+          {/* Arrival Window (±10 Mins) Card */}
+          <div data-testid="ticket-arrival-window" className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-300">
+                <Clock className="w-5 h-5 text-emerald-700" />
+              </div>
+              <div>
+                <span className="text-xs text-emerald-800 font-semibold uppercase tracking-wider block">OPD Arrival Window (±10 Mins)</span>
+                <p className="text-base font-extrabold text-emerald-950 font-mono">{arrivalWindowFormatted}</p>
+              </div>
+            </div>
+            <div className="text-xs text-emerald-800/90 max-w-sm">
+              💡 Booked time is a ceiling: starting earlier is always allowed when you are present and the doctor is free.
+            </div>
+          </div>
+
+          {/* Standby Queue Honest Estimate Banner */}
+          {booking.queue_position && isCheckedIn && (
+            <div data-testid="ticket-standby-banner" className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 flex items-start gap-3">
+              <span className="text-xl">⏰</span>
+              <div>
+                <h4 className="font-bold text-amber-950">Standby Queue Assigned (Turn #{booking.queue_position})</h4>
+                <p className="mt-1 text-amber-800 leading-relaxed">
+                  You arrived after your scheduled window. You are placed in the Standby Queue in original booking order. The doctor will see you in gaps between on-time patients or at the end of the session. You will never be dropped!
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Optional Come Now Invite */}
+          {data.is_doctor_ahead && !isCheckedIn && (
+            <div data-testid="ticket-come-now-invite" className="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-4 text-xs text-emerald-950 flex items-start justify-between gap-3 shadow-md">
+              <div className="flex items-start gap-2.5">
+                <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-emerald-900 text-sm">Doctor Running Ahead of Schedule ⚡</h4>
+                  <p className="text-emerald-800 mt-0.5">
+                    Dr. {doctor.name} is ready early! If you are nearby, you are welcome to come in now.
+                  </p>
+                  <p className="text-[11px] text-emerald-700 mt-1 italic">
+                    Optional: Declining changes nothing; your slot at {timeFormatted} remains 100% reserved.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* How to test instructions card */}
           <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-4 text-xs text-blue-900 space-y-1.5">
