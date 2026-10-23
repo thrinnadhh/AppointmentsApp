@@ -84,16 +84,17 @@ test.describe.serial('Phase 5a: Hospital Admin UI Screens & Workflows', () => {
       await provisionBtn.click();
 
       // Verify modal and tabs
-      await expect(page.getByRole('heading', { name: /Unified Staff Provisioning/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /Consultant \/ Doctor/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /Front Desk/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /Hospital Admin/i })).toBeVisible();
+      const modal = page.locator('.fixed.inset-0').last();
+      await expect(modal.getByRole('heading', { name: /Unified Staff Provisioning/i })).toBeVisible();
+      await expect(modal.getByRole('button', { name: /Consultant \/ Doctor/i })).toBeVisible();
+      await expect(modal.getByRole('button', { name: /Front Desk/i })).toBeVisible();
+      await expect(modal.getByRole('button', { name: /Hospital Admin/i })).toBeVisible();
 
       // Verify department quota notification
-      await expect(page.getByText('Policy: Max 3 members per department')).toBeVisible();
+      await expect(modal.getByText('Policy: Max 3 members per department')).toBeVisible();
 
       // Close modal
-      await page.getByRole('button', { name: '✕' }).click();
+      await modal.getByRole('button', { name: '✕' }).click();
     }
   });
 
