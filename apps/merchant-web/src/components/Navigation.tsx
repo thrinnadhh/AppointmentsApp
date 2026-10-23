@@ -134,6 +134,18 @@ export default function Navigation() {
       { href: '/demo', label: 'Live Simulator', icon: Sparkles },
       { href: '/', label: 'Merchant App', icon: LayoutDashboard },
     ];
+  } else if (isHospitalVenue && hospitalContext?.role === 'consultant') {
+    navItems = [
+      { href: '/consultation', label: 'Consultation Desk', icon: Stethoscope },
+      { href: '/schedule', label: 'My Schedule', icon: Clock },
+      { href: '/', label: 'Overview', icon: LayoutDashboard },
+    ];
+  } else if (isHospitalVenue && hospitalContext?.role === 'front_desk') {
+    navItems = [
+      { href: '/', label: 'Check-In Desk', icon: LayoutDashboard },
+      { href: '/bookings', label: 'Bookings', icon: CalendarDays },
+      { href: '/schedule', label: 'Schedule', icon: Clock },
+    ];
   } else if (isHospitalVenue && hospitalContext?.role === 'department_member') {
     // Scoped navigation for hospital department members
     const allowed = hospitalContext.allowedModules || [];
@@ -167,6 +179,7 @@ export default function Navigation() {
     navItems = [
       { href: '/', label: 'Overview', icon: LayoutDashboard },
       ...(canSeeHospitalAdmin ? [{ href: '/departments', label: 'Departments', icon: Layers }] : []),
+      ...(isHospitalVenue ? [{ href: '/consultation', label: 'Consultation', icon: Stethoscope }] : []),
       { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },
       { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users },
       { href: '/bookings', label: 'Bookings', icon: CalendarDays },
