@@ -10,6 +10,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
   let hospA;
   let tokens = {};
   let neuroDocId;
+  let neuroDeptId;
   let testCustomerId;
 
   before(async () => {
@@ -26,6 +27,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
 
     manifest = JSON.parse(fs.readFileSync('scripts/test-seed-manifest.json', 'utf8'));
     hospA = manifest.hospitalA;
+    neuroDeptId = hospA.departments.find((d) => d.name === 'Neurology').id;
 
     async function login(email, password = 'HospitalTest2026!') {
       const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
@@ -73,6 +75,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
       body: JSON.stringify({
         provider_id: hospA.id,
         resource_id: neuroDocId,
+        department_id: neuroDeptId,
         customer_id: testCustomerId,
         slot_start: start.toISOString(),
         slot_end: end.toISOString(),
@@ -259,5 +262,22 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
       errorMsg.toLowerCase().includes('account is blocked'),
       `Hold attempt must be rejected with account blocked message, got: ${errorMsg}`
     );
+  });
+
+  after(async () => {
+    // Clean up test bookings and reset profile
+    await fetch(`${supabaseUrl}/rest/v1/bookings?reference_code=like.NS-TEST-%`, {
+      method: 'DELETE',
+      headers: serviceHeaders,
+    });
+    await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${testCustomerId}`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: JSON.stringify({
+        no_show_count: 0,
+        blocked_until: null,
+        is_flagged: false,
+      }),
+    });
   });
 });

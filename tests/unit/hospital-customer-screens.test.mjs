@@ -281,4 +281,87 @@ describe('Phase 5d: Hospital Customer Screens & Booking Pass Suite', () => {
       assert.equal(data.payment_status, 'FORFEITED');
     });
   });
+
+  describe('5. Customer Attendance Standing, 3rd Booking Notice & 7-Day Account Block (SPEC line 13)', () => {
+    it('accurately exposes no_show_count and blocked_until on customer profile query', async () => {
+      // Set patient2 strikes to 2
+      await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${tokens.patient2.user.id}`, {
+        method: 'PATCH',
+        headers: serviceHeaders,
+        body: JSON.stringify({ no_show_count: 2, blocked_until: null }),
+      });
+
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?id=eq.${tokens.patient2.user.id}&select=no_show_count,is_flagged,blocked_until`,
+        {
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${tokens.patient2.token}`,
+          },
+        }
+      );
+      assert.equal(res.status, 200);
+      const rows = await res.json();
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].no_show_count, 2, 'Customer 2 must have 2 strikes for 3rd booking warning');
+      assert.equal(rows[0].blocked_until, null);
+    });
+
+    it('rejects booking hold creation if customer account is blocked for 7 days', async () => {
+      // Set customer 2 blocked_until to 7 days in future
+      const futureBlock = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${tokens.patient2.user.id}`, {
+        method: 'PATCH',
+        headers: serviceHeaders,
+        body: JSON.stringify({ blocked_until: futureBlock }),
+      });
+
+      const slotStart = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const slotEnd = new Date(Date.now() + 24.25 * 60 * 60 * 1000).toISOString();
+
+      const holdRes = await fetch(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          p_customer_id: tokens.patient2.user.id,
+          p_resource_id: testDocResource.id,
+          p_slot_start: slotStart,
+          p_slot_end: slotEnd,
+        }),
+      });
+
+      assert.equal(holdRes.status, 200);
+      const holdData = await holdRes.json();
+      assert.equal(holdData.success, false);
+      assert.match(holdData.error, /Your account is blocked for 7 days/i);
+    });
+
+    it('allows booking hold creation once the 7-day cooldown expires', async () => {
+      // Set customer 2 blocked_until to past (expired cooldown)
+      const pastBlock = new Date(Date.now() - 60 * 1000).toISOString();
+      await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${tokens.patient2.user.id}`, {
+        method: 'PATCH',
+        headers: serviceHeaders,
+        body: JSON.stringify({ blocked_until: pastBlock, no_show_count: 0 }),
+      });
+
+      const slotStart = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+      const slotEnd = new Date(Date.now() + 48.25 * 60 * 60 * 1000).toISOString();
+
+      const holdRes = await fetch(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          p_customer_id: tokens.patient2.user.id,
+          p_resource_id: testDocResource.id,
+          p_slot_start: slotStart,
+          p_slot_end: slotEnd,
+        }),
+      });
+
+      assert.equal(holdRes.status, 200);
+      const holdData = await holdRes.json();
+      assert.equal(holdData.success, true, 'Booking hold must succeed once block expires');
+    });
+  });
 });
