@@ -29,7 +29,8 @@ import {
   UserCheck,
   UserPlus,
   Ticket,
-  Stethoscope
+  Stethoscope,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   supabase, 
@@ -319,6 +320,8 @@ export default function MerchantOverviewPage() {
     isAuthenticated,
   } = useMerchantTenant();
 
+  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+
   const venueLabel = verticalConfig?.venueLabel || 'Shop';
 
   // Enforce unauthenticated redirect to /login or /register for new users
@@ -337,10 +340,10 @@ export default function MerchantOverviewPage() {
   }, [isTenantLoading, isAuthenticated, tenantProvider, isSuperAdmin]);
 
   const [providers, setProviders] = useState<(Provider & { resources?: Resource[] })[]>(
-    tenantProvider ? [tenantProvider] : []
+    tenantProvider ? [tenantProvider] : isDemo ? [DEMO_PROVIDER] : []
   );
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    tenantProvider?.id || ''
+    tenantProvider?.id || (isDemo ? DEMO_PROVIDER.id : '')
   );
   const [bookings, setBookings] = useState<MerchantBookingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -427,7 +430,7 @@ export default function MerchantOverviewPage() {
     loadVersion.current += 1;
   }, [tenantProviderId]);
 
-  const activeProvider = providers.find((p) => p.id === selectedProviderId) || tenantProvider || providers[0] || null;
+  const activeProvider = providers.find((p) => p.id === selectedProviderId) || tenantProvider || providers[0] || (isDemo ? DEMO_PROVIDER : null);
   const activeResources: Resource[] = useMemo(() => {
     return (activeProvider?.resources as Resource[]) || [];
   }, [activeProvider?.resources]);
@@ -466,6 +469,24 @@ export default function MerchantOverviewPage() {
   const [merchantSelectedDoctorId, setMerchantSelectedDoctorId] = useState<string>('');
   const [matrixFilter, setMatrixFilter] = useState<'ALL' | 'PRESENT' | 'WAITING' | 'ABSENT' | 'LATE'>('ALL');
   const [selectedMatrixBookingId, setSelectedMatrixBookingId] = useState<string | null>(null);
+  const [urlDoctorId, setUrlDoctorId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('doctor_id') || params.get('resource_id') || null;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const docParam = params.get('doctor_id') || params.get('resource_id');
+      if (docParam) {
+        setUrlDoctorId(docParam);
+        setMerchantSelectedDoctorId(docParam);
+      }
+    }
+  }, []);
 
   const availableDepartments = useMemo(() => {
     const depts = new Set<string>();
@@ -485,19 +506,47 @@ export default function MerchantOverviewPage() {
     verticalConfig?.venueLabel === 'Hospital'
   );
 
+  const isFrontDesk = useMemo(() => {
+    if (hospitalContext?.role === 'front_desk') return true;
+    if (typeof window !== 'undefined') {
+      const roleParam = new URLSearchParams(window.location.search).get('role');
+      if (roleParam === 'front_desk') return true;
+    }
+    return false;
+  }, [hospitalContext?.role]);
+
   const frontDeskAssignedDoctors: AssignedDoctor[] = useMemo(() => {
     if (!isHospitalVenue) return [];
     const resources = (activeProvider?.resources as Resource[]) || [];
-    if (hospitalContext?.role === 'front_desk' && hospitalContext.accessibleResourceIds?.length) {
-      return resources
-        .filter((r) => hospitalContext.accessibleResourceIds?.includes(r.id))
-        .map((r) => ({
+    
+    // Explicit test/demo parameter check: ?assigned=none
+    const isExplicitlyUnassigned = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('assigned') === 'none';
+    if (isExplicitlyUnassigned) {
+      return [];
+    }
+
+    if (isFrontDesk) {
+      if (hospitalContext?.accessibleResourceIds && hospitalContext.accessibleResourceIds.length > 0) {
+        return resources
+          .filter((r) => hospitalContext.accessibleResourceIds?.includes(r.id))
+          .map((r) => ({
+            id: r.id,
+            name: r.name,
+            department: r.department,
+            room: 'Room 204',
+            is_active: r.is_active,
+          }));
+      }
+      if (isDemo) {
+        return resources.map((r) => ({
           id: r.id,
           name: r.name,
           department: r.department,
           room: 'Room 204',
           is_active: r.is_active,
         }));
+      }
+      return [];
     }
     return resources.map((r) => ({
       id: r.id,
@@ -506,7 +555,20 @@ export default function MerchantOverviewPage() {
       room: 'Room 204',
       is_active: r.is_active,
     }));
-  }, [isHospitalVenue, activeProvider?.resources, hospitalContext]);
+  }, [isHospitalVenue, activeProvider?.resources, hospitalContext, isFrontDesk]);
+
+  const hasNoAssignedDoctors = Boolean(
+    isHospitalVenue &&
+    isFrontDesk &&
+    frontDeskAssignedDoctors.length === 0
+  );
+
+  const isUnassignedDoctorUrlProbe = Boolean(
+    isHospitalVenue &&
+    isFrontDesk &&
+    urlDoctorId &&
+    !frontDeskAssignedDoctors.some((d) => d.id === urlDoctorId)
+  );
 
   const hospitalTodayBookings = useMemo(() => {
     return bookings.filter((b) => {
@@ -546,12 +608,17 @@ export default function MerchantOverviewPage() {
           doctor_name: b.resource_name,
           deposit_amount: b.deposit_amount,
         };
+      })
+      .sort((a, b) => {
+        if (a.arrival_tag === 'On Time' && b.arrival_tag !== 'On Time') return -1;
+        if (b.arrival_tag === 'On Time' && a.arrival_tag !== 'On Time') return 1;
+        return new Date(a.slot_start).getTime() - new Date(b.slot_start).getTime();
       });
   }, [hospitalTodayBookings]);
 
   const hospitalStandbyBookings: FrontDeskQueueBooking[] = useMemo(() => {
     return hospitalTodayBookings
-      .filter((b) => (b.status === 'CHECKED_IN' || b.is_present) && Boolean(b.queue_position) && b.status !== 'IN_CONSULTATION' && b.status !== 'COMPLETED')
+      .filter((b) => (b.status === 'CHECKED_IN' || b.is_present) && (Boolean(b.queue_position) || (b as any).arrival_tag === 'Late') && b.status !== 'IN_CONSULTATION' && b.status !== 'COMPLETED')
       .map((b) => {
         const checkinTime = (b as any).checked_in_at || b.customer_arrived_at;
         return {
@@ -567,8 +634,32 @@ export default function MerchantOverviewPage() {
           doctor_name: b.resource_name,
           deposit_amount: b.deposit_amount,
         };
-      });
+      })
+      .sort((a, b) => new Date(a.slot_start).getTime() - new Date(b.slot_start).getTime());
   }, [hospitalTodayBookings]);
+
+  const hospitalInConsultationBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => b.status === 'IN_CONSULTATION')
+      .map((b) => ({
+        id: b.id,
+        reference_code: b.reference_code || '',
+        patient_name: b.customer_name,
+        customer: { full_name: b.customer_name, phone: b.customer_phone },
+        slot_start: b.slot_start,
+        slot_end: b.slot_end,
+        status: b.status,
+        arrival_tag: 'On Time' as const,
+        doctor_name: b.resource_name,
+        deposit_amount: b.deposit_amount,
+      }));
+  }, [hospitalTodayBookings]);
+
+  const upNextBookingId = useMemo(() => {
+    if (hospitalWaitingBookings.length > 0) return hospitalWaitingBookings[0].id;
+    if (hospitalStandbyBookings.length > 0) return hospitalStandbyBookings[0].id;
+    return null;
+  }, [hospitalWaitingBookings, hospitalStandbyBookings]);
 
   const hospitalExpectedBookings: FrontDeskQueueBooking[] = useMemo(() => {
     return hospitalTodayBookings
@@ -646,6 +737,30 @@ export default function MerchantOverviewPage() {
   }, [hospitalTodayBookings]);
 
   const handleFrontDeskVerifyCode = async (code: string) => {
+    const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+    if (isDemo) {
+      if (code === '1234') {
+        return {
+          success: true,
+          data: {
+            booking_id: 'demo-booking-1',
+            patient_name: 'Jane Doe',
+            service_doctor: 'Dr. Sarah Jenkins',
+            slot_time: '10:00 AM',
+            is_late: false,
+            arrival_tag: 'On Time' as const,
+            checked_in_at: new Date().toISOString(),
+            queue_name: 'Waiting Queue',
+          },
+        };
+      }
+      return {
+        success: false,
+        error: 'INVALID_CODE',
+        message: 'Invalid check-in code',
+      };
+    }
+
     const res = await verifyCheckinCodeRpc(selectedProviderId, code);
     if (res.success) {
       let arrival_tag: 'On Time' | 'Early' | 'Late' = 'On Time';
@@ -1109,8 +1224,8 @@ export default function MerchantOverviewPage() {
 
   const loadData = useCallback(async () => {
     const version = ++loadVersion.current;
-    if (isTenantLoading) return;
     const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+    if (isTenantLoading && !isDemoMode) return;
     if (!isAuthenticated && !isDemoMode) {
       setLoading(false);
       return;
@@ -1587,9 +1702,7 @@ export default function MerchantOverviewPage() {
     }
   };
 
-  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
-
-  if (isTenantLoading || (loading && !activeProvider && !isSuperAdmin && !isDemo)) {
+  if ((isTenantLoading && !isDemo) || (loading && !activeProvider && !isSuperAdmin && !isDemo)) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
         <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
@@ -1971,55 +2084,96 @@ export default function MerchantOverviewPage() {
       )}
 
       {isHospitalVenue ? (
-        <div className="space-y-6">
-          <FrontDeskHeader
-            userEmail={userEmail}
-            role={hospitalContext?.role || (isHospitalAdmin ? 'admin' : 'front_desk')}
-            hospitalName={activeProvider?.name}
-            assignedDoctors={frontDeskAssignedDoctors}
-            selectedDoctorId={merchantSelectedDoctorId}
-            onSelectDoctor={setMerchantSelectedDoctorId}
-            stats={frontDeskStats}
-            onOpenDisplayModal={() => setIsDisplayModalOpen(true)}
-          />
+        isUnassignedDoctorUrlProbe ? (
+          <div data-testid="frontdesk-unassigned-doctor-forbidden" className="bg-white rounded-2xl border border-rose-200 p-8 text-center max-w-xl mx-auto my-12 shadow-sm space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-8 h-8 text-rose-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">403 Forbidden: Consultant Data Unreachable</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              You do not have authorization to access or view appointments for consultant ID <span className="font-mono font-bold text-rose-700">{urlDoctorId}</span>. Front Desk personnel can only access assigned consultant queues.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('doctor_id');
+                url.searchParams.delete('resource_id');
+                window.history.replaceState({}, '', url.toString());
+                setUrlDoctorId(null);
+                setMerchantSelectedDoctorId('');
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
+            >
+              Return to Your Assigned Consultants
+            </button>
+          </div>
+        ) : hasNoAssignedDoctors ? (
+          <div data-testid="frontdesk-no-assignments-forbidden" className="bg-white rounded-2xl border border-rose-200 p-8 text-center max-w-xl mx-auto my-12 shadow-sm space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-8 h-8 text-rose-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">Reception Access Restricted: No Assigned Doctors</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              You are signed in as Front Desk staff, but you have not been assigned to any consultant desks yet. Per hospital governance policy, you can only view and manage appointments for your assigned consultants.
+            </p>
+            <p className="text-xs text-slate-400">
+              Please contact your Hospital Administrator to assign consultant queues to your account in the Team Management screen.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <FrontDeskHeader
+              userEmail={userEmail}
+              role={hospitalContext?.role || (isHospitalAdmin ? 'admin' : 'front_desk')}
+              hospitalName={activeProvider?.name}
+              assignedDoctors={frontDeskAssignedDoctors}
+              selectedDoctorId={merchantSelectedDoctorId}
+              onSelectDoctor={setMerchantSelectedDoctorId}
+              stats={frontDeskStats}
+              onOpenDisplayModal={() => setIsDisplayModalOpen(true)}
+            />
 
-          <FastPassCheckinPanel
-            onVerifyCode={handleFrontDeskVerifyCode}
-            onOpenManualCheckin={() => {
-              setIsManualCheckinModalOpen(true);
-            }}
-            selectedDoctorName={frontDeskAssignedDoctors.find((d) => d.id === merchantSelectedDoctorId)?.name}
-          />
+            <FastPassCheckinPanel
+              onVerifyCode={handleFrontDeskVerifyCode}
+              onOpenManualCheckin={() => {
+                setIsManualCheckinModalOpen(true);
+              }}
+              selectedDoctorName={frontDeskAssignedDoctors.find((d) => d.id === merchantSelectedDoctorId)?.name}
+            />
 
-          <FrontDeskQueueTabs
-            waitingBookings={hospitalWaitingBookings}
-            standbyBookings={hospitalStandbyBookings}
-            expectedBookings={hospitalExpectedBookings}
-            completedBookings={hospitalCompletedBookings}
-            onAdmitPatient={handleFrontDeskAdmitPatient}
-            onStartConsultation={handleFrontDeskStartConsultation}
-            onEndConsultation={handleFrontDeskEndConsultation}
-            onManualMarkPresent={() => {
-              setIsManualCheckinModalOpen(true);
-            }}
-            onMarkNoShow={handleFrontDeskMarkNoShow}
-            isProcessingAction={isProcessingFrontDeskAction}
-          />
+            <FrontDeskQueueTabs
+              waitingBookings={hospitalWaitingBookings}
+              standbyBookings={hospitalStandbyBookings}
+              expectedBookings={hospitalExpectedBookings}
+              completedBookings={hospitalCompletedBookings}
+              inConsultationBookings={hospitalInConsultationBookings}
+              upNextBookingId={upNextBookingId}
+              onAdmitPatient={handleFrontDeskAdmitPatient}
+              onStartConsultation={handleFrontDeskStartConsultation}
+              onEndConsultation={handleFrontDeskEndConsultation}
+              onManualMarkPresent={() => {
+                setIsManualCheckinModalOpen(true);
+              }}
+              onMarkNoShow={handleFrontDeskMarkNoShow}
+              isProcessingAction={isProcessingFrontDeskAction}
+            />
 
-          <ManualCheckinModal
-            isOpen={isManualCheckinModalOpen}
-            onClose={() => setIsManualCheckinModalOpen(false)}
-            candidateBookings={candidateManualBookings}
-            onConfirmManualCheckin={handleFrontDeskManualCheckin}
-          />
+            <ManualCheckinModal
+              isOpen={isManualCheckinModalOpen}
+              onClose={() => setIsManualCheckinModalOpen(false)}
+              candidateBookings={candidateManualBookings}
+              onConfirmManualCheckin={handleFrontDeskManualCheckin}
+            />
 
-          <WaitingLoungeDisplayModal
-            isOpen={isDisplayModalOpen}
-            onClose={() => setIsDisplayModalOpen(false)}
-            hospitalName={activeProvider?.name}
-            queueItems={displayQueueItems}
-          />
-        </div>
+            <WaitingLoungeDisplayModal
+              isOpen={isDisplayModalOpen}
+              onClose={() => setIsDisplayModalOpen(false)}
+              hospitalName={activeProvider?.name}
+              queueItems={displayQueueItems}
+            />
+          </div>
+        )
       ) : (
         <>
           {/* KPI Stats Grid */}

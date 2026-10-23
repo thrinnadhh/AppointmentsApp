@@ -16,7 +16,8 @@ import {
   UserX,
   Sparkles,
   HelpCircle,
-  FileText
+  FileText,
+  Stethoscope
 } from 'lucide-react';
 import { CustomerContactBadge } from '@/components/CustomerContactBadge';
 
@@ -44,6 +45,8 @@ interface FrontDeskQueueTabsProps {
   standbyBookings: FrontDeskQueueBooking[];
   expectedBookings: FrontDeskQueueBooking[];
   completedBookings: FrontDeskQueueBooking[];
+  inConsultationBookings?: FrontDeskQueueBooking[];
+  upNextBookingId?: string | null;
   onAdmitPatient: (bookingId: string) => Promise<void>;
   onStartConsultation: (bookingId: string) => Promise<void>;
   onEndConsultation: (bookingId: string) => Promise<void>;
@@ -57,6 +60,8 @@ export default function FrontDeskQueueTabs({
   standbyBookings,
   expectedBookings,
   completedBookings,
+  inConsultationBookings = [],
+  upNextBookingId,
   onAdmitPatient,
   onStartConsultation,
   onEndConsultation,
@@ -72,21 +77,21 @@ export default function FrontDeskQueueTabs({
     switch (tag) {
       case 'On Time':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <span data-testid="patient-on-time-tag" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
             On Time
           </span>
         );
       case 'Early':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+          <span data-testid="patient-early-tag" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
             <Clock className="w-3 h-3 text-sky-600" />
             Early
           </span>
         );
       case 'Late':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+          <span data-testid="patient-late-tag" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
             <AlertCircle className="w-3 h-3 text-amber-600" />
             Late
           </span>
@@ -189,6 +194,42 @@ export default function FrontDeskQueueTabs({
 
       {/* Tab Content */}
       <div className="p-5 sm:p-6">
+        {/* Active In-Consultation Banner */}
+        {inConsultationBookings && inConsultationBookings.length > 0 && (
+          <div data-testid="in-consultation-panel" className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <Stethoscope className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">In Consultation Now</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                <p className="text-sm font-black text-emerald-950 mt-0.5">
+                  {inConsultationBookings[0].patient_name || inConsultationBookings[0].customer?.full_name || 'Patient'}
+                  <span className="text-xs font-normal text-emerald-700 ml-2 font-mono">
+                    ({inConsultationBookings[0].reference_code})
+                  </span>
+                </p>
+                <p className="text-xs text-emerald-700">
+                  Doctor: <strong>{inConsultationBookings[0].doctor_name || 'Consultant'}</strong> • Slot: {new Date(inConsultationBookings[0].slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(inConsultationBookings[0].slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              data-testid="end-consultation-btn"
+              disabled={isProcessingAction}
+              onClick={() => onEndConsultation(inConsultationBookings[0].id)}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition disabled:opacity-50 shadow-xs flex items-center gap-2 cursor-pointer self-start sm:self-center shrink-0"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>Complete Consultation</span>
+            </button>
+          </div>
+        )}
+
         {/* TAB 1: WAITING QUEUE */}
         {activeTab === 'waiting' && (
           <div className="space-y-4">
@@ -204,10 +245,12 @@ export default function FrontDeskQueueTabs({
                 <p className="text-xs">No checked-in patients are currently waiting.</p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+              <div data-testid="waiting-queue-list" className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 {waitingBookings.map((booking, idx) => {
                   const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
                   const slotStr = `${new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(booking.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                  const isUpNext = booking.id === upNextBookingId || (idx === 0 && (!upNextBookingId || upNextBookingId === booking.id));
+
                   return (
                     <div 
                       key={booking.id}
@@ -218,12 +261,21 @@ export default function FrontDeskQueueTabs({
                           #{idx + 1}
                         </div>
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-bold text-slate-900">{patientName}</span>
                             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
                               {booking.reference_code}
                             </span>
                             {getArrivalBadge(booking.arrival_tag)}
+                            {isUpNext && (
+                              <span 
+                                data-testid="up-next-badge"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                                Up Next
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                             {booking.doctor_name && (
@@ -241,12 +293,22 @@ export default function FrontDeskQueueTabs({
                       <div className="flex items-center gap-2 self-end sm:self-center">
                         <button
                           type="button"
+                          data-testid="start-consultation-btn"
                           disabled={isProcessingAction}
                           onClick={() => onStartConsultation(booking.id)}
                           className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 shadow-2xs flex items-center gap-1.5 cursor-pointer"
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
                           <span>Call Patient</span>
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="mark-no-show-btn"
+                          disabled={isProcessingAction}
+                          onClick={() => setNoShowConfirmBooking(booking)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 transition cursor-pointer"
+                        >
+                          Mark No Show
                         </button>
                       </div>
                     </div>
@@ -278,7 +340,7 @@ export default function FrontDeskQueueTabs({
                 <p className="text-xs">There are no late arrival patients waiting for gaps.</p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+              <div data-testid="standby-queue-list" className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 {standbyBookings.map((booking, idx) => {
                   const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
                   return (
@@ -352,7 +414,7 @@ export default function FrontDeskQueueTabs({
                 <p className="text-xs">All scheduled patients for today have arrived or no appointments matched.</p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+              <div data-testid="expected-queue-list" className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 {filteredExpected.map((booking) => {
                   const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
                   const slotStart = new Date(booking.slot_start);
@@ -400,6 +462,7 @@ export default function FrontDeskQueueTabs({
                         {isPastSlot && (
                           <button
                             type="button"
+                            data-testid="mark-no-show-btn"
                             onClick={() => setNoShowConfirmBooking(booking)}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 transition cursor-pointer"
                           >
@@ -425,7 +488,7 @@ export default function FrontDeskQueueTabs({
                 <p className="text-xs">Finished patient visits will appear here.</p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+              <div data-testid="completed-queue-list" className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 {completedBookings.map((booking) => {
                   const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
                   return (

@@ -23,6 +23,7 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
 | 2026-10-23 | Phase 7b Customer Mobile UI & Account Block Notice | DECIDED | Updated Customer Mobile UI (`CheckoutModal.tsx` and `AccountScreen.tsx`): (1) Added 3rd time booking warning popup modal and persistent warning card detailing the ₹60 penalty split (Hospital ₹50, Appointments App ₹10, rest refunded); (2) Displayed 7-day account block banner if customer exceeded 5 strikes (`blocked_until > NOW()`) with disabled Pay CTA; (3) Updated cancellation policy card; (4) Added attendance standing card to `AccountScreen.tsx`; (5) Granted SELECT access on `public.profiles` (`no_show_count`, `is_flagged`) via migration 20261024000002. |
 | 2026-10-23 | Phase 8a Database Layer: Permanent Lifetime PIN, 1-Hour Patient Gap, & Emergency Cancellation RPCs | DECIDED | Added migration 20261024000003 creating `customer_checkin_pins` for immutable customer lifetime PINs, updated `create_booking_hold` with 1-hour patient collision check bypassing on family/friend toggle, and created `choose_emergency_option` RPC for doctor emergency choices with full 100% refund logic. |
 | 2026-10-23 | Phase 8b Customer Mobile UI & API Layer: Lifetime PIN, Emergency Modal, Family Booking Toggle, and Home Live Card | DECIDED | Built customer mobile components: (1) `CheckoutModal` family/friend toggle with relationship pills and 1-hour gap check; (2) `DoctorEmergencyModal` with Wait/Reschedule/100% Refund options; (3) `HomeScreen` pulsing green light live upcoming card; (4) `MyBookingsScreen` lifetime PIN banner and Upcoming vs History subtabs; (5) API route `/api/bookings/emergency-choice`. |
+| 2026-10-23 | Phase 5b Front Desk UI Hardening & Consultant URL Scoping | DECIDED | Hardened front desk reception workspace in `apps/merchant-web`. Scoped front desk staff strictly to assigned consultants, rendering explicit 403 Forbidden states on unassigned doctor URL probes (`?doctor_id=...`) and when no consultants are assigned. Integrated Fast-Pass OTP check-in with 60s security lockout on 5 consecutive failures, shared queue engine 'Up Next' derivation, Standby FIFO queue, and 7 Playwright journeys. |
 
 ---
 
@@ -158,3 +159,18 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
   6. **Customer App Navigation (`App.tsx`)**:
      - Persistent 3-tab bottom navigation: **Explore** (`HOME`), **My Appointments** (`MY_BOOKINGS` with dynamic upcoming count badge), and **Account**.
      - Listens to active booking status and mounts `DoctorEmergencyModal` overlay when doctor emergency cancellation occurs.
+
+---
+
+### Decision 9: Phase 5b Front Desk UI Hardening & Consultant URL Scoping
+- **Date**: 2026-10-23
+- **Status**: DECIDED (Implemented & Verified in Phase 5b)
+- **Requirement & Architecture**:
+  1. **Strict Consultant Scoping**: Front Desk staff (`role === 'front_desk'`) can only see and manage appointments for doctors explicitly assigned to them via `doctor_front_desk_assignments`. If staff has 0 assigned doctors (`hasNoAssignedDoctors`), a dedicated `[data-testid="frontdesk-no-assignments-forbidden"]` state is rendered blocking access.
+  2. **URL Parameter Protection**: Probing unassigned doctors via URL parameters (`?doctor_id=unassigned-id` or `?resource_id=...`) triggers an immediate 403 Forbidden state (`[data-testid="frontdesk-unassigned-doctor-forbidden"]`) with a clear error explanation and a CTA to return to assigned consultants.
+  3. **Fast-Pass OTP Check-in & Security Lockout**: Arriving patients submit 4-digit code. In accordance with SPEC line 16, 5 consecutive invalid entries trigger a 60-second lockout timer disabling input and verification (`[data-testid="checkin-lockout-alert"]`).
+  4. **Queue Triaging & Priority**:
+     - **Waiting Queue**: Lists present patients. Top patient derives "Up Next" status (`[data-testid="up-next-badge"]`) based on shared queue engine priority with Call Patient action (`[data-testid="start-consultation-btn"]`).
+     - **Standby Queue**: Late arrivals (>10m after slot start) automatically display in Standby Queue sorted in FIFO order per SPEC lines 19 & 20 without displacing on-time patients.
+     - **In-Consultation Banner**: Active ongoing consultation banner (`[data-testid="in-consultation-panel"]`) with Complete Consultation button (`[data-testid="end-consultation-btn"]`).
+  5. **Verification**: Backed by 7 automated Playwright test journeys in `tests/e2e/hospital-frontdesk-screens.spec.ts`.
