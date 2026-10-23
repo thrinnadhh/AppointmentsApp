@@ -183,6 +183,22 @@ serve(async (req: Request) => {
       throw new Error(`Dispatch failed: ${dispatchError.message}`);
     }
 
+    // Skip duplicate push notification if notification was already dispatched
+    if ((dispatchResult as any)?.idempotent) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          idempotent: true,
+          booking_id,
+          event_type,
+          dispatch: dispatchResult,
+          push_notification: { sent: false, channel: 'expo-push', reason: 'already_dispatched' },
+          processed_at: new Date().toISOString(),
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
     // ── 3. Derive push token strictly from customer profile in database ──────
     let pushResult = { sent: false, channel: 'expo-push' };
     if (booking.customer_id) {

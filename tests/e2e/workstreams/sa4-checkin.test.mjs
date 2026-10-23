@@ -23,25 +23,8 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import { createTenant, cleanupTenant } from '../harness/tenant-factory.mjs';
 import { SubAgentReportWriter } from '../harness/report-writer.mjs';
-import { getFrontDeskClient, getCustomerClient } from '../harness/client-helpers.mjs';
+import { getFrontDeskClient, getCustomerClient, getDbConfig } from '../harness/client-helpers.mjs';
 import { calculateArrivalTag, HospitalDepartmentQueueEngine } from '../../../packages/shared/src/queue-engine.ts';
-
-function getDbConfig() {
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const url = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/)[1];
-  const serviceKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/)[1];
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-  return {
-    url,
-    anonKey,
-    serviceHeaders: {
-      'apikey': serviceKey,
-      'Authorization': `Bearer ${serviceKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    }
-  };
-}
 
 describe('Workstream SA4: Check-in', () => {
   let tenant;
@@ -51,13 +34,26 @@ describe('Workstream SA4: Check-in', () => {
   before(async () => {
     writer = new SubAgentReportWriter('SA4', 'Check-in');
     console.log('[SA4] Setting up isolated tenant SA4...');
-    tenant = await createTenant('SA4');
+    try {
+      tenant = await createTenant('SA4');
+    } catch (err) {
+      if (writer) writer.markSetupFailed(err);
+      throw err;
+    }
   });
 
   after(async () => {
     console.log('[SA4] Generating test report and tearing down tenant SA4...');
-    writer.save();
-    await cleanupTenant('SA4');
+    try {
+      if (writer) writer.save();
+    } catch (e) {
+      console.error('[SA4] Error saving report:', e);
+    }
+    try {
+      await cleanupTenant('SA4');
+    } catch (e) {
+      console.error('[SA4] Error cleaning up tenant:', e);
+    }
   });
 
   // D1: On-time protection against late arrivals

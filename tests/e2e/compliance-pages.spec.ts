@@ -379,6 +379,10 @@ test.describe('Customer Data Masking — DPIIT & DPDPA Compliance', () => {
       const slotStart = new Date(Date.now() + 86400000 * 25).toISOString();
       const slotEnd = new Date(Date.now() + 86400000 * 25 + 1800000).toISOString();
       const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+        headers: {
+          'x-customer-id': '99999999-9999-9999-9999-999999999991',
+          'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
+        },
         data: {
           customer_id: '99999999-9999-9999-9999-999999999991',
           resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -389,6 +393,10 @@ test.describe('Customer Data Masking — DPIIT & DPDPA Compliance', () => {
       if (holdRes.ok()) {
         const { booking_id } = await holdRes.json();
         await request.post('http://localhost:3000/api/bookings/confirm', {
+          headers: {
+            'x-customer-id': '99999999-9999-9999-9999-999999999991',
+            'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
+          },
           data: {
             booking_id,
             payment_id: 'pay_compliance_seed_123',

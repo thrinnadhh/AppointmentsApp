@@ -20,25 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import { createTenant, cleanupTenant } from '../harness/tenant-factory.mjs';
 import { SubAgentReportWriter } from '../harness/report-writer.mjs';
-import { getAdminClient, getConsultantClient, getFrontDeskClient, getCustomerClient } from '../harness/client-helpers.mjs';
-
-function getDbConfig() {
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const url = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/)[1];
-  const serviceKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/)[1];
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-  return {
-    url,
-    appUrl: 'http://localhost:3000',
-    serviceHeaders: {
-      'apikey': serviceKey,
-      'Authorization': `Bearer ${serviceKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    },
-    anonKey
-  };
-}
+import { getAdminClient, getConsultantClient, getFrontDeskClient, getCustomerClient, getDbConfig } from '../harness/client-helpers.mjs';
 
 describe('Workstream SA1: Setup and Roles', () => {
   let tenant;
@@ -48,13 +30,26 @@ describe('Workstream SA1: Setup and Roles', () => {
   before(async () => {
     writer = new SubAgentReportWriter('SA1', 'Setup and roles');
     console.log('[SA1] Setting up isolated tenant SA1...');
-    tenant = await createTenant('SA1');
+    try {
+      tenant = await createTenant('SA1');
+    } catch (err) {
+      if (writer) writer.markSetupFailed(err);
+      throw err;
+    }
   });
 
   after(async () => {
     console.log('[SA1] Generating test report and tearing down tenant SA1...');
-    writer.save();
-    await cleanupTenant('SA1');
+    try {
+      if (writer) writer.save();
+    } catch (e) {
+      console.error('[SA1] Error saving report:', e);
+    }
+    try {
+      await cleanupTenant('SA1');
+    } catch (e) {
+      console.error('[SA1] Error cleaning up tenant:', e);
+    }
   });
 
   // A1: Admin creates departments: visible on admin and merchant screens.

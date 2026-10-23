@@ -1,5 +1,10 @@
 import fs from 'fs';
 
+if (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production') {
+  console.error('FATAL: Cannot run destructive script in production environment');
+  process.exit(1);
+}
+
 async function wipeAllVenues() {
   const envPath = 'apps/merchant-web/.env.local';
   const envContent = fs.readFileSync(envPath, 'utf8');

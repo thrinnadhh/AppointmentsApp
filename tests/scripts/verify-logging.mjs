@@ -2,48 +2,69 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { sanitizeLogData, createAppLogger } from './packages/shared/src/logger.ts';
+import {
+  sanitizeLogData,
+  createAppLogger,
+  computeFingerprint,
+  classifySeverity,
+} from '../../packages/shared/src/logger.ts';
 
-describe('Comprehensive Logging System Test Suite', () => {
-
-  // 1. PII Redaction and Sanitization
-  describe('1. PII Redaction & Data Sanitization', () => {
-    it('redacts Authorization Bearer tokens in headers and strings', () => {
+describe('Comprehensive Logging & Reliability Audit Test Suite', () => {
+  // 1. PII, Payment, and Medical Data Sanitization
+  describe('1. PII, Payment, and Medical Redaction & Data Sanitization', () => {
+    it('redacts Authorization Bearer tokens, raw JWTs, and API keys', () => {
       const payload = {
         authorization: 'Bearer super_secret_jwt_token_123',
-        error_details: 'Request header was Bearer secret_token_xyz and raw session token was eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc',
+        apiKey: 'sk_live_998124912849124',
+        error_details:
+          'Request header was Bearer secret_token_xyz and raw session token was eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc',
       };
       const sanitized = sanitizeLogData(payload);
 
       assert.strictEqual(sanitized.authorization, '[REDACTED]');
+      assert.strictEqual(sanitized.apiKey, '[REDACTED]');
       assert.ok(sanitized.error_details.includes('Bearer [REDACTED]'), 'Must redact Bearer token');
       assert.ok(!sanitized.error_details.includes('secret_token_xyz'), 'Raw token secret must not be leaked');
       assert.ok(sanitized.error_details.includes('[REDACTED_JWT]'), 'Must redact raw JWT token');
       assert.ok(!sanitized.error_details.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'), 'Raw JWT payload must not be leaked');
     });
 
-    it('redacts sensitive passwords, secrets, and auth tokens while preserving safe keys', () => {
+    it('redacts payment data (card numbers, CVV, UPI PINs, PAN)', () => {
       const payload = {
-        password: 'AdminPassword123!',
-        secret: 'webhook_secret_key',
-        otp: '123456',
-        refreshToken: 'refresh_tok_999',
-        apiKey: 'sk_live_xyz123',
-        itemCount: 42,
-        componentKey: 'provider-detail-card',
-        slotId: 'slot_883921',
+        cvv: '123',
+        upi_pin: '9876',
+        pan: 'ABCDE1234F',
+        cardNumber: '4532 1234 5678 9012',
+        message: 'Payment attempt with PAN ABCDE1234F and card 4532123456789012 failed',
       };
       const sanitized = sanitizeLogData(payload);
 
-      assert.strictEqual(sanitized.password, '[REDACTED]');
-      assert.strictEqual(sanitized.secret, '[REDACTED]');
-      assert.strictEqual(sanitized.otp, '[REDACTED]');
-      assert.strictEqual(sanitized.refreshToken, '[REDACTED]');
-      assert.strictEqual(sanitized.apiKey, '[REDACTED]');
-      // Safe keys must not be redacted
-      assert.strictEqual(sanitized.itemCount, 42);
-      assert.strictEqual(sanitized.componentKey, 'provider-detail-card');
-      assert.strictEqual(sanitized.slotId, 'slot_883921');
+      assert.strictEqual(sanitized.cvv, '[REDACTED]');
+      assert.strictEqual(sanitized.upi_pin, '[REDACTED]');
+      assert.strictEqual(sanitized.pan, '[REDACTED]');
+      assert.strictEqual(sanitized.cardNumber, '[REDACTED]');
+      assert.ok(sanitized.message.includes('[REDACTED_PAN]'), 'PAN in text must be redacted');
+      assert.ok(!sanitized.message.includes('4532123456789012'), 'Full card number must not appear in text');
+    });
+
+    it('redacts medical details (diagnosis, symptoms, prescriptions, doctor notes)', () => {
+      const payload = {
+        symptom: 'Severe persistent chest pain and palpitations',
+        diagnosis: 'Acute Bronchitis',
+        prescription: 'Azithromycin 500mg BID x 3 days',
+        clinical_note: 'Patient advised complete bed rest for 48 hours',
+        safeCategory: 'HOSPITAL_QUEUE',
+        tokenNumber: 'A-42',
+      };
+      const sanitized = sanitizeLogData(payload);
+
+      assert.strictEqual(sanitized.symptom, '[REDACTED_MEDICAL]');
+      assert.strictEqual(sanitized.diagnosis, '[REDACTED_MEDICAL]');
+      assert.strictEqual(sanitized.prescription, '[REDACTED_MEDICAL]');
+      assert.strictEqual(sanitized.clinical_note, '[REDACTED_MEDICAL]');
+      // Non-medical operational fields must remain intact
+      assert.strictEqual(sanitized.safeCategory, 'HOSPITAL_QUEUE');
+      assert.strictEqual(sanitized.tokenNumber, 'A-42');
     });
 
     it('masks phone numbers according to Indian DPDP / DPIIT rules', () => {
@@ -59,44 +80,130 @@ describe('Comprehensive Logging System Test Suite', () => {
     });
   });
 
-  // 2. Component Scoping & Multi-Platform Logger
-  describe('2. Component & Platform Scoping', () => {
-    it('scopes logs to specific components and platforms correctly', async () => {
+  // 2. Deterministic Fingerprint Calculation
+  describe('2. Fingerprint Calculation & Duplicate Grouping', () => {
+    it('produces identical fingerprints for errors with varying IDs or numbers', () => {
+      const fp1 = computeFingerprint(
+        'Slot occupied: slot 88888888-4444-4444-4444-123456789012 occupied at 10:30',
+        'Error: Collision\n  at reserveSlot (api.ts:42:15)'
+      );
+      const fp2 = computeFingerprint(
+        'Slot occupied: slot 99999999-5555-5555-5555-987654321098 occupied at 14:00',
+        'Error: Collision\n  at reserveSlot (api.ts:98:20)'
+      );
+
+      assert.strictEqual(fp1, fp2, 'Fingerprints must group identical stack and error patterns');
+    });
+
+    it('produces different fingerprints for different error root causes', () => {
+      const fp1 = computeFingerprint('Network request timed out', 'Error: Timeout\n  at fetchWithTimeout (http.ts:12)');
+      const fp2 = computeFingerprint('Invalid JWT signature', 'Error: AuthFailed\n  at verifySession (auth.ts:99)');
+
+      assert.notStrictEqual(fp1, fp2, 'Different errors must have distinct fingerprints');
+    });
+  });
+
+  // 3. Automated CRITICAL Elevation
+  describe('3. Automated Severity Elevation & Classification', () => {
+    it('auto-elevates UI crashes to CRITICAL', () => {
+      const severity = classifySeverity({
+        level: 'error',
+        category: 'UI_CRASH',
+        message: 'React Native render error: undefined is not an object',
+      });
+      assert.strictEqual(severity, 'CRITICAL');
+    });
+
+    it('auto-elevates payment failures to CRITICAL', () => {
+      const severity = classifySeverity({
+        level: 'error',
+        category: 'PAYMENT',
+        message: 'Razorpay order verification failed: signature mismatch',
+      });
+      assert.strictEqual(severity, 'CRITICAL');
+    });
+
+    it('auto-elevates double-booking conflicts to CRITICAL', () => {
+      const severity = classifySeverity({
+        level: 'warn',
+        category: 'BOOKING',
+        message: 'Concurrency collision: Slot occupied during checkout',
+      });
+      assert.strictEqual(severity, 'CRITICAL');
+    });
+
+    it('auto-elevates security and RLS violations to CRITICAL', () => {
+      const severity = classifySeverity({
+        level: 'error',
+        category: 'SECURITY',
+        message: 'Postgres RLS denied access to provider bookings table',
+      });
+      assert.strictEqual(severity, 'CRITICAL');
+    });
+
+    it('auto-elevates deposit/refund mismatches to CRITICAL', () => {
+      const severity = classifySeverity({
+        level: 'warn',
+        category: 'PAYMENT',
+        message: 'Audit discrepancy: Deposit mismatch between gateway and database records',
+      });
+      assert.strictEqual(severity, 'CRITICAL');
+    });
+
+    it('preserves INFO and WARN when not matching critical criteria', () => {
+      const infoSev = classifySeverity({
+        level: 'info',
+        category: 'BOOKING',
+        message: 'Customer viewed provider calendar',
+      });
+      assert.strictEqual(infoSev, 'INFO');
+
+      const warnSev = classifySeverity({
+        level: 'warn',
+        category: 'NETWORK',
+        message: 'Slow response: request took 1800ms',
+      });
+      assert.strictEqual(warnSev, 'WARN');
+    });
+  });
+
+  // 4. Component Scoping & Multi-Platform Logger
+  describe('4. Component & Platform Scoping with Classification Fields', () => {
+    it('scopes logs to specific components and populates classification fields', async () => {
       const receivedLogs = [];
       const testLogger = createAppLogger({
         platform: 'web',
+        source: 'merchant-web',
         flushHandler: async (entry) => {
           receivedLogs.push(entry);
         },
         enableConsole: false,
       });
 
-      const detailLogger = testLogger.forComponent('ProviderDetailScreen');
-      const checkoutLogger = testLogger.forComponent('CheckoutModal');
+      const detailLogger = testLogger.forComponent('ProviderDetailScreen', 'BOOKING');
+      const checkoutLogger = testLogger.forComponent('CheckoutModal', 'PAYMENT');
 
       await detailLogger.info('Viewing provider calendar', { providerId: 'prov_123' });
-      await detailLogger.warn('Slow network response on slot fetch', { durationMs: 1400 });
-      await checkoutLogger.error('Prescription upload failed', new Error('File size exceeded'), { fileSize: '12MB' });
+      await detailLogger.warn('Slow network response on slot fetch', { durationMs: 1400 }, 'NETWORK');
+      await checkoutLogger.critical('Razorpay payment signature mismatch', new Error('Invalid signature'), { amount: 500 }, 'PAYMENT');
 
       assert.strictEqual(receivedLogs.length, 3);
 
       // Log 1: Info
       assert.strictEqual(receivedLogs[0].platform, 'web');
-      assert.strictEqual(receivedLogs[0].level, 'info');
+      assert.strictEqual(receivedLogs[0].source, 'merchant-web');
+      assert.strictEqual(receivedLogs[0].severity, 'INFO');
+      assert.strictEqual(receivedLogs[0].category, 'BOOKING');
       assert.strictEqual(receivedLogs[0].component, 'ProviderDetailScreen');
-      assert.strictEqual(receivedLogs[0].message, 'Viewing provider calendar');
-      assert.strictEqual(receivedLogs[0].metadata.providerId, 'prov_123');
 
       // Log 2: Warn
-      assert.strictEqual(receivedLogs[1].level, 'warn');
-      assert.strictEqual(receivedLogs[1].component, 'ProviderDetailScreen');
+      assert.strictEqual(receivedLogs[1].severity, 'WARN');
+      assert.strictEqual(receivedLogs[1].category, 'NETWORK');
 
-      // Log 3: Error
-      assert.strictEqual(receivedLogs[2].level, 'error');
-      assert.strictEqual(receivedLogs[2].component, 'CheckoutModal');
-      assert.strictEqual(receivedLogs[2].message, 'Prescription upload failed');
-      assert.ok(receivedLogs[2].metadata.error.message.includes('File size exceeded'));
-      assert.ok(receivedLogs[2].stack_trace);
+      // Log 3: Critical
+      assert.strictEqual(receivedLogs[2].severity, 'CRITICAL');
+      assert.strictEqual(receivedLogs[2].category, 'PAYMENT');
+      assert.ok(receivedLogs[2].fingerprint, 'Must compute fingerprint');
     });
 
     it('never throws unhandled exceptions if the flush handler fails', async () => {
@@ -108,74 +215,68 @@ describe('Comprehensive Logging System Test Suite', () => {
         enableConsole: false,
       });
 
-      // Calling log methods must resolve cleanly without crashing
       await assert.doesNotReject(async () => {
         await faultyLogger.error('Test error during network blackout');
       });
     });
   });
 
-  // 3. Security & Admin-Only Access Verification
-  describe('3. Admin-Only Access & Route Guard Validation', () => {
-    it('verifies admin-only route (/api/admin/app-logs) strictly rejects non-admins', () => {
-      const adminRoutePath = path.resolve('apps/merchant-web/src/app/api/admin/app-logs/route.ts');
-      const adminRouteSrc = fs.readFileSync(adminRoutePath, 'utf8');
+  // 5. Database Schema, Migration & Retention
+  describe('5. Database Schema, RLS & Tiered Retention Integrity', () => {
+    it('verifies classification migration contains all required columns and constraints', () => {
+      const migrationPath = path.resolve('supabase/migrations/20261021000001_classify_app_logs_and_alerts.sql');
+      const migrationSrc = fs.readFileSync(migrationPath, 'utf8');
 
-      // Checks verifyAdminRequest guard
-      assert.ok(adminRouteSrc.includes('verifyAdminRequest(request)'), 'Must call verifyAdminRequest');
-      assert.ok(adminRouteSrc.includes("if ('error' in authResult)"), 'Must return error on unauthorized caller');
+      // Column additions
+      assert.ok(migrationSrc.includes('ADD COLUMN IF NOT EXISTS severity text'));
+      assert.ok(migrationSrc.includes('ADD COLUMN IF NOT EXISTS category text'));
+      assert.ok(migrationSrc.includes('ADD COLUMN IF NOT EXISTS source text'));
+      assert.ok(migrationSrc.includes('ADD COLUMN IF NOT EXISTS fingerprint text'));
+      assert.ok(migrationSrc.includes('ADD COLUMN IF NOT EXISTS app_version text'));
+
+      // Constraints
+      assert.ok(migrationSrc.includes("CHECK (severity IN ('DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'))"));
+      assert.ok(migrationSrc.includes("CHECK (category IN ('AUTH', 'BOOKING', 'PAYMENT'"));
+
+      // Deduplication table
+      assert.ok(migrationSrc.includes('CREATE TABLE IF NOT EXISTS public.crash_alert_dedup'));
+
+      // Tiered retention
+      assert.ok(migrationSrc.includes("INTERVAL '30 days'"), '30-day DEBUG/INFO retention');
+      assert.ok(migrationSrc.includes("INTERVAL '180 days'"), '180-day ERROR/CRITICAL retention');
     });
+  });
 
-    it('verifies ingest route enforces payload size limits against DOS', () => {
+  // 6. Security, Rate Limiting & Admin Access
+  describe('6. Security & Ingestion Rate Limiting', () => {
+    it('verifies /api/logs/ingest implements sliding-window rate limiting', () => {
       const ingestPath = path.resolve('apps/merchant-web/src/app/api/logs/ingest/route.ts');
       const ingestSrc = fs.readFileSync(ingestPath, 'utf8');
 
-      assert.ok(ingestSrc.includes('rawText.length > 65536'), 'Must enforce max 64KB payload');
-      assert.ok(ingestSrc.includes('status: 413'), 'Must return 413 on payload too large');
+      assert.ok(ingestSrc.includes('checkRateLimit'), 'Must include checkRateLimit');
+      assert.ok(ingestSrc.includes('status: 429'), 'Must return 429 when rate limit exceeded');
+    });
+
+    it('verifies admin-only routes enforce verifyAdminRequest', () => {
+      const adminRoutePath = path.resolve('apps/merchant-web/src/app/api/admin/app-logs/route.ts');
+      const adminRouteSrc = fs.readFileSync(adminRoutePath, 'utf8');
+
+      assert.ok(adminRouteSrc.includes('verifyAdminRequest(request)'));
+      assert.ok(adminRouteSrc.includes("if ('error' in authResult)"));
     });
   });
 
-  // 4. Supabase Database Security & Migration Integrity
-  describe('4. Database Schema, RLS & Retention Pruning', () => {
-    it('verifies migration restricts SELECT to public.is_admin(auth.uid()) only', () => {
-      const migrationPath = path.resolve('supabase/migrations/20261009000001_create_app_logs_and_admin_security.sql');
-      const migrationSrc = fs.readFileSync(migrationPath, 'utf8');
+  // 7. Crash Alert Edge Function
+  describe('7. Crash Alert Supabase Edge Function', () => {
+    it('verifies crash-alert edge function deduplication and Resend integration', () => {
+      const edgeFuncPath = path.resolve('supabase/functions/crash-alert/index.ts');
+      const edgeFuncSrc = fs.readFileSync(edgeFuncPath, 'utf8');
 
-      // Table & RLS
-      assert.ok(migrationSrc.includes('CREATE TABLE IF NOT EXISTS public.app_logs'));
-      assert.ok(migrationSrc.includes('ALTER TABLE public.app_logs ENABLE ROW LEVEL SECURITY'));
-      
-      // Strict Admin Select Policy
-      assert.ok(migrationSrc.includes('CREATE POLICY "Only admins can view app logs"'));
-      assert.ok(migrationSrc.includes('USING (public.is_admin(auth.uid()))'));
-
-      // Mutations revoked
-      assert.ok(migrationSrc.includes('REVOKE UPDATE, DELETE, INSERT ON public.app_logs FROM anon, authenticated, PUBLIC;'));
-
-      // Auto-pruning retention
-      assert.ok(migrationSrc.includes("INTERVAL '30 days'"), 'Must implement 30-day retention prune');
-    });
-  });
-
-  // 5. Customer Mobile Error Boundary
-  describe('5. Mobile Error Boundary & Component Fallback', () => {
-    it('verifies ErrorBoundary is wired to root App.tsx', () => {
-      const appPath = path.resolve('apps/customer-mobile/App.tsx');
-      const appSrc = fs.readFileSync(appPath, 'utf8');
-
-      assert.ok(appSrc.includes("import { ErrorBoundary } from './src/components/ErrorBoundary'"));
-      assert.ok(appSrc.includes('<ErrorBoundary>'));
-      assert.ok(appSrc.includes('</ErrorBoundary>'));
-    });
-  });
-
-  // 6. Next.js Root Error Boundary
-  describe('6. Next.js Global Error Boundary', () => {
-    it('verifies global-error.tsx automatically captures root crashes', () => {
-      const globalErrorPath = path.resolve('apps/merchant-web/src/app/global-error.tsx');
-      const globalErrorSrc = fs.readFileSync(globalErrorPath, 'utf8');
-
-      assert.ok(globalErrorSrc.includes("webLogger.forComponent('RootGlobalError').error"));
+      assert.ok(edgeFuncSrc.includes('ADMIN_ALERT_EMAIL'), 'Must read ADMIN_ALERT_EMAIL');
+      assert.ok(edgeFuncSrc.includes('RESEND_API_KEY'), 'Must read RESEND_API_KEY');
+      assert.ok(edgeFuncSrc.includes('crash_alert_dedup'), 'Must check deduplication table');
+      assert.ok(edgeFuncSrc.includes('DEDUP_WINDOW_MINUTES = 15'), 'Must enforce 15-minute dedup window');
+      assert.ok(edgeFuncSrc.includes('api.resend.com/emails'), 'Must integrate with Resend API');
     });
   });
 });

@@ -141,8 +141,12 @@ test.describe.serial('Phase 1: High Severity Financial & Access Control BOLA Def
     });
 
     await test.step('Act: Attempt direct payment fetch confirmation on unlinked booking', async () => {
+      const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
       const confirmRes = await request.post('http://localhost:3000/api/bookings/confirm', {
-        headers: { 'x-customer-id': TEST_CUSTOMER_ID },
+        headers: {
+          'x-customer-id': TEST_CUSTOMER_ID,
+          ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
+        },
         data: {
           booking_id: unlinkedBookingId,
           gateway_payment_id: 'pay_test_direct_unlinked',

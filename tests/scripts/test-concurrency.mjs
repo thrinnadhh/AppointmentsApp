@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { acquireSlotLock, releaseSlotLock, clearAllMemoryLocks } from './apps/merchant-web/src/lib/redis.ts';
+import { acquireSlotLock, releaseSlotLock, clearAllMemoryLocks } from '../../apps/merchant-web/src/lib/redis.ts';
 
 describe('Concurrency & Financial State Machine Remediation Suite', () => {
 

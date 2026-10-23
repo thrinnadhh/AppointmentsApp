@@ -16,23 +16,10 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
-import { createTenant, cleanupTenant } from '../harness/tenant-factory.mjs';
+import { createTenant, cleanupTenant, dbInsertProvider, dbDeleteProvider } from '../harness/tenant-factory.mjs';
 import { SubAgentReportWriter } from '../harness/report-writer.mjs';
 
-function getDbConfig() {
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const url = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/)[1];
-  const serviceKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/)[1];
-  return {
-    url,
-    serviceHeaders: {
-      'apikey': serviceKey,
-      'Authorization': `Bearer ${serviceKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    }
-  };
-}
+import { getDbConfig } from '../harness/client-helpers.mjs';
 
 describe('Workstream SA8: Resilience and Non-Hospital Regression', () => {
   let tenant;
@@ -46,28 +33,28 @@ describe('Workstream SA8: Resilience and Non-Hospital Regression', () => {
   before(async () => {
     writer = new SubAgentReportWriter('SA8', 'Resilience and Non-Hospital Regression');
     console.log('[SA8] Setting up isolated tenant SA8...');
-    tenant = await createTenant('SA8');
+    try {
+      tenant = await createTenant('SA8');
+    } catch (err) {
+      if (writer) writer.markSetupFailed(err);
+      throw err;
+    }
 
     const p = tenant.prefix;
     const lowP = p.toLowerCase();
 
     // 1. Setup Gaming & Turf provider
-    const turfRes = await fetch(`${url}/rest/v1/providers`, {
-      method: 'POST',
-      headers: serviceHeaders,
-      body: JSON.stringify({
-        name: `[${p}] Box Cricket & Turf Arena`,
-        category_id: 'gaming',
-        owner_id: tenant.adminUser.id,
-        address: 'Alipiri Road',
-        phone: '+919848033333',
-        city: 'Tirupati',
-        latitude: 13.6288,
-        longitude: 79.4192,
-        is_active: true
-      })
+    gamingProvider = await dbInsertProvider({
+      name: `[${p}] Box Cricket & Turf Arena`,
+      category_id: 'gaming',
+      owner_id: tenant.adminUser.id,
+      address: 'Alipiri Road',
+      phone: '+919848033333',
+      city: 'Tirupati',
+      latitude: 13.6288,
+      longitude: 79.4192,
+      is_active: true
     });
-    gamingProvider = (await turfRes.json())[0];
     await tenant.clock.linkProvider(gamingProvider.id);
 
     const courtRes = await fetch(`${url}/rest/v1/resources`, {
@@ -87,22 +74,17 @@ describe('Workstream SA8: Resilience and Non-Hospital Regression', () => {
     gamingResource = (await courtRes.json())[0];
 
     // 2. Setup Restaurants & Dining provider
-    const diningRes = await fetch(`${url}/rest/v1/providers`, {
-      method: 'POST',
-      headers: serviceHeaders,
-      body: JSON.stringify({
-        name: `[${p}] Royal Dine Family Restaurant`,
-        category_id: 'restaurants',
-        owner_id: tenant.adminUser.id,
-        address: 'Bypass Road',
-        phone: '+919848044444',
-        city: 'Tirupati',
-        latitude: 13.6288,
-        longitude: 79.4192,
-        is_active: true
-      })
+    diningProvider = await dbInsertProvider({
+      name: `[${p}] Royal Dine Family Restaurant`,
+      category_id: 'restaurants',
+      owner_id: tenant.adminUser.id,
+      address: 'Bypass Road',
+      phone: '+919848044444',
+      city: 'Tirupati',
+      latitude: 13.6288,
+      longitude: 79.4192,
+      is_active: true
     });
-    diningProvider = (await diningRes.json())[0];
     await tenant.clock.linkProvider(diningProvider.id);
 
     const tableRes = await fetch(`${url}/rest/v1/resources`, {
@@ -122,22 +104,17 @@ describe('Workstream SA8: Resilience and Non-Hospital Regression', () => {
     diningResource = (await tableRes.json())[0];
 
     // 3. Setup Pets Care & Clinic provider
-    const petsRes = await fetch(`${url}/rest/v1/providers`, {
-      method: 'POST',
-      headers: serviceHeaders,
-      body: JSON.stringify({
-        name: `[${p}] Tirupati Pet Care Clinic`,
-        category_id: 'pets',
-        owner_id: tenant.adminUser.id,
-        address: 'Bhavani Nagar',
-        phone: '+919848055555',
-        city: 'Tirupati',
-        latitude: 13.6288,
-        longitude: 79.4192,
-        is_active: true
-      })
+    petsProvider = await dbInsertProvider({
+      name: `[${p}] Tirupati Pet Care Clinic`,
+      category_id: 'pets',
+      owner_id: tenant.adminUser.id,
+      address: 'Bhavani Nagar',
+      phone: '+919848055555',
+      city: 'Tirupati',
+      latitude: 13.6288,
+      longitude: 79.4192,
+      is_active: true
     });
-    petsProvider = (await petsRes.json())[0];
     await tenant.clock.linkProvider(petsProvider.id);
 
     const vetRes = await fetch(`${url}/rest/v1/resources`, {
@@ -159,20 +136,28 @@ describe('Workstream SA8: Resilience and Non-Hospital Regression', () => {
 
   after(async () => {
     console.log('[SA8] Generating test report and tearing down tenant SA8...');
-    writer.save();
+    try {
+      if (writer) writer.save();
+    } catch (e) {
+      console.error('[SA8] Error saving report:', e);
+    }
 
     // Clean up auxiliary providers
-    if (gamingProvider) {
-      await fetch(`${url}/rest/v1/providers?id=eq.${gamingProvider.id}`, { method: 'DELETE', headers: serviceHeaders });
-    }
-    if (diningProvider) {
-      await fetch(`${url}/rest/v1/providers?id=eq.${diningProvider.id}`, { method: 'DELETE', headers: serviceHeaders });
-    }
-    if (petsProvider) {
-      await fetch(`${url}/rest/v1/providers?id=eq.${petsProvider.id}`, { method: 'DELETE', headers: serviceHeaders });
-    }
+    try {
+      if (gamingProvider) await dbDeleteProvider(gamingProvider.id);
+    } catch {}
+    try {
+      if (diningProvider) await dbDeleteProvider(diningProvider.id);
+    } catch {}
+    try {
+      if (petsProvider) await dbDeleteProvider(petsProvider.id);
+    } catch {}
 
-    await cleanupTenant('SA8');
+    try {
+      await cleanupTenant('SA8');
+    } catch (e) {
+      console.error('[SA8] Error in cleanupTenant:', e);
+    }
   });
 
   // K1: Salon, vet care, turf/gaming and dining bookings still work end to end
