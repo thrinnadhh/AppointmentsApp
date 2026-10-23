@@ -10,6 +10,12 @@ Roles: Hospital Admin, Front Desk, Consultant. Arrival tags: On Time, Early, Lat
 ## Booking and money
 - A booking is confirmed by paying a deposit. The hold lasts one value everywhere (code, tests, jobs, gateway order expiry): 5 minutes unless I change it.
 - Customer cancels or reschedules free if at least 60 minutes remain before the slot; otherwise the deposit is forfeited. If the business cancels: full refund.
+- There must be at least a 1-hour gap between appointments for the same patient. When booking for different patients (family or friend), no 1-hour gap is required (back-to-back or simultaneous bookings are permitted).
+- In case of emergency when a doctor becomes unavailable or leaves mid-day:
+  - Patients who booked for that doctor are informed via an in-app popup modal ("Due to emergency, doctor is not available").
+  - If doctor arrived and cancelled mid-session, patients are offered options: Wait, Reschedule, or Refund.
+  - If cancelled before arrival, options are: Reschedule or Refund.
+  - Refunds are 100% full refunds, including the full platform fee and deposit amount.
 - No Show means the patient never checked in before the doctor's session ended.
   - Strikes 1 & 2: Two times there will be no issue (100% courtesy deposit refund, no monetary penalty).
   - Third time booking (with 2 prior misses): Warning popup modal and note stating: "Two times there will be no issue, but for the third time: if you don't show up this time, there will be a penalty of ₹60. In ₹60, ₹50 will be given to the hospital and ₹10 to the Appointments app. The rest of your deposit will be refunded."
@@ -17,7 +23,14 @@ Roles: Hospital Admin, Front Desk, Consultant. Arrival tags: On Time, Early, Lat
   - Exceeding 5 strikes (6th no-show): account is blocked for 7 days (`blocked_until = NOW() + INTERVAL '7 days'`), display 'Your account is blocked for 7 days', and reset the strike counter to 0.
 - A patient who checked in but was not reached is NOT a no-show: free reschedule or full refund.
 ## Check-in
-- 4-digit code per confirmed appointment, generated on the server, unique per shop per date, shown to the customer from 60 minutes before the slot until check-in. Staff verify it through a function only and can never read codes. 5 wrong attempts lock that staff user for 60 seconds. Unauthorized, other-shop and invalid codes return the identical error. Manual mark-present exists as a logged fallback.
+- 4-digit check-in PIN is permanent and lifetime for the customer across all their bookings as long as they use the app. It does not change on reschedule or per-appointment.
+- PIN is shown to the customer on their ticket/booking pass from 60 minutes before the slot until check-in. Staff verify it through a function only and can never read codes. 5 wrong attempts lock that staff user for 60 seconds. Unauthorized, other-shop and invalid codes return the identical error. Manual mark-present exists as a logged fallback.
+## Customer Mobile UX & Notifications
+- SMS & WhatsApp are primary communication channels.
+- Customer Mobile App features a dedicated 'My Appointments' tab showing:
+  - Active and upcoming appointments
+  - Complete history of past completed and cancelled appointments
+- On the Home Screen of the customer app, for the current upcoming appointment, a short and sweet live card displays the essential details with a pulsing/blinking micro green light indicator.
 ## Time and queue
 - Arrival window is plus or minus 10 minutes of the booked time. The booked time is a ceiling: starting earlier is always allowed when the patient is present and the doctor is free.
 - Priority whenever the doctor is free: (1) On Time patients whose window is open, earliest booked first; (2) the Standby Queue in original booking order, only if the consultation (about the 70th percentile estimate) finishes before the next booked patient's time; (3) early patients whose window has not opened, only to avoid idling; (4) otherwise wait.
@@ -25,7 +38,7 @@ Roles: Hospital Admin, Front Desk, Consultant. Arrival tags: On Time, Early, Lat
 - Live ETA is recomputed on every check-in, start and end; the customer is notified only when the ETA leaves their window. When the doctor runs early an optional "come now?" invite goes out; declining changes nothing. Staff can manually override a position for medical urgency (Hospital Admin or Consultant), always logged.
 - The old "+2 appointments later" late-queue rule is retired.
 ## Open decisions (do not decide; list the current behavior of the code for each)
-Overlapping bookings by one customer with two doctors; Consultant on leave with existing bookings; Consultant unavailable mid-day; check-in code after reschedule; deposit below 60 rupees; push notifications at launch; production domain.
+Production domain (user will decide final production live URL later).
 
 ### Current code behavior for open decisions
 - **Overlapping bookings by one customer with two doctors**: Currently ALLOWED. The database range exclusion constraint (`no_overlapping_active_bookings`) only prevents overlaps on the same `resource_id` (`resource_id WITH =, tstzrange(slot_start, slot_end) WITH &&`). There is no cross-resource exclusion constraint or check on `customer_id`.
