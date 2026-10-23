@@ -4,20 +4,115 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
 
 | Date | Topic / Decision | Status | Reason / Current Code Behavior |
 |------|------------------|--------|--------------------------------|
-| 2026-10-23 | 1-Hour Gap for Same Patient & Family/Friend Booking | DECIDED | For the same patient (name/phone), there must be at least a 1-hour gap between appointments. When booking for different patients (family or friend toggle), no 1-hour gap is enforced, allowing back-to-back or simultaneous bookings. |
-| 2026-10-23 | Doctor Emergency Leave & Mid-Day Cancellation | DECIDED | If a doctor becomes unavailable or leaves mid-day due to an emergency, affected customers are informed with an in-app popup modal ("Due to emergency, doctor is not available"). If doctor arrived and cancelled mid-session, patients choose Wait, Reschedule, or Refund. If cancelled before arrival, options are Reschedule or Refund. Refunds are 100% full refunds including deposit and platform fee. |
-| 2026-10-23 | Permanent Lifetime Customer Check-In PIN | DECIDED | A customer's 4-digit check-in PIN is permanent and lifetime for the customer across all their bookings as long as they use the app. It does not change on reschedule or per-appointment. |
-| 2026-10-23 | SMS/WhatsApp Primary & Customer App Appointments UX | DECIDED | SMS & WhatsApp are primary communication channels. Customer Mobile App features a dedicated 'My Appointments' tab (upcoming + history) and a Home Screen live upcoming appointment card with main necessary details and a pulsing/blinking micro green light indicator. |
-| 2026-10-23 | Deposit below 60 rupees & Tiered No-Show Policy | DECIDED | Two times there will be no issue (100% courtesy deposit refund). For third time booking onwards (strikes 3 to 5), penalty of ₹60 applies: ₹50 is given to hospital, ₹10 to Appointments app. If deposit <= ₹60, deposit is forfeited with zero refund; if deposit > ₹60, remainder (deposit - 60) is refunded. Exceeding 5 strikes blocks account for 7 days and resets strike counter to 0. |
-| 2026-10-23 | Production domain | OPEN | Configurable via environment variables (EXPO_PUBLIC_API_BASE_URL and NEXT_PUBLIC_APP_URL). User will decide final live production URL later. |
-| 2026-10-23 | Queue Engine Single Source of Truth & Retirement of '+2 Buffer' | DECIDED | Replaced legacy '+2 appointments later' arithmetic across API routes, web components, customer mobile app, and test scripts with `packages/shared/src/queue-engine.ts`. Ordering rules strictly enforce SPEC priority: (1) On-Time in window, (2) Standby Queue in original booking order (FIFO) with fit check, (3) Early arrivals to prevent doctor idling, (4) Fit check lifted at end of day when no booked patients remain, with nobody dropped. |
-| 2026-10-23 | Notification Gating on ETA Leaving Customer Window | DECIDED | Customer ETA notifications are gated strictly per SPEC line 21 via `shouldSendEtaNotification(slotStart, estimatedStartTime)`. Updates are emitted only when new ETA is outside the +/- 10 min window (`slotStart +/- 10m`), preventing notification spam for minor intraday schedule adjustments. |
+| 2026-10-23 | 1. 1-Hour Gap for Same Patient & Family/Friend Booking | DECIDED | For the same patient (name/phone), there must be at least a 1-hour gap between appointments. When booking for different patients (family or friend toggle), no 1-hour gap is enforced, allowing back-to-back or simultaneous bookings. |
+| 2026-10-23 | 2 & 3. Doctor Emergency Mid-Day Leave & Cancellation | DECIDED | If a doctor becomes unavailable or leaves mid-day due to an emergency, affected customers receive an in-app popup modal ("Due to emergency, doctor is not available"). If doctor arrived and cancelled mid-session: options are Wait, Reschedule, or Refund. If cancelled before arrival: options are Reschedule or Refund. Refunds are 100% full refunds including deposit and platform fee. |
+| 2026-10-23 | 4. Permanent Lifetime Customer Check-In PIN | DECIDED | A customer's 4-digit check-in PIN is permanent and lifetime for the customer across all their bookings as long as they use the app. It does not change on reschedule or per-appointment. Masked until 60m pre-slot. |
+| 2026-10-23 | 5. SMS/WhatsApp Primary & Customer App Appointments UX | DECIDED | SMS & WhatsApp are primary communication channels. Customer Mobile App features a dedicated 'My Appointments' tab (upcoming + history) and a Home Screen live upcoming appointment card with main necessary details and a pulsing/blinking micro green light indicator. |
+| 2026-10-23 | Tiered No-Show Policy (₹50 Hospital / ₹10 Platform Split) | DECIDED | Strikes 1 & 2: courtesy 100% deposit refund, no penalty. 3rd time booking: warning popup modal and note stating ₹60 penalty if no-show (₹50 to hospital, ₹10 to Appointments app, remainder refunded). Strikes 3 to 5: ₹60 penalty applied. >5 strikes (6th miss): account blocked for 7 days, strike counter reset to 0. |
+| 2026-10-23 | 6. Production Domain | OPEN | Still not decided by user. Configurable via environment variables (EXPO_PUBLIC_API_BASE_URL and NEXT_PUBLIC_APP_URL). User will decide final live production URL later. |
+| 2026-10-23 | Queue Engine Single Source of Truth & Retirement of '+2 Buffer' | DECIDED | Replaced legacy '+2 appointments later' arithmetic across API routes, web components, customer mobile app, and test scripts with `packages/shared/src/queue-engine.ts`. Strictly enforces SPEC priority: (1) On-Time in window, (2) Standby Queue in original booking order (FIFO) with fit check, (3) Early arrivals to prevent doctor idling, (4) Fit check lifted at end of day with nobody dropped. |
+| 2026-10-23 | Notification Gating on ETA Leaving Customer Window | DECIDED | Customer ETA notifications are gated strictly per SPEC line 21 via `shouldSendEtaNotification(slotStart, estimatedStartTime)`. Updates are emitted only when new ETA is outside the +/- 10 min window (`slotStart +/- 10m`), preventing notification spam. |
 | 2026-10-23 | Rolling Queue Dispatcher Peek & Manual Consultation Gate | DECIDED | `buildRollingTenSlotQueue` calls `departmentEngine.dispatchNext(..., { peekOnly: true })` to highlight 'Up Next' and compute pure ETAs without mutating engine consultation state. Manual staff actions remain the sole mechanism for starting consultations. |
-| 2026-10-23 | Phase 5a Hospital Admin UI Screens & Modular Architecture | DECIDED | Modularized `team/page.tsx` from 1,369 lines into small single-purpose components under `components/team/` (`DoctorAssignmentCard`, `AssignFrontDeskModal`, `UnifiedAddStaffModal`, `StaffRosterTable`, `TeamMetricsCards`). Built dedicated `/departments` screen with CRUD, modules, 7-day invite expiry, and max-3 member quota enforcement. Built `/audit-logs` screen with category filtering and JSON metadata inspection. Enhanced `/` with department filters. Added read-only No-Show formula (₹50 doctor / ₹10 platform / remainder refund) and 60m cutoff display to `/settings`. Enhanced `/schedule` with doctor-specific leave marking. |
-| 2026-10-23 | Restored 1-arg RPC wrappers for hospital_role and hospital_accessible_resource_ids | DECIDED | Added migration 20261023000001 restoring 1-arg overloads calling (provider_id, auth.uid()). PostgREST RPC requests from client-side callers and integration test suites specifying only p_provider_id resolve without PGRST202 schema errors while preserving 2-arg explicit caller security definer implementation. |
-| 2026-10-23 | Phase 5b Consultant UI & Clinical Consultation Workspace | DECIDED | Built dedicated `/consultation` workspace for Doctors/Consultants and supervising Hospital Admins adhering strictly to `docs/hospital/screens-consultant.md` and `DESIGN.md`. Features live consultation card with real-time elapsed timer, clinical notes / prescription textarea with quick-chips, 'Complete Consultation' action (`POST /api/bookings/end`), 'Up Next' card with queue engine priority reasoning and 'Start Consultation' CTA (`POST /api/bookings/start`), 4-tab queue roster (Waiting Lounge, Standby Queue with FIFO explanation, Completed Today, All Slots), and Medical Urgency Override modal (`POST /api/bookings/override`). Access control enforces strict doctor data isolation where consultants only see their own appointments while admins can supervise any department doctor. |
-| 2026-10-23 | Phase 5c Front Desk Reception & Check-In Screens | DECIDED | Implemented Front Desk reception workspace in `apps/merchant-web` per `docs/hospital/screens-frontdesk.md` and `DESIGN.md`. Scoped front desk staff to assigned doctors via `/api/hospital/context`. Built Fast-Pass 4-digit code check-in (`/api/bookings/checkin`) with uniform error security (SPEC line 16), 5-consecutive-attempt rate-limiting lockout countdown (60s), and arrival status tagging (On-Time, Early, Late). Built fallback manual check-in modal invoking `mark_present_manually` RPC with mandatory staff justification audit requirement. Built 4 queue triage tabs (Waiting, Standby with SPEC line 19 & 20 FIFO explanation, Expected Today with phone search and No-Show policy confirmation, and Completed Today). Built high-contrast, privacy-masked Waiting Lounge TV display modal for public waiting areas. Preserved non-hospital merchant dashboards for salon/retail venues. |
-| 2026-10-23 | Phase 5d Customer Screens & 60-Minute Pre-Slot Check-In Code Visibility Gate | DECIDED | Implemented and verified Customer Screens (Mobile OPD Booking Pass & Web Ticket) per `docs/hospital/SPEC.md` and `docs/hospital/screens-customer.md`. Implemented server-side 60-minute visibility gating in `/api/ticket/[id]` route: PIN is masked (`checkin_code: null`, `is_window_open: false`) when appointment is > 60m away, returning `window_opens_at` timestamp; 4-digit PIN is revealed only within `<= 60m` of slot start or once checked in. Updated Web Ticket screen (`apps/merchant-web/src/app/ticket/[id]/page.tsx`) with locked countdown card, 4-digit PIN display, and verified badge upon check-in. Verified Mobile Booking Pass (`apps/customer-mobile/src/screens/BookingPassModal.tsx`) enforcing the identical 60-minute gate. Verified customer data scoping (Customer 2 cannot read Customer 1 codes), arrival notification via `POST /api/bookings/reach` with queue tagging, and 60-minute cancellation cutoff policy (full refund >= 60m, deposit forfeited < 60m). |
-| 2026-10-23 | Phase 6 Hardening Layer & E2E Integration Gate | DECIDED | Completed multi-surface hardening across edge functions, middleware, client session fallbacks, and Playwright E2E test suites per `docs/hospital/SPEC.md`. Replaced wildcard CORS headers in crash-alert edge function with dynamic origin matching. Whitelisted demo=1 parameter in middleware across all hospital workspace routes (/departments, /audit-logs, /consultation, /team, /settings). Added comprehensive Playwright hospital E2E test suite (tests/e2e/hospital-customer-screens.spec.ts) covering customer 60-minute check-in PIN lock countdown, fast-pass reveal, queue stepper, and live appointment data loading. Executed full verification gate: clean supabase db reset with all 48 migrations, test data seed, serial execution of all 16 hospital unit test suites (127/127 passed), all 4 Playwright hospital E2E suites (16/16 passed), typechecks across merchant-web and customer-mobile (0 errors), and successful production build. |
-| 2026-10-23 | Phase 7a Tiered No-Show Policy & 7-Day Account Block | DECIDED | Implemented tiered no-show policy per user decision: (1) Strikes 1 & 2: courtesy 100% deposit refund, no monetary penalty; (2) Warning note during booking at 2 strikes informing user that future no-shows forfeit ₹60; (3) Strikes 3 to 5: ₹50 credited to doctor, ₹10 platform fee, remainder refunded to customer; (4) Exceeding 5 strikes (6th no-show): account blocked for 7 days (`blocked_until = NOW() + 7 days`), message displayed 'Your account is blocked for 7 days', strike counter reset to 0. Enforced active block check in `create_booking_hold` RPC. |
-| 2026-10-23 | Phase 7b Customer Mobile UI & Account Block Notice | DECIDED | Updated Customer Mobile UI (`CheckoutModal.tsx` and `AccountScreen.tsx`): (1) Added 3rd time booking warning popup modal and note: two times there will be no issue or penalty, but for the 3rd time, failing to show up incurs a ₹60 penalty where ₹50 is given to the hospital and ₹10 to the Appointments app (rest refunded); (2) Displayed 7-day account block banner if customer exceeded 5 strikes (`blocked_until > NOW()`) with disabled Pay CTA ('Account Blocked (7 Days)'); (3) Updated cancellation policy card with tiered rules; (4) Added attendance standing card to `AccountScreen.tsx`; (5) Granted SELECT access on `public.profiles` (`no_show_count`, `is_flagged`) to `authenticated` and `anon` via migration 20261024000002. |
+| 2026-10-23 | Phase 5a Hospital Admin UI Screens & Modular Architecture | DECIDED | Modularized `team/page.tsx` into small single-purpose components under `components/team/`. Built dedicated `/departments` screen with CRUD, modules, 7-day invite expiry, and max-3 member quota enforcement. Built `/audit-logs` screen with category filtering. Added read-only No-Show formula (₹50 doctor / ₹10 platform / remainder refund) and 60m cutoff display to `/settings`. |
+| 2026-10-23 | Restored 1-arg RPC wrappers for hospital_role and hospital_accessible_resource_ids | DECIDED | Added migration 20261023000001 restoring 1-arg overloads calling (provider_id, auth.uid()). PostgREST RPC requests from client-side callers and integration test suites specifying only p_provider_id resolve without PGRST202 schema errors. |
+| 2026-10-23 | Phase 5b Consultant UI & Clinical Consultation Workspace | DECIDED | Built dedicated `/consultation` workspace for Doctors/Consultants and supervising Hospital Admins. Features live consultation card with real-time elapsed timer, clinical notes / prescription textarea with quick-chips, 'Complete Consultation' action, 'Up Next' card with queue engine priority reasoning, and Medical Urgency Override modal. Access control enforces strict doctor data isolation. |
+| 2026-10-23 | Phase 5c Front Desk Reception & Check-In Screens | DECIDED | Implemented Front Desk reception workspace in `apps/merchant-web`. Scoped front desk staff to assigned doctors. Built Fast-Pass 4-digit code check-in with uniform error security (SPEC line 16), 5-consecutive-attempt rate-limiting lockout countdown (60s), and arrival status tagging. Built fallback manual check-in modal with mandatory justification. Built 4 queue triage tabs and Waiting Lounge TV display modal. |
+| 2026-10-23 | Phase 5d Customer Screens & 60-Minute Pre-Slot Check-In Code Visibility Gate | DECIDED | Implemented server-side 60-minute visibility gating in `/api/ticket/[id]` route: PIN is masked (`checkin_code: null`, `is_window_open: false`) when appointment is > 60m away, returning `window_opens_at` timestamp; 4-digit PIN is revealed only within `<= 60m` of slot start or once checked in. Updated Web Ticket screen and Mobile Booking Pass enforcing identical 60m gate. |
+| 2026-10-23 | Phase 6 Hardening Layer & E2E Integration Gate | DECIDED | Completed multi-surface hardening across edge functions, middleware, client session fallbacks, and Playwright E2E test suites per `docs/hospital/SPEC.md`. Replaced wildcard CORS headers with dynamic origin matching. Whitelisted demo=1 parameter in middleware. Added comprehensive Playwright hospital customer screens E2E test suite. |
+| 2026-10-23 | Phase 7a Tiered No-Show Policy & 7-Day Account Block | DECIDED | Implemented tiered no-show policy: (1) Strikes 1 & 2: courtesy 100% deposit refund, no monetary penalty; (2) Warning note during booking at 2 strikes; (3) Strikes 3 to 5: ₹50 credited to doctor, ₹10 platform fee, remainder refunded; (4) Exceeding 5 strikes (6th no-show): account blocked for 7 days (`blocked_until = NOW() + 7 days`), message displayed 'Your account is blocked for 7 days', strike counter reset to 0. Enforced in `create_booking_hold` RPC. |
+| 2026-10-23 | Phase 7b Customer Mobile UI & Account Block Notice | DECIDED | Updated Customer Mobile UI (`CheckoutModal.tsx` and `AccountScreen.tsx`): (1) Added 3rd time booking warning popup modal and persistent warning card detailing the ₹60 penalty split (Hospital ₹50, Appointments App ₹10, rest refunded); (2) Displayed 7-day account block banner if customer exceeded 5 strikes (`blocked_until > NOW()`) with disabled Pay CTA; (3) Updated cancellation policy card; (4) Added attendance standing card to `AccountScreen.tsx`; (5) Granted SELECT access on `public.profiles` (`no_show_count`, `is_flagged`) via migration 20261024000002. |
+
+---
+
+## Detailed Decision Specifications
+
+### Decision 1: 1-Hour Gap for Same Patient vs. Family/Friend Bookings
+- **Date**: 2026-10-23
+- **Status**: DECIDED
+- **Requirement**: There must be at least a 1-hour time gap between appointments if it is for the same patient. If booking for different patients (e.g., family or friend), no 1-hour time gap is required (back-to-back or simultaneous bookings are permitted).
+- **Rules & Implementation**:
+  1. **Patient Identification**: Patient identity is evaluated based on `patient_name` and `patient_phone` provided in the booking details.
+  2. **Self vs. Someone Else Toggle**: In `CheckoutModal.tsx`, a toggle/checkbox is provided: *"Booking for family or friend (someone else)"*.
+     - When toggled **OFF** (default / self-booking): The app checks existing active bookings for that customer/patient on that day. If any existing appointment slot is within `< 60 minutes` of the selected slot start/end, the booking is blocked with the error message:
+       > *"Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for someone else'."*
+     - When toggled **ON** (booking for someone else): The user enters the distinct patient name and contact number. The 1-hour gap restriction between the customer's self-appointments is bypassed, allowing back-to-back or simultaneous appointments for multiple family members.
+  3. **Backend Enforcement**: Evaluated in `create_booking_hold` RPC and API validation layer to prevent API-level circumvention.
+
+---
+
+### Decisions 2 & 3: Doctor Emergency Mid-Day Leave & Cancellation with In-App Emergency Modal & 100% Full Refunds
+- **Date**: 2026-10-23
+- **Status**: DECIDED
+- **Requirement**:
+  - In case of an emergency where a doctor becomes unavailable or leaves mid-day, affected patients must be informed with an in-app popup message: *"Due to emergency, doctor is not available"*.
+  - **Scenario A (Doctor arrived & cancelled mid-session)**: If the doctor arrived at the clinic/hospital and had to cancel or leave in the middle of completion, patients who booked for that doctor are shown THREE options:
+    1. **Wait** (stay in standby queue in case emergency is resolved or backup arrives)
+    2. **Reschedule** (choose another date/slot with the same or affiliated consultant without fee)
+    3. **Refund** (100% full refund)
+  - **Scenario B (Doctor did not arrive / emergency cancel before session)**: Patients are shown TWO options:
+    1. **Reschedule**
+    2. **Refund**
+  - **Refund Specification**: Total amount must be refunded, including 100% of the deposit AND the platform fee (`total_refund = deposit_amount + platform_fee`). No deductions apply for business/doctor emergency cancellations.
+- **Rules & Implementation**:
+  1. **Emergency Cancellation Trigger**: Merchant/Admin triggers `POST /api/doctor/emergency-cancel` with `doctor_arrived_midway` boolean flag.
+  2. **In-App Modal**: Customer mobile app listens to real-time appointment updates. Upon detecting `emergency_cancelled` status, displays an urgent modal overlay:
+     - Header: *"Doctor Unavailable"*
+     - Message: *"Due to emergency, doctor is not available."*
+     - If `doctor_arrived = true`: Shows 3 CTAs: `[Wait]`, `[Reschedule]`, `[Refund (100%)]`.
+     - If `doctor_arrived = false`: Shows 2 CTAs: `[Reschedule]`, `[Refund (100%)]`.
+  3. **Payment Reversal**: Invokes payment gateway full refund endpoint covering both merchant deposit and platform fee.
+
+---
+
+### Decision 4: Permanent Lifetime Customer Check-In PIN
+- **Date**: 2026-10-23
+- **Status**: DECIDED
+- **Requirement**: The 4-digit check-in PIN is identical and permanent for each customer for a lifetime as long as they use the app. It does not change per appointment, nor does it regenerate on reschedule or new bookings.
+- **Rules & Implementation**:
+  1. **Account Binding**: When a customer profile is first created (or upon first appointment), a permanent 4-digit numeric PIN is assigned to the customer (`profiles.lifetime_pin` / `permanent_checkin_pin`).
+  2. **Immutability**: All subsequent appointments booked by this customer share this permanent 4-digit PIN. Rescheduling an appointment retains the same PIN.
+  3. **Security & Visibility Window**: Per SPEC line 27, the 4-digit PIN is hidden/masked on the customer pass and web ticket until 60 minutes before the scheduled slot start (or until checked in). Front desk verification continues to check the PIN securely via cryptographic hash RPC (`verify_checkin_code`) without staff ever seeing the raw PIN beforehand.
+
+---
+
+### Decision 5: Primary Communication Channels (SMS/WhatsApp) & Customer Mobile UX
+- **Date**: 2026-10-23
+- **Status**: DECIDED
+- **Requirement**:
+  - SMS and WhatsApp are the primary communication channels for appointment notifications, confirmations, and ETA alerts.
+  - In the Customer Mobile App, there must be a dedicated **"My Appointments"** bottom navigation tab containing:
+    1. Current upcoming appointments.
+    2. Complete history of appointments made (past completed, cancelled, and rescheduled).
+  - On the **Home Screen** of the Customer Mobile App, for the current upcoming appointment, there must be a short and sweet live card displaying essential information with a pulsing/blinking micro green light indicator (`🟢`).
+- **Rules & Implementation**:
+  1. **Bottom Navigation**: Add `"My Appointments"` tab alongside Home and Profile in `apps/customer-mobile/src/navigation/`.
+  2. **My Appointments View**:
+     - Tabs: `Upcoming` (cards with live status, date/time, doctor name, department, venue, and pass link) and `History` (chronological list of completed/cancelled appointments with receipt summary).
+  3. **Home Screen Live Appointment Card**:
+     - Placed prominently above category/doctor browse cards.
+     - Displays: Doctor Name, Specialty, Date & Time, Clinic Name.
+     - Visual Indicator: Blinking/pulsing micro green dot animation (`Animated.loop` opacity pulse between `1.0` and `0.3`) indicating active confirmed appointment standing.
+     - Quick Action: `[View Pass / PIN]` button opening the ticket/pass modal.
+  4. **Primary Notifications**: Integrated with WhatsApp Cloud API / SMS gateway webhook fallbacks in addition to Expo Push notifications.
+
+---
+
+### Decision 6: Production Domain
+- **Date**: 2026-10-23
+- **Status**: OPEN (Still Not Decided)
+- **Requirement**: The live production domain URL is not yet finalized and will be decided by the user at a later stage.
+- **Current Behavior**:
+  - Web: Configured via `NEXT_PUBLIC_APP_URL` in environment files (defaults to `http://localhost:3000` in dev).
+  - Mobile: Configured via `EXPO_PUBLIC_API_BASE_URL` (enforces HTTPS in release builds).
+  - All callbacks (Razorpay webhook, OAuth redirects) use dynamic host resolution from environment variables, ensuring zero hardcoded domain locks.
+
+---
+
+### Decision 7: Tiered No-Show Policy (₹50 Hospital / ₹10 Platform Split) & 7-Day Account Block
+- **Date**: 2026-10-23
+- **Status**: DECIDED (Implemented & Verified in Phases 7a & 7b)
+- **Requirement**:
+  - Strikes 1 & 2: Two times there will be no issue (100% courtesy deposit refund, 0 monetary penalty).
+  - 3rd Time Booking: Popup modal and persistent warning card warning the user that if they don't show up this time, a penalty of ₹60 will be deducted: ₹50 is paid to the hospital, ₹10 is retained as the Appointments app platform fee, and the remainder of the deposit is refunded.
+  - Strikes 3 to 5: ₹60 penalty applied (₹50 hospital / ₹10 platform fee). If deposit $\le$ ₹60, deposit is forfeited with ₹0 refund. If deposit > ₹60, remainder is refunded.
+  - Exceeding 5 Strikes (6th miss): Account is blocked for 7 days (`blocked_until = NOW() + INTERVAL '7 days'`), display message *"Your account is blocked for 7 days"*, and reset strike counter to 0. Pay CTA is disabled with label *"Account Blocked (7 Days)"*.
