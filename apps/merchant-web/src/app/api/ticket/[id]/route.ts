@@ -48,15 +48,25 @@ export async function GET(
       .eq('id', booking.resource_id)
       .maybeSingle();
 
-    // 5. Fetch check-in code
+    // 5. Check-in code visibility gating (SPEC line 16)
+    // Shown to customer from 60 minutes before slot start until check-in.
+    const slotStartMs = new Date(booking.slot_start).getTime();
+    const nowMs = Date.now();
+    const isWindowOpen = nowMs >= slotStartMs - 60 * 60 * 1000;
+    const isCheckedIn = booking.status === 'CHECKED_IN' || booking.is_present;
+
     const { data: checkinCodeRecord } = await supabaseAdmin
       .from('appointment_checkin_codes')
       .select('code, appointment_date')
       .eq('booking_id', booking.id)
       .maybeSingle();
 
+    const displayCode = isWindowOpen || isCheckedIn ? (checkinCodeRecord?.code || '----') : null;
+
     return NextResponse.json({
       success: true,
+      is_window_open: isWindowOpen || isCheckedIn,
+      window_opens_at: new Date(slotStartMs - 60 * 60 * 1000).toISOString(),
       booking: {
         id: booking.id,
         resource_id: booking.resource_id,
@@ -88,7 +98,7 @@ export async function GET(
         duration_minutes: resource?.duration_minutes || 2,
         price: resource?.price || 500
       },
-      checkin_code: checkinCodeRecord?.code || '----'
+      checkin_code: displayCode
     });
   } catch (error) {
     console.error('Error fetching ticket data:', error);

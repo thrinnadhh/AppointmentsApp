@@ -55,7 +55,9 @@ interface TicketData {
     duration_minutes: number;
     price: number;
   };
-  checkin_code: string;
+  is_window_open?: boolean;
+  window_opens_at?: string;
+  checkin_code: string | null;
 }
 
 export default function CustomerTicketPage({
@@ -357,32 +359,63 @@ export default function CustomerTicketPage({
             Reception Check-in PIN
           </span>
 
-          <h2 className="text-sm font-medium text-gray-600 mb-3">
-            Please tell this 4-digit PIN at the reception desk upon arrival:
-          </h2>
+          {isCheckedIn ? (
+            <div>
+              <h2 className="text-sm font-medium text-gray-600 mb-3">
+                Your presence has been verified by the reception desk.
+              </h2>
+              <div className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-100/80 text-emerald-800 border border-emerald-300 font-semibold shadow-sm">
+                <UserCheck className="w-5 h-5 text-emerald-600" />
+                <span>Verified Present in Waiting Lounge</span>
+              </div>
+            </div>
+          ) : (!data.is_window_open || !checkin_code) ? (
+            /* Locked 60m Countdown Gate */
+            <div data-testid="checkin-pin-locked-box" className="max-w-md mx-auto bg-amber-50/80 border border-amber-200/80 rounded-2xl p-5 mb-2 text-center">
+              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-2 text-lg">
+                🔒
+              </div>
+              <h3 className="text-sm font-bold text-amber-900 mb-1">Check-in PIN Unlocks 60m Before Slot</h3>
+              <p className="text-xs text-amber-800/90 leading-relaxed">
+                Your 4-digit reception PIN will unlock at{' '}
+                <span className="font-semibold text-amber-950">
+                  {data.window_opens_at
+                    ? new Date(data.window_opens_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                    : '60 minutes before your slot'}
+                </span>
+                . Show or tell it at the counter upon arrival.
+              </p>
+            </div>
+          ) : (
+            /* Open 4-digit PIN */
+            <>
+              <h2 className="text-sm font-medium text-gray-600 mb-3">
+                Please tell this 4-digit PIN at the reception desk upon arrival:
+              </h2>
 
-          {/* Big PIN Box */}
-          <div className="relative inline-flex items-center justify-center gap-3 bg-white border-2 border-emerald-600 px-8 py-4 rounded-2xl shadow-lg shadow-emerald-600/10 mb-4">
-            <span
-              data-testid="customer-checkin-pin"
-              className="font-mono text-4xl sm:text-5xl font-black tracking-[0.25em] text-emerald-800 select-all"
-            >
-              {checkin_code}
-            </span>
+              <div className="relative inline-flex items-center justify-center gap-3 bg-white border-2 border-emerald-600 px-8 py-4 rounded-2xl shadow-lg shadow-emerald-600/10 mb-4">
+                <span
+                  data-testid="customer-checkin-pin"
+                  className="font-mono text-4xl sm:text-5xl font-black tracking-[0.25em] text-emerald-800 select-all"
+                >
+                  {checkin_code}
+                </span>
 
-            <button
-              onClick={handleCopyCode}
-              title="Copy PIN"
-              className="ml-2 p-2.5 hover:bg-emerald-50 active:scale-95 text-emerald-700 rounded-xl transition border border-emerald-200"
-            >
-              {copied ? <Check className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
-            </button>
-          </div>
+                <button
+                  onClick={handleCopyCode}
+                  title="Copy PIN"
+                  className="ml-2 p-2.5 hover:bg-emerald-50 active:scale-95 text-emerald-700 rounded-xl transition border border-emerald-200"
+                >
+                  {copied ? <Check className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
+                </button>
+              </div>
 
-          {copied && (
-            <p className="text-xs text-emerald-600 font-semibold mb-2">
-              ✓ PIN copied to clipboard!
-            </p>
+              {copied && (
+                <p className="text-xs text-emerald-600 font-semibold mb-2">
+                  ✓ PIN copied to clipboard!
+                </p>
+              )}
+            </>
           )}
 
           {/* Status Badge */}
