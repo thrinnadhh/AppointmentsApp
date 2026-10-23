@@ -83,6 +83,8 @@ export default function CheckoutModal({
   onPaymentSuccess,
 }: CheckoutModalProps) {
   const [customerStrikes, setCustomerStrikes] = useState<number>(0);
+  const [isBlocked, setIsBlocked] = useState<boolean>(false);
+  const [blockedUntil, setBlockedUntil] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number>(300); // 5 minutes
   const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
   const [checkingCooling, setCheckingCooling] = useState<boolean>(false);
@@ -129,9 +131,15 @@ export default function CheckoutModal({
   useEffect(() => {
     let active = true;
     setCustomerStrikes(0);
+    setIsBlocked(false);
+    setBlockedUntil(null);
     if (visible && customerId) {
       fetchCustomerStrikes(customerId).then((res) => {
-        if (active) setCustomerStrikes(res.strikes);
+        if (active) {
+          setCustomerStrikes(res.strikes);
+          setIsBlocked(res.isBlocked);
+          setBlockedUntil(res.blockedUntil);
+        }
       });
     }
     return () => { active = false; };
@@ -212,6 +220,12 @@ export default function CheckoutModal({
     setIsProcessing(true);
     setPayError(null);
     try {
+      if (isBlocked) {
+        setPayError('Your account is blocked for 7 days due to excessive no-shows.');
+        setIsProcessing(false);
+        return;
+      }
+
       if (!isAuthenticated) {
         setPayError('Authentication required to create booking hold. Please sign in with your mobile number.');
         setIsProcessing(false);
@@ -405,15 +419,33 @@ export default function CheckoutModal({
               </View>
             )}
 
-            {/* 3rd Strike Courtesy Notice if customer has 2 prior missed appointments */}
-            {customerStrikes >= 2 && !isFreeFollowup && (
+            {/* Account Blocked Notice if customer exceeded 5 strikes */}
+            {isBlocked && (
+              <View style={styles.blockedWarningCard} testID="account-blocked-card">
+                <View style={styles.blockedWarningHeader}>
+                  <Text style={styles.blockedWarningIcon}>🚫</Text>
+                  <Text style={styles.blockedWarningTitle}>Account Blocked for 7 Days</Text>
+                </View>
+                <Text style={styles.blockedWarningText}>
+                  Your account is blocked for 7 days due to excessive no-shows (exceeded 5 misses). You cannot book new appointments until{' '}
+                  {blockedUntil ? new Date(blockedUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'the 7-day cooldown expires'}.
+                </Text>
+              </View>
+            )}
+
+            {/* Courtesy Policy / Deduction Notice */}
+            {customerStrikes >= 2 && !isBlocked && !isFreeFollowup && (
               <View style={styles.strikeWarningCard} testID="strike-warning-card">
                 <View style={styles.strikeWarningHeader}>
                   <Text style={styles.strikeWarningIcon}>⚠️</Text>
-                  <Text style={styles.strikeWarningTitle}>Courtesy Policy Notice (2 Prior Misses)</Text>
+                  <Text style={styles.strikeWarningTitle}>
+                    {customerStrikes === 2 ? 'Courtesy Policy Notice (3rd Booking)' : `No-Show Policy Notice (${customerStrikes} Prior Misses)`}
+                  </Text>
                 </View>
                 <Text style={styles.strikeWarningText}>
-                  You have missed 2 previous appointments. Under our courtesy policy, first 2 misses are granted full refunds. If you do not show up for this appointment, your ₹100 deposit will be forfeited to the merchant.
+                  {customerStrikes === 2
+                    ? 'You have 2 prior no-shows with courtesy full refunds. If you do not show up for this appointment, an amount of ₹60 will be deducted (₹50 sent to doctor, ₹10 platform fee) and only the rest will be refunded.'
+                    : 'If you do not show up for this appointment, an amount of ₹60 will be deducted (₹50 sent to doctor, ₹10 platform fee) and the rest will be refunded. Exceeding 5 no-shows will block your account for 7 days.'}
                 </Text>
               </View>
             )}
@@ -680,9 +712,9 @@ export default function CheckoutModal({
               <Text style={styles.policyText}>
                 {'✅ Free cancellation up to 1 hour before your slot — full deposit refunded.\n'}
                 {'↩️  Reschedule free within the same window — deposit carries over.\n'}
-                {'⚠️  Cancel within 1 hour or no-show — deposit forfeited to merchant.\n'}
-                {'💰  If the merchant cancels — you are always refunded in full, no exceptions.\n'}
-                {'🚫  4 no-shows in 12 months triggers a temporary booking restriction.'}
+                {'⚠️  Miss 1st or 2nd appointment — 100% deposit courtesy refund.\n'}
+                {'⚠️  Miss 3rd to 5th appointment — ₹60 deducted (₹50 to doctor, ₹10 platform fee), rest refunded.\n'}
+                {'🚫  Exceeding 5 no-shows — Account blocked for 7 days and strikes reset.'}
               </Text>
               <Text style={styles.policyLinkText}
                 onPress={() => Linking.openURL('https://appointments4u.in/refund-policy')}
@@ -776,16 +808,20 @@ export default function CheckoutModal({
               style={[
                 styles.payButton,
                 isFreeFollowup && styles.freePayButton,
-                isProcessing && styles.payButtonDisabled,
+                (isProcessing || isBlocked) && styles.payButtonDisabled,
+                isBlocked && styles.payButtonBlocked,
               ]}
-              disabled={isProcessing || secondsLeft === 0}
+              disabled={isProcessing || secondsLeft === 0 || isBlocked}
               onPress={handlePay}
+              testID="btn-pay-now"
             >
               {isProcessing ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
                 <Text style={styles.payButtonText}>
-                  {isFreeFollowup
+                  {isBlocked
+                    ? 'Account Blocked (7 Days)'
+                    : isFreeFollowup
                     ? 'Confirm Free Follow-up Appointment (₹0)'
                     : `Pay ₹${totalPayable} via Razorpay (UPI / Card)`}
                 </Text>
@@ -1147,6 +1183,36 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#b45309',
     lineHeight: 16,
+  },
+  blockedWarningCard: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#fecaca',
+  },
+  blockedWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  blockedWarningIcon: {
+    fontSize: 16,
+  },
+  blockedWarningTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#991b1b',
+  },
+  blockedWarningText: {
+    fontSize: 11,
+    color: '#b91c1c',
+    lineHeight: 16,
+  },
+  payButtonBlocked: {
+    backgroundColor: '#94a3b8',
   },
   lateArrivalCard: {
     backgroundColor: '#fffbeb',

@@ -1634,26 +1634,40 @@ export async function joinCityWaitlist(
 /**
  * Fetch customer no-show strikes count and flagged status from public.profiles
  */
+export interface CustomerStrikesResult {
+  strikes: number;
+  isFlagged: boolean;
+  isBlocked: boolean;
+  blockedUntil: string | null;
+}
+
 export async function fetchCustomerStrikes(
   customerId: string
-): Promise<{ strikes: number; isFlagged: boolean }> {
+): Promise<CustomerStrikesResult> {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('no_show_count, is_flagged')
+      .select('no_show_count, is_flagged, blocked_until')
       .eq('id', customerId)
       .maybeSingle();
 
     if (error || !data) {
-      return { strikes: 0, isFlagged: false };
+      return { strikes: 0, isFlagged: false, isBlocked: false, blockedUntil: null };
     }
+
+    const blockedUntilStr = data.blocked_until ? String(data.blocked_until) : null;
+    const isBlocked = Boolean(
+      blockedUntilStr && new Date(blockedUntilStr).getTime() > Date.now()
+    );
 
     return {
       strikes: Number(data.no_show_count) || 0,
       isFlagged: Boolean(data.is_flagged),
+      isBlocked,
+      blockedUntil: blockedUntilStr,
     };
   } catch {
-    return { strikes: 0, isFlagged: false };
+    return { strikes: 0, isFlagged: false, isBlocked: false, blockedUntil: null };
   }
 }
 

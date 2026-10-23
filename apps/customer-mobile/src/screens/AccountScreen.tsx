@@ -10,7 +10,7 @@ import {
   Alert, ActivityIndicator, ScrollView, Linking, Switch,
   Platform, StatusBar,
 } from 'react-native';
-import { supabase, getApiBaseUrl } from '../services/api';
+import { supabase, getApiBaseUrl, fetchCustomerStrikes } from '../services/api';
 
 interface DeletionStatus {
   pending: boolean;
@@ -30,6 +30,7 @@ export interface AccountScreenProps {
 export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
   const [user, setUser]                 = useState<{ id: string; phone?: string; email?: string } | null>(null);
   const [deletion, setDeletion]         = useState<DeletionStatus | null>(null);
+  const [strikeInfo, setStrikeInfo]     = useState<{ strikes: number; isBlocked: boolean; blockedUntil: string | null } | null>(null);
   const [loadingDelete, setLoadingDelete] = useState(false);
   const [loading, setLoading]           = useState(true);
   const [consents, setConsents]         = useState<ConsentState>({ location_detection: false, marketing_notifications: false, loaded: false });
@@ -40,8 +41,13 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user ? { id: user.id, phone: user.phone, email: user.email } : null);
 
-      // Load optional consent settings from DB (DPDPA §6 right to withdraw)
       if (user) {
+        try {
+          const strikesRes = await fetchCustomerStrikes(user.id);
+          setStrikeInfo(strikesRes);
+        } catch { /* non-fatal */ }
+
+        // Load optional consent settings from DB (DPDPA §6 right to withdraw)
         try {
           const { data: rows } = await supabase
             .from('user_consents')
@@ -199,6 +205,34 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
       )}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
         {!onClose && <Text style={styles.heading}>Account</Text>}
+
+      {/* Account Standing & No-Show Policy */}
+      {strikeInfo?.isBlocked ? (
+        <View style={[styles.section, styles.blockedSection]} testID="account-blocked-banner">
+          <Text style={[styles.sectionTitle, { color: '#991b1b' }]}>🚫 Account Blocked (7 Days)</Text>
+          <Text style={styles.blockedText}>
+            Your account is temporarily blocked for 7 days due to excessive missed appointments (exceeded 5 no-shows).
+            {strikeInfo.blockedUntil
+              ? ` Cooldown expires on ${new Date(strikeInfo.blockedUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.`
+              : ''}
+            {'\n\n'}You cannot book new appointments during this 7-day cooldown period. After the cooldown expires, your no-show strikes will reset to zero.
+          </Text>
+        </View>
+      ) : strikeInfo && strikeInfo.strikes > 0 ? (
+        <View style={[styles.section, styles.strikeSection]} testID="account-strikes-banner">
+          <Text style={[styles.sectionTitle, { color: '#92400e' }]}>⚠️ Attendance Standing</Text>
+          <Text style={styles.strikeText}>
+            {strikeInfo.strikes === 1 && '1 missed appointment recorded. First 2 missed appointments are eligible for 100% courtesy deposit refunds.'}
+            {strikeInfo.strikes === 2 && '2 missed appointments recorded. Note: Booking a 3rd appointment means if you do not show up, ₹60 will be deducted (₹50 to doctor, ₹10 platform fee) and only the rest will be refunded.'}
+            {strikeInfo.strikes >= 3 && `${strikeInfo.strikes} missed appointments recorded. If you miss an appointment, ₹60 will be deducted (₹50 to doctor, ₹10 platform fee) and the rest refunded. Exceeding 5 no-shows will block your account for 7 days.`}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.section} testID="account-good-standing-card">
+          <Text style={styles.sectionTitle}>Attendance Standing</Text>
+          <Text style={styles.detail}>✨ Good Standing (0 Missed Appointments)</Text>
+        </View>
+      )}
 
       {/* Profile */}
       <View style={styles.section}>
@@ -375,4 +409,8 @@ const styles = StyleSheet.create({
   consentLabelGroup:    { flex: 1, marginRight: 12 },
   consentLabel:         { fontSize: 14, fontWeight: '600', color: '#1e293b' },
   consentSub:           { fontSize: 12, color: '#64748b', marginTop: 2 },
+  blockedSection:       { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1.5 },
+  blockedText:          { fontSize: 13, color: '#b91c1c', lineHeight: 18 },
+  strikeSection:        { backgroundColor: '#fffbeb', borderColor: '#fde68a', borderWidth: 1.5 },
+  strikeText:           { fontSize: 13, color: '#b45309', lineHeight: 18 },
 });
