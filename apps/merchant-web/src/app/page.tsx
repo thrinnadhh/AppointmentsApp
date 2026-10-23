@@ -49,6 +49,11 @@ import {
 } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 import { CustomerContactBadge } from '@/components/CustomerContactBadge';
+import FrontDeskHeader, { AssignedDoctor } from '@/components/frontdesk/FrontDeskHeader';
+import FastPassCheckinPanel, { CheckinSuccessData } from '@/components/frontdesk/FastPassCheckinPanel';
+import ManualCheckinModal, { UpcomingCandidateBooking } from '@/components/frontdesk/ManualCheckinModal';
+import FrontDeskQueueTabs, { FrontDeskQueueBooking } from '@/components/frontdesk/FrontDeskQueueTabs';
+import WaitingLoungeDisplayModal, { DisplayQueueItem } from '@/components/frontdesk/WaitingLoungeDisplayModal';
 
 const DEMO_PROVIDER: Provider & { resources?: Resource[] } = {
   id: 'b66cb1fc-0248-4c13-97d3-73b0519b59f9',
@@ -361,6 +366,42 @@ export default function MerchantOverviewPage() {
   const [checkinErrorMessage, setCheckinErrorMessage] = useState<string | null>(null);
   const checkinInputRef = useRef<HTMLInputElement>(null);
 
+  // Front Desk Hospital Workspace State (Phase 5c)
+  const [hospitalContext, setHospitalContext] = useState<{
+    role?: string;
+    accessibleResourceIds?: string[];
+    departments?: any[];
+    members?: any[];
+    assignments?: any[];
+  } | null>(null);
+  const [userEmail, setUserEmail] = useState('');
+  const [isDisplayModalOpen, setIsDisplayModalOpen] = useState(false);
+  const [isManualCheckinModalOpen, setIsManualCheckinModalOpen] = useState(false);
+  const [isProcessingFrontDeskAction, setIsProcessingFrontDeskAction] = useState(false);
+
+  useEffect(() => {
+    async function loadUserAndHospitalContext() {
+      if (!selectedProviderId) return;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        setUserEmail(sessionData.session?.user?.email || '');
+        if (!token) return;
+
+        const res = await fetch(`/api/hospital/context?provider_id=${selectedProviderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setHospitalContext(data);
+        }
+      } catch (err) {
+        console.error('Failed to load hospital context:', err);
+      }
+    }
+    loadUserAndHospitalContext();
+  }, [selectedProviderId]);
+
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -438,6 +479,306 @@ export default function MerchantOverviewPage() {
     if (!selectedDepartmentFilter) return activeResources;
     return activeResources.filter((r) => (r.department || 'General') === selectedDepartmentFilter);
   }, [activeResources, selectedDepartmentFilter]);
+
+  const isHospitalVenue = Boolean(
+    activeProvider?.category_id === 'hospital' || 
+    verticalConfig?.venueLabel === 'Hospital'
+  );
+
+  const frontDeskAssignedDoctors: AssignedDoctor[] = useMemo(() => {
+    if (!isHospitalVenue) return [];
+    const resources = (activeProvider?.resources as Resource[]) || [];
+    if (hospitalContext?.role === 'front_desk' && hospitalContext.accessibleResourceIds?.length) {
+      return resources
+        .filter((r) => hospitalContext.accessibleResourceIds?.includes(r.id))
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          department: r.department,
+          room: 'Room 204',
+          is_active: r.is_active,
+        }));
+    }
+    return resources.map((r) => ({
+      id: r.id,
+      name: r.name,
+      department: r.department,
+      room: 'Room 204',
+      is_active: r.is_active,
+    }));
+  }, [isHospitalVenue, activeProvider?.resources, hospitalContext]);
+
+  const hospitalTodayBookings = useMemo(() => {
+    return bookings.filter((b) => {
+      const isToday = b.slot_start?.startsWith(today);
+      if (!isToday) return false;
+      if (!merchantSelectedDoctorId) {
+        if (hospitalContext?.role === 'front_desk' && hospitalContext.accessibleResourceIds?.length) {
+          return hospitalContext.accessibleResourceIds.includes(b.resource_id);
+        }
+        return true;
+      }
+      return b.resource_id === merchantSelectedDoctorId;
+    });
+  }, [bookings, today, merchantSelectedDoctorId, hospitalContext]);
+
+  const hospitalWaitingBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => (b.status === 'CHECKED_IN' || b.is_present) && !b.queue_position && b.status !== 'IN_CONSULTATION' && b.status !== 'COMPLETED')
+      .map((b) => {
+        let arrival_tag: 'On Time' | 'Early' | 'Late' = 'On Time';
+        const checkinTime = (b as any).checked_in_at || b.customer_arrived_at;
+        if (checkinTime) {
+          const diffMs = new Date(checkinTime).getTime() - new Date(b.slot_start).getTime();
+          if (diffMs > 10 * 60 * 1000) arrival_tag = 'Late';
+          else if (diffMs < -10 * 60 * 1000) arrival_tag = 'Early';
+        }
+        return {
+          id: b.id,
+          reference_code: b.reference_code || '',
+          patient_name: b.customer_name,
+          customer: { full_name: b.customer_name, phone: b.customer_phone },
+          slot_start: b.slot_start,
+          slot_end: b.slot_end,
+          status: b.status,
+          arrival_tag,
+          checked_in_at: checkinTime || undefined,
+          doctor_name: b.resource_name,
+          deposit_amount: b.deposit_amount,
+        };
+      });
+  }, [hospitalTodayBookings]);
+
+  const hospitalStandbyBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => (b.status === 'CHECKED_IN' || b.is_present) && Boolean(b.queue_position) && b.status !== 'IN_CONSULTATION' && b.status !== 'COMPLETED')
+      .map((b) => {
+        const checkinTime = (b as any).checked_in_at || b.customer_arrived_at;
+        return {
+          id: b.id,
+          reference_code: b.reference_code || '',
+          patient_name: b.customer_name,
+          customer: { full_name: b.customer_name, phone: b.customer_phone },
+          slot_start: b.slot_start,
+          slot_end: b.slot_end,
+          status: b.status,
+          arrival_tag: 'Late' as const,
+          checked_in_at: checkinTime || undefined,
+          doctor_name: b.resource_name,
+          deposit_amount: b.deposit_amount,
+        };
+      });
+  }, [hospitalTodayBookings]);
+
+  const hospitalExpectedBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => b.status === 'CONFIRMED' && !b.is_present)
+      .map((b) => ({
+        id: b.id,
+        reference_code: b.reference_code || '',
+        patient_name: b.customer_name,
+        customer: { full_name: b.customer_name, phone: b.customer_phone },
+        slot_start: b.slot_start,
+        slot_end: b.slot_end,
+        status: b.status,
+        arrival_tag: 'Expected' as const,
+        doctor_name: b.resource_name,
+        deposit_amount: b.deposit_amount,
+      }));
+  }, [hospitalTodayBookings]);
+
+  const hospitalCompletedBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => b.status === 'COMPLETED')
+      .map((b) => ({
+        id: b.id,
+        reference_code: b.reference_code || '',
+        patient_name: b.customer_name,
+        customer: { full_name: b.customer_name, phone: b.customer_phone },
+        slot_start: b.slot_start,
+        slot_end: b.slot_end,
+        status: b.status,
+        doctor_name: b.resource_name,
+        deposit_amount: b.deposit_amount,
+      }));
+  }, [hospitalTodayBookings]);
+
+  const frontDeskStats = useMemo(() => ({
+    checkedIn: hospitalWaitingBookings.length,
+    standby: hospitalStandbyBookings.length,
+    expected: hospitalExpectedBookings.length,
+    completed: hospitalCompletedBookings.length,
+  }), [hospitalWaitingBookings.length, hospitalStandbyBookings.length, hospitalExpectedBookings.length, hospitalCompletedBookings.length]);
+
+  const candidateManualBookings: UpcomingCandidateBooking[] = useMemo(() => {
+    return hospitalExpectedBookings.map((b) => ({
+      id: b.id,
+      reference_code: b.reference_code || '',
+      patient_name: b.patient_name,
+      phone: b.customer?.phone,
+      slot_start: b.slot_start,
+      slot_end: b.slot_end,
+      status: b.status,
+      doctor_name: b.doctor_name,
+    }));
+  }, [hospitalExpectedBookings]);
+
+  const displayQueueItems: DisplayQueueItem[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => b.status === 'IN_CONSULTATION' || b.status === 'CHECKED_IN')
+      .map((b, idx) => {
+        const pName = b.customer_name || 'Patient';
+        const parts = pName.trim().split(' ');
+        const masked = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+        return {
+          id: b.id,
+          tokenNumber: idx + 1,
+          referenceCode: b.reference_code || '',
+          maskedName: masked,
+          doctorName: b.resource_name || 'Doctor',
+          departmentName: (b as any).department || 'Consultation',
+          roomNumber: 'Room 204',
+          status: b.status === 'IN_CONSULTATION' ? ('IN_CONSULTATION' as const) : idx === 0 ? ('UP_NEXT' as const) : Boolean(b.queue_position) ? ('STANDBY' as const) : ('WAITING' as const),
+          slotTime: new Date(b.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          estimatedWaitMinutes: (idx + 1) * 15,
+        };
+      });
+  }, [hospitalTodayBookings]);
+
+  const handleFrontDeskVerifyCode = async (code: string) => {
+    const res = await verifyCheckinCodeRpc(selectedProviderId, code);
+    if (res.success) {
+      let arrival_tag: 'On Time' | 'Early' | 'Late' = 'On Time';
+      if (res.is_late) arrival_tag = 'Late';
+      void loadData();
+      return {
+        success: true,
+        data: {
+          booking_id: res.booking_id,
+          patient_name: res.patient_name,
+          service_doctor: res.service_doctor,
+          slot_time: res.slot_time,
+          is_late: res.is_late,
+          arrival_tag,
+          checked_in_at: res.checked_in_at,
+        },
+      };
+    }
+    return {
+      success: false,
+      error: res.error,
+      message: res.message || 'Invalid check-in code',
+    };
+  };
+
+  const handleFrontDeskStartConsultation = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/bookings/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to start consultation');
+      }
+      setRecentNotification('Patient called into consultation');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskEndConsultation = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/bookings/end', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to end consultation');
+      }
+      setRecentNotification('Consultation marked completed');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskAdmitPatient = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/bookings/admit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to admit patient');
+      }
+      setRecentNotification('Patient admitted to waiting area');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskManualCheckin = async (bookingId: string, reason: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const res = await markPresentManuallyRpc(bookingId);
+      if (!res.success) {
+        throw new Error(res.message || 'Failed to mark present');
+      }
+      setRecentNotification('Patient marked present manually');
+      void loadData();
+      return true;
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Manual check-in failed');
+      return false;
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskMarkNoShow = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      await recordMerchantNoShow(bookingId);
+      setRecentNotification('Patient marked as No Show with deposit settled');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Mark No Show failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
 
   useEffect(() => {
     if (activeProvider) {
@@ -1629,11 +1970,63 @@ export default function MerchantOverviewPage() {
         </div>
       )}
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmed</span>
+      {isHospitalVenue ? (
+        <div className="space-y-6">
+          <FrontDeskHeader
+            userEmail={userEmail}
+            role={hospitalContext?.role || (isHospitalAdmin ? 'admin' : 'front_desk')}
+            hospitalName={activeProvider?.name}
+            assignedDoctors={frontDeskAssignedDoctors}
+            selectedDoctorId={merchantSelectedDoctorId}
+            onSelectDoctor={setMerchantSelectedDoctorId}
+            stats={frontDeskStats}
+            onOpenDisplayModal={() => setIsDisplayModalOpen(true)}
+          />
+
+          <FastPassCheckinPanel
+            onVerifyCode={handleFrontDeskVerifyCode}
+            onOpenManualCheckin={() => {
+              setIsManualCheckinModalOpen(true);
+            }}
+            selectedDoctorName={frontDeskAssignedDoctors.find((d) => d.id === merchantSelectedDoctorId)?.name}
+          />
+
+          <FrontDeskQueueTabs
+            waitingBookings={hospitalWaitingBookings}
+            standbyBookings={hospitalStandbyBookings}
+            expectedBookings={hospitalExpectedBookings}
+            completedBookings={hospitalCompletedBookings}
+            onAdmitPatient={handleFrontDeskAdmitPatient}
+            onStartConsultation={handleFrontDeskStartConsultation}
+            onEndConsultation={handleFrontDeskEndConsultation}
+            onManualMarkPresent={() => {
+              setIsManualCheckinModalOpen(true);
+            }}
+            onMarkNoShow={handleFrontDeskMarkNoShow}
+            isProcessingAction={isProcessingFrontDeskAction}
+          />
+
+          <ManualCheckinModal
+            isOpen={isManualCheckinModalOpen}
+            onClose={() => setIsManualCheckinModalOpen(false)}
+            candidateBookings={candidateManualBookings}
+            onConfirmManualCheckin={handleFrontDeskManualCheckin}
+          />
+
+          <WaitingLoungeDisplayModal
+            isOpen={isDisplayModalOpen}
+            onClose={() => setIsDisplayModalOpen(false)}
+            hospitalName={activeProvider?.name}
+            queueItems={displayQueueItems}
+          />
+        </div>
+      ) : (
+        <>
+          {/* KPI Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmed</span>
             <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             </div>
@@ -2472,6 +2865,8 @@ export default function MerchantOverviewPage() {
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* ========================================================================= */}
       {/* OPERATIONAL SETTINGS MODAL (Auto-Accept & Daily Limit)                     */}
