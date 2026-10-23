@@ -1,4 +1,4 @@
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
 
@@ -422,5 +422,12 @@ describe('Subtask 1: Hospital Per-Consultant RBAC Gaps Reproduction', () => {
       Array.isArray(logs) && logs.length > 0,
       'public.audit_logs must contain entries for check-in and booking operations, but found 0 entries'
     );
+  });
+
+  after(async () => {
+    await fetch(`${url}/rest/v1/bookings?reference_code=in.(GAP-TEST-DOC1,GAP-TEST-DOC2)`, {
+      method: 'DELETE',
+      headers: serviceHeaders
+    });
   });
 });

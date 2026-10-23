@@ -1,4 +1,4 @@
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
@@ -362,6 +362,20 @@ describe('Phase 5d: Hospital Customer Screens & Booking Pass Suite', () => {
       assert.equal(holdRes.status, 200);
       const holdData = await holdRes.json();
       assert.equal(holdData.success, true, 'Booking hold must succeed once block expires');
+
+      if (holdData.booking_id) {
+        await fetch(`${supabaseUrl}/rest/v1/bookings?id=eq.${holdData.booking_id}`, {
+          method: 'DELETE',
+          headers: serviceHeaders,
+        });
+      }
+    });
+  });
+
+  after(async () => {
+    await fetch(`${supabaseUrl}/rest/v1/bookings?customer_id=in.(${tokens.patient1.user.id},${tokens.patient2.user.id})&reference_code=not.like.TEST-REF-%25`, {
+      method: 'DELETE',
+      headers: serviceHeaders,
     });
   });
 });

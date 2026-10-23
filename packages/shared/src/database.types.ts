@@ -259,6 +259,7 @@ export type Database = {
       bookings: {
         Row: {
           attachment_url: string | null
+          booking_for_someone_else: boolean
           checked_in_at: string | null
           checked_in_by: string | null
           checked_in_method: string | null
@@ -268,6 +269,9 @@ export type Database = {
           department_id: string | null
           deposit_amount: number
           disclaimer_version: string | null
+          emergency_cancelled: boolean
+          emergency_doctor_arrived: boolean
+          emergency_patient_choice: string | null
           estimated_wait_minutes: number | null
           followup_original_booking_id: string | null
           gateway_order_id: string | null
@@ -279,6 +283,9 @@ export type Database = {
           invoice_number: string | null
           is_followup: boolean
           is_present: boolean
+          patient_name: string | null
+          patient_phone: string | null
+          patient_relationship: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           platform_fee: number | null
           platform_fee_gst: number
@@ -298,6 +305,7 @@ export type Database = {
         }
         Insert: {
           attachment_url?: string | null
+          booking_for_someone_else?: boolean
           checked_in_at?: string | null
           checked_in_by?: string | null
           checked_in_method?: string | null
@@ -307,6 +315,9 @@ export type Database = {
           department_id?: string | null
           deposit_amount: number
           disclaimer_version?: string | null
+          emergency_cancelled?: boolean
+          emergency_doctor_arrived?: boolean
+          emergency_patient_choice?: string | null
           estimated_wait_minutes?: number | null
           followup_original_booking_id?: string | null
           gateway_order_id?: string | null
@@ -318,6 +329,9 @@ export type Database = {
           invoice_number?: string | null
           is_followup?: boolean
           is_present?: boolean
+          patient_name?: string | null
+          patient_phone?: string | null
+          patient_relationship?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
           platform_fee_gst?: number
@@ -337,6 +351,7 @@ export type Database = {
         }
         Update: {
           attachment_url?: string | null
+          booking_for_someone_else?: boolean
           checked_in_at?: string | null
           checked_in_by?: string | null
           checked_in_method?: string | null
@@ -346,6 +361,9 @@ export type Database = {
           department_id?: string | null
           deposit_amount?: number
           disclaimer_version?: string | null
+          emergency_cancelled?: boolean
+          emergency_doctor_arrived?: boolean
+          emergency_patient_choice?: string | null
           estimated_wait_minutes?: number | null
           followup_original_booking_id?: string | null
           gateway_order_id?: string | null
@@ -357,6 +375,9 @@ export type Database = {
           invoice_number?: string | null
           is_followup?: boolean
           is_present?: boolean
+          patient_name?: string | null
+          patient_phone?: string | null
+          patient_relationship?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
           platform_fee_gst?: number
@@ -930,6 +951,7 @@ export type Database = {
           id: string
           is_flagged: boolean
           no_show_count: number
+          permanent_checkin_pin: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
@@ -945,6 +967,7 @@ export type Database = {
           id: string
           is_flagged?: boolean
           no_show_count?: number
+          permanent_checkin_pin?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -960,6 +983,7 @@ export type Database = {
           id?: string
           is_flagged?: boolean
           no_show_count?: number
+          permanent_checkin_pin?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string

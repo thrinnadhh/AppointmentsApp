@@ -19,6 +19,7 @@ const testFiles = [
   'tests/unit/hospital-rbac-security.test.mjs',
   'tests/unit/hospital-server-api-matrix.test.mjs',
   'tests/unit/hospital-no-show-policy.test.mjs',
+  'tests/unit/hospital-lifetime-pin-and-patient-gap.test.mjs',
 ];
 
 let totalTests = 0;
