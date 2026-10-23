@@ -185,7 +185,7 @@ export default function BookingsManagementPage() {
           event: '*',
           schema: 'public',
           table: 'bookings',
-          filter: `provider_id=eq.${selectedProviderId}`,
+          filter: selectedProviderId ? `provider_id=eq.${selectedProviderId}` : undefined,
         },
         async (payload) => {
           const eventType = payload.eventType;

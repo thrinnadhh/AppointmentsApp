@@ -206,7 +206,7 @@ export function middleware(req: NextRequest) {
   // 2. Public Page Routes Gate
   if (
     PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) ||
-    ((pathname === '/' || pathname === '/schedule') && req.nextUrl.searchParams.get('demo') === '1') ||
+    ((['/', '/schedule', '/departments', '/audit-logs', '/consultation', '/team', '/settings'].includes(pathname)) && req.nextUrl.searchParams.get('demo') === '1') ||
     isE2EBypass
   ) {
     return NextResponse.next();
