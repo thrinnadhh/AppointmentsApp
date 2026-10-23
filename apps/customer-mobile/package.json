@@ -16,6 +16,8 @@
     "@appointments/shared": "workspace:*",
     "@supabase/supabase-js": "^2.45.0",
     "expo": "~57.0.21",
+    "expo-device": "^58.0.5",
+    "expo-notifications": "^58.1.6",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",

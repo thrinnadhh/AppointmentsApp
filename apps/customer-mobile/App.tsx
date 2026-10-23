@@ -45,6 +45,10 @@ import {
   signOutCustomer,
   supabase,
 } from './src/services/api';
+import {
+  registerForPushNotificationsAsync,
+  setupNotificationListeners,
+} from './src/services/notifications';
 
 type ScreenType = 'HOME' | 'PROVIDER_DETAIL' | 'MY_BOOKINGS';
 
@@ -134,6 +138,22 @@ export default function App() {
       }
     }
     checkSession();
+  }, []);
+
+  // Deep-linking listener for push notifications: opens ticket / booking pass on notification tap
+  useEffect(() => {
+    const unsubscribe = setupNotificationListeners(async (bookingId) => {
+      try {
+        const booking = await fetchSingleCustomerBookingFromSupabase(bookingId);
+        if (booking) {
+          setSelectedBookingForPass(booking);
+          setPassModalVisible(true);
+        }
+      } catch (err) {
+        console.warn('Failed to load booking from push notification tap:', err);
+      }
+    });
+    return unsubscribe;
   }, []);
 
   // Stored customer bookings (seeded from Supabase)
@@ -560,6 +580,9 @@ export default function App() {
     // Present appointment pass with assigned token directly in-app!
     setSelectedBookingForPass(newBooking);
     setPassModalVisible(true);
+
+    // Prompt for push notification permission at this sensible moment (right after booking confirmation)
+    registerForPushNotificationsAsync(activeCustomerId).catch(() => null);
 
     loadBookings();
 

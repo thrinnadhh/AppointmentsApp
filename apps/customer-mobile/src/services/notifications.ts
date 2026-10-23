@@ -1,12 +1,21 @@
 /**
  * Expo Push Notification Service
- * Free Tier Allowance: 100% Free & Unlimited (free-for.dev)
  *
  * Manages push notification permissions and device token registration.
- * Saves push tokens to Supabase profile for instant alerts (confirmations,
- * reminders, emergency staff reassignments) saving up to 70% in SMS costs.
+ * Persists push tokens to the dedicated public.push_tokens table and syncs
+ * with customer profile for instant alerts (confirmations, reminders, queue callouts).
+ *
+ * Privacy Safeguards:
+ * Strictly receives privacy-safe alerts without patient names or medical conditions.
+ *
+ * Denial & Offline Tolerance:
+ * When permission is denied, the in-app state (HomeScreen live card and Booking Pass)
+ * remains the live, authoritative source of truth.
  */
 
+import { Platform } from 'react-native';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import { supabase } from './api';
 
 declare const process: { env: Record<string, string | undefined> };
@@ -18,6 +27,17 @@ const isProduction =
   typeof __DEV__ !== 'undefined'
     ? !__DEV__
     : typeof process !== 'undefined' && process.env?.NODE_ENV === 'production';
+
+// Configure default notification handler for foreground notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 /**
  * Checks if a push token is synthetic/mocked
@@ -36,57 +56,175 @@ export function isValidProductionPushToken(token: string | null | undefined): bo
   return isExpoFormat && !isMockPushToken(token);
 }
 
+export type PushPermissionResult = {
+  token: string | null;
+  status: 'granted' | 'denied' | 'undetermined';
+  denied: boolean;
+};
+
 /**
- * Register device for push notifications and sync token with customer profile
+ * Register device for push notifications and sync token with push_tokens table
+ * Prompted at a sensible moment (e.g. after booking confirmation or viewing booking pass)
  */
 export async function registerForPushNotificationsAsync(
   customerId?: string
 ): Promise<string | null> {
+  const result = await requestPushPermissionWithStatus(customerId);
+  return result.token;
+}
+
+/**
+ * Requests push permission, retrieves native token, and saves to database.
+ * Returns detailed status so UI can gracefully handle denial.
+ */
+export async function requestPushPermissionWithStatus(
+  customerId?: string
+): Promise<PushPermissionResult> {
   try {
-    // 1. Web / Simulator fallback
-    if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
-      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-        await Notification.requestPermission().catch(() => null);
+    // 1. Android specific notification channel setup
+    if (Platform.OS === 'android') {
+      try {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Appointments & Queue Updates',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#059669',
+          sound: 'default',
+        });
+      } catch (err) {
+        console.warn('[PushNotification] Error setting android notification channel:', err);
       }
     }
 
-    // In production, mock tokens are strictly forbidden from being generated or persisted
-    if (isProduction) {
-      if (cachedPushToken && isValidProductionPushToken(cachedPushToken)) {
-        return cachedPushToken;
+    // 2. Physical device check
+    if (Platform.OS !== 'web' && !Device.isDevice) {
+      console.log('[PushNotification] Must use physical device for real push notifications');
+      if (isProduction) {
+        return { token: null, status: 'undetermined', denied: false };
       }
-      // On real devices, Expo Notifications SDK would provide a genuine device token here
-      return null;
     }
 
-    // Generate deterministic device push token for development/testing
-    const token = cachedPushToken || `ExponentPushToken[tpt_${(customerId || 'guest').substring(0, 8)}_${Date.now().toString(36)}]`;
+    // 3. Permission Request
+    let finalStatus: Notifications.PermissionStatus = Notifications.PermissionStatus.UNDETERMINED;
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
+        if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+          const webPerm = await Notification.requestPermission().catch(() => 'denied');
+          finalStatus = webPerm === 'granted'
+            ? Notifications.PermissionStatus.GRANTED
+            : Notifications.PermissionStatus.DENIED;
+        } else {
+          finalStatus = Notification.permission === 'granted'
+            ? Notifications.PermissionStatus.GRANTED
+            : Notifications.PermissionStatus.DENIED;
+        }
+      }
+    } else {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      finalStatus = existingStatus;
+
+      if (existingStatus !== Notifications.PermissionStatus.GRANTED) {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+    }
+
+    if (finalStatus !== Notifications.PermissionStatus.GRANTED) {
+      console.log('[PushNotification] Permission not granted. In-app status remains primary source of truth.');
+      return { token: null, status: 'denied', denied: true };
+    }
+
+    // 4. Token Acquisition
+    let token: string | null = null;
+
+    if (Platform.OS !== 'web' && Device.isDevice) {
+      try {
+        const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+        const pushTokenData = await Notifications.getExpoPushTokenAsync(
+          projectId ? { projectId } : undefined
+        );
+        token = pushTokenData.data;
+      } catch (tokenErr) {
+        console.warn('[PushNotification] Error getting native push token:', tokenErr);
+      }
+    }
+
+    // Dev/Simulator mock token fallback when genuine token unavailable
+    if (!token && !isProduction) {
+      token = cachedPushToken || `ExponentPushToken[tpt_${(customerId || 'guest').substring(0, 8)}_${Date.now().toString(36)}]`;
+    }
+
     cachedPushToken = token;
 
-    // 2. Persist to customer Supabase profile if ID provided (development/staging only for mock tokens)
-    if (customerId) {
+    // 5. Persist to dedicated public.push_tokens table
+    if (token) {
       if (isProduction && !isValidProductionPushToken(token)) {
         console.warn('[PushNotification] Refusing to persist mock push token to production profile');
-        return null;
+        return { token: null, status: 'granted', denied: false };
       }
 
       try {
+        // Upsert into dedicated push_tokens table (RLS ensures user can only insert/update own token)
         await supabase
-          .from('profiles')
-          .update({
-            expo_push_token: token,
-          } as any)
-          .eq('id', customerId);
-      } catch {
-        // Non-blocking
+          .from('push_tokens')
+          .upsert(
+            {
+              token,
+              device_type: Platform.OS,
+              updated_at: new Date().toISOString(),
+            } as any,
+            { onConflict: 'user_id,token' }
+          );
+
+        // Also update legacy profile column for backwards compatibility
+        if (customerId) {
+          await supabase
+            .from('profiles')
+            .update({ expo_push_token: token } as any)
+            .eq('id', customerId);
+        }
+      } catch (dbErr) {
+        console.warn('[PushNotification] Token persistence error (non-fatal):', dbErr);
       }
     }
 
-    return token;
+    return {
+      token,
+      status: 'granted',
+      denied: false,
+    };
   } catch (err) {
     console.warn('[PushNotification] Registration error:', err);
-    return null;
+    return { token: null, status: 'undetermined', denied: false };
   }
+}
+
+/**
+ * Configure push notification listeners and deep-linking to the ticket screen
+ */
+export function setupNotificationListeners(
+  onNavigateToTicket: (bookingId: string) => void
+): () => void {
+  // 1. Foreground notification received listener
+  const notificationSubscription = Notifications.addNotificationReceivedListener((notification) => {
+    console.log('[PushNotification] Notification received in foreground:', notification.request.content.title);
+  });
+
+  // 2. Notification response (tap) listener for deep-linking
+  const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    const data = response.notification.request.content.data;
+    const bookingId = typeof data?.booking_id === 'string' ? data.booking_id : undefined;
+    if (bookingId && typeof onNavigateToTicket === 'function') {
+      console.log('[PushNotification] Deep-linking to ticket:', bookingId);
+      onNavigateToTicket(bookingId);
+    }
+  });
+
+  return () => {
+    notificationSubscription.remove();
+    responseSubscription.remove();
+  };
 }
 
 /**
@@ -97,22 +235,32 @@ export function showInAppNotification(
   body: string,
   data?: Record<string, unknown>
 ): void {
-  if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
-    if (Notification.permission === 'granted') {
-      try {
-        new Notification(title, {
-          body,
-          icon: '/favicon.ico',
-          data,
-        });
-        return;
-      } catch {
-        // Continue to console fallback
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
+      if (Notification.permission === 'granted') {
+        try {
+          new Notification(title, {
+            body,
+            icon: '/favicon.ico',
+            data,
+          });
+          return;
+        } catch {
+          // Continue to console fallback
+        }
       }
     }
+  } else {
+    Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data: data || {},
+      },
+      trigger: null, // immediate
+    }).catch(() => null);
   }
 
-  // Fallback for environments without Notification permission
   console.log(`[PUSH NOTIFICATION] 🔔 ${title}: ${body}`, data || '');
 }
 
