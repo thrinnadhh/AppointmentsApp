@@ -10,7 +10,11 @@ Roles: Hospital Admin, Front Desk, Consultant. Arrival tags: On Time, Early, Lat
 ## Booking and money
 - A booking is confirmed by paying a deposit. The hold lasts one value everywhere (code, tests, jobs, gateway order expiry): 5 minutes unless I change it.
 - Customer cancels or reschedules free if at least 60 minutes remain before the slot; otherwise the deposit is forfeited. If the business cancels: full refund.
-- No Show means the patient never checked in before the doctor's session ended. Then: notify the customer, set a flag, count it for reporting only (never block the account); from the deposit, 50 rupees goes to the doctor, 10 rupees to the platform, and the rest (deposit minus 60) is refunded. Both amounts are admin settings.
+- No Show means the patient never checked in before the doctor's session ended.
+  - Strikes 1 & 2: courtesy 100% deposit refund, no monetary penalty.
+  - Booking with 2 strikes: prompt note warns customer that a 3rd no-show incurs a ₹60 deduction (₹50 doctor / ₹10 platform / remainder refund).
+  - Strikes 3 to 5: ₹50 goes to the doctor, ₹10 to the platform, and the rest (deposit minus 60) is refunded to customer.
+  - Exceeding 5 strikes (6th no-show): account is blocked for 7 days (`blocked_until = NOW() + INTERVAL '7 days'`), display 'Your account is blocked for 7 days', and reset the strike counter to 0.
 - A patient who checked in but was not reached is NOT a no-show: free reschedule or full refund.
 ## Check-in
 - 4-digit code per confirmed appointment, generated on the server, unique per shop per date, shown to the customer from 60 minutes before the slot until check-in. Staff verify it through a function only and can never read codes. 5 wrong attempts lock that staff user for 60 seconds. Unauthorized, other-shop and invalid codes return the identical error. Manual mark-present exists as a logged fallback.
@@ -33,9 +37,9 @@ Overlapping bookings by one customer with two doctors; Consultant on leave with 
 - **Production domain**: No custom production domain is hardcoded in the codebase. Mobile release builds enforce an explicit HTTPS endpoint through `EXPO_PUBLIC_API_BASE_URL` (no LAN/cleartext allowed). Web uses `NEXT_PUBLIC_APP_URL` (defaults to `http://localhost:3000` in dev).
 
 ## Conflicts with current codebase
-1. **No-Show Financial Split**:
-   - *Spec*: 50 rupees to doctor, 10 rupees to platform, rest (deposit - 60) refunded to customer; count for reporting only and never block account.
-   - *Code Conflict*: `record_no_show` in `supabase/migrations/20260925000001_refund_pending_status_and_60m_window.sql` applies a 3-strike policy (strikes 1-2 get 100% refund, strike 3+ gets 100% forfeiture/0 refund) and flags the account via `is_flagged = TRUE` at 3 strikes.
+1. **No-Show Tiered Policy & 7-Day Account Block**:
+   - *Spec*: Strikes 1-2 courtesy refund; strike 3-5 ₹50 doctor / ₹10 platform / remainder refund; >5 strikes (6th) blocks account for 7 days (`blocked_until = NOW() + 7 days`), displays 'Your account is blocked for 7 days', and resets strike counter to 0.
+   - *Status*: Being implemented in Phase 7a database migration `20261024000001_no_show_tiered_policy_and_account_block.sql`.
 2. **Check-in Code Customer Visibility Window**:
    - *Spec*: "shown to the customer from 60 minutes before the slot until check-in."
    - *Code Conflict*: In the customer mobile app (`BookingPassModal.tsx` and API responses), the check-in code / reference code is accessible immediately upon booking confirmation on the in-app pass, without a 60-minute pre-slot visibility gate.

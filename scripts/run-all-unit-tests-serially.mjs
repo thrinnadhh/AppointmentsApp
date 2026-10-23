@@ -18,6 +18,7 @@ const testFiles = [
   'tests/unit/hospital-queue-engine.test.mjs',
   'tests/unit/hospital-rbac-security.test.mjs',
   'tests/unit/hospital-server-api-matrix.test.mjs',
+  'tests/unit/hospital-no-show-policy.test.mjs',
 ];
 
 let totalTests = 0;
