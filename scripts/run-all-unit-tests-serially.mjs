@@ -21,6 +21,8 @@ const testFiles = [
   'tests/unit/hospital-no-show-policy.test.mjs',
   'tests/unit/hospital-lifetime-pin-and-patient-gap.test.mjs',
   'tests/unit/hospital-push-notifications.test.mjs',
+  'tests/unit/security-audit-nextjs-dependencies.test.mjs',
+  'tests/unit/security-audit-database-grants.test.mjs',
 ];
 
 let totalTests = 0;
