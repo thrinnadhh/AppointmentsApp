@@ -1,35 +1,57 @@
-// test-late-queue.mjs
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  calculateArrivalTag,
+  computePatientETA,
+  HospitalDepartmentQueueEngine,
+} from '../../packages/shared/src/queue-engine.ts';
 
 const ROOT_DIR = process.cwd();
 
 describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
 
   // =========================================================================
-  // 1. API Algorithm & Buffer Logic Tests (/api/bookings/reach)
+  // 1. SPEC Late Arrival Queue Calculation Logic (/api/bookings/reach)
   // =========================================================================
   describe('1. Late Arrival Queue Calculation Logic (/api/bookings/reach)', () => {
-    function simulateReachArrival({ slotStart, arrivedAt, existingQueuePositions }) {
-      const slotStartTime = new Date(slotStart).getTime();
-      const arrivalTime = new Date(arrivedAt).getTime();
-      const isLateArrival = arrivalTime > (slotStartTime + 5 * 60 * 1000);
+    function evaluateReachArrival({ slotStart, arrivedAt, todayBookings = [] }) {
+      const arrivalTag = calculateArrivalTag(slotStart, arrivedAt);
+      const isLateArrival = arrivalTag === 'Late';
 
       let queuePosition = null;
       let waitMinutes = 0;
       let queueNotice = null;
 
       if (isLateArrival) {
-        const activePositions = existingQueuePositions.filter((p) => typeof p === 'number');
-        const maxPosition = activePositions.length > 0 ? Math.max(...activePositions) : 1;
-        queuePosition = maxPosition + 2; // +2 dynamic buffer rule
-        waitMinutes = 2 * 15; // 30 mins
-        queueNotice = `You arrived after your scheduled slot (${new Date(slotStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). You will be accommodated after 2 member appointments (Estimated wait: ~${waitMinutes} mins). Queue Token: #${queuePosition}.`;
+        const bookingsList = todayBookings.map((b) => ({
+          id: b.id,
+          slotStart: b.slotStart,
+          slotEnd: b.slotEnd,
+          status: b.status,
+          isCheckedIn: b.isCheckedIn ?? true,
+          isCompleted: b.isCompleted ?? false,
+          arrivedAt: b.arrivedAt,
+          durationMinutes: 15,
+        }));
+        const activeConsultation = bookingsList.find((b) => b.status === 'IN_CONSULTATION') || null;
+
+        const etaResult = computePatientETA({
+          bookingId: 'target-booking',
+          currentTime: arrivedAt,
+          bookings: bookingsList,
+          currentConsultation: activeConsultation,
+          defaultDurationMinutes: 15,
+        });
+
+        queuePosition = etaResult?.queuePosition ?? 1;
+        waitMinutes = etaResult?.estimatedWaitMinutes ?? 0;
+        queueNotice = `You arrived after your scheduled slot (${new Date(slotStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). You have been placed in the Standby Queue in booking order (Estimated wait: ~${waitMinutes} mins). Queue Token: #${queuePosition}.`;
       }
 
       return {
+        arrivalTag,
         isLateArrival,
         queuePosition,
         waitMinutes,
@@ -37,50 +59,57 @@ describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
       };
     }
 
-    it('detects on-time arrival within 5-min grace period and does not re-queue', () => {
+    it('detects on-time arrival within +/- 10-min window and does not tag as late', () => {
       const slotStart = '2026-10-11T10:00:00.000Z';
-      const arrivedAt = '2026-10-11T10:04:00.000Z'; // 4 mins after start -> within 5m grace
-      const result = simulateReachArrival({
+      const arrivedAt = '2026-10-11T10:04:00.000Z'; // 4 mins after start -> within 10m window
+      const result = evaluateReachArrival({
         slotStart,
         arrivedAt,
-        existingQueuePositions: [1, 2, 3],
+        todayBookings: [{ id: 'target-booking', slotStart, slotEnd: '2026-10-11T10:15:00.000Z', status: 'CHECKED_IN', isCheckedIn: true }],
       });
 
       assert.equal(result.isLateArrival, false);
+      assert.equal(result.arrivalTag, 'On Time');
       assert.equal(result.queuePosition, null);
       assert.equal(result.waitMinutes, 0);
       assert.equal(result.queueNotice, null);
     });
 
-    it('detects late arrival (>5 mins after slot) and dynamically queues at ongoing + 2', () => {
+    it('detects late arrival (>10 mins after slot) and dynamically queues in Standby in booking order', () => {
       const slotStart = '2026-10-11T10:00:00.000Z';
-      const arrivedAt = '2026-10-11T10:15:00.000Z'; // 15 mins after start -> late
-      const existingPositions = [5, 6, 7]; // highest ongoing token is 7
-      const result = simulateReachArrival({
+      const arrivedAt = '2026-10-11T10:15:00.000Z'; // 15 mins after start -> late (>10m)
+      const existingBookings = [
+        { id: 'b1', slotStart: '2026-10-11T10:00:00.000Z', slotEnd: '2026-10-11T10:15:00.000Z', status: 'IN_CONSULTATION', isCheckedIn: true },
+        { id: 'b2', slotStart: '2026-10-11T10:15:00.000Z', slotEnd: '2026-10-11T10:30:00.000Z', status: 'CHECKED_IN', isCheckedIn: true, arrivedAt: '2026-10-11T10:10:00.000Z' },
+        { id: 'target-booking', slotStart, slotEnd: '2026-10-11T10:15:00.000Z', status: 'CHECKED_IN', isCheckedIn: true, arrivedAt },
+      ];
+      const result = evaluateReachArrival({
         slotStart,
         arrivedAt,
-        existingQueuePositions: existingPositions,
+        todayBookings: existingBookings,
       });
 
       assert.equal(result.isLateArrival, true);
-      assert.equal(result.queuePosition, 9, 'Must insert at highest ongoing token (7) + 2 buffer = 9');
-      assert.equal(result.waitMinutes, 30, '2 appointments buffer = 30 minutes wait');
-      assert.match(result.queueNotice, /accommodated after 2 member appointments/);
-      assert.match(result.queueNotice, /Queue Token: #9/);
+      assert.equal(result.arrivalTag, 'Late');
+      assert.equal(result.queuePosition, 3, 'Must position after in-consultation and on-time present patient');
+      assert.equal(result.waitMinutes, 30, '2 patients ahead = 30 minutes wait');
+      assert.match(result.queueNotice, /placed in the Standby Queue in booking order/);
+      assert.match(result.queueNotice, /Queue Token: #3/);
     });
 
     it('handles first queue of the day when no prior tokens exist', () => {
       const slotStart = '2026-10-11T09:00:00.000Z';
-      const arrivedAt = '2026-10-11T09:20:00.000Z'; // late
-      const result = simulateReachArrival({
+      const arrivedAt = '2026-10-11T09:20:00.000Z'; // late (>10m)
+      const result = evaluateReachArrival({
         slotStart,
         arrivedAt,
-        existingQueuePositions: [],
+        todayBookings: [{ id: 'target-booking', slotStart, slotEnd: '2026-10-11T09:15:00.000Z', status: 'CHECKED_IN', isCheckedIn: true, arrivedAt }],
       });
 
       assert.equal(result.isLateArrival, true);
-      assert.equal(result.queuePosition, 3, 'Baseline fallback 1 + 2 = 3');
-      assert.equal(result.waitMinutes, 30);
+      assert.equal(result.arrivalTag, 'Late');
+      assert.equal(result.queuePosition, 1, 'First in queue token is #1');
+      assert.equal(result.waitMinutes, 0);
     });
   });
 
@@ -88,7 +117,7 @@ describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
   // 2. Merchant Desk Late Actions (/api/bookings/late-queue)
   // =========================================================================
   describe('2. Merchant Desk Late Actions (/api/bookings/late-queue)', () => {
-    function simulateMerchantLateAction(action, { bufferOffset = 2, existingPositions = [10] }) {
+    function simulateMerchantLateAction(action, { todayBookings = [] }) {
       if (action === 'MOVE_TO_STANDBY') {
         return {
           success: true,
@@ -98,17 +127,36 @@ describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
         };
       }
       if (action === 'CHECKIN_LATE') {
-        const maxPos = existingPositions.length > 0 ? Math.max(...existingPositions) : 1;
-        const offset = Number(bufferOffset) || 2;
-        const newQueuePosition = maxPos + offset;
-        const waitMinutes = offset * 15;
+        const bookingsList = todayBookings.map((b) => ({
+          id: b.id,
+          slotStart: b.slotStart,
+          slotEnd: b.slotEnd,
+          status: b.status,
+          isCheckedIn: b.isCheckedIn ?? true,
+          isCompleted: b.isCompleted ?? false,
+          arrivedAt: b.arrivedAt,
+          durationMinutes: 15,
+        }));
+        const activeConsultation = bookingsList.find((b) => b.status === 'IN_CONSULTATION') || null;
+
+        const eta = computePatientETA({
+          bookingId: 'target-late',
+          currentTime: '2026-10-11T10:15:00.000Z',
+          bookings: bookingsList,
+          currentConsultation: activeConsultation,
+          defaultDurationMinutes: 15,
+        });
+
+        const queuePos = eta?.queuePosition ?? 1;
+        const waitMins = eta?.estimatedWaitMinutes ?? 0;
+
         return {
           success: true,
           action: 'CHECKIN_LATE',
           isPresent: true,
-          queuePosition: newQueuePosition,
-          waitMinutes,
-          queueNotice: `You have been accommodated and will be sent after ${offset} member appointments (Estimated wait: ~${waitMinutes} mins). Queue Token: #${newQueuePosition}.`,
+          queuePosition: queuePos,
+          waitMinutes: waitMins,
+          queueNotice: `You have been accommodated in the Standby Queue in booking order (Estimated wait: ~${waitMins} mins). Queue Token: #${queuePos}.`,
         };
       }
       return { success: false, error: 'Invalid action' };
@@ -121,25 +169,34 @@ describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
       assert.equal(result.action, 'MOVE_TO_STANDBY');
     });
 
-    it('handles CHECKIN_LATE with default +2 buffer', () => {
+    it('handles CHECKIN_LATE with SPEC Standby Queue in booking order', () => {
       const result = simulateMerchantLateAction('CHECKIN_LATE', {
-        bufferOffset: 2,
-        existingPositions: [10, 11, 12],
+        todayBookings: [
+          { id: 'b1', slotStart: '2026-10-11T10:00:00.000Z', slotEnd: '2026-10-11T10:15:00.000Z', status: 'IN_CONSULTATION', isCheckedIn: true },
+          { id: 'b2', slotStart: '2026-10-11T10:15:00.000Z', slotEnd: '2026-10-11T10:30:00.000Z', status: 'CHECKED_IN', isCheckedIn: true, arrivedAt: '2026-10-11T10:10:00.000Z' },
+          { id: 'target-late', slotStart: '2026-10-11T09:45:00.000Z', slotEnd: '2026-10-11T10:00:00.000Z', status: 'CHECKED_IN', isCheckedIn: true, arrivedAt: '2026-10-11T10:15:00.000Z' },
+        ],
       });
       assert.equal(result.success, true);
       assert.equal(result.isPresent, true);
-      assert.equal(result.queuePosition, 14, '12 + 2 = 14');
+      assert.equal(result.queuePosition, 3, 'Standby patient placed behind in-consultation and on-time present patient');
       assert.equal(result.waitMinutes, 30);
     });
 
-    it('handles CHECKIN_LATE with custom buffer (e.g. +3)', () => {
-      const result = simulateMerchantLateAction('CHECKIN_LATE', {
-        bufferOffset: 3,
-        existingPositions: [15],
-      });
-      assert.equal(result.success, true);
-      assert.equal(result.queuePosition, 18, '15 + 3 = 18');
-      assert.equal(result.waitMinutes, 45, '3 appointments * 15 mins = 45m');
+    it('handles Standby Queue order when multiple late patients arrive', () => {
+      const engine = new HospitalDepartmentQueueEngine('General');
+      engine.addBooking({ id: 'P_ON', slotStart: '2026-10-11T10:00:00.000Z', durationMinutes: 15 });
+      engine.addBooking({ id: 'P_LATE_1', slotStart: '2026-10-11T09:00:00.000Z', originalBookingTime: '2026-10-11T09:00:00.000Z', durationMinutes: 15 });
+      engine.addBooking({ id: 'P_LATE_2', slotStart: '2026-10-11T09:30:00.000Z', originalBookingTime: '2026-10-11T09:30:00.000Z', durationMinutes: 15 });
+
+      engine.checkInPatient('P_ON', '2026-10-11T09:55:00.000Z');
+      engine.checkInPatient('P_LATE_1', '2026-10-11T10:10:00.000Z');
+      engine.checkInPatient('P_LATE_2', '2026-10-11T10:05:00.000Z');
+
+      const queues = engine.evaluateQueues('2026-10-11T10:00:00.000Z');
+      assert.equal(queues.waitingQueue[0].id, 'P_ON');
+      assert.equal(queues.standbyQueue[0].id, 'P_LATE_1', 'Earlier original booking time served first in Standby');
+      assert.equal(queues.standbyQueue[1].id, 'P_LATE_2');
     });
   });
 

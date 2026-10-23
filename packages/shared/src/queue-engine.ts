@@ -45,6 +45,7 @@ export interface HospitalQueueBooking {
   pulledInEarly?: boolean;
   isExpired?: boolean;
   expiredAt?: string;
+  status?: string;
   [key: string]: any;
 }
 
@@ -62,6 +63,24 @@ export interface EvaluatedQueuesState {
   nextOnTimeStartMs: number | null;
 }
 
+export interface PatientETA {
+  bookingId: string;
+  estimatedStartTime: string;
+  estimatedWaitMinutes: number;
+  queuePosition: number;
+  windowStart: string;
+  windowEnd: string;
+  hasLeftWindow: boolean;
+  statusLabel?: string;
+}
+
+/**
+ * Calculates arrival tag according to SPEC: +/- 10-minute window around slot_start
+ * - < -10 min: 'Early'
+ * - -10 min to +10 min: 'On Time'
+ * - > +10 min: 'Late'
+ * - null / undefined: 'Expected'
+ */
 export function calculateArrivalTag(slotStart: string, arrivedAt?: string | null): ArrivalTag {
   if (!arrivedAt) return 'Expected';
   const startMs = new Date(slotStart).getTime();
@@ -71,6 +90,274 @@ export function calculateArrivalTag(slotStart: string, arrivedAt?: string | null
   if (diffMinutes < -10) return 'Early';
   if (diffMinutes >= -10 && diffMinutes <= 10) return 'On Time';
   return 'Late';
+}
+
+/**
+ * Notification Rule (SPEC line 21):
+ * Customer is notified ONLY when the live ETA leaves their +/- 10 min window.
+ */
+export function shouldSendEtaNotification(slotStart: string, estimatedStartTime: string): boolean {
+  const slotMs = new Date(slotStart).getTime();
+  const etaMs = new Date(estimatedStartTime).getTime();
+  const windowStartMs = slotMs - 10 * 60 * 1000;
+  const windowEndMs = slotMs + 10 * 60 * 1000;
+  return etaMs < windowStartMs || etaMs > windowEndMs;
+}
+
+/**
+ * Pure ETA computation function.
+ * Given the current time and list of bookings, computes deterministic start time,
+ * wait minutes, queue position, arrival window, and whether notification should fire.
+ * Never mutates input objects or database.
+ */
+export function computeQueueETAs(params: {
+  currentTime: string;
+  bookings: HospitalQueueBooking[];
+  currentConsultation?: HospitalQueueBooking | null;
+  defaultDurationMinutes?: number;
+}): Map<string, PatientETA> {
+  const {
+    currentTime,
+    bookings,
+    currentConsultation = null,
+    defaultDurationMinutes = 15,
+  } = params;
+
+  const etaMap = new Map<string, PatientETA>();
+  const currMs = new Date(currentTime).getTime();
+
+  // Active unserved bookings (exclude CANCELLED, NO_SHOW, and COMPLETED)
+  const activeBookings = bookings.filter(
+    (b) => b.status !== 'CANCELLED' && b.status !== 'NO_SHOW' && !b.isCompleted
+  );
+
+  let simMs = currMs;
+  let queuePositionCounter = 1;
+
+  // 1. If doctor is actively busy with currentConsultation
+  if (currentConsultation) {
+    const durMs = (currentConsultation.durationMinutes || defaultDurationMinutes) * 60 * 1000;
+    const startMs = currentConsultation.consultationStart
+      ? new Date(currentConsultation.consultationStart).getTime()
+      : currMs;
+    const finishMs = Math.max(currMs, startMs + durMs);
+
+    const slotStartMs = new Date(currentConsultation.slotStart).getTime();
+    const estStartIso = new Date(startMs).toISOString();
+    const wStartIso = new Date(slotStartMs - 10 * 60 * 1000).toISOString();
+    const wEndIso = new Date(slotStartMs + 10 * 60 * 1000).toISOString();
+
+    etaMap.set(currentConsultation.id, {
+      bookingId: currentConsultation.id,
+      estimatedStartTime: estStartIso,
+      estimatedWaitMinutes: 0,
+      queuePosition: queuePositionCounter++,
+      windowStart: wStartIso,
+      windowEnd: wEndIso,
+      hasLeftWindow: shouldSendEtaNotification(currentConsultation.slotStart, estStartIso),
+      statusLabel: 'In Consultation',
+    });
+
+    simMs = finishMs;
+  }
+
+  // Work on remaining bookings not currently in consultation
+  const remaining = activeBookings
+    .filter((b) => !currentConsultation || b.id !== currentConsultation.id)
+    .map((b) => ({
+      ...b,
+      durationMinutes: b.durationMinutes || defaultDurationMinutes,
+      originalBookingTime: b.originalBookingTime || b.slotStart,
+      arrivalTag: b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt),
+    }));
+
+  while (remaining.length > 0) {
+    // Identify patients checked in by simMs
+    const checkedIn = remaining.filter((b) => {
+      if (b.isCheckedIn) {
+        if (!b.arrivedAt) return true;
+        return new Date(b.arrivedAt).getTime() <= simMs;
+      }
+      return false;
+    });
+
+    // Waiting queue: On Time & Early, sorted by slotStart ASC
+    const waitingQueue = checkedIn
+      .filter((b) => b.arrivalTag === 'On Time' || b.arrivalTag === 'Early')
+      .sort((a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime());
+
+    // Standby queue: Late, sorted by originalBookingTime ASC (FIFO)
+    const standbyQueue = checkedIn
+      .filter((b) => b.arrivalTag === 'Late')
+      .sort(
+        (a, b) =>
+          new Date(a.originalBookingTime!).getTime() -
+          new Date(b.originalBookingTime!).getTime()
+      );
+
+    // Booked patients remaining (not late standby)
+    const upcomingBooked = remaining.filter((b) => b.arrivalTag !== 'Late');
+
+    let nextPatient: typeof remaining[0] | null = null;
+    const nextOnTime = waitingQueue[0];
+    const nextStandby = standbyQueue[0];
+
+    // Priority 1: On-time patient whose window is open
+    if (nextOnTime) {
+      const onTimeStartMs = new Date(nextOnTime.slotStart).getTime();
+      const windowOpen = simMs >= onTimeStartMs - 10 * 60 * 1000;
+      if (windowOpen) {
+        nextPatient = nextOnTime;
+      }
+    }
+
+    // Priority 2: Standby patient if fits gap before next booked patient, OR if no booked patients left (fit check lifted!)
+    if (!nextPatient && nextStandby) {
+      const standbyDurationMs = (nextStandby.durationMinutes || defaultDurationMinutes) * 60 * 1000;
+
+      // Find earliest upcoming booked patient time (excluding standby itself)
+      const futureBooked = upcomingBooked.filter(
+        (b) => new Date(b.slotStart).getTime() >= simMs
+      );
+      const nextBookedTimeMs =
+        futureBooked.length > 0
+          ? Math.min(...futureBooked.map((b) => new Date(b.slotStart).getTime()))
+          : null;
+
+      if (nextBookedTimeMs === null) {
+        // Fit check lifted at end of day! No booked patients left
+        nextPatient = nextStandby;
+      } else if (simMs + standbyDurationMs <= nextBookedTimeMs) {
+        // Fits in gap before next booked patient's time
+        nextPatient = nextStandby;
+      }
+    }
+
+    // Priority 3: Early patient whose window has not opened, only to avoid doctor idling
+    if (!nextPatient && nextOnTime) {
+      nextPatient = nextOnTime;
+    }
+
+    if (nextPatient) {
+      const slotStartMs = new Date(nextPatient.slotStart).getTime();
+      const estStartIso = new Date(simMs).toISOString();
+      const waitMins = Math.max(0, Math.round((simMs - currMs) / (60 * 1000)));
+      const wStartIso = new Date(slotStartMs - 10 * 60 * 1000).toISOString();
+      const wEndIso = new Date(slotStartMs + 10 * 60 * 1000).toISOString();
+
+      const isUpNext = queuePositionCounter === (currentConsultation ? 2 : 1);
+
+      etaMap.set(nextPatient.id, {
+        bookingId: nextPatient.id,
+        estimatedStartTime: estStartIso,
+        estimatedWaitMinutes: waitMins,
+        queuePosition: queuePositionCounter++,
+        windowStart: wStartIso,
+        windowEnd: wEndIso,
+        hasLeftWindow: shouldSendEtaNotification(nextPatient.slotStart, estStartIso),
+        statusLabel: isUpNext
+          ? 'Up Next'
+          : nextPatient.arrivalTag === 'Late'
+          ? 'Standby Queue'
+          : 'Waiting',
+      });
+
+      // Advance simMs by duration
+      simMs += (nextPatient.durationMinutes || defaultDurationMinutes) * 60 * 1000;
+
+      // Remove from remaining
+      const idx = remaining.findIndex((b) => b.id === nextPatient!.id);
+      if (idx !== -1) remaining.splice(idx, 1);
+    } else {
+      // Priority 4: Otherwise wait - advance clock to next event
+      let nextEventMs = Infinity;
+
+      for (const b of remaining) {
+        if (!b.isCheckedIn && b.arrivedAt) {
+          const arrMs = new Date(b.arrivedAt).getTime();
+          if (arrMs > simMs && arrMs < nextEventMs) nextEventMs = arrMs;
+        }
+        if (b.arrivalTag !== 'Late') {
+          const windowStart = new Date(b.slotStart).getTime() - 10 * 60 * 1000;
+          if (windowStart > simMs && windowStart < nextEventMs) nextEventMs = windowStart;
+          const slotStart = new Date(b.slotStart).getTime();
+          if (slotStart > simMs && slotStart < nextEventMs) nextEventMs = slotStart;
+        }
+      }
+
+      if (nextEventMs === Infinity || nextEventMs <= simMs) {
+        const remainingStandby = remaining.filter((b) => b.arrivalTag === 'Late');
+        if (remainingStandby.length > 0) {
+          // Fit check lifted for remaining standby (no future slots to wait on)
+          const candidate = remainingStandby[0];
+          const slotStartMs = new Date(candidate.slotStart).getTime();
+          const estStartIso = new Date(simMs).toISOString();
+          const waitMins = Math.max(0, Math.round((simMs - currMs) / (60 * 1000)));
+
+          const isUpNext = queuePositionCounter === (currentConsultation ? 2 : 1);
+
+          etaMap.set(candidate.id, {
+            bookingId: candidate.id,
+            estimatedStartTime: estStartIso,
+            estimatedWaitMinutes: waitMins,
+            queuePosition: queuePositionCounter++,
+            windowStart: new Date(slotStartMs - 10 * 60 * 1000).toISOString(),
+            windowEnd: new Date(slotStartMs + 10 * 60 * 1000).toISOString(),
+            hasLeftWindow: shouldSendEtaNotification(candidate.slotStart, estStartIso),
+            statusLabel: isUpNext ? 'Up Next' : 'Standby Queue',
+          });
+
+          simMs += (candidate.durationMinutes || defaultDurationMinutes) * 60 * 1000;
+          const idx = remaining.findIndex((b) => b.id === candidate.id);
+          if (idx !== -1) remaining.splice(idx, 1);
+        } else {
+          // Unarrived booked patients
+          const nextBooked = remaining.sort(
+            (a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime()
+          )[0];
+          const slotStartMs = new Date(nextBooked.slotStart).getTime();
+          simMs = Math.max(simMs, slotStartMs);
+          const estStartIso = new Date(simMs).toISOString();
+          const waitMins = Math.max(0, Math.round((simMs - currMs) / (60 * 1000)));
+
+          const isUpNext = queuePositionCounter === (currentConsultation ? 2 : 1);
+
+          etaMap.set(nextBooked.id, {
+            bookingId: nextBooked.id,
+            estimatedStartTime: estStartIso,
+            estimatedWaitMinutes: waitMins,
+            queuePosition: queuePositionCounter++,
+            windowStart: new Date(slotStartMs - 10 * 60 * 1000).toISOString(),
+            windowEnd: new Date(slotStartMs + 10 * 60 * 1000).toISOString(),
+            hasLeftWindow: shouldSendEtaNotification(nextBooked.slotStart, estStartIso),
+            statusLabel: isUpNext ? 'Up Next' : 'Booked',
+          });
+
+          simMs += (nextBooked.durationMinutes || defaultDurationMinutes) * 60 * 1000;
+          const idx = remaining.findIndex((b) => b.id === nextBooked.id);
+          if (idx !== -1) remaining.splice(idx, 1);
+        }
+      } else {
+        simMs = nextEventMs;
+      }
+    }
+  }
+
+  return etaMap;
+}
+
+/**
+ * Convenience helper to compute pure ETA for a single patient booking.
+ */
+export function computePatientETA(params: {
+  bookingId: string;
+  currentTime: string;
+  bookings: HospitalQueueBooking[];
+  currentConsultation?: HospitalQueueBooking | null;
+  defaultDurationMinutes?: number;
+}): PatientETA | null {
+  const etas = computeQueueETAs(params);
+  return etas.get(params.bookingId) || null;
 }
 
 export class HospitalDepartmentQueueEngine {
@@ -109,7 +396,102 @@ export class HospitalDepartmentQueueEngine {
   }
 
   /**
-   * Evaluates the current state of queues at simulated currentTime
+   * Internal helper: determines the next eligible booking to dispatch according to strict SPEC ordering rules.
+   */
+  selectNextCandidate(
+    currentTime: string,
+    waitingQueue: HospitalQueueBooking[],
+    standbyQueue: HospitalQueueBooking[],
+    upcomingBooked: HospitalQueueBooking[]
+  ): HospitalQueueBooking | null {
+    const currMs = new Date(currentTime).getTime();
+
+    const nextOnTime = waitingQueue[0];
+    const standbyPatient = standbyQueue[0];
+
+    // Priority 1: On-time patient whose +/- 10 min window is open
+    if (nextOnTime) {
+      const startMs = new Date(nextOnTime.slotStart).getTime();
+      const inWindow = currMs >= startMs - 10 * 60 * 1000;
+      if (inWindow) {
+        return nextOnTime;
+      }
+    }
+
+    // Priority 2: Standby Queue in original booking order (FIFO),
+    // only if consultation finishes before next booked patient's time (fit check)
+    // OR if no booked patients left (fit check lifted at end of day)
+    if (standbyPatient) {
+      const standbyDurationMs = (standbyPatient.durationMinutes || 15) * 60 * 1000;
+
+      // Find future booked patients
+      const futureBooked = upcomingBooked.filter((b) => new Date(b.slotStart).getTime() >= currMs);
+      const nextBookedTimeMs =
+        futureBooked.length > 0
+          ? Math.min(...futureBooked.map((b) => new Date(b.slotStart).getTime()))
+          : null;
+
+      if (nextBookedTimeMs === null) {
+        // Fit check lifted at end of day / no booked patients left!
+        return standbyPatient;
+      } else if (currMs + standbyDurationMs <= nextBookedTimeMs) {
+        // Fits in gap before next booked patient's time
+        return standbyPatient;
+      }
+    }
+
+    // Priority 3: Early patient whose window has not opened, only to avoid doctor idling
+    if (nextOnTime) {
+      return nextOnTime;
+    }
+
+    // Priority 4: Otherwise wait
+    return null;
+  }
+
+  getNextEligibleBooking(currentTime: string): HospitalQueueBooking | null {
+    const currMs = new Date(currentTime).getTime();
+
+    // 1. Separate checked-in patients into Waiting Queue vs Standby Queue
+    const checkedIn = this.bookings.filter(
+      (b) => b.isCheckedIn && !b.isCompleted && b !== this.currentConsultation
+    );
+
+    const waitingQueue = checkedIn
+      .filter((b) => {
+        const tag = b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt);
+        return tag === 'On Time' || tag === 'Early';
+      })
+      .sort((a, b) => new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime());
+
+    const standbyQueue = checkedIn
+      .filter((b) => {
+        const tag = b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt);
+        if (tag !== 'Late') return false;
+        if (this.standbyExpiryMinutes !== null) {
+          const arrivalMs = new Date(b.arrivedAt || b.slotStart).getTime();
+          const waitMinutes = (currMs - arrivalMs) / (60 * 1000);
+          if (waitMinutes > this.standbyExpiryMinutes) return false;
+        }
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.originalBookingTime || a.slotStart).getTime() -
+          new Date(b.originalBookingTime || b.slotStart).getTime()
+      );
+
+    const upcomingBooked = this.bookings.filter((b) => {
+      if (b.isCompleted || b === this.currentConsultation) return false;
+      const tag = b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt);
+      return tag !== 'Late';
+    });
+
+    return this.selectNextCandidate(currentTime, waitingQueue, standbyQueue, upcomingBooked);
+  }
+
+  /**
+   * Evaluates the current state of queues at simulated currentTime.
    * Returns: { liveQueue, waitingQueue, standbyQueue, expiredStandbyQueue, doctorStatus, currentServing, upNext, ... }
    */
   evaluateQueues(currentTime: string): EvaluatedQueuesState {
@@ -140,7 +522,7 @@ export class HospitalDepartmentQueueEngine {
           new Date(b.originalBookingTime || b.slotStart).getTime()
       );
 
-    // 45-Minute Standby Auto-Expiry: Filter out standby patients whose wait time exceeds threshold
+    // Standby Queue: Nobody is dropped per SPEC ("Nobody is dropped")
     const standbyQueue: HospitalQueueBooking[] = [];
     const expiredStandbyQueue: HospitalQueueBooking[] = [];
 
@@ -169,14 +551,31 @@ export class HospitalDepartmentQueueEngine {
       nextOnTime && nextOnTimeStartMs && currMs >= nextOnTimeStartMs - 10 * 60 * 1000
     );
 
+    // Determine upNext using candidate selection
+    let nextCandidate: HospitalQueueBooking | null = null;
+    const upcomingBooked = this.bookings.filter((b) => {
+      if (b.isCompleted || b === this.currentConsultation) return false;
+      const tag = b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt);
+      return tag !== 'Late';
+    });
+
+    if (currentServing) {
+      const durMs = (currentServing.durationMinutes || 15) * 60 * 1000;
+      const startMs = currentServing.consultationStart
+        ? new Date(currentServing.consultationStart).getTime()
+        : currMs;
+      const finishIso = new Date(Math.max(currMs, startMs + durMs)).toISOString();
+      nextCandidate = this.selectNextCandidate(finishIso, waitingQueue, standbyQueue, upcomingBooked);
+    } else {
+      nextCandidate = this.selectNextCandidate(currentTime, waitingQueue, standbyQueue, upcomingBooked);
+    }
+
     return {
       departmentName: this.departmentName,
       doctorStatus,
       currentServing,
-      liveQueue: currentServing ? [currentServing] : waitingQueue.slice(0, 1),
-      upNext: currentServing
-        ? waitingQueue[0] || standbyQueue[0] || null
-        : waitingQueue[1] || standbyQueue[0] || null,
+      liveQueue: currentServing ? [currentServing] : (nextCandidate ? [nextCandidate] : []),
+      upNext: nextCandidate,
       waitingQueue,
       standbyQueue,
       expiredStandbyQueue,
@@ -187,67 +586,49 @@ export class HospitalDepartmentQueueEngine {
   }
 
   /**
-   * Dispatches the next patient to consultation according to strict hospital rules
+   * Dispatches the next patient to consultation according to strict hospital rules.
+   * If options.peekOnly is true, determines who would be next WITHOUT starting consultation.
    */
-  dispatchNext(currentTime: string): HospitalQueueBooking | null {
-    const state = this.evaluateQueues(currentTime);
-    const currMs = new Date(currentTime).getTime();
-
-    if (this.currentConsultation) {
+  dispatchNext(
+    currentTime: string,
+    options?: { peekOnly?: boolean }
+  ): HospitalQueueBooking | null {
+    if (this.currentConsultation && !options?.peekOnly) {
       // Doctor is currently busy
       return this.currentConsultation;
     }
 
-    const nextOnTime = state.waitingQueue[0];
-    const standbyPatient = state.standbyQueue[0];
-
-    if (nextOnTime) {
-      const startMs = new Date(nextOnTime.slotStart).getTime();
-      const inWindow = currMs >= startMs - 10 * 60 * 1000;
-
-      if (inWindow) {
-        // D1 & D2: On-time patient in window goes straight in! Never delayed by standby.
-        this.currentConsultation = this.bookings.find((b) => b.id === nextOnTime.id) || null;
-        if (this.currentConsultation) {
-          this.currentConsultation.consultationStart = currentTime;
-        }
-        return this.currentConsultation;
-      }
-
-      // Next on-time patient is early and NOT yet in window (e.g. booked at 7:50, current time 7:30)
-      // Can a standby patient fit into the gap?
-      if (standbyPatient) {
-        const standbyDurationMs = (standbyPatient.durationMinutes || 15) * 60 * 1000;
-        // D6: Does standby patient finish before or at on-time window start?
-        const onTimeWindowStartMs = startMs - 10 * 60 * 1000;
-        if (currMs + standbyDurationMs <= onTimeWindowStartMs + 10 * 60 * 1000) {
-          // Fits safely in gap! Late patient takes free time
-          this.currentConsultation = this.bookings.find((b) => b.id === standbyPatient.id) || null;
-          if (this.currentConsultation) {
-            this.currentConsultation.consultationStart = currentTime;
-            this.currentConsultation.servedInGap = true;
-          }
-          return this.currentConsultation;
-        }
-      }
-
-      // E8: Doctor would otherwise idle and no Standby patient fits the gap -> Pull in early patient!
-      this.currentConsultation = this.bookings.find((b) => b.id === nextOnTime.id) || null;
-      if (this.currentConsultation) {
-        this.currentConsultation.consultationStart = currentTime;
-        this.currentConsultation.pulledInEarly = true;
-      }
-      return this.currentConsultation;
-    } else if (standbyPatient) {
-      // D4 & D7: No waiting queue patient; Standby patient goes in immediately. Doctor never idle!
-      this.currentConsultation = this.bookings.find((b) => b.id === standbyPatient.id) || null;
-      if (this.currentConsultation) {
-        this.currentConsultation.consultationStart = currentTime;
-      }
-      return this.currentConsultation;
+    let evalTime = currentTime;
+    if (this.currentConsultation && options?.peekOnly) {
+      const durMs = (this.currentConsultation.durationMinutes || 15) * 60 * 1000;
+      const startMs = this.currentConsultation.consultationStart
+        ? new Date(this.currentConsultation.consultationStart).getTime()
+        : new Date(currentTime).getTime();
+      evalTime = new Date(Math.max(new Date(currentTime).getTime(), startMs + durMs)).toISOString();
     }
 
-    return null;
+    const candidate = this.getNextEligibleBooking(evalTime);
+    if (!candidate) return null;
+
+    const booking = this.bookings.find((b) => b.id === candidate.id) || candidate;
+
+    if (!options?.peekOnly) {
+      this.currentConsultation = booking;
+      this.currentConsultation.consultationStart = currentTime;
+
+      const tag = booking.arrivalTag || calculateArrivalTag(booking.slotStart, booking.arrivedAt);
+      if (tag === 'Late') {
+        this.currentConsultation.servedInGap = true;
+      } else {
+        const startMs = new Date(booking.slotStart).getTime();
+        const currMs = new Date(currentTime).getTime();
+        if (currMs < startMs - 10 * 60 * 1000) {
+          this.currentConsultation.pulledInEarly = true;
+        }
+      }
+    }
+
+    return booking;
   }
 
   completeCurrentConsultation(finishTime: string): void {
@@ -259,3 +640,4 @@ export class HospitalDepartmentQueueEngine {
     }
   }
 }
+
