@@ -921,6 +921,7 @@ export type Database = {
       profiles: {
         Row: {
           assigned_city_id: string | null
+          blocked_until: string | null
           created_at: string
           default_provider_id: string | null
           email: string | null
@@ -935,6 +936,7 @@ export type Database = {
         }
         Insert: {
           assigned_city_id?: string | null
+          blocked_until?: string | null
           created_at?: string
           default_provider_id?: string | null
           email?: string | null
@@ -949,6 +951,7 @@ export type Database = {
         }
         Update: {
           assigned_city_id?: string | null
+          blocked_until?: string | null
           created_at?: string
           default_provider_id?: string | null
           email?: string | null
