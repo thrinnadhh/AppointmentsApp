@@ -1,136 +1,197 @@
 # Hospital Vertical: Doctor / Consultant Web Screens Specification
 
 **Date:** 2026-10-23  
-**Status:** Approved  
+**Status:** Awaiting Approval (Step 1)  
+**Layer:** UI Layer (`apps/merchant-web`)  
+**Branch:** `phase-5c-consultant-ui`  
 **Source of Truth:** `docs/hospital/SPEC.md`  
-**Governing Design System:** `DESIGN.md` (Tirupati Merchant Command, Emerald `#047857` palette, Inter + Geist Mono, Purple Ban)
+**Governing Design System:** `DESIGN.md` (Tirupati Merchant Command, Emerald `#047857` primary, Slate background, Geist Mono, Purple Ban)
 
 ---
 
-## 1. Overview & Architecture
+## 1. Overview & Core Authority Boundaries
 
-Per `docs/hospital/SPEC.md` line 5:
-> **Consultant: sees and acts only on their own appointments and queue.**
+Per `docs/hospital/SPEC.md`:
+> - **Line 5:** "Consultant: sees and acts only on their own appointments and queue."
+> - **Line 3:** "Hospital Admin (owner/in-charge): sees everything in their hospital. Only this role can create departments, add or remove Front Desk members and Consultants... assign Front Desk members to Consultants."
+> - **Line 7:** "Department members see only their department's appointments; per-Consultant assignment is an additional gate. Hospital vertical only; other verticals unchanged."
+> - **Line 38:** "Staff can manually override a position for medical urgency (Hospital Admin or Consultant), always logged."
 
-The Doctor / Consultant workspace provides an autonomous, real-time clinical consultation desk where a doctor can:
-1. View only their own patients, queue, and schedule (enforced at database RLS, PostgREST helpers, and Next.js server API routes).
-2. Seamlessly call the next patient according to the single-source-of-truth Queue Specification (`packages/shared/src/queue-engine.ts`):
-   - **Priority 1**: On-Time patients whose window (`slot_start ± 10m`) is open, earliest booked first.
-   - **Priority 2**: Standby Queue (late arrivals) in original booking order (FIFO), if the consultation fits the schedule before the next booked patient.
-   - **Priority 3**: Early arrivals whose window has not opened, only to avoid doctor idling.
-   - **Priority 4**: Wait / Idle.
-3. Conduct the consultation with a live timer, clinical notes, and prescription entry.
-4. Conclude consultations atomically with status transition to `COMPLETED`.
-5. Trigger Medical Urgency Overrides with audited justifications.
-6. Manage mid-day emergency departures or temporary standby.
+The Consultant screen provides an autonomous clinical workspace mounted at `/consultation`. It is purpose-built to eliminate distraction, prevent clinical errors, and enforce strict data isolation between medical practitioners.
 
 ---
 
-## 2. Screen & Component Architecture
+## 2. Feature Inventory & Current Implementation Status
 
-### Route: `/consultation`
-- File: `apps/merchant-web/src/app/consultation/page.tsx`
-- Layout: Responsive desktop and tablet clinical console.
+| Feature / Requirement | SPEC Reference | Description | Status (`exists` / `partial` / `missing`) | Notes / Gaps |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. My Queue: Up Next** | SPEC L35-37 | Computes next patient via `HospitalDepartmentQueueEngine.dispatchNext(..., { peekOnly: true })` following priority: (1) On-Time in window, (2) Standby FIFO with fit-check, (3) Early arrivals to prevent doctor idling, (4) Idle/Wait. Displays call patient CTA. | **PARTIAL** | UI card exists (`UpNextPatientCard.tsx`), but needs strict `data-testid` hooks and live integration with simulated test clock/engine. |
+| **2. My Queue: In Consultation** | SPEC L8-9 | Shows current patient undergoing consultation, live elapsed duration timer, clinical prescription/notes textarea with chips, and "Complete Consultation" CTA. | **PARTIAL** | `ActiveConsultationCard.tsx` exists, but needs robust `data-testid` attributes, error resilience on end consultation API, and draft notes persistence. |
+| **3. My Queue: Waiting Lounge** | SPEC L9, 36 | Lists checked-in On-Time and Early patients present in clinic waiting area. Shows slot time, arrival tag (`On Time`, `Early`), token number, and medical urgency override action. | **PARTIAL** | Tab exists in `ConsultantQueueTabs.tsx`; needs explicit `data-testid="waiting-queue-list"` and arrival status badges. |
+| **4. My Queue: Standby Queue** | SPEC L9, 36-37 | Dedicated tab for late patients (checked in >10m after booked slot). Served in FIFO order during gaps or after on-time queue without displacing on-time patients. | **PARTIAL** | Tab exists in `ConsultantQueueTabs.tsx`; needs explicit `data-testid="standby-queue-list"` and gap fit explanations. |
+| **5. Today's Appointments** | SPEC L5, 9 | Full view of all appointments scheduled for today for this consultant across all statuses (`BOOKED`, `CHECKED_IN`, `IN_CONSULTATION`, `COMPLETED`, `NO_SHOW`). | **PARTIAL** | `ALL` tab exists in `ConsultantQueueTabs.tsx`; needs clear status filters, search, and comprehensive appointment details card. |
+| **6. Start Consultation** | SPEC L4, 9 | Action to admit and call Up Next patient (`POST /api/bookings/start`). Atomically transitions booking from `CHECKED_IN` to `IN_CONSULTATION`, starts live consultation timer, and sets doctor status to busy. | **PARTIAL** | Handler exists in `apps/merchant-web/src/app/consultation/page.tsx`; needs `data-testid="start-consultation-btn"` and optimistic error handling. |
+| **7. End Consultation** | SPEC L4, 9 | Action to conclude active consultation (`POST /api/bookings/end`). Transitions booking from `IN_CONSULTATION` to `COMPLETED`, saves clinical notes/prescriptions, logs audit event, and frees doctor for next patient. | **PARTIAL** | Handler exists in `page.tsx`; needs `data-testid="end-consultation-btn"` and UI feedback states. |
+| **8. Manual Override with Reason (Logged)** | SPEC L38 | Modal to prioritize a patient for medical urgency (e.g. chest pain, pediatric respiratory distress). Prompts for target position and mandatory clinical reason. Calls `POST /api/bookings/override` and writes to `audit_logs`. | **PARTIAL** | `MedicalUrgencyOverrideModal.tsx` exists; needs `data-testid="submit-override-btn"` and Playwright journey proving audit log entry creation. |
+| **9. Nothing from other Consultants (Strict Isolation)** | SPEC L5, 7 | Consultant sees and acts **only** on their own queue. Probing another consultant's URL (e.g., `?doctor_id=other_doc_id` or `?resource_id=other_id`) is strictly denied with an explicit 403 Forbidden screen. | **MISSING** | `apps/merchant-web/src/app/consultation/page.tsx` checks role but does NOT validate requested `doctor_id` search parameter against `hospitalContext.assignedDoctorIds`. Must render 403 Forbidden on foreign consultant URL probes. |
+| **10. Shared Dashboard: Consultant vs In-Charge** | SPEC L3, 5 | Both roles use `/consultation`. Consultant is locked to own resource with no switcher; Hospital Admin has consultant selector dropdown to supervise any doctor's room. | **PARTIAL** | Basic dropdown exists in `ConsultationSessionHeader.tsx`, but role-based URL routing, permission guards, and consultant-locking logic need hardening. |
+| **11. Four States per Screen** | System Quality Gate | All screens/views must explicitly support 4 UI states: `Loading`, `Empty`, `Error`, and `Forbidden / Denied`. | **PARTIAL** | Loading skeletons and basic empty states exist; 403 Forbidden for cross-consultant URL probes and robust network error recovery are missing. |
 
-### Component Breakdown (`apps/merchant-web/src/components/consultation/`)
+---
+
+## 3. Shared Department Dashboard: Consultant vs. In-Charge (Hospital Admin)
+
+Both the individual **Consultant** and the **Hospital In-Charge (Admin/Owner)** access the consultation workflow via the same URL route: `/consultation`.
+
+### How the Dual-Persona Workflow Operates:
 
 ```
-apps/merchant-web/src/components/consultation/
-├── ConsultationSessionHeader.tsx   # Doctor metadata, specialty, room, shift toggle, assigned front desks
-├── ActiveConsultationCard.tsx        # In-consultation patient, live elapsed timer, notes/prescription, complete CTA
-├── UpNextPatientCard.tsx             # Queue engine selected next patient, arrival tag, start consultation CTA
-├── ConsultantQueueTabs.tsx           # Waiting Queue (with override), Standby Queue, Completed consultations list
-└── MedicalUrgencyOverrideModal.tsx   # Urgency position override modal with audit reason input
+                                 /consultation
+                                       │
+                      ┌────────────────┴────────────────┐
+                      ▼                                 ▼
+             Role: Consultant                  Role: Hospital Admin
+                      │                                 │
+           ┌──────────┴──────────┐            ┌─────────┴─────────┐
+           │ Bound to 1 Doctor   │            │ Supervise All     │
+           │ Resource ID         │            │ Department Doctors│
+           └──────────┬──────────┘            └─────────┬─────────┘
+                      │                                 │
+           ┌──────────▼──────────┐            ┌─────────▼─────────┐
+           │ URL ?doctor_id=X    │            │ URL ?doctor_id=X  │
+           │ If X != my_id:      │            │ Allows any doctor │
+           │ ⛔ 403 FORBIDDEN    │            │ in hospital.      │
+           └──────────┬──────────┘            └─────────┬─────────┘
+                      │                                 │
+           ┌──────────▼──────────┐            ┌─────────▼─────────┐
+           │ No Doctor Switcher  │            │ Doctor Switcher   │
+           │ Pure Clinical Desk  │            │ Dropdown in Header│
+           └─────────────────────┘            └───────────────────┘
 ```
 
----
+1. **Context Resolution (`/api/hospital/context`)**:
+   - The screen fetches `hospitalContext` to determine the user's role (`consultant`, `admin`, `owner`, `front_desk`).
+   - If the user is `front_desk` or a customer: access is immediately rejected with a **403 Forbidden** restricted workspace state (`data-testid="consultant-role-forbidden"`).
 
-## 3. UI Specifications & Wireframes
+2. **When Authenticated as a Consultant**:
+   - The user has an assigned consultant resource (`hospitalContext.assignedDoctorIds[0]`).
+   - **Strict URL Scoping**:
+     - If the URL contains `?doctor_id=other_id` (or `?resource_id=other_id`), the app verifies if `other_id` equals the consultant's own assigned ID.
+     - If it does **NOT** match: the UI renders an immediate **403 Forbidden** card (`data-testid="consultant-foreign-doctor-forbidden"`) stating:
+       > *"Access Denied: You are not authorized to view or manage consultations for another Consultant. You may only access your own assigned consultation desk."*
+     - No patient data, queue, or schedule from the other doctor is ever fetched or rendered.
+   - **Header Display**:
+     - No doctor switcher dropdown is displayed.
+     - Doctor's name, department pill, and room number are static.
+     - Shows assigned Front Desk receptionists for direct communication.
 
-### 3.1 Header: `ConsultationSessionHeader.tsx`
-- **Doctor Identity**: Full name (e.g., `Dr. A. Sharma`), specialty pill (`Neurology`), provider hospital name.
-- **Assigned Front Desk Team**: Badges of assigned receptionists and their ID badge numbers (e.g., `Reception Desk 1 (ID: HOSP-FD-NEURO)`).
-- **Shift / Session State Toggle**:
-  - `In Session` (Emerald dot): Normal active consultation state.
-  - `Taking Break` (Amber dot): Temporarily pauses new auto-calls.
-  - `Emergency Departure` (Rose outline button): Prompts emergency cancellation or reassignment.
-
-### 3.2 Active Consultation: `ActiveConsultationCard.tsx`
-- **Condition**: Rendered when there is a booking with `status === 'IN_CONSULTATION'`.
-- **Patient Profile**:
-  - Full Name, Reference Code (`TEST-REF-XX`), Booked Slot (`10:00 AM - 10:15 AM`).
-  - Arrival Tag badge: `On Time` (Emerald), `Early` (Sky), or `Late` (Amber).
-  - Check-in Time & Method (`Reception Code` or `Manual Mark`).
-- **Live Consultation Timer**:
-  - Increments every second since `updated_at` / consultation start.
-  - Highlights green for standard duration (<= 15 mins), amber if exceeding slot duration.
-- **Prescription / Clinical Notes**:
-  - Textarea with auto-expanding height.
-  - Quick action chips: "Routine Follow-up", "Vitals Normal", "Medication Prescribed", "Referred for Diagnostics".
-  - Preserves drafts in state / local storage.
-- **Action CTAs**:
-  - Primary CTA: **Complete Consultation** (`POST /api/bookings/end` or `POST /api/bookings/complete`) -> Transitions to `COMPLETED`, records `STATUS_CHANGE` audit log, frees doctor.
-  - Secondary CTA: **Emergency Refer / Flag**.
-
-### 3.3 Up Next: `UpNextPatientCard.tsx`
-- **Condition**: Highlighted when doctor is free and checked-in patients exist.
-- **Next Patient Selection**:
-  - Computed via `HospitalDepartmentQueueEngine.dispatchNext(..., { peekOnly: true })`.
-  - Explains priority: e.g., *"On-Time Patient (Slot: 10:30 AM)"* or *"Standby Patient filling 20-min schedule gap"*.
-- **Primary CTA**: **Call Patient / Start Consultation** (`POST /api/bookings/start`).
-  - Transitions booking from `CHECKED_IN` / `WAITING` to `IN_CONSULTATION`.
-  - Atomically enforced in database (only 1 simultaneous active consultation per doctor).
-
-### 3.4 Queue Tabs: `ConsultantQueueTabs.tsx`
-Three dedicated tabs:
-
-1. **Waiting Queue (X)**:
-   - Checked-in and on-time patients currently present in the waiting lounge.
-   - Shows token / queue position, arrival tag, slot time, and live ETA.
-   - Action: **Prioritize for Medical Urgency** button.
-
-2. **Standby Queue (Y)**:
-   - Late patients (checked in >10 minutes after scheduled slot).
-   - Explanatory banner: *"Late arrivals are placed on standby. They are served during schedule gaps or after all on-time patients without displacement."*
-   - Shows original slot time, actual arrival time, and gap-fit evaluation.
-
-3. **Completed Consultations (Z)**:
-   - Summary of today's completed patients.
-   - Displays completion timestamp, duration, and prescription status.
-
-### 3.5 Medical Urgency Override Modal: `MedicalUrgencyOverrideModal.tsx`
-Per SPEC line 21:
-> *"Staff can manually override a position for medical urgency (Hospital Admin or Consultant), always logged."*
-- Form fields:
-  - Patient Name & Current Position.
-  - Target Position (e.g. Move to Position #1 / Next).
-  - Clinical Urgency Reason (Mandatory text: e.g. "Acute chest pain, immediate triage required").
-- Execution:
-  - Calls `POST /api/bookings/override`.
-  - Logs `QUEUE_OVERRIDE` to `public.audit_logs` with `actor_id`, `before`, `after`, and `reason`.
+3. **When Authenticated as Hospital In-Charge (Admin / Owner)**:
+   - The In-Charge holds supervisory authority over all consultants in the hospital.
+   - **Supervisory Switcher**:
+     - Displays a Consultant Selector dropdown (`data-testid="admin-doctor-switcher"`) in the header.
+     - The In-Charge can select any active doctor to inspect their live consultation room, monitor wait times, view clinical queue progress, and assist with emergency triage or position overrides.
+   - **URL Query Permission**:
+     - May supply `?doctor_id=any_id` in the URL to jump directly to any consultant's consultation desk.
 
 ---
 
-## 4. Permission & Security Boundary Matrix
+## 4. Detailed Component & State Specifications
 
-| User Persona | Access to `/consultation` | Visible Resources & Bookings | Actions Allowed |
-| :--- | :--- | :--- | :--- |
-| **Hospital Admin** | Full Access | All doctors in hospital | Supervise, start, end, medical override, reassign |
-| **Consultant** | Scoped Access | **Own bound resource ONLY** | Start consultation, end consultation, medical override |
-| **Front Desk** | Blocked / Redirected | None on this screen | Must use reception check-in desk |
-| **Customer** | 403 Forbidden | None | None |
+### 4.1 Header: `ConsultationSessionHeader.tsx`
+- **Doctor Profile**: Full name, department badge (`Cardiology`, `Neurology`), clinic/hospital name, room number.
+- **Session Status**:
+  - `Active Session` (Emerald pulse indicator): Normal consultation operations.
+  - `Taking Break` (Amber icon): Pauses automated patient calling.
+  - `Off Duty / Emergency Departure` (Rose outline): Signals doctor emergency mid-day departure per SPEC lines 14-18.
+- **Assigned Front Desk Staff**: Badges with receptionist names and ID card numbers (e.g. `HOSP-FD-01`).
+- **In-Charge Selector**: Rendered only when `isHospitalAdmin === true`.
+
+### 4.2 Active Consultation Card: `ActiveConsultationCard.tsx`
+- **Status Indicator**: Blinking green dot with `"IN CONSULTATION"`.
+- **Patient Profile**: Name, booking reference, arrival tag (`On Time`, `Early`, `Late`), checked-in time.
+- **Live Elapsed Timer**: Running clock (`MM:SS`) since consultation started. Turns amber if exceeding slot duration (15m).
+- **Clinical Prescription & Notes**: Auto-expanding textarea with quick-action symptom and prescription chips.
+- **CTAs**:
+  - `Complete Consultation` (`data-testid="end-consultation-btn"`): Invokes `POST /api/bookings/end` -> marks `COMPLETED`, logs audit entry, resets timer.
+
+### 4.3 Up Next Patient Card: `UpNextPatientCard.tsx`
+- **Priority Indicator**: Explains why this patient is next (e.g., *"Priority 1: On-Time Scheduled Patient (Slot: 10:15 AM)"* or *"Priority 2: Standby Patient filling schedule gap"*).
+- **Patient Summary**: Name, scheduled slot, arrival status badge, wait time.
+- **CTA**:
+  - `Call Patient / Start Consultation` (`data-testid="start-consultation-btn"`): Disabled if a consultation is already active; otherwise calls `POST /api/bookings/start` and transitions patient to `IN_CONSULTATION`.
+
+### 4.4 Queue Tabs: `ConsultantQueueTabs.tsx`
+Four dedicated tabs:
+1. **Waiting Lounge** (`data-testid="tab-waiting"`):
+   - Checked-in on-time and early patients waiting in clinic.
+   - Action: `Prioritize (Urgency)` button opening override modal.
+2. **Standby Queue** (`data-testid="tab-standby"`):
+   - Late arrivals (>10 mins late).
+   - Shows FIFO order, arrival time, and schedule gap fit explanation.
+3. **Completed Today** (`data-testid="tab-completed"`):
+   - Patients completed today with duration and timestamp.
+4. **Today's Appointments / All Slots** (`data-testid="tab-all-slots"`):
+   - Complete daily appointment list with statuses: `Booked`, `Checked In`, `In Consultation`, `Completed`, `No Show`.
+
+### 4.5 Medical Urgency Override Modal: `MedicalUrgencyOverrideModal.tsx`
+- **Trigger**: Click `Prioritize (Urgency)` on any patient in Waiting Lounge.
+- **Inputs**:
+  - Target queue position (default: `#1 - Up Next`).
+  - Mandatory clinical justification (textarea, minimum 10 characters, e.g. *"Acute chest pain with diaphoresis"*).
+- **Execution**:
+  - Submits to `POST /api/bookings/override`.
+  - Records `QUEUE_OVERRIDE` in `public.audit_logs`.
+  - Re-orders queue immediately and closes modal.
 
 ---
 
-## 5. UI States & Edge Cases
+## 5. The Four States Per Screen
 
-1. **Loading State**:
-   - Polished Emerald pulse skeleton cards for session header, active patient, and queue tabs.
-2. **Idle State (No Active Patient)**:
-   - Clean slate icon: *"Consultation room is ready. Select 'Call Patient' to begin."*
-3. **Empty Queue State**:
-   - *"No patients waiting in queue. Next appointment at [Time]."*
-4. **Forbidden State (403)**:
-   - Displays dedicated access alert: *"Doctor credentials required. You must be bound to a hospital consultant resource to enter this workspace."*
-5. **Session Interruption Safety**:
-   - If the browser tab is refreshed mid-consultation, active consultation state is rehydrated immediately from the database booking with `status = 'IN_CONSULTATION'`. No work or timer is lost.
+Every component and route view under `/consultation` strictly implements all 4 states:
+
+| Screen / Component | 1. Loading State | 2. Empty State | 3. Error State | 4. Forbidden / Denied State (403) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Workspace Root (`/consultation`)** | Emerald pulse skeleton cards for header, active room, and queue tabs (`data-testid="consultant-loading-skeleton"`). | Clean slate banner: *"No appointments scheduled for this consultant today."* | Red error banner with retry sync button (`data-testid="consultant-error-banner"`). | **403 Card**: Non-consultant/non-admin blocked (`data-testid="consultant-role-forbidden"`). Foreign doctor URL probe blocked (`data-testid="consultant-foreign-doctor-forbidden"`). |
+| **Active Consultation Card** | Pulsing card skeleton with animated timer bar. | Slate card with stethoscope icon: *"Doctor is free. Select 'Call Patient' to begin next consultation."* (`data-testid="active-consultation-idle"`) | Error badge if completing consultation fails with error message and retry button. | Read-only view if viewed by unauthorized spectator. |
+| **Up Next Card** | Skeleton pill and button shimmer. | *"No patients waiting in queue. Next scheduled slot at [Time]."* (`data-testid="up-next-empty"`) | Error alert on call patient network failure. | Disabled actions when viewing across unpermitted doctor boundaries. |
+| **Queue Tabs** | Tab skeleton with list placeholders. | Individual empty states per tab: *"No patients waiting"*, *"No patients on standby"*, *"No completed consultations yet"*. | Error banner on queue fetch failure with manual `Sync Queue` CTA. | Tab contents hidden if doctor scoping check fails. |
+
+---
+
+## 6. Step 2 Planned Playwright Journeys
+
+After approval, the following automated E2E test journeys will be implemented and validated in `tests/e2e/hospital-consultant-screens.spec.ts`:
+
+1. **Journey 1: Full Queue Lifecycle (Up Next -> Start -> In Consultation -> End -> Completed)**:
+   - Consultant opens `/consultation`.
+   - Verifies "Up Next" patient according to SPEC priority.
+   - Clicks `[Call Patient / Start Consultation]`.
+   - Verifies patient transitions to Active Consultation card (`data-testid="in-consultation-card"`) with running timer.
+   - Enters prescription notes and clicks `[Complete Consultation]`.
+   - Verifies patient moves to `Completed Today` tab with timestamp.
+2. **Journey 2: Medical Urgency Position Override (Logged)**:
+   - Consultant selects a patient in the Waiting Lounge and clicks `[Prioritize (Urgency)]`.
+   - Enters clinical reason *"Acute severe chest pain, immediate ECG triage required"*.
+   - Submits override.
+   - Verifies patient is moved to Position #1 in queue and audit log event is recorded.
+3. **Journey 3: Another Consultant's URL Access Denied (403 Forbidden)**:
+   - Logged-in Consultant attempts to open `/consultation?doctor_id=foreign-doctor-uuid`.
+   - Verifies system intercepts the request and renders explicit 403 Forbidden state (`data-testid="consultant-foreign-doctor-forbidden"`).
+   - Verifies foreign consultant's patient appointments are completely unreachable.
+4. **Journey 4: Hospital In-Charge (Admin) Department Dashboard Supervision**:
+   - In-Charge logs in and visits `/consultation`.
+   - Verifies Consultant Switcher dropdown is present.
+   - Switches between different consultants in the department and verifies respective queues load accurately.
+5. **Journey 5: Standby Queue & Today's Appointments View**:
+   - Verifies late patients appear in Standby Queue tab with arrival tags and FIFO explanation.
+   - Verifies "All Slots Today" tab displays full caseload with correct status badges.
+
+---
+
+## 7. Verification Gate Checklist (Step 2 Execution)
+1. `supabase db reset` (clean migration check)
+2. `scripts/seed-hospital-test-data.mjs` (seed clean test data)
+3. Serial execution of all unit test suites (`node scripts/run-all-unit-tests-serially.mjs`)
+4. Playwright E2E suite (`tests/e2e/hospital-consultant-screens.spec.ts`)
+5. Full workspace typecheck (`pnpm typecheck`)
+6. Production build (`ALLOW_MOCK_PAYMENTS=false pnpm build`)
