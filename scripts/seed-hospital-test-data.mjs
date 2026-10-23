@@ -193,7 +193,7 @@ export async function seedHospitalTestData() {
   const deptB = createdB[0];
 
   // 4. Create Resources (Doctors & Stylist)
-  async function createResource(provider_id, name, department_id, departmentName, type = 'doctor') {
+  async function createResource(provider_id, name, department_id, departmentName, type = 'doctor', userId = null) {
     const res = await fetch(`${url}/rest/v1/resources`, {
       method: 'POST',
       headers,
@@ -201,6 +201,7 @@ export async function seedHospitalTestData() {
         provider_id,
         name,
         department_id,
+        user_id: userId,
         type,
         deposit_amount: 100,
         duration_minutes: 15,
@@ -208,7 +209,8 @@ export async function seedHospitalTestData() {
         is_active: true,
         attributes: {
           department: departmentName,
-          price: 500
+          price: 500,
+          user_id: userId
         }
       })
     });
@@ -219,12 +221,33 @@ export async function seedHospitalTestData() {
     return data[0];
   }
 
-  const resDocNeuro = await createResource(hospA.id, 'Dr. A. Sharma (Neurologist)', deptsA['Neurology'].id, 'Neurology');
-  const resDocNeuroSur = await createResource(hospA.id, 'Dr. B. Verma (Neurosurgeon)', deptsA['Neurosurgery'].id, 'Neurosurgery');
-  const resDocDerma = await createResource(hospA.id, 'Dr. C. Rao (Dermatologist)', deptsA['Dermatology'].id, 'Dermatology');
-  const resDocDental = await createResource(hospA.id, 'Dr. D. Gupta (Dentist)', deptsA['Dentistry'].id, 'Dentistry');
-  const resDocGenMed = await createResource(hospB.id, 'Dr. E. Reddy (Physician)', deptB.id, 'General Medicine');
+  const resDocNeuro = await createResource(hospA.id, 'Dr. A. Sharma (Neurologist)', deptsA['Neurology'].id, 'Neurology', 'doctor', userMap['neuro.doc']);
+  const resDocNeuro2 = await createResource(hospA.id, 'Dr. K. Patel (Neurologist 2)', deptsA['Neurology'].id, 'Neurology', 'doctor');
+  const resDocNeuroSur = await createResource(hospA.id, 'Dr. B. Verma (Neurosurgeon)', deptsA['Neurosurgery'].id, 'Neurosurgery', 'doctor', userMap['neurosur.doc']);
+  const resDocDerma = await createResource(hospA.id, 'Dr. C. Rao (Dermatologist)', deptsA['Dermatology'].id, 'Dermatology', 'doctor', userMap['derma.doc']);
+  const resDocDental = await createResource(hospA.id, 'Dr. D. Gupta (Dentist)', deptsA['Dentistry'].id, 'Dentistry', 'doctor', userMap['dental.doc']);
+  const resDocGenMed = await createResource(hospB.id, 'Dr. E. Reddy (Physician)', deptB.id, 'General Medicine', 'doctor', userMap['genmed.doc']);
   const resStylist = await createResource(salonC.id, 'Vikram Senior Stylist', null, 'Haircare', 'stylist');
+
+  // Assign front desk staff to their respective department doctors
+  async function assignFrontDesk(provider_id, doctor_id, user_id, id_card_number) {
+    await fetch(`${url}/rest/v1/doctor_front_desk_assignments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        provider_id,
+        doctor_id,
+        user_id,
+        id_card_number
+      })
+    });
+  }
+
+  await assignFrontDesk(hospA.id, resDocNeuro.id, userMap['neuro.desk'], 'HOSP-FD-NEURO');
+  await assignFrontDesk(hospA.id, resDocNeuroSur.id, userMap['neurosur.desk'], 'HOSP-FD-NEUROSUR');
+  await assignFrontDesk(hospA.id, resDocDerma.id, userMap['derma.desk'], 'HOSP-FD-DERMA');
+  await assignFrontDesk(hospA.id, resDocDental.id, userMap['dental.desk'], 'HOSP-FD-DENTAL');
+  await assignFrontDesk(hospB.id, resDocGenMed.id, userMap['genmed.desk'], 'HOSP-FD-GENMED');
 
   // 5. Add Department Members (Active status, 2 per dept, 3rd slot left open!)
   async function addMember(department_id, merchant_id, email, user_id, inviter_id) {
