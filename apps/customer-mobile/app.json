@@ -13,7 +13,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.appointments.tirupati"
+      "bundleIdentifier": "com.appointments.tirupati",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,6 +22,7 @@
         "backgroundColor": "#059669"
       },
       "package": "com.appointments.tirupati",
+      "versionCode": 1,
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "POST_NOTIFICATIONS"
