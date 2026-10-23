@@ -1,3 +1,95 @@
+# Hospital E2E status - 24 Oct 2026, 12:26 am IST
+
+## 1. Verdict: NOT READY
+
+Reason: run incomplete: 3 not run, 0 blocked.
+Branch: phase-7-release, last commit bff5031 "fix(security): enforce Upstash credentials, https-only URLs, and mock payments lock in production env validator", 91 commit(s) since e2e/base.
+Result files read: 19 (case-map.md, leg_sa1.md, leg_sa2.md, leg_sa3.md, leg_sa4.md, leg_sa5.md, leg_sa6.md, leg_sa7.md, manual-script.md, phase2.md, sa1.md, sa2.md, sa3.md, sa4.md, sa5.md, sa6.md, sa7.md, sa8.md, hospital-e2e-report.md).
+WARNING: the newest result file is older than the latest commit. Re-run the tests before trusting this.
+
+## 2. Scoreboard
+
+Only PASS counts as passed. Blocked, skipped, flaky and not-run cases are not passes.
+
+| Workstream | Planned | PASS | FAIL | BLOCKED | FLAKY | Not run | Pass rate |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SA1 Setup and roles | 9 | 8 | 0 | 0 | 0 | 1 | 89% |
+| SA2 Booking and payments | 10 | 10 | 0 | 0 | 0 | 0 | 100% |
+| SA3 Cancel, reschedule, money | 9 | 9 | 0 | 0 | 0 | 0 | 100% |
+| SA4 Check-in | 8 | 8 | 0 | 0 | 0 | 0 | 100% |
+| SA5 Queue integration | 14 | 14 | 0 | 0 | 0 | 0 | 100% |
+| SA6 Randomized simulation | 1 | 1 | 0 | 0 | 0 | 0 | 100% |
+| SA7 ETA and notifications | 7 | 7 | 0 | 0 | 0 | 0 | 100% |
+| SA8 Resilience and regression | 7 | 5 | 0 | 0 | 0 | 2 | 71% |
+| P2 Phase 2 (orchestrator) | 3 | 3 | 0 | 0 | 0 | 0 | 100% |
+| **Total** | 68 | 65 | 0 | 0 | 0 | 3 | 96% |
+
+Of the passes, 64 are automated and 1 manual.
+
+## 3. Defects
+
+| Severity | Total | Open | Fixed | Flaky | Deferred |
+| --- | --- | --- | --- | --- | --- |
+| Critical | 0 | 0 | 0 | 0 | 0 |
+| High | 0 | 0 | 0 | 0 | 0 |
+| Medium | 1 | 0 | 1 | 0 | 0 |
+| Low | 2 | 2 | 0 | 0 | 0 |
+
+No open Critical or High defects.
+
+Fixed: 1.
+
+## 4. Policy questions that need your decision
+
+These cases only record what the app does today. For each, decide whether that behavior is right.
+
+- B7 (one customer booking overlapping slots): PASS - ** The same customer books overlapping slots: report the current behavior. Same doctor: rejected by exclusion 
+- C2 (does a late-cancelled slot reopen?): PASS - ** Does a late-cancelled slot reopen? Late-cancelled slot reopens immediately for new booking without exclusio
+- C3 (what happens to the check-in code on reschedule): PASS - ** What happens to the check-in code on reschedule Original check-in code is retained and remains valid for th
+- G3 (deposit for a Standby patient who is present and served): PASS - ** Deposit for a Standby patient who is present and served Standby patient served: deposit retained as CAPTURE
+- A6 (Consultant on leave with existing bookings): PASS - ** A Consultant marks leave for a day: no new bookings. Report what happens to existing bookings. Consultant m
+- J6 (Consultant unavailable mid-day): PASS - ** A Consultant becomes unavailable mid-day: report how the remaining queue is handled Consultant deactivated 
+
+## 5. Key checks
+
+- Worked examples: MET (E1=PASS, E2=PASS)
+- Randomized simulation: MET (E15=PASS)
+- Money cases: MET (B5=PASS, B6=PASS, C1=PASS, C2=PASS, C3=PASS, C4=PASS, C5=PASS, C6=PASS, G2=PASS, G3=PASS, G4=PASS)
+- Check-in security: MET (D4=PASS, D5=PASS)
+- Non-hospital regression: MET (K1=PASS, K2=PASS)
+- Race tests (n/50 lines found): 9 found, 0 below 50
+- Per-Consultant access isolation: MET
+
+## 6. Performance
+
+J4 full-day load: PASS - ** Full-Day 250 Patient High-Throughput Load Test Processed 250/250 bookings across 5 consultants & 3 front desks in 2.49s (100.4 
+
+## 7. Coverage and risk
+
+- Workstreams with no result file: none.
+- Cases passed by manual check: E12.
+- Cases not run: A7, J2, J3.
+
+## 8. Release gate
+
+- MET: Zero open Critical and High defects
+- MET: All money cases pass (B5, B6, C1-C6, G2-G4)
+- MET: Race tests pass 50 out of 50
+- MET: Worked examples and simulation pass (E1, E2, E15)
+- MET: Check-in security passes (D4, D5)
+- MET: Access isolation tests pass (docs/hospital-test-report.md)
+- MET: Non-hospital regression passes (K1, K2)
+- UNVERIFIED: Policy questions decided by you
+
+## 9. Next steps
+
+1. Re-run the tests (results are older than the latest commit).
+2. Run the 3 case(s) that have not run yet.
+3. You: decide the policy questions in section 4.
+4. Re-run this report: node scripts/e2e-status.mjs
+
+---
+
 # Hospital E2E status - 21 Oct 2026, 1:57 pm IST
 
 ## 1. Verdict: NOT READY

@@ -1,0 +1,44 @@
+[
+  {
+    "vus": 100,
+    "rate": 100,
+    "duration": "20s",
+    "requests": 2503,
+    "rps": "116.2",
+    "p50": "133.54",
+    "p95": "4900.83",
+    "p99": "5488.65",
+    "errors": 0,
+    "errorRate": "0.00%",
+    "peakDbConnections": 0,
+    "cacheHitRatio": "100.00%"
+  },
+  {
+    "vus": 500,
+    "rate": 500,
+    "duration": "20s",
+    "requests": 6110,
+    "rps": "190.6",
+    "p50": "144.88",
+    "p95": "11492.85",
+    "p99": "16176.34",
+    "errors": 2160,
+    "errorRate": "0.00%",
+    "peakDbConnections": 0,
+    "cacheHitRatio": "100.00%"
+  },
+  {
+    "vus": 1000,
+    "rate": 1000,
+    "duration": "20s",
+    "requests": 12450,
+    "rps": "313.7",
+    "p50": "23.36",
+    "p95": "7040.13",
+    "p99": "19714.06",
+    "errors": 7660,
+    "errorRate": "0.00%",
+    "peakDbConnections": 0,
+    "cacheHitRatio": "100.00%"
+  }
+]

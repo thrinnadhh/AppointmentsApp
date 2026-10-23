@@ -29,8 +29,13 @@ async function generate() {
   });
 
   // 2. Front Desk
-  const fdRes = await pool.query(`SELECT user_id, merchant_id FROM public.department_members WHERE role = 'front_desk' LIMIT 1`);
+  const fdRes = await pool.query(`
+    SELECT user_id, provider_id 
+    FROM public.doctor_front_desk_assignments 
+    LIMIT 1
+  `);
   const fd = fdRes.rows[0];
+  const providerId = fd.provider_id;
   const frontDeskToken = makeJwt({
     aud: 'authenticated',
     exp: Math.floor(Date.now() / 1000) + 86400,
@@ -42,8 +47,13 @@ async function generate() {
   });
 
   // 3. Consultant
-  const consRes = await pool.query(`SELECT user_id, merchant_id FROM public.department_members WHERE role = 'consultant' LIMIT 1`);
-  const cons = consRes.rows[0];
+  const consRes = await pool.query(`
+    SELECT user_id, merchant_id 
+    FROM public.department_members 
+    WHERE role = 'consultant' AND merchant_id = $1 
+    LIMIT 1
+  `, [providerId]);
+  const cons = consRes.rows[0] || (await pool.query(`SELECT user_id, merchant_id FROM public.department_members WHERE role = 'consultant' LIMIT 1`)).rows[0];
   const consultantToken = makeJwt({
     aud: 'authenticated',
     exp: Math.floor(Date.now() / 1000) + 86400,
@@ -55,12 +65,32 @@ async function generate() {
   });
 
   // Sample Resource & Provider
-  const resRes = await pool.query(`SELECT id, provider_id FROM public.resources LIMIT 1`);
+  const resRes = await pool.query(`
+    SELECT id, provider_id 
+    FROM public.resources 
+    WHERE provider_id = $1 
+    LIMIT 1
+  `, [providerId]);
   const sampleRes = resRes.rows[0];
+
+  // 4. Provider Owner (Merchant)
+  const provRes = await pool.query(`SELECT owner_id FROM public.providers WHERE id = $1`, [providerId]);
+  const merchantOwnerId = provRes.rows[0]?.owner_id || providerId;
+  const merchantToken = makeJwt({
+    aud: 'authenticated',
+    exp: Math.floor(Date.now() / 1000) + 86400,
+    sub: merchantOwnerId,
+    email: 'merchant@test.local',
+    role: 'authenticated',
+    app_metadata: { provider: 'email', providers: ['email'] },
+    user_metadata: { role: 'merchant' }
+  });
 
   const config = {
     customerId: cust.id,
     customerToken,
+    merchantId: merchantOwnerId,
+    merchantToken,
     frontDeskUserId: fd.user_id,
     frontDeskToken,
     consultantUserId: cons.user_id,

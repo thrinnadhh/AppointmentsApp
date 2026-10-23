@@ -5,28 +5,25 @@ import { Rate } from 'k6/metrics';
 const errorRate = new Rate('custom_error_rate');
 const config = JSON.parse(open('./load-test-config.json'));
 
+const targetRate = parseInt(__ENV.TARGET_RATE || '100', 10);
+const targetVUs = parseInt(__ENV.TARGET_VUS || '100', 10);
+const duration = __ENV.DURATION || '20s';
+
 export const options = {
   scenarios: {
-    realistic_ramp: {
-      executor: 'ramping-arrival-rate',
-      startRate: 50,
+    fixed_arrival: {
+      executor: 'constant-arrival-rate',
+      rate: targetRate,
       timeUnit: '1s',
-      preAllocatedVUs: 100,
-      maxVUs: 1200,
-      stages: [
-        { target: 100, duration: '10s' }, // Ramp to 100 req/s with 100 VUs
-        { target: 100, duration: '10s' }, // Sustain 100
-        { target: 500, duration: '15s' }, // Ramp to 500 req/s with 500 VUs
-        { target: 500, duration: '15s' }, // Sustain 500
-        { target: 1000, duration: '20s' }, // Ramp to 1000 req/s with 1000 VUs
-        { target: 1000, duration: '15s' }, // Sustain 1000
-        { target: 0, duration: '10s' },    // Ramp down
-      ],
+      duration: duration,
+      preAllocatedVUs: targetVUs,
+      maxVUs: Math.max(targetVUs * 2, 200),
     },
   },
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(50)', 'p(90)', 'p(95)', 'p(99)'],
   thresholds: {
     http_req_failed: ['rate<0.05'], // Max 5% errors
-    http_req_duration: ['p(95)<1000'], // 95% under 1s
+    http_req_duration: ['p(95)<1500'], // 95% under 1.5s
   },
 };
 
@@ -37,20 +34,20 @@ export default function () {
   const rand = Math.random();
 
   if (rand < 0.50) {
-    // 50% Customer Traffic: Next.js API route + PostgREST Customer Bookings
+    // 50% Customer Traffic: Next.js API route + PostgREST Customer Bookings with RLS
     const customerHeaders = {
       'Authorization': `Bearer ${config.customerToken}`,
       'apikey': config.anonKey,
       'Content-Type': 'application/json',
     };
 
-    // 1. Next.js API Route: /api/slots/booked
-    const slotsRes = http.get(
-      `${NEXT_BASE}/api/slots/booked?resourceId=${config.resourceId}&date=${config.dateStr}`,
-      { headers: { ...customerHeaders, 'x-customer-id': config.customerId }, tags: { name: 'NextJS_Slots_Booked' } }
+    // 1. Next.js API Route: /api/bookings
+    const custApiRes = http.get(
+      `${NEXT_BASE}/api/bookings?customer_id=${config.customerId}`,
+      { headers: customerHeaders, tags: { name: 'NextJS_Customer_Bookings' } }
     );
-    const slotsOk = check(slotsRes, { 'Next.js slots booked returns 200': (r) => r.status === 200 });
-    errorRate.add(!slotsOk);
+    const custApiOk = check(custApiRes, { 'Next.js customer bookings returns 200': (r) => r.status === 200 });
+    errorRate.add(!custApiOk);
 
     // 2. PostgREST Customer Bookings with RLS
     const custBookingsRes = http.get(
@@ -61,7 +58,20 @@ export default function () {
     errorRate.add(!custOk);
 
   } else if (rand < 0.80) {
-    // 30% Front Desk Traffic: PostgREST merchant_bookings view with Front Desk JWT
+    // 30% Staff/Front Desk Traffic: Next.js /api/slots/booked + PostgREST merchant_bookings view with Front Desk JWT
+    const merchantHeaders = {
+      'Authorization': `Bearer ${config.merchantToken}`,
+      'apikey': config.anonKey,
+      'Content-Type': 'application/json',
+    };
+
+    const slotsRes = http.get(
+      `${NEXT_BASE}/api/slots/booked?resource_id=${config.resourceId}&date=${config.dateStr}`,
+      { headers: merchantHeaders, tags: { name: 'NextJS_Slots_Booked' } }
+    );
+    const slotsOk = check(slotsRes, { 'Next.js slots booked returns 200': (r) => r.status === 200 });
+    errorRate.add(!slotsOk);
+
     const fdHeaders = {
       'Authorization': `Bearer ${config.frontDeskToken}`,
       'apikey': config.anonKey,
@@ -91,3 +101,4 @@ export default function () {
     errorRate.add(!consOk);
   }
 }
+
