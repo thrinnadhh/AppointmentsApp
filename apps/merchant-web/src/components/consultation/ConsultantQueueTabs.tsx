@@ -70,6 +70,7 @@ export default function ConsultantQueueTabs({
       <div className="flex border-b border-slate-200 bg-slate-50/70 overflow-x-auto text-xs font-bold">
         <button
           type="button"
+          data-testid="tab-waiting"
           onClick={() => setActiveTab('WAITING')}
           className={`flex items-center gap-2 px-6 py-4 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'WAITING'
@@ -86,6 +87,7 @@ export default function ConsultantQueueTabs({
 
         <button
           type="button"
+          data-testid="tab-standby"
           onClick={() => setActiveTab('STANDBY')}
           className={`flex items-center gap-2 px-6 py-4 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'STANDBY'
@@ -102,6 +104,7 @@ export default function ConsultantQueueTabs({
 
         <button
           type="button"
+          data-testid="tab-completed"
           onClick={() => setActiveTab('COMPLETED')}
           className={`flex items-center gap-2 px-6 py-4 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'COMPLETED'
@@ -118,6 +121,7 @@ export default function ConsultantQueueTabs({
 
         <button
           type="button"
+          data-testid="tab-all-slots"
           onClick={() => setActiveTab('ALL')}
           className={`flex items-center gap-2 px-6 py-4 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'ALL'
@@ -135,14 +139,14 @@ export default function ConsultantQueueTabs({
 
       {/* Tab 1: Waiting Lounge */}
       {activeTab === 'WAITING' && (
-        <div className="p-6 space-y-4">
+        <div data-testid="waiting-queue-list" className="p-6 space-y-4">
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>Checked-in on-time patients present in waiting area.</span>
             <span>Sorted by scheduled slot time</span>
           </div>
 
           {waitingPatients.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-sm">
+            <div data-testid="empty-waiting-queue" className="py-12 text-center text-slate-400 text-sm">
               No on-time patients currently in waiting lounge.
             </div>
           ) : (
@@ -177,8 +181,9 @@ export default function ConsultantQueueTabs({
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
+                        data-testid="open-medical-override-btn"
                         onClick={() => onOverrideUrgency(booking)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer"
                       >
                         <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
                         Medical Override
@@ -194,7 +199,7 @@ export default function ConsultantQueueTabs({
 
       {/* Tab 2: Standby Queue (Late Arrivals) */}
       {activeTab === 'STANDBY' && (
-        <div className="p-6 space-y-4">
+        <div data-testid="standby-queue-list" className="p-6 space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 leading-relaxed space-y-1">
             <div className="font-bold flex items-center gap-1.5 text-amber-950">
               <AlertCircle className="w-4 h-4 text-amber-700" />
@@ -208,7 +213,7 @@ export default function ConsultantQueueTabs({
           </div>
 
           {standbyPatients.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-sm">
+            <div data-testid="empty-standby-queue" className="py-12 text-center text-slate-400 text-sm">
               No late patients currently held in Standby Queue.
             </div>
           ) : (
@@ -245,8 +250,9 @@ export default function ConsultantQueueTabs({
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
+                        data-testid="open-medical-override-btn"
                         onClick={() => onOverrideUrgency(booking)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer"
                       >
                         <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
                         Medical Override
@@ -262,14 +268,14 @@ export default function ConsultantQueueTabs({
 
       {/* Tab 3: Completed Today */}
       {activeTab === 'COMPLETED' && (
-        <div className="p-6 space-y-4">
+        <div data-testid="completed-queue-list" className="p-6 space-y-4">
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>Patients who completed consultation today.</span>
             <span>Total: {completedPatients.length} consultations</span>
           </div>
 
           {completedPatients.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-sm">
+            <div data-testid="empty-completed-queue" className="py-12 text-center text-slate-400 text-sm">
               No consultations completed yet today.
             </div>
           ) : (
@@ -317,41 +323,47 @@ export default function ConsultantQueueTabs({
 
       {/* Tab 4: All Scheduled Today */}
       {activeTab === 'ALL' && (
-        <div className="p-6 space-y-4">
+        <div data-testid="all-slots-queue-list" className="p-6 space-y-4">
           <div className="text-xs text-slate-500">
             Master roster of all scheduled appointments for this consultant today.
           </div>
 
-          <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-            {allScheduledPatients.map((booking) => {
-              const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
-              const slotTime = `${new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(booking.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-              return (
-                <div key={booking.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">{patientName}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-                        booking.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                        booking.status === 'IN_CONSULTATION' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' :
-                        booking.status === 'CHECKED_IN' ? 'bg-sky-50 text-sky-800 border-sky-200' :
-                        'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}>
-                        {booking.status}
-                      </span>
+          {allScheduledPatients.length === 0 ? (
+            <div data-testid="empty-all-slots" className="py-12 text-center text-slate-400 text-sm">
+              No appointments scheduled for today.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+              {allScheduledPatients.map((booking) => {
+                const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
+                const slotTime = `${new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(booking.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                return (
+                  <div key={booking.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">{patientName}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                          booking.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                          booking.status === 'IN_CONSULTATION' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' :
+                          booking.status === 'CHECKED_IN' ? 'bg-sky-50 text-sky-800 border-sky-200' :
+                          'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                        <span className="font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          {booking.reference_code}
+                        </span>
+                        <span>•</span>
+                        <span>{slotTime}</span>
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                      <span className="font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                        {booking.reference_code}
-                      </span>
-                      <span>•</span>
-                      <span>{slotTime}</span>
-                    </p>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

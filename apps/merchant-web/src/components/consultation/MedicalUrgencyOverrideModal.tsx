@@ -52,7 +52,10 @@ export default function MedicalUrgencyOverrideModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div 
+      data-testid="medical-urgency-override-modal"
+      className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+    >
       <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-rose-50/50">
@@ -67,8 +70,9 @@ export default function MedicalUrgencyOverrideModal({
           </div>
           <button
             type="button"
+            data-testid="close-override-modal-btn"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-white transition"
+            className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-white transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -105,9 +109,10 @@ export default function MedicalUrgencyOverrideModal({
               Target Queue Position
             </label>
             <select
+              data-testid="override-target-position-select"
               value={targetPosition}
               onChange={(e) => setTargetPosition(Number(e.target.value))}
-              className="w-full text-sm bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              className="w-full text-sm bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
             >
               <option value={1}>Position #1 (Up Next / Immediate Next)</option>
               {Array.from({ length: Math.max(1, totalQueueLength) }).map((_, idx) => {
@@ -126,6 +131,7 @@ export default function MedicalUrgencyOverrideModal({
               Clinical Justification (Mandatory)
             </label>
             <textarea
+              data-testid="override-reason-input"
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -138,15 +144,17 @@ export default function MedicalUrgencyOverrideModal({
           <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
             <button
               type="button"
+              data-testid="cancel-override-btn"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
+              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
+              data-testid="submit-override-btn"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl transition shadow-xs disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl transition shadow-xs disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? (
                 <>
@@ -156,7 +164,7 @@ export default function MedicalUrgencyOverrideModal({
               ) : (
                 <>
                   <ArrowUpCircle className="w-4 h-4" />
-                  Confirm Medical Override
+                  Apply Priority Override
                 </>
               )}
             </button>

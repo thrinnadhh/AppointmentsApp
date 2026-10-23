@@ -116,7 +116,10 @@ export default function ActiveConsultationCard({
 
   if (!booking) {
     return (
-      <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[300px]">
+      <div 
+        data-testid="active-consultation-idle"
+        className="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[300px]"
+      >
         <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mb-4">
           <Stethoscope className="w-8 h-8 opacity-80" />
         </div>
@@ -138,7 +141,10 @@ export default function ActiveConsultationCard({
   const slotFormatted = `${new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(booking.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
   return (
-    <div className="bg-white border-2 border-emerald-500/80 rounded-2xl p-6 shadow-md relative overflow-hidden space-y-6">
+    <div 
+      data-testid="in-consultation-panel"
+      className="bg-white border-2 border-emerald-500/80 rounded-2xl p-6 shadow-md relative overflow-hidden space-y-6"
+    >
       <div className="absolute top-0 right-0 bg-emerald-700 text-white text-[11px] font-bold tracking-wider px-4 py-1 rounded-bl-xl uppercase shadow-xs flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
         In Consultation
@@ -152,7 +158,7 @@ export default function ActiveConsultationCard({
           </div>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-xl font-bold text-slate-900">{patientName}</h2>
+              <h2 data-testid="active-patient-name" className="text-xl font-bold text-slate-900">{patientName}</h2>
               {getArrivalBadge(booking.arrival_tag)}
             </div>
             <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
@@ -175,7 +181,7 @@ export default function ActiveConsultationCard({
           <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
             Elapsed Time
           </span>
-          <span className="font-mono text-2xl font-black text-emerald-900">
+          <span data-testid="consultation-timer" className="font-mono text-2xl font-black text-emerald-900">
             {formatTimer(elapsedSeconds)}
           </span>
         </div>
@@ -192,6 +198,7 @@ export default function ActiveConsultationCard({
         </div>
 
         <textarea
+          data-testid="consultation-notes-input"
           rows={4}
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}
@@ -232,6 +239,7 @@ export default function ActiveConsultationCard({
 
         <button
           type="button"
+          data-testid="end-consultation-btn"
           onClick={onComplete}
           disabled={isCompleting}
           className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm rounded-xl transition shadow-sm hover:shadow disabled:opacity-50 cursor-pointer"

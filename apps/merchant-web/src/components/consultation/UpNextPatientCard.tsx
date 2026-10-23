@@ -31,7 +31,10 @@ export default function UpNextPatientCard({
 }: UpNextPatientCardProps) {
   if (!candidate) {
     return (
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
+      <div 
+        data-testid="up-next-empty"
+        className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center"
+      >
         <p className="text-sm text-slate-500 flex items-center justify-center gap-2">
           <HelpCircle className="w-4 h-4 text-slate-400" />
           No checked-in patients currently waiting in queue.
@@ -76,7 +79,10 @@ export default function UpNextPatientCard({
   };
 
   return (
-    <div className="bg-gradient-to-r from-emerald-50/60 to-teal-50/40 border border-emerald-200 rounded-2xl p-6 shadow-xs relative">
+    <div 
+      data-testid="up-next-patient-card"
+      className="bg-gradient-to-r from-emerald-50/60 to-teal-50/40 border border-emerald-200 rounded-2xl p-6 shadow-xs relative"
+    >
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-white border border-emerald-200 flex items-center justify-center font-bold text-emerald-800 text-lg shadow-2xs shrink-0">
@@ -85,7 +91,10 @@ export default function UpNextPatientCard({
 
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider bg-emerald-100/80 px-2.5 py-0.5 rounded-md">
+              <span 
+                data-testid="up-next-badge"
+                className="text-xs font-bold text-emerald-800 uppercase tracking-wider bg-emerald-100/80 px-2.5 py-0.5 rounded-md"
+              >
                 Up Next In Queue
               </span>
               {getArrivalBadge(candidate.arrival_tag)}
@@ -123,6 +132,7 @@ export default function UpNextPatientCard({
           ) : (
             <button
               type="button"
+              data-testid="start-consultation-btn"
               onClick={onCallPatient}
               disabled={isCalling}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm rounded-xl transition shadow-sm hover:shadow cursor-pointer disabled:opacity-50"

@@ -112,6 +112,7 @@ export default function ConsultationSessionHeader({
           {isHospitalAdmin && allDoctors.length > 1 && (
             <div className="relative">
               <select
+                data-testid="admin-doctor-switcher"
                 value={selectedDoctorId || ''}
                 onChange={(e) => onSelectDoctor?.(e.target.value)}
                 className="appearance-none pl-3 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-medium rounded-xl transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-600"
@@ -130,8 +131,9 @@ export default function ConsultationSessionHeader({
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
             <button
               type="button"
+              data-testid="session-status-in-session"
               onClick={() => onToggleStatus('IN_SESSION')}
-              className={`px-3 py-1.5 rounded-lg transition ${
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 sessionStatus === 'IN_SESSION'
                   ? 'bg-white text-emerald-800 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -141,8 +143,9 @@ export default function ConsultationSessionHeader({
             </button>
             <button
               type="button"
+              data-testid="session-status-on-break"
               onClick={() => onToggleStatus('ON_BREAK')}
-              className={`px-3 py-1.5 rounded-lg transition ${
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 sessionStatus === 'ON_BREAK'
                   ? 'bg-white text-amber-800 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -152,8 +155,9 @@ export default function ConsultationSessionHeader({
             </button>
             <button
               type="button"
+              data-testid="session-status-off-duty"
               onClick={() => onToggleStatus('OFF_DUTY')}
-              className={`px-3 py-1.5 rounded-lg transition ${
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 sessionStatus === 'OFF_DUTY'
                   ? 'bg-white text-slate-800 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -166,8 +170,9 @@ export default function ConsultationSessionHeader({
           {/* Emergency Departure Button */}
           <button
             type="button"
+            data-testid="session-status-emergency-departure"
             onClick={onEmergencyDeparture}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl transition"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl transition cursor-pointer"
           >
             <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
             Emergency Departure
