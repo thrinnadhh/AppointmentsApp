@@ -222,9 +222,9 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
         <View style={[styles.section, styles.strikeSection]} testID="account-strikes-banner">
           <Text style={[styles.sectionTitle, { color: '#92400e' }]}>⚠️ Attendance Standing</Text>
           <Text style={styles.strikeText}>
-            {strikeInfo.strikes === 1 && '1 missed appointment recorded. First 2 missed appointments are eligible for 100% courtesy deposit refunds.'}
-            {strikeInfo.strikes === 2 && '2 missed appointments recorded. Note: Booking a 3rd appointment means if you do not show up, ₹60 will be deducted (₹50 to doctor, ₹10 platform fee) and only the rest will be refunded.'}
-            {strikeInfo.strikes >= 3 && `${strikeInfo.strikes} missed appointments recorded. If you miss an appointment, ₹60 will be deducted (₹50 to doctor, ₹10 platform fee) and the rest refunded. Exceeding 5 no-shows will block your account for 7 days.`}
+            {strikeInfo.strikes === 1 && '1 missed appointment recorded. Two times there will be no issue or penalty (100% deposit refunded).'}
+            {strikeInfo.strikes === 2 && "2 missed appointments recorded. Two times there was no issue, but for your third time booking: if you don't show up this time, there will be a penalty of ₹60. In ₹60, ₹50 will be given to the hospital and ₹10 to the Appointments app (the rest of your deposit will be refunded)."}
+            {strikeInfo.strikes >= 3 && `${strikeInfo.strikes} missed appointments recorded. If you don't show up, a penalty of ₹60 will be deducted (₹50 to the hospital and ₹10 to the Appointments app). Exceeding 5 no-shows will block your account for 7 days.`}
           </Text>
         </View>
       ) : (

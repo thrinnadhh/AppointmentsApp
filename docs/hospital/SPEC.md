@@ -11,9 +11,9 @@ Roles: Hospital Admin, Front Desk, Consultant. Arrival tags: On Time, Early, Lat
 - A booking is confirmed by paying a deposit. The hold lasts one value everywhere (code, tests, jobs, gateway order expiry): 5 minutes unless I change it.
 - Customer cancels or reschedules free if at least 60 minutes remain before the slot; otherwise the deposit is forfeited. If the business cancels: full refund.
 - No Show means the patient never checked in before the doctor's session ended.
-  - Strikes 1 & 2: courtesy 100% deposit refund, no monetary penalty.
-  - Booking with 2 strikes: prompt note warns customer that a 3rd no-show incurs a ₹60 deduction (₹50 doctor / ₹10 platform / remainder refund).
-  - Strikes 3 to 5: ₹50 goes to the doctor, ₹10 to the platform, and the rest (deposit minus 60) is refunded to customer.
+  - Strikes 1 & 2: Two times there will be no issue (100% courtesy deposit refund, no monetary penalty).
+  - Third time booking (with 2 prior misses): Warning popup modal and note stating: "Two times there will be no issue, but for the third time: if you don't show up this time, there will be a penalty of ₹60. In ₹60, ₹50 will be given to the hospital and ₹10 to the Appointments app. The rest of your deposit will be refunded."
+  - Strikes 3 to 5: ₹50 goes to the hospital, ₹10 to the Appointments app, and the rest (deposit minus 60) is refunded to customer.
   - Exceeding 5 strikes (6th no-show): account is blocked for 7 days (`blocked_until = NOW() + INTERVAL '7 days'`), display 'Your account is blocked for 7 days', and reset the strike counter to 0.
 - A patient who checked in but was not reached is NOT a no-show: free reschedule or full refund.
 ## Check-in

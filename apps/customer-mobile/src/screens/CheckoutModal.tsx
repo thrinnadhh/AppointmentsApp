@@ -85,6 +85,8 @@ export default function CheckoutModal({
   const [customerStrikes, setCustomerStrikes] = useState<number>(0);
   const [isBlocked, setIsBlocked] = useState<boolean>(false);
   const [blockedUntil, setBlockedUntil] = useState<string | null>(null);
+  const [showThirdStrikePopup, setShowThirdStrikePopup] = useState<boolean>(false);
+  const [acknowledgedThirdStrike, setAcknowledgedThirdStrike] = useState<boolean>(false);
   const [secondsLeft, setSecondsLeft] = useState<number>(300); // 5 minutes
   const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
   const [checkingCooling, setCheckingCooling] = useState<boolean>(false);
@@ -133,12 +135,17 @@ export default function CheckoutModal({
     setCustomerStrikes(0);
     setIsBlocked(false);
     setBlockedUntil(null);
+    setShowThirdStrikePopup(false);
+    setAcknowledgedThirdStrike(false);
     if (visible && customerId) {
       fetchCustomerStrikes(customerId).then((res) => {
         if (active) {
           setCustomerStrikes(res.strikes);
           setIsBlocked(res.isBlocked);
           setBlockedUntil(res.blockedUntil);
+          if (res.strikes === 2 && !res.isBlocked) {
+            setShowThirdStrikePopup(true);
+          }
         }
       });
     }
@@ -222,6 +229,12 @@ export default function CheckoutModal({
     try {
       if (isBlocked) {
         setPayError('Your account is blocked for 7 days due to excessive no-shows.');
+        setIsProcessing(false);
+        return;
+      }
+
+      if (customerStrikes === 2 && !acknowledgedThirdStrike) {
+        setShowThirdStrikePopup(true);
         setIsProcessing(false);
         return;
       }
@@ -439,14 +452,23 @@ export default function CheckoutModal({
                 <View style={styles.strikeWarningHeader}>
                   <Text style={styles.strikeWarningIcon}>⚠️</Text>
                   <Text style={styles.strikeWarningTitle}>
-                    {customerStrikes === 2 ? 'Courtesy Policy Notice (3rd Booking)' : `No-Show Policy Notice (${customerStrikes} Prior Misses)`}
+                    {customerStrikes === 2 ? 'Warning: 3rd Time Booking' : `No-Show Policy Notice (${customerStrikes} Prior Misses)`}
                   </Text>
                 </View>
                 <Text style={styles.strikeWarningText}>
                   {customerStrikes === 2
-                    ? 'You have 2 prior no-shows with courtesy full refunds. If you do not show up for this appointment, an amount of ₹60 will be deducted (₹50 sent to doctor, ₹10 platform fee) and only the rest will be refunded.'
-                    : 'If you do not show up for this appointment, an amount of ₹60 will be deducted (₹50 sent to doctor, ₹10 platform fee) and the rest will be refunded. Exceeding 5 no-shows will block your account for 7 days.'}
+                    ? "Two times there will be no issue, but for the third time: if you don't show up this time, there will be a penalty of ₹60. In ₹60, ₹50 will be given to the hospital and ₹10 to the Appointments app. The rest of your deposit will be refunded."
+                    : "If you don't show up for this appointment, there will be a penalty of ₹60 (₹50 to the hospital and ₹10 to the Appointments app), and the rest will be refunded. Exceeding 5 no-shows will block your account for 7 days."}
                 </Text>
+                {customerStrikes === 2 && (
+                  <TouchableOpacity
+                    style={styles.reviewPolicyBtn}
+                    onPress={() => setShowThirdStrikePopup(true)}
+                    testID="btn-view-third-strike-popup"
+                  >
+                    <Text style={styles.reviewPolicyBtnText}>View 3rd Time Policy Note ℹ️</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -712,9 +734,9 @@ export default function CheckoutModal({
               <Text style={styles.policyText}>
                 {'✅ Free cancellation up to 1 hour before your slot — full deposit refunded.\n'}
                 {'↩️  Reschedule free within the same window — deposit carries over.\n'}
-                {'⚠️  Miss 1st or 2nd appointment — 100% deposit courtesy refund.\n'}
-                {'⚠️  Miss 3rd to 5th appointment — ₹60 deducted (₹50 to doctor, ₹10 platform fee), rest refunded.\n'}
-                {'🚫  Exceeding 5 no-shows — Account blocked for 7 days and strikes reset.'}
+                {'⚠️  Two times no-show — No issue or penalty (100% deposit refunded).\n'}
+                {'⚠️  3rd to 5th no-show — ₹60 penalty (₹50 to hospital, ₹10 to Appointments app), rest refunded.\n'}
+                {'🚫  Exceeding 5 no-shows — Account blocked for 7 days.'}
               </Text>
               <Text style={styles.policyLinkText}
                 onPress={() => Linking.openURL('https://appointments4u.in/refund-policy')}
@@ -835,6 +857,53 @@ export default function CheckoutModal({
             </Text>
           </View>
         </View>
+
+        {/* 3rd Time Booking Warning Popup Overlay */}
+        {showThirdStrikePopup && (
+          <View style={styles.popupOverlay} testID="third-strike-popup-modal">
+            <View style={styles.popupContainer}>
+              <View style={styles.popupHeader}>
+                <Text style={styles.popupIcon}>⚠️</Text>
+                <Text style={styles.popupTitle}>Notice: 3rd Time Booking</Text>
+              </View>
+
+              <View style={styles.popupBody}>
+                <Text style={styles.popupHighlight}>
+                  Two times there will be no issue or penalty.
+                </Text>
+                <Text style={styles.popupMessage}>
+                  If you don't show up this time, there will be a penalty of ₹60. In ₹60, ₹50 will be given to the hospital and ₹10 to the Appointments app. The rest of your deposit will be refunded.
+                </Text>
+
+                <View style={styles.popupSplitBox}>
+                  <View style={styles.popupSplitRow}>
+                    <Text style={styles.popupSplitLabel}>🏥 Given to Hospital:</Text>
+                    <Text style={styles.popupSplitValue}>₹50</Text>
+                  </View>
+                  <View style={styles.popupSplitRow}>
+                    <Text style={styles.popupSplitLabel}>📱 Appointments App Fee:</Text>
+                    <Text style={styles.popupSplitValue}>₹10</Text>
+                  </View>
+                  <View style={[styles.popupSplitRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 6, marginTop: 4 }]}>
+                    <Text style={[styles.popupSplitLabel, { fontWeight: '700', color: '#0f172a' }]}>Total Penalty:</Text>
+                    <Text style={[styles.popupSplitValue, { fontWeight: '800', color: '#b91c1c' }]}>₹60</Text>
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.popupConfirmButton}
+                onPress={() => {
+                  setAcknowledgedThirdStrike(true);
+                  setShowThirdStrikePopup(false);
+                }}
+                testID="btn-acknowledge-third-strike"
+              >
+                <Text style={styles.popupConfirmText}>I Understand & Accept</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -1529,5 +1598,105 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 2,
     lineHeight: 16,
+  },
+  popupOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 9999,
+    elevation: 20,
+  },
+  popupContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 22,
+    width: '100%',
+    maxWidth: 420,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  popupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  popupIcon: {
+    fontSize: 24,
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#991b1b',
+  },
+  popupBody: {
+    marginBottom: 18,
+  },
+  popupHighlight: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#059669',
+    marginBottom: 8,
+  },
+  popupMessage: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  popupSplitBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 12,
+  },
+  popupSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  popupSplitLabel: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  popupSplitValue: {
+    fontSize: 13,
+    color: '#0f172a',
+    fontWeight: '700',
+  },
+  popupConfirmButton: {
+    backgroundColor: '#b91c1c',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  popupConfirmText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  reviewPolicyBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#fef3c7',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  reviewPolicyBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400e',
   },
 });
