@@ -1008,7 +1008,7 @@ export default function MerchantOverviewPage() {
     }
   };
 
-  const handleLateQueueAction = async (bookingId: string, action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE', bufferOffset = 2) => {
+  const handleLateQueueAction = async (bookingId: string, action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE') => {
     if (pendingBookingId) return;
     setPendingBookingId(bookingId);
     try {
@@ -1028,16 +1028,16 @@ export default function MerchantOverviewPage() {
         );
         setRecentNotification(
           action === 'CHECKIN_LATE'
-            ? `✓ Late check-in assigned: Accommodated after ${bufferOffset} member appointments (Estimated wait: ~${bufferOffset * 15}m)`
+            ? '✓ Late check-in assigned: Placed in Standby Queue in booking order'
             : '⏳ Patient moved to Standby Queue.'
         );
         return;
       }
 
-      const res = await manageLateQueueBooking(bookingId, action, bufferOffset);
+      const res = await manageLateQueueBooking(bookingId, action);
       if (res.success) {
         if (action === 'CHECKIN_LATE') {
-          setRecentNotification(`✓ Late check-in assigned: Accommodated after ${bufferOffset} member appointments (Token #${res.queue_position}, ~${res.estimated_wait_minutes}m wait)`);
+          setRecentNotification(`✓ Late check-in assigned: Placed in Standby Queue in booking order (Token #${res.queue_position}, ~${res.estimated_wait_minutes}m wait)`);
         } else {
           setRecentNotification('⏳ Patient moved to Standby Queue until physical arrival.');
         }
@@ -2207,7 +2207,7 @@ export default function MerchantOverviewPage() {
                             ) : isLate ? (
                               <button
                                 type="button"
-                                onClick={() => handleLateQueueAction(booking.id, 'CHECKIN_LATE', 2)}
+                                onClick={() => handleLateQueueAction(booking.id, 'CHECKIN_LATE')}
                                 disabled={pendingBookingId === booking.id}
                                 className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer"
                               >

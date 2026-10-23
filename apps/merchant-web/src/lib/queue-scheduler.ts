@@ -17,17 +17,25 @@
 import {
   HospitalDepartmentQueueEngine,
   calculateArrivalTag,
+  computeQueueETAs,
+  computePatientETA,
+  shouldSendEtaNotification,
   type ArrivalTag,
   type HospitalQueueBooking,
   type EvaluatedQueuesState,
+  type PatientETA,
 } from '@appointments/shared/queue-engine';
 
 export {
   HospitalDepartmentQueueEngine,
   calculateArrivalTag,
+  computeQueueETAs,
+  computePatientETA,
+  shouldSendEtaNotification,
   type ArrivalTag,
   type HospitalQueueBooking,
   type EvaluatedQueuesState,
+  type PatientETA,
 };
 
 export type QueueSlotType = 
@@ -55,6 +63,7 @@ export interface QueueSlot {
   statusDescription: string;
   isGuaranteedUndisturbed: boolean;
   isFastTracked: boolean;
+  isUpNext?: boolean;
 }
 
 export interface DayAttendance {
@@ -114,10 +123,13 @@ export interface ScheduledBookingInput {
   checked_in_at?: string | null;
   arrival_tag?: ArrivalTag;
   original_booking_time?: string;
+  duration_minutes?: number;
 }
 
 /**
- * Builds a rolling 10-slot queue adhering strictly to the user's specification.
+ * Builds a rolling 10-slot queue adhering strictly to SPEC rules.
+ * Uses HospitalDepartmentQueueEngine.dispatchNext for "Up Next" and
+ * evaluateQueues / computeQueueETAs for the rest.
  */
 export function buildRollingTenSlotQueue(params: {
   bookings: ScheduledBookingInput[];
@@ -133,8 +145,9 @@ export function buildRollingTenSlotQueue(params: {
   } = params;
 
   const durationMs = slotDurationMinutes * 60 * 1000;
+  const anchorTimeIso = anchorStartTime.toISOString();
 
-  // Filter out cancelled bookings
+  // Filter out cancelled and no-show bookings
   const activeBookings = bookings
     .filter((b) => b.status !== 'CANCELLED' && b.status !== 'NO_SHOW')
     .sort((a, b) => new Date(a.slot_start).getTime() - new Date(b.slot_start).getTime());
@@ -142,34 +155,55 @@ export function buildRollingTenSlotQueue(params: {
   // Model underlying HospitalDepartmentQueueEngine instance
   const departmentEngine = new HospitalDepartmentQueueEngine('OPD Clinic');
   for (const b of activeBookings) {
+    const isLate = Boolean(
+      b.is_late_queue ||
+      (b.queue_position && !b.is_present) ||
+      b.arrival_tag === 'Late' ||
+      (b.checked_in_at && calculateArrivalTag(b.slot_start, b.checked_in_at) === 'Late')
+    );
+
     departmentEngine.addBooking({
       id: b.id,
       patientName: b.customer_name || undefined,
       slotStart: b.slot_start,
       slotEnd: b.slot_end,
-      durationMinutes: slotDurationMinutes,
+      durationMinutes: b.duration_minutes || slotDurationMinutes,
       isCheckedIn: Boolean(b.is_present || b.status === 'CHECKED_IN'),
       arrivedAt: b.checked_in_at || null,
       originalBookingTime: b.original_booking_time || b.slot_start,
-      arrivalTag: b.arrival_tag,
+      arrivalTag: b.arrival_tag || (isLate ? 'Late' : undefined),
+      status: b.status,
     });
   }
 
-  // Separate normal on-time bookings from late/standby queue bookings
-  const lateQueuePatients = activeBookings.filter((b) => {
-    if (b.is_late_queue) return true;
-    if (b.queue_position && !b.is_present) return true;
-    if (b.arrival_tag === 'Late') return true;
-    if (b.checked_in_at) {
-      return calculateArrivalTag(b.slot_start, b.checked_in_at) === 'Late';
-    }
-    return false;
-  }).sort((a, b) => {
-    const aTime = new Date(a.original_booking_time || a.slot_start).getTime();
-    const bTime = new Date(b.original_booking_time || b.slot_start).getTime();
-    return aTime - bTime;
+  // Active consultation: check if an appointment is currently in consultation
+  let activeConsultationBooking: HospitalQueueBooking | null = null;
+  if (currentBookingId) {
+    activeConsultationBooking = departmentEngine.bookings.find((b) => b.id === currentBookingId) || null;
+  }
+  if (!activeConsultationBooking) {
+    activeConsultationBooking = departmentEngine.bookings.find((b) => b.status === 'IN_CONSULTATION') || null;
+  }
+  if (activeConsultationBooking) {
+    departmentEngine.currentConsultation = activeConsultationBooking;
+  }
+
+  // 1. Evaluate engine state (Waiting Queue, Standby Queue, etc.)
+  const engineState = departmentEngine.evaluateQueues(anchorTimeIso);
+
+  // 2. Call dispatchNext for "Up Next" (peek without starting consultation)
+  const upNextCandidate = departmentEngine.dispatchNext(anchorTimeIso, { peekOnly: true });
+
+  // 3. Compute pure ETAs across all bookings
+  const etas = computeQueueETAs({
+    currentTime: anchorTimeIso,
+    bookings: departmentEngine.bookings,
+    currentConsultation: departmentEngine.currentConsultation,
+    defaultDurationMinutes: slotDurationMinutes,
   });
 
+  // Separate Waiting Queue (On Time / Early) from Standby Queue (Late)
+  const lateQueuePatients = [...engineState.standbyQueue];
   const onTimeBookings = activeBookings.filter(
     (b) => !lateQueuePatients.some((l) => l.id === b.id)
   );
@@ -222,17 +256,27 @@ export function buildRollingTenSlotQueue(params: {
     if (bookedPatient) {
       // Slot is occupied by on-time booked patient
       const isPresent = Boolean(bookedPatient.is_present || bookedPatient.status === 'CHECKED_IN');
-      const isServing = slotIndex === 1 && isPresent;
+      const isActualConsultation = bookedPatient.status === 'IN_CONSULTATION' || Boolean(currentBookingId && bookedPatient.id === currentBookingId);
+      const isServing = isActualConsultation || (slotIndex === 1 && isPresent);
       const isCurrent = Boolean(currentBookingId && bookedPatient.id === currentBookingId);
+      const isUpNext = Boolean(upNextCandidate && bookedPatient.id === upNextCandidate.id);
 
       let slotType: QueueSlotType;
       let statusLabel: string;
       let statusDescription: string;
 
-      if (isServing) {
+      if (isActualConsultation) {
         slotType = 'SERVING';
-        statusLabel = 'Now In Consultation';
+        statusLabel = 'In Consultation';
         statusDescription = 'With Doctor right now';
+      } else if (isUpNext) {
+        slotType = slotIndex === 1 ? 'SERVING' : 'BOOKED_PRESENT';
+        statusLabel = 'Up Next';
+        statusDescription = 'Next in line for consultation';
+      } else if (isServing) {
+        slotType = 'SERVING';
+        statusLabel = 'Present & Ready';
+        statusDescription = 'Reception PIN verified. Next in line.';
       } else if (isPresent) {
         slotType = 'BOOKED_PRESENT';
         statusLabel = 'Present & Ready';
@@ -243,6 +287,8 @@ export function buildRollingTenSlotQueue(params: {
         statusDescription = 'Arriving shortly. Token reserved.';
       }
 
+      const patientEta = etas.get(bookedPatient.id);
+
       slots.push({
         slotIndex,
         slotStart: slotStartIso,
@@ -250,7 +296,7 @@ export function buildRollingTenSlotQueue(params: {
         formattedStartTime,
         formattedEndTime,
         type: slotType,
-        tokenNumber: bookedPatient.queue_position || tokenCounter++,
+        tokenNumber: patientEta?.queuePosition || bookedPatient.queue_position || tokenCounter++,
         referenceCode: bookedPatient.reference_code || `P${tokenCounter}`,
         bookingId: bookedPatient.id,
         patientName: bookedPatient.customer_name || `Patient P${tokenCounter}`,
@@ -260,15 +306,16 @@ export function buildRollingTenSlotQueue(params: {
         statusDescription,
         isGuaranteedUndisturbed: true,
         isFastTracked: false,
+        isUpNext: isUpNext && !isActualConsultation,
       });
     } else {
       // Slot has NO on-time booking (Empty Gap: e.g. P11, P12, P13)
-      // Check if a late-queue patient can be placed here without disturbing the next on-time patient
-      let accommodatedLatePatient: ScheduledBookingInput | null = null;
+      // Check if a Standby Queue patient can be placed here without disturbing next on-time patient
+      let accommodatedLatePatient: HospitalQueueBooking | null = null;
 
       if (remainingLatePatients.length > 0) {
         const candidateLate = remainingLatePatients[0];
-        // Condition: Placing candidate in this gap must conclude before or at next on-time patient start
+        // Fit check: Placing candidate in this gap must conclude before or at next on-time patient start
         const canFitWithoutDelayingNext =
           !nextOnTimeStartMs || slotEndMs <= nextOnTimeStartMs;
 
@@ -280,6 +327,8 @@ export function buildRollingTenSlotQueue(params: {
       if (accommodatedLatePatient) {
         // Late patient placed into free gap safely
         const isCurrent = Boolean(currentBookingId && accommodatedLatePatient.id === currentBookingId);
+        const isUpNext = Boolean(upNextCandidate && accommodatedLatePatient.id === upNextCandidate.id);
+        const patientEta = etas.get(accommodatedLatePatient.id);
 
         slots.push({
           slotIndex,
@@ -288,18 +337,19 @@ export function buildRollingTenSlotQueue(params: {
           formattedStartTime,
           formattedEndTime,
           type: 'LATE_ACCOMMODATED',
-          tokenNumber: accommodatedLatePatient.queue_position || tokenCounter++,
+          tokenNumber: patientEta?.queuePosition || accommodatedLatePatient.queue_position || tokenCounter++,
           referenceCode: accommodatedLatePatient.reference_code || `LATE-${tokenCounter}`,
           bookingId: accommodatedLatePatient.id,
-          patientName: accommodatedLatePatient.customer_name || 'Late Patient (Accommodated)',
+          patientName: accommodatedLatePatient.patientName || accommodatedLatePatient.customer_name || 'Late Patient (Standby Queue)',
           isPresent: true,
           isCurrentPatient: isCurrent,
-          statusLabel: 'Late Accommodated in Gap',
+          statusLabel: isUpNext ? 'Up Next' : 'Late Accommodated in Gap',
           statusDescription: nextOnTimePatient
             ? `Placed in gap; ${nextOnTimePatient.reference_code || 'next patient'} time undisturbed`
-            : 'Fitted into available gap',
+            : 'Fitted into available gap in Standby Queue order',
           isGuaranteedUndisturbed: false,
           isFastTracked: false,
+          isUpNext,
         });
       } else if (remainingLatePatients.length > 0 && nextOnTimeStartMs && slotEndMs > nextOnTimeStartMs) {
         // Late patient cannot fit here without disturbing next on-time patient: must wait for next free window!
@@ -313,7 +363,7 @@ export function buildRollingTenSlotQueue(params: {
           tokenNumber: null,
           referenceCode: null,
           bookingId: null,
-          patientName: 'Late Queue (Waiting for Free Window)',
+          patientName: 'Standby Queue (Waiting for Free Window)',
           isPresent: false,
           isCurrentPatient: false,
           statusLabel: 'Late Member Waiting',
@@ -323,7 +373,6 @@ export function buildRollingTenSlotQueue(params: {
         });
       } else {
         // Free Slot with no late queue patient waiting
-        // Next on-time patient can be fast-tracked to the doctor if preceding slots are empty!
         const willFastTrackNext = slotIndex === 1 && Boolean(nextOnTimePatient);
 
         slots.push({

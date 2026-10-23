@@ -67,23 +67,21 @@ export default function BookingsManagementPage() {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [doctorLeftMap, setDoctorLeftMap] = useState<Record<string, boolean>>({});
 
-  // Late Arrival & Buffer Queue State
+  // Late Arrival & Standby Queue State
   const [lateCheckinBooking, setLateCheckinBooking] = useState<MerchantBookingWithDetails | null>(null);
-  const [lateBufferOffset, setLateBufferOffset] = useState<number>(2);
   const [isProcessingLateQueue, setIsProcessingLateQueue] = useState(false);
 
   const handleOpenLateCheckin = (booking: MerchantBookingWithDetails) => {
     setLateCheckinBooking(booking);
-    setLateBufferOffset(2);
   };
 
   const handleConfirmLateCheckin = async () => {
     if (!lateCheckinBooking) return;
     setIsProcessingLateQueue(true);
     try {
-      const res = await manageLateQueueBooking(lateCheckinBooking.id, 'CHECKIN_LATE', lateBufferOffset);
+      const res = await manageLateQueueBooking(lateCheckinBooking.id, 'CHECKIN_LATE');
       if (res.success) {
-        setFeedbackToast(`✓ ${lateCheckinBooking.customer_name} accommodated after ${lateBufferOffset} appointments. Token #${res.queue_position}.`);
+        setFeedbackToast(`✓ ${lateCheckinBooking.customer_name} placed in Standby Queue in original booking order (Token #${res.queue_position}).`);
         setLateCheckinBooking(null);
         await loadData();
       } else {
@@ -875,16 +873,16 @@ export default function BookingsManagementPage() {
                         </button>
                       )}
 
-                      {/* Late Arrival +2 Buffer Action when slot has started */}
-                      {new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                      {/* Late Arrival Standby Queue Action when slot has started */}
+                      {new Date(booking.slot_start).getTime() < Date.now() - 10 * 60 * 1000 && (
                         <button
                           onClick={() => handleOpenLateCheckin(booking)}
                           className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 transition shadow-2xs cursor-pointer"
-                          title="Patient arrived after slot time: Place after 2 member appointments and send SMS/WhatsApp notification"
+                          title="Patient arrived after slot time: Place into Standby Queue in booking order (FIFO)"
                           data-testid={`late-checkin-btn-${booking.id}`}
                         >
                           <Clock className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                          Arrived Late (+2 Queue)
+                          Arrived Late (Standby Queue)
                         </button>
                       )}
 
@@ -1137,30 +1135,16 @@ export default function BookingsManagementPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-                  Dynamic Queue Accommodation Rule:
+                  Standby Queue Placement Rule (SPEC):
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[1, 2, 3].map((offset) => (
-                    <button
-                      key={offset}
-                      type="button"
-                      onClick={() => setLateBufferOffset(offset)}
-                      className={`p-2.5 rounded-xl border text-center transition ${
-                        lateBufferOffset === offset
-                          ? 'bg-amber-600 text-white border-amber-700 font-bold shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'
-                      }`}
-                    >
-                      <div className="text-sm">+{offset} Member{offset > 1 ? 's' : ''}</div>
-                      <div className={`text-[10px] ${lateBufferOffset === offset ? 'text-amber-100' : 'text-slate-500'}`}>
-                        {offset === 2 ? 'Standard Buffer' : `~${offset * 15}m wait`}
-                      </div>
-                    </button>
-                  ))}
+                <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-xs text-amber-950 space-y-1.5">
+                  <p className="font-semibold text-amber-900">
+                    Priority: Standby Queue in Original Booking Order (FIFO)
+                  </p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Patient will be accommodated in available gaps when consultation finishes before the next scheduled patient, or at the end of the day when all booked patients conclude. On-time patients are guaranteed undisturbed.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1.5">
-                  Patient will be positioned after {lateBufferOffset} active consultations to ensure zero delay for punctual patients.
-                </p>
               </div>
 
               {/* Live Patient Message Preview */}
@@ -1170,7 +1154,7 @@ export default function BookingsManagementPage() {
                   <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Auto-dispatched</span>
                 </div>
                 <p className="text-xs text-slate-700 font-mono bg-white p-2.5 rounded-lg border border-slate-200/80 leading-relaxed">
-                  &ldquo;Hello {lateCheckinBooking.customer_name}, you arrived after your scheduled slot. You will be accommodated after {lateBufferOffset} member appointments (Estimated wait: ~{lateBufferOffset * 15} mins). Queue Token will be assigned.&rdquo;
+                  &ldquo;Hello {lateCheckinBooking.customer_name}, you arrived after your scheduled slot. You have been placed in the Standby Queue in original booking order. Queue Token will be assigned.&rdquo;
                 </p>
               </div>
             </div>
@@ -1195,7 +1179,7 @@ export default function BookingsManagementPage() {
                 ) : (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Accommodate After {lateBufferOffset} Appointments
+                    Confirm Standby Queue Placement
                   </>
                 )}
               </button>

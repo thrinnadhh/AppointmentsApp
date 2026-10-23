@@ -592,11 +592,11 @@ export default function BookingPassModal({
                             <Text style={styles.lateQueueBadgeText}>LATE TURN ASSIGNED</Text>
                           </View>
                           <Text style={styles.lateQueueTokenNumber} testID="pass-late-token-number">
-                            Turn #{currentQueuePosition}
+                            Token #{currentQueuePosition}
                           </Text>
                         </View>
                         <Text style={styles.lateQueueNoticeText}>
-                          You have been accommodated after 2 member appointments (+2 buffer) due to late arrival.
+                          You have been accommodated in the Standby Queue in booking order due to late arrival.
                         </Text>
                         {currentWaitMinutes ? (
                           <View style={styles.lateWaitRow}>
@@ -612,10 +612,10 @@ export default function BookingPassModal({
                         <View style={styles.lateArrivalPassNote} testID="pass-late-arrival-note">
                           <View style={styles.lateArrivalPassHeader}>
                             <Text style={styles.lateArrivalPassIcon}>⏱️</Text>
-                            <Text style={styles.lateArrivalPassTitle}>Late Arrival Rule (+2 Token Buffer)</Text>
+                            <Text style={styles.lateArrivalPassTitle}>Late Arrival Rule (Standby Queue)</Text>
                           </View>
                           <Text style={styles.lateArrivalPassText}>
-                            Arriving late? Don't worry! Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"I've Reached"</Text> below when you arrive. You will be placed <Text style={{ fontWeight: '700', color: '#0f172a' }}>2 tokens after the ongoing token</Text> (e.g. token #2 ongoing → queued at turn #4).
+                            Arriving late? Don't worry! Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"I've Reached"</Text> below when you arrive. You will be placed in the <Text style={{ fontWeight: '700', color: '#0f172a' }}>Standby Queue in original booking order</Text> and called between on-time patients when a slot fits.
                           </Text>
                         </View>
                       )

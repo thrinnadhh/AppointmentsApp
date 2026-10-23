@@ -266,7 +266,7 @@ export default function MyBookingsScreen({
                 {booking.queue_position ? (
                   <View style={styles.lateQueueNoticeBox} testID={`late-queue-notice-${booking.id}`}>
                     <Text style={styles.lateQueueNoticeText}>
-                      ⏰ <Text style={{ fontWeight: '700' }}>Late Arrival Accommodated:</Text> Assigned Queue Token #{booking.queue_position} (after 2 member appointments).
+                      ⏰ <Text style={{ fontWeight: '700' }}>Late Arrival Accommodated:</Text> Assigned Queue Token #{booking.queue_position} (Standby Queue in booking order).
                       {booking.estimated_wait_minutes ? ` Estimated wait: ~${booking.estimated_wait_minutes} mins.` : ''}
                     </Text>
                   </View>
@@ -274,7 +274,7 @@ export default function MyBookingsScreen({
                   booking.status === 'CONFIRMED' && !booking.is_present && (
                     <View style={styles.lateArrivalTipBox} testID={`late-arrival-tip-${booking.id}`}>
                       <Text style={styles.lateArrivalTipText}>
-                        ⏱️ <Text style={{ fontWeight: '700' }}>Running late?</Text> Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"Say Reached"</Text> on arrival to enter at Ongoing Token + 2 (e.g. #10 → #12).
+                        ⏱️ <Text style={{ fontWeight: '700' }}>Running late?</Text> Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"Say Reached"</Text> on arrival to enter Standby Queue in booking order.
                       </Text>
                     </View>
                   )

@@ -114,7 +114,8 @@ export function RollingTenSlotQueue({
       {/* Slots List / Grid */}
       <div className="p-5 space-y-3">
         {slots.map((slot) => {
-          const isServing = slot.type === 'SERVING';
+          const isServing = slot.type === 'SERVING' && slot.statusLabel === 'In Consultation';
+          const isUpNext = Boolean(slot.isUpNext || slot.statusLabel === 'Up Next');
           const isBookedPresent = slot.type === 'BOOKED_PRESENT';
           const isAwaitingPin = slot.type === 'BOOKED_AWAITING_PIN';
           const isFree = slot.type === 'FREE_GAP';
@@ -228,7 +229,14 @@ export function RollingTenSlotQueue({
 
               {/* Right Column: Status Badges */}
               <div className="flex items-center gap-2 self-start md:self-center">
-                {isBookedPresent && (
+                {(isUpNext || slot.statusLabel === 'Up Next') && !isServing && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-2xs">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Up Next</span>
+                  </span>
+                )}
+
+                {isBookedPresent && !isUpNext && slot.statusLabel !== 'Up Next' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Present (PIN Verified)</span>
@@ -245,7 +253,7 @@ export function RollingTenSlotQueue({
                 {isLateAccommodated && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-100 text-sky-800 border border-sky-300">
                     <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
-                    <span>Late Accommodated in Gap</span>
+                    <span>Standby Queue (Accommodated)</span>
                   </span>
                 )}
 

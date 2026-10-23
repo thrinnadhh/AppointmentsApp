@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { calculateArrivalTag, computePatientETA } from '@appointments/shared/queue-engine';
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,28 +75,43 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'CHECKIN_LATE') {
-      // Patient physically arrived late: Insert after specified member appointments (default 2)
+      // Patient physically arrived late: Place into Standby Queue in original booking order (FIFO)
+      const arrivedAt = new Date().toISOString();
       const slotDate = booking.slot_start.slice(0, 10);
       const { data: todayBookings } = await supabaseAdmin
         .from('bookings')
-        .select('id, queue_position, status, is_present')
+        .select('id, slot_start, slot_end, status, is_present, customer_arrived_at, queue_position, estimated_wait_minutes')
         .eq('resource_id', booking.resource_id)
         .gte('slot_start', `${slotDate}T00:00:00`)
         .lte('slot_start', `${slotDate}T23:59:59`)
-        .in('status', ['CONFIRMED', 'COMPLETED'])
-        .order('queue_position', { ascending: true, nullsFirst: false });
+        .in('status', ['CONFIRMED', 'CHECKED_IN', 'IN_CONSULTATION', 'COMPLETED'])
+        .order('slot_start', { ascending: true });
 
-      const activePositions = (todayBookings || [])
-        .map((b) => b.queue_position)
-        .filter((p): p is number => typeof p === 'number');
+      const activeBookingsList = (todayBookings || []).map((b) => ({
+        id: b.id,
+        slotStart: b.slot_start,
+        slotEnd: b.slot_end,
+        status: b.id === booking_id ? 'CHECKED_IN' : b.status,
+        isCheckedIn: b.id === booking_id ? true : Boolean(b.is_present || b.status === 'CHECKED_IN'),
+        isCompleted: b.status === 'COMPLETED',
+        arrivedAt: b.id === booking_id ? arrivedAt : b.customer_arrived_at,
+        originalBookingTime: b.slot_start,
+        arrivalTag: b.id === booking_id ? 'Late' : calculateArrivalTag(b.slot_start, b.customer_arrived_at),
+      }));
 
-      const maxPosition = activePositions.length > 0 ? Math.max(...activePositions) : 1;
-      const offset = Number(buffer_offset) || 2;
-      const newQueuePosition = maxPosition + offset;
-      const waitMinutes = offset * 15;
-      const arrivedAt = new Date().toISOString();
+      const activeConsultation = activeBookingsList.find((b) => b.status === 'IN_CONSULTATION') || null;
 
-      const queueNotice = `You arrived after your scheduled slot (${new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). You have been accommodated and will be sent after ${offset} member appointments (Estimated wait: ~${waitMinutes} mins). Queue Token: #${newQueuePosition}.`;
+      const patientEta = computePatientETA({
+        bookingId: booking_id,
+        currentTime: arrivedAt,
+        bookings: activeBookingsList,
+        currentConsultation: activeConsultation,
+      });
+
+      const newQueuePosition = patientEta?.queuePosition || booking.queue_position || 1;
+      const waitMinutes = patientEta?.estimatedWaitMinutes ?? 0;
+
+      const queueNotice = `You arrived after your scheduled slot (${new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). You have been placed in the Standby Queue in booking order (Estimated wait: ~${waitMinutes} mins). Queue Token: #${newQueuePosition}.`;
 
       // Update booking
       const { error: updateError } = await supabaseAdmin
@@ -113,28 +129,32 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
       }
 
-      // Log notification
-      try {
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('phone, full_name')
-          .eq('id', booking.customer_id)
-          .maybeSingle();
+      // Log notification only when ETA leaves patient window
+      const shouldNotify = patientEta ? patientEta.hasLeftWindow : true;
 
-        if (profile?.phone) {
-          await supabaseAdmin.from('notification_logs').insert({
-            booking_id: booking_id,
-            recipient_phone: profile.phone,
-            recipient_name: profile.full_name || 'Patient',
-            event_type: 'LATE_ARRIVAL_QUEUE_UPDATE',
-            channel: 'WHATSAPP',
-            status: 'DELIVERED',
-            message_content: `Namaste ${profile.full_name || 'Patient'}! ${queueNotice}`,
-            sent_at: new Date().toISOString(),
-          });
+      if (shouldNotify) {
+        try {
+          const { data: profile } = await supabaseAdmin
+            .from('profiles')
+            .select('phone, full_name')
+            .eq('id', booking.customer_id)
+            .maybeSingle();
+
+          if (profile?.phone) {
+            await supabaseAdmin.from('notification_logs').insert({
+              booking_id: booking_id,
+              recipient_phone: profile.phone,
+              recipient_name: profile.full_name || 'Patient',
+              event_type: 'ETA_UPDATE',
+              channel: 'WHATSAPP',
+              status: 'DELIVERED',
+              message_content: `Namaste ${profile.full_name || 'Patient'}! ${queueNotice}`,
+              sent_at: new Date().toISOString(),
+            });
+          }
+        } catch (notifyErr) {
+          console.warn('[LateQueueRoute] Error writing notification log:', notifyErr);
         }
-      } catch (notifyErr) {
-        console.warn('[LateQueueRoute] Error writing notification log:', notifyErr);
       }
 
       return NextResponse.json({
@@ -145,7 +165,6 @@ export async function POST(req: NextRequest) {
         customer_arrived_at: arrivedAt,
         queue_position: newQueuePosition,
         estimated_wait_minutes: waitMinutes,
-        buffer_offset: offset,
         queue_notice: queueNotice,
       });
     }
