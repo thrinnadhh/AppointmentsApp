@@ -96,16 +96,33 @@ function DepartmentsContent() {
   const fetchDepartments = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
     try {
       const res = await fetch('/api/hospital/departments');
       const json = await res.json();
       if (!res.ok || !json.success) {
+        if (isDemoMode) {
+          setDepartments([
+            { id: 'demo-dept-1', merchant_id: 'demo-prov', name: 'Neurology', is_preset: true, is_active: true, allowed_modules: ['appointments', 'queue_schedule', 'check_in'], member_count: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+            { id: 'demo-dept-2', merchant_id: 'demo-prov', name: 'Neurosurgery', is_preset: true, is_active: true, allowed_modules: ['appointments', 'queue_schedule', 'check_in'], member_count: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+            { id: 'demo-dept-3', merchant_id: 'demo-prov', name: 'Dermatology', is_preset: true, is_active: true, allowed_modules: ['appointments', 'queue_schedule', 'check_in'], member_count: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          ]);
+          return;
+        }
         throw new Error(json.error || 'Failed to load departments');
       }
       setDepartments(json.departments || []);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error loading departments';
-      setError(msg);
+      if (isDemoMode) {
+        setDepartments([
+          { id: 'demo-dept-1', merchant_id: 'demo-prov', name: 'Neurology', is_preset: true, is_active: true, allowed_modules: ['appointments', 'queue_schedule', 'check_in'], member_count: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          { id: 'demo-dept-2', merchant_id: 'demo-prov', name: 'Neurosurgery', is_preset: true, is_active: true, allowed_modules: ['appointments', 'queue_schedule', 'check_in'], member_count: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        ]);
+        setError(null);
+      } else {
+        const msg = err instanceof Error ? err.message : 'Error loading departments';
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -118,16 +135,32 @@ function DepartmentsContent() {
   const loadDepartmentMembers = async (deptId: string) => {
     setLoadingMembers(true);
     setMemberError(null);
+    const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
     try {
       const res = await fetch(`/api/hospital/members?department_id=${deptId}`);
       const json = await res.json();
       if (!res.ok || !json.success) {
+        if (isDemoMode) {
+          setMembers([
+            { id: 'demo-m-1', department_id: deptId, merchant_id: 'demo-prov', email: 'dr.sharma@hospital.local', role: 'consultant', status: 'active', invited_at: new Date().toISOString(), invite_expires_at: new Date(Date.now() + 7*86400000).toISOString() },
+            { id: 'demo-m-2', department_id: deptId, merchant_id: 'demo-prov', email: 'reception.neuro@hospital.local', role: 'front_desk', status: 'active', invited_at: new Date().toISOString(), invite_expires_at: new Date(Date.now() + 7*86400000).toISOString() }
+          ]);
+          return;
+        }
         throw new Error(json.error || 'Failed to load department members');
       }
       setMembers(json.members || []);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error loading members';
-      setMemberError(msg);
+      if (isDemoMode) {
+        setMembers([
+          { id: 'demo-m-1', department_id: deptId, merchant_id: 'demo-prov', email: 'dr.sharma@hospital.local', role: 'consultant', status: 'active', invited_at: new Date().toISOString(), invite_expires_at: new Date(Date.now() + 7*86400000).toISOString() },
+          { id: 'demo-m-2', department_id: deptId, merchant_id: 'demo-prov', email: 'reception.neuro@hospital.local', role: 'front_desk', status: 'active', invited_at: new Date().toISOString(), invite_expires_at: new Date(Date.now() + 7*86400000).toISOString() }
+        ]);
+        setMemberError(null);
+      } else {
+        const msg = err instanceof Error ? err.message : 'Error loading members';
+        setMemberError(msg);
+      }
     } finally {
       setLoadingMembers(false);
     }

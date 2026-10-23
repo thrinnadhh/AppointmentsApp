@@ -17,6 +17,54 @@ export async function GET(
     const supabaseAdmin = getSupabaseAdmin();
 
     // 1. Fetch booking
+    if (id === 'demo' || id === 'demo-locked') {
+      const isLocked = id === 'demo-locked';
+      return NextResponse.json({
+        success: true,
+        is_window_open: !isLocked,
+        window_opens_at: isLocked
+          ? new Date(Date.now() + 120 * 60 * 1000).toISOString()
+          : new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        booking: {
+          id: isLocked ? 'demo-locked-id' : 'demo-booking-id',
+          resource_id: 'demo-res-1',
+          provider_id: 'demo-provider-id',
+          reference_code: isLocked ? 'TEST-LOCKED-PASS' : 'TEST-DEMO-PASS',
+          slot_start: isLocked
+            ? new Date(Date.now() + 180 * 60 * 1000).toISOString()
+            : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          slot_end: isLocked
+            ? new Date(Date.now() + 195 * 60 * 1000).toISOString()
+            : new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          status: 'CONFIRMED',
+          payment_status: 'CAPTURED',
+          deposit_amount: 100,
+          is_present: false,
+          checked_in_at: null,
+          checked_in_method: null,
+          queue_position: isLocked ? 5 : 1,
+        },
+        customer: {
+          name: 'Demo Patient',
+          email: 'demo.patient@hospital.local',
+          phone: '+919999900001',
+        },
+        hospital: {
+          name: 'Tirupati Apex Hospital',
+          address: 'Test Medical Road, Tirupati, AP',
+          phone: '+919999900000',
+        },
+        doctor: {
+          id: 'demo-res-1',
+          name: 'Dr. A. Sharma (Neurologist)',
+          department: 'Neurology',
+          duration_minutes: 30,
+          price: 500,
+        },
+        checkin_code: isLocked ? null : '4282',
+      });
+    }
+
     const { data: booking, error: bErr } = await supabaseAdmin
       .from('bookings')
       .select('id, reference_code, slot_start, slot_end, status, payment_status, deposit_amount, total_amount, is_present, checked_in_at, checked_in_method, customer_id, provider_id, resource_id')
