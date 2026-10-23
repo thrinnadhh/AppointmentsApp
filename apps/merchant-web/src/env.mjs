@@ -57,6 +57,8 @@ export const REQUIRED_PRODUCTION_VARS = [
   'ADMIN_SECRET',
   'CRON_SECRET',
   'DELETION_TOKEN_SECRET',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
 ];
 
 export const APP_KEY_PREFIXES = [
@@ -137,6 +139,14 @@ export function validateEnv(env = process.env, options = {}) {
 
     if (env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
       errors.push('NEXT_PUBLIC_SUPABASE_URL cannot point to a placeholder domain in production.');
+    }
+
+    if (env.NEXT_PUBLIC_SUPABASE_URL && !env.NEXT_PUBLIC_SUPABASE_URL.startsWith('https://')) {
+      errors.push('NEXT_PUBLIC_SUPABASE_URL must use https:// protocol in production.');
+    }
+
+    if (env.NEXT_PUBLIC_APP_URL && !env.NEXT_PUBLIC_APP_URL.startsWith('https://')) {
+      errors.push('NEXT_PUBLIC_APP_URL must use https:// protocol in production.');
     }
   }
 
