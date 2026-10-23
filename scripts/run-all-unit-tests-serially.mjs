@@ -20,6 +20,7 @@ const testFiles = [
   'tests/unit/hospital-server-api-matrix.test.mjs',
   'tests/unit/hospital-no-show-policy.test.mjs',
   'tests/unit/hospital-lifetime-pin-and-patient-gap.test.mjs',
+  'tests/unit/hospital-push-notifications.test.mjs',
 ];
 
 let totalTests = 0;

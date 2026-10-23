@@ -1005,6 +1005,41 @@ export type Database = {
           },
         ]
       }
+      push_tokens: {
+        Row: {
+          created_at: string
+          device_type: string
+          id: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_type?: string
+          id?: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_type?: string
+          id?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       providers: {
         Row: {
           address: string
@@ -1722,6 +1757,10 @@ export type Database = {
       }
       record_no_show: { Args: { p_booking_id: string }; Returns: Json }
       release_expired_holds: { Args: never; Returns: Json }
+      remove_stale_push_token: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       request_account_deletion: { Args: { p_reason?: string }; Returns: Json }
       reschedule_booking_slot: {
         Args: {
