@@ -269,6 +269,10 @@ export async function POST(req: NextRequest) {
       p_slot_start: slot_start,
       p_slot_end: slot_end,
       p_customer_id: customer_id,
+      p_booking_for_someone_else: Boolean(body.booking_for_someone_else),
+      p_patient_name: body.patient_name || null,
+      p_patient_phone: body.patient_phone || null,
+      p_patient_relationship: body.patient_relationship || null,
     });
 
     if (error) {

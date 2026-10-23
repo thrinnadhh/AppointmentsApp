@@ -11,6 +11,8 @@ import {
   Platform,
   Linking,
   StatusBar,
+  TextInput,
+  Switch,
 } from 'react-native';
 import { Resource, Slot, getPlatformFee, CoolingPeriodEligibilityResult } from '@appointments/shared';
 import {
@@ -159,12 +161,22 @@ export default function CheckoutModal({
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'QR' | 'CARD'>('UPI');
   const [selectedUpiApp, setSelectedUpiApp] = useState<'phonepe' | 'gpay' | 'paytm' | 'bhim'>('phonepe');
 
+  // Booking for someone else (family/friend) state
+  const [isBookingForSomeoneElse, setIsBookingForSomeoneElse] = useState<boolean>(false);
+  const [otherPatientName, setOtherPatientName] = useState<string>('');
+  const [otherPatientPhone, setOtherPatientPhone] = useState<string>('');
+  const [patientRelationship, setPatientRelationship] = useState<string>('Family');
+
   useEffect(() => {
     if (!visible) {
       setSecondsLeft(300);
       setAttachedFileName(null);
       setAttachedPath(null);
       setPayError(null);
+      setIsBookingForSomeoneElse(false);
+      setOtherPatientName('');
+      setOtherPatientPhone('');
+      setPatientRelationship('Family');
       return;
     }
 
@@ -245,16 +257,43 @@ export default function CheckoutModal({
         return;
       }
 
+      if (isBookingForSomeoneElse) {
+        if (!otherPatientName.trim()) {
+          setPayError("Please enter the patient's full name.");
+          setIsProcessing(false);
+          return;
+        }
+        const cleanPhone = otherPatientPhone.trim().replace(/\D/g, '');
+        if (!cleanPhone || cleanPhone.length < 10) {
+          setPayError("Please enter a valid 10-digit mobile number for the patient.");
+          setIsProcessing(false);
+          return;
+        }
+      }
+
       // 1. Acquire atomic hold via backend API (with all validation)
       const holdRes = await createHoldOnSupabase(
         customerId,
         resource.id,
         slot.start_time,
-        slot.end_time
+        slot.end_time,
+        isBookingForSomeoneElse,
+        isBookingForSomeoneElse ? otherPatientName.trim() : undefined,
+        isBookingForSomeoneElse ? otherPatientPhone.trim() : undefined,
+        isBookingForSomeoneElse ? patientRelationship : undefined
       );
 
       if (!holdRes.success || !holdRes.booking_id) {
-        setPayError(holdRes.error || 'Could not reserve this slot. It may already be taken.');
+        let errMsg = holdRes.error || 'Could not reserve this slot. It may already be taken.';
+        if (
+          errMsg.includes('PATIENT_APPOINTMENT_GAP_VIOLATION') ||
+          errMsg.toLowerCase().includes('1 hour') ||
+          errMsg.toLowerCase().includes('one hour')
+        ) {
+          errMsg =
+            "Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for someone else'.";
+        }
+        setPayError(errMsg);
         setIsProcessing(false);
         return;
       }
@@ -472,27 +511,89 @@ export default function CheckoutModal({
               </View>
             )}
 
-            {/* Patient & Registered Details Overview */}
-            {patientDetails?.fullName ? (
-              <View style={{
-                backgroundColor: '#ffffff',
-                borderRadius: 14,
-                padding: 14,
-                marginBottom: 14,
-                borderWidth: 1,
-                borderColor: '#e2e8f0',
-              }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  Patient & Registered Contact
-                </Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0f172a', marginTop: 4 }}>
-                  {patientDetails.fullName}
-                </Text>
-                <Text style={{ fontSize: 13, color: '#334155', marginTop: 2 }}>
-                  📞 {patientDetails.phone}{patientDetails.email ? ` • ✉️ ${patientDetails.email}` : ''}
-                </Text>
+            {/* Patient & Registered Details / Family Toggle Overview */}
+            <View style={styles.patientCard} testID="patient-mode-card">
+              <View style={styles.patientCardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.patientCardSub}>
+                    {isBookingForSomeoneElse ? 'Booking for Family / Friend' : 'Patient & Registered Contact'}
+                  </Text>
+                  <Text style={styles.patientCardName}>
+                    {isBookingForSomeoneElse ? (otherPatientName.trim() || 'Guest Patient') : (patientDetails?.fullName || 'Registered Patient')}
+                  </Text>
+                  <Text style={styles.patientCardPhone}>
+                    📞 {isBookingForSomeoneElse ? (otherPatientPhone.trim() || 'Enter patient phone') : patientDetails?.phone}
+                  </Text>
+                </View>
               </View>
-            ) : null}
+
+              {/* Toggle: Booking for someone else */}
+              <View style={styles.toggleRow}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.toggleTitle}>Booking for someone else?</Text>
+                  <Text style={styles.toggleDesc}>
+                    Family member or friend (No 1-hour gap restriction)
+                  </Text>
+                </View>
+                <Switch
+                  value={isBookingForSomeoneElse}
+                  onValueChange={setIsBookingForSomeoneElse}
+                  trackColor={{ false: '#cbd5e1', true: '#a7f3d0' }}
+                  thumbColor={isBookingForSomeoneElse ? '#047857' : '#f8fafc'}
+                  testID="toggle-booking-someone-else"
+                />
+              </View>
+
+              {isBookingForSomeoneElse && (
+                <View style={styles.otherPatientForm} testID="other-patient-form">
+                  <Text style={styles.inputGroupLabel}>PATIENT FULL NAME *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. Ramesh Kumar"
+                    placeholderTextColor="#94a3b8"
+                    value={otherPatientName}
+                    onChangeText={setOtherPatientName}
+                    testID="input-other-patient-name"
+                  />
+
+                  <Text style={[styles.inputGroupLabel, { marginTop: 10 }]}>PATIENT MOBILE NUMBER *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 9876543210"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="phone-pad"
+                    value={otherPatientPhone}
+                    onChangeText={setOtherPatientPhone}
+                    testID="input-other-patient-phone"
+                  />
+
+                  <Text style={[styles.inputGroupLabel, { marginTop: 10 }]}>RELATIONSHIP</Text>
+                  <View style={styles.relationshipPillsRow}>
+                    {['Family', 'Spouse', 'Child', 'Parent', 'Friend', 'Other'].map((rel) => {
+                      const isSel = patientRelationship === rel;
+                      return (
+                        <TouchableOpacity
+                          key={rel}
+                          style={[styles.relPill, isSel && styles.relPillActive]}
+                          onPress={() => setPatientRelationship(rel)}
+                          testID={`rel-pill-${rel.toLowerCase()}`}
+                        >
+                          <Text style={[styles.relPillText, isSel && styles.relPillTextActive]}>
+                            {rel}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.gapExemptionNotice}>
+                    <Text style={styles.gapExemptionText}>
+                      🟢 <Text style={{ fontWeight: '700' }}>1-Hour Gap Rule Exemption:</Text> Appointments for different family members or friends have no minimum gap requirement and can be booked back-to-back or simultaneously.
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
 
             {/* Booking Summary */}
             <View style={styles.card}>
@@ -919,6 +1020,119 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: 'space-between',
+  },
+  patientCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 14,
+  },
+  patientCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  patientCardSub: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  patientCardName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 3,
+  },
+  patientCardPhone: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+  },
+  toggleTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  toggleDesc: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  otherPatientForm: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  inputGroupLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  textInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0f172a',
+  },
+  relationshipPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  relPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  relPillActive: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#047857',
+  },
+  relPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  relPillTextActive: {
+    color: '#047857',
+    fontWeight: '700',
+  },
+  gapExemptionNotice: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    padding: 10,
+    marginTop: 12,
+  },
+  gapExemptionText: {
+    fontSize: 11,
+    color: '#065f46',
+    lineHeight: 16,
   },
   header: {
     flexDirection: 'row',

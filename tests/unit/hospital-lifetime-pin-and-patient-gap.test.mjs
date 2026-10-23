@@ -462,4 +462,130 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     assert.equal(updatedBooking.status, 'WAITING');
     assert.equal(updatedBooking.emergency_patient_choice, 'WAIT');
   });
+
+  it('8. API Route: /api/bookings/emergency-choice handles patient selection', async () => {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 6);
+    const dateStr = futureDate.toISOString().split('T')[0];
+
+    const slotStart = `${dateStr}T10:00:00Z`;
+    const slotEnd = `${dateStr}T10:30:00Z`;
+
+    // Create confirmed booking
+    const bRes = await fetch(`${supabaseUrl}/rest/v1/bookings`, {
+      method: 'POST',
+      headers: serviceHeaders,
+      body: JSON.stringify({
+        customer_id: testCustomerId,
+        provider_id: hospA.id,
+        resource_id: neuroDocId,
+        department_id: neuroDeptId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+        status: 'CONFIRMED',
+        payment_status: 'CAPTURED',
+        deposit_amount: 100,
+        platform_fee: 10,
+        total_amount: 110,
+        reference_code: 'EMERG-API-01',
+      }),
+    });
+    const [b] = await bRes.json();
+    createdBookingIds.push(b.id);
+
+    // Cancel doctor emergency with doctor_arrived = false
+    await fetch(`${supabaseUrl}/rest/v1/rpc/cancel_doctor_emergency`, {
+      method: 'POST',
+      headers: serviceHeaders,
+      body: JSON.stringify({
+        p_doctor_resource_id: neuroDocId,
+        p_effective_from: slotStart,
+        p_reason: 'Emergency Callout',
+        p_doctor_arrived: false,
+      }),
+    });
+
+    // Call /api/bookings/emergency-choice
+    const apiRes = await fetch('http://localhost:3000/api/bookings/emergency-choice', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${customerToken}`,
+        'x-customer-id': testCustomerId,
+      },
+      body: JSON.stringify({
+        booking_id: b.id,
+        choice: 'REFUND',
+      }),
+    });
+    const apiData = await apiRes.json();
+    assert.equal(apiRes.status, 200);
+    assert.equal(apiData.success, true);
+    assert.equal(apiData.choice, 'REFUND');
+    assert.equal(apiData.refund_amount, 110, '100% full refund includes deposit (100) + platform fee (10)');
+  });
+
+  it('9. API Route: /api/bookings/hold accepts family/friend booking without 1-hour gap', async () => {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 7);
+    const dateStr = futureDate.toISOString().split('T')[0];
+
+    const slot1Start = `${dateStr}T11:00:00Z`;
+    const slot1End = `${dateStr}T11:30:00Z`;
+    const slot2Start = `${dateStr}T11:30:00Z`; // Immediately after!
+    const slot2End = `${dateStr}T12:00:00Z`;
+
+    // Hold 1: for self
+    const h1Res = await fetch('http://localhost:3000/api/bookings/hold', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${customerToken}`,
+        'x-customer-id': testCustomerId,
+      },
+      body: JSON.stringify({
+        customer_id: testCustomerId,
+        resource_id: neuroDocId,
+        slot_start: slot1Start,
+        slot_end: slot1End,
+        booking_for_someone_else: false,
+      }),
+    });
+    const h1Data = await h1Res.json();
+    assert.equal(h1Data.success, true);
+    createdBookingIds.push(h1Data.booking_id);
+
+    // Hold 2: for a family member / friend (back-to-back, 0 gap)
+    const h2Res = await fetch('http://localhost:3000/api/bookings/hold', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${customerToken}`,
+        'x-customer-id': testCustomerId,
+      },
+      body: JSON.stringify({
+        customer_id: testCustomerId,
+        resource_id: cardioDocId,
+        slot_start: slot2Start,
+        slot_end: slot2End,
+        booking_for_someone_else: true,
+        patient_name: 'Lakshmi Mother',
+        patient_phone: '+919876543219',
+        patient_relationship: 'Mother',
+      }),
+    });
+    const h2Data = await h2Res.json();
+    assert.equal(h2Data.success, true, 'Booking for someone else must succeed back-to-back with 0 gap');
+    createdBookingIds.push(h2Data.booking_id);
+
+    // Verify row in DB has family fields saved
+    const bCheck = await fetch(`${supabaseUrl}/rest/v1/bookings?id=eq.${h2Data.booking_id}&select=*`, {
+      headers: serviceHeaders,
+    });
+    const [savedBooking] = await bCheck.json();
+    assert.equal(savedBooking.booking_for_someone_else, true);
+    assert.equal(savedBooking.patient_name, 'Lakshmi Mother');
+    assert.equal(savedBooking.patient_phone, '+919876543219');
+    assert.equal(savedBooking.patient_relationship, 'Mother');
+  });
 });

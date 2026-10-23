@@ -7,6 +7,10 @@ export interface CreateHoldRequest {
   slot_start: string;
   slot_end: string;
   customer_id: string;
+  booking_for_someone_else?: boolean;
+  patient_name?: string | null;
+  patient_phone?: string | null;
+  patient_relationship?: string | null;
 }
 
 export interface CreateHoldResponse {

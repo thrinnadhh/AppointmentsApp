@@ -139,6 +139,14 @@ export interface Booking {
   estimated_wait_minutes?: number | null;
   department_id?: string | null;
   department_name?: string | null;
+  emergency_cancelled?: boolean;
+  emergency_doctor_arrived?: boolean;
+  emergency_patient_choice?: string | null;
+  booking_for_someone_else?: boolean;
+  patient_name?: string | null;
+  patient_phone?: string | null;
+  patient_relationship?: string | null;
+  total_charged?: number | null;
   version?: number;
   provider?: Provider;
   resource?: Resource;

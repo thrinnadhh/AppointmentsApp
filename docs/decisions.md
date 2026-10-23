@@ -21,6 +21,8 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
 | 2026-10-23 | Phase 6 Hardening Layer & E2E Integration Gate | DECIDED | Completed multi-surface hardening across edge functions, middleware, client session fallbacks, and Playwright E2E test suites per `docs/hospital/SPEC.md`. Replaced wildcard CORS headers with dynamic origin matching. Whitelisted demo=1 parameter in middleware. Added comprehensive Playwright hospital customer screens E2E test suite. |
 | 2026-10-23 | Phase 7a Tiered No-Show Policy & 7-Day Account Block | DECIDED | Implemented tiered no-show policy: (1) Strikes 1 & 2: courtesy 100% deposit refund, no monetary penalty; (2) Warning note during booking at 2 strikes; (3) Strikes 3 to 5: ₹50 credited to doctor, ₹10 platform fee, remainder refunded; (4) Exceeding 5 strikes (6th no-show): account blocked for 7 days (`blocked_until = NOW() + 7 days`), message displayed 'Your account is blocked for 7 days', strike counter reset to 0. Enforced in `create_booking_hold` RPC. |
 | 2026-10-23 | Phase 7b Customer Mobile UI & Account Block Notice | DECIDED | Updated Customer Mobile UI (`CheckoutModal.tsx` and `AccountScreen.tsx`): (1) Added 3rd time booking warning popup modal and persistent warning card detailing the ₹60 penalty split (Hospital ₹50, Appointments App ₹10, rest refunded); (2) Displayed 7-day account block banner if customer exceeded 5 strikes (`blocked_until > NOW()`) with disabled Pay CTA; (3) Updated cancellation policy card; (4) Added attendance standing card to `AccountScreen.tsx`; (5) Granted SELECT access on `public.profiles` (`no_show_count`, `is_flagged`) via migration 20261024000002. |
+| 2026-10-23 | Phase 8a Database Layer: Permanent Lifetime PIN, 1-Hour Patient Gap, & Emergency Cancellation RPCs | DECIDED | Added migration 20261024000003 creating `customer_checkin_pins` for immutable customer lifetime PINs, updated `create_booking_hold` with 1-hour patient collision check bypassing on family/friend toggle, and created `choose_emergency_option` RPC for doctor emergency choices with full 100% refund logic. |
+| 2026-10-23 | Phase 8b Customer Mobile UI & API Layer: Lifetime PIN, Emergency Modal, Family Booking Toggle, and Home Live Card | DECIDED | Built customer mobile components: (1) `CheckoutModal` family/friend toggle with relationship pills and 1-hour gap check; (2) `DoctorEmergencyModal` with Wait/Reschedule/100% Refund options; (3) `HomeScreen` pulsing green light live upcoming card; (4) `MyBookingsScreen` lifetime PIN banner and Upcoming vs History subtabs; (5) API route `/api/bookings/emergency-choice`. |
 
 ---
 
@@ -116,3 +118,43 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
   - 3rd Time Booking: Popup modal and persistent warning card warning the user that if they don't show up this time, a penalty of ₹60 will be deducted: ₹50 is paid to the hospital, ₹10 is retained as the Appointments app platform fee, and the remainder of the deposit is refunded.
   - Strikes 3 to 5: ₹60 penalty applied (₹50 hospital / ₹10 platform fee). If deposit $\le$ ₹60, deposit is forfeited with ₹0 refund. If deposit > ₹60, remainder is refunded.
   - Exceeding 5 Strikes (6th miss): Account is blocked for 7 days (`blocked_until = NOW() + INTERVAL '7 days'`), display message *"Your account is blocked for 7 days"*, and reset strike counter to 0. Pay CTA is disabled with label *"Account Blocked (7 Days)"*.
+
+---
+
+### Decision 8: Phase 8b Customer Mobile UI & API Layer
+- **Date**: 2026-10-23
+- **Status**: DECIDED (Implemented & Verified in Phase 8b)
+- **Requirement & Architecture**:
+  1. **Family / Friend Booking Toggle (`CheckoutModal.tsx`)**:
+     - Added an interactive switch toggle: *"Booking for someone else?"*.
+     - When toggled ON, reveals patient details inputs: Patient Full Name (`otherPatientName`), Patient Contact Number (`otherPatientPhone`), and Relationship pills (`Parent`, `Spouse`, `Child`, `Sibling`, `Friend`, `Other`).
+     - Includes helper text: *"Appointments for different family members or friends have no 1-hour gap restriction and can be scheduled back-to-back."*
+     - If booking for self and an existing appointment slot for the same patient falls within `< 60 minutes`, friendly validation error is displayed: *"Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for someone else'."*
+     - Passes `booking_for_someone_else`, `patient_name`, `patient_phone`, and `patient_relationship` into `/api/bookings/hold` and `create_booking_hold` RPC.
+  2. **Doctor Emergency Modal (`DoctorEmergencyModal.tsx`)**:
+     - Automatically displayed when an active booking has `emergency_cancelled === true` and no choice has been recorded yet (`!emergency_patient_choice`).
+     - Banner and title: *"Due to emergency, doctor is not available"*.
+     - Dynamic option presentation:
+       - **Doctor arrived & cancelled mid-session (`emergency_doctor_arrived === true`)**: 3 action options: **Wait** (standby queue), **Reschedule** (select new slot without fee), **100% Full Refund** (100% deposit + platform fee).
+       - **Doctor did not arrive / emergency cancel prior (`emergency_doctor_arrived === false`)**: 2 action options: **Reschedule** or **100% Full Refund**.
+     - Full refund clearly notes 100% reimbursement of both ₹100 deposit and ₹10 platform fee (total ₹110).
+  3. **Emergency Choice API Route (`/api/bookings/emergency-choice`)**:
+     - Endpoint accepts `POST` with `booking_id`, `choice` (`WAIT` | `RESCHEDULE` | `REFUND`), and optional `reschedule_slot_start` / `reschedule_slot_end`.
+     - Validates authentication and ownership against `bookings.customer_id`.
+     - Invokes `choose_emergency_option` RPC (`p_booking_id`, `p_choice`, `p_new_slot_start`, `p_new_slot_end`).
+     - Calculates 100% refund amount (`total_charged` or `deposit_amount + platform_fee`) on `REFUND` choice.
+  4. **Home Screen Live Upcoming Appointment Card (`HomeScreen.tsx`)**:
+     - Displays live card at top of Home Screen (both Category Hub view and Category Provider List view) whenever there is an active upcoming confirmed booking.
+     - Features an animated micro green light pulsing indicator (`Animated.loop` between opacity 1.0 and 0.3) denoting active standing.
+     - Displays essential details: Doctor name, Department / Specialty, Hospital name, Token number badge, Date & Time.
+     - Displays Permanent 4-Digit Check-In PIN:
+       - If within 60 minutes of slot start (`timeUntilSlot <= 60m`) or already checked in, reveals 4-digit PIN with unlocked green badge `🔓 PIN: [PIN]`.
+       - If > 60 minutes, displays masked lock badge `🔒 PIN: •••• (Reveals 60m before slot)`.
+     - Direct CTA: *"View Pass & Queue"* opening the digital pass modal, and *"I've Reached"* instant lobby check-in action.
+  5. **Dedicated "My Appointments" Tab & Lifetime PIN Banner (`MyBookingsScreen.tsx`)**:
+     - Top card prominently displays customer's permanent lifetime PIN: `🔑 YOUR LIFETIME CHECK-IN PIN: [PIN]` with note *"Permanent 4-digit code across all your bookings. Does not change on reschedule."*
+     - Sub-tabs: **Upcoming** (CONFIRMED, HELD, CHECKED_IN) vs **History** (COMPLETED, CANCELLED, NO_SHOW).
+     - Distinct patient badge on appointment cards: `👥 Patient: [Name] ([Relationship])` when booked for someone else.
+  6. **Customer App Navigation (`App.tsx`)**:
+     - Persistent 3-tab bottom navigation: **Explore** (`HOME`), **My Appointments** (`MY_BOOKINGS` with dynamic upcoming count badge), and **Account**.
+     - Listens to active booking status and mounts `DoctorEmergencyModal` overlay when doctor emergency cancellation occurs.

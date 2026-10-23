@@ -409,6 +409,9 @@ export async function fetchCustomerBookingsFromSupabase(
         id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
         status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
         checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
+        queue_position, estimated_wait_minutes, emergency_cancelled, emergency_doctor_arrived,
+        emergency_patient_choice, booking_for_someone_else, patient_name, patient_phone,
+        patient_relationship, total_charged,
         created_at, updated_at,
         providers ( name ),
         resources ( name )
@@ -473,7 +476,9 @@ export async function fetchSingleCustomerBookingFromSupabase(
         id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
         status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
         checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
-        queue_position, estimated_wait_minutes,
+        queue_position, estimated_wait_minutes, emergency_cancelled, emergency_doctor_arrived,
+        emergency_patient_choice, booking_for_someone_else, patient_name, patient_phone,
+        patient_relationship, total_charged,
         created_at, updated_at,
         providers ( name ),
         resources ( name )
@@ -572,7 +577,11 @@ export async function createHoldOnSupabase(
   customerId: string,
   resourceId: string,
   slotStart: string,
-  slotEnd: string
+  slotEnd: string,
+  bookingForSomeoneElse?: boolean,
+  patientName?: string,
+  patientPhone?: string,
+  patientRelationship?: string
 ): Promise<CreateHoldSupabaseResult> {
   // Route all resource hold operations strictly through backend API routes.
   // Direct client-side unmetered RPC access is disallowed to enforce Redis concurrency locks, rate limits, and business logic.
@@ -592,6 +601,10 @@ export async function createHoldOnSupabase(
         resource_id: resourceId,
         slot_start: slotStart,
         slot_end: slotEnd,
+        booking_for_someone_else: Boolean(bookingForSomeoneElse),
+        patient_name: patientName || null,
+        patient_phone: patientPhone || null,
+        patient_relationship: patientRelationship || null,
       }),
     });
 
@@ -621,6 +634,53 @@ export async function createHoldOnSupabase(
     return {
       success: false,
       error: `Unable to reserve slot: ${msg}`,
+    };
+  }
+}
+
+export async function chooseEmergencyOption(
+  bookingId: string,
+  choice: 'WAIT' | 'RESCHEDULE' | 'REFUND',
+  rescheduleSlotStart?: string,
+  rescheduleSlotEnd?: string
+): Promise<{ success: boolean; choice?: string; refund_amount?: number; message?: string; error?: string }> {
+  try {
+    const session = (await supabase.auth.getSession()).data?.session;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
+    const resp = await fetch(`${API_BASE_URL}/api/bookings/emergency-choice`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        booking_id: bookingId,
+        choice,
+        reschedule_slot_start: rescheduleSlotStart || null,
+        reschedule_slot_end: rescheduleSlotEnd || null,
+      }),
+    });
+
+    const json = await resp.json().catch(() => ({}));
+    if (resp.ok && json.success) {
+      return {
+        success: true,
+        choice: json.choice,
+        refund_amount: json.refund_amount,
+        message: json.message,
+      };
+    }
+
+    return {
+      success: false,
+      error: json.error || `Emergency option selection failed (${resp.status})`,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error';
+    return {
+      success: false,
+      error: msg,
     };
   }
 }
@@ -1724,5 +1784,25 @@ export async function fetchBookingCheckinCode(bookingId: string): Promise<string
     console.warn('Network error fetching checkin code:', err);
     return null;
   }
+}
+
+/**
+ * Fetch permanent lifetime 4-digit check-in PIN for customer
+ */
+export async function fetchCustomerLifetimePin(customerId: string): Promise<string | null> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from('customer_checkin_pins')
+      .select('pin')
+      .eq('customer_id', customerId)
+      .maybeSingle();
+
+    if (!error && data?.pin) {
+      return data.pin;
+    }
+  } catch (err) {
+    console.warn('Network error fetching customer lifetime pin:', err);
+  }
+  return null;
 }
 

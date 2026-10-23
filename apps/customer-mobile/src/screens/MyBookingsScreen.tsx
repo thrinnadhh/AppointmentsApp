@@ -13,11 +13,12 @@ import {
 } from 'react-native';
 import { Booking } from '@appointments/shared';
 import BookingPassModal from './BookingPassModal';
-import { fetchCustomerStrikes } from '../services/api';
+import { fetchCustomerStrikes, fetchCustomerLifetimePin } from '../services/api';
 
 interface MyBookingsScreenProps {
   onBack: () => void;
   bookings: (Booking & { provider_name?: string; resource_name?: string })[];
+  customerId?: string;
   onCancelBooking: (bookingId: string) => void;
   onRescheduleBooking?: (bookingId: string, newSlotStart: string, newSlotEnd: string) => Promise<void>;
   onMarkReached?: (bookingId: string) => Promise<void>;
@@ -29,6 +30,7 @@ interface MyBookingsScreenProps {
 export default function MyBookingsScreen({
   onBack,
   bookings,
+  customerId = '99999999-9999-9999-9999-999999999991',
   onCancelBooking,
   onRescheduleBooking,
   onMarkReached,
@@ -36,6 +38,8 @@ export default function MyBookingsScreen({
   hasMore,
   isLoadingMore,
 }: MyBookingsScreenProps) {
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
+  const [lifetimePin, setLifetimePin] = useState<string | null>(null);
   const [selectedPassBooking, setSelectedPassBooking] = useState<
     (Booking & { provider_name?: string; resource_name?: string }) | null
   >(null);
@@ -70,10 +74,21 @@ export default function MyBookingsScreen({
   };
 
   useEffect(() => {
-    fetchCustomerStrikes('99999999-9999-9999-9999-999999999991').then((res) => {
+    fetchCustomerStrikes(customerId).then((res) => {
       setCustomerStrikes(res.strikes);
     });
-  }, []);
+    fetchCustomerLifetimePin(customerId).then((pin) => {
+      if (pin) setLifetimePin(pin);
+    });
+  }, [customerId]);
+
+  const upcomingBookings = bookings.filter((b) =>
+    b.status === 'CONFIRMED' || b.status === 'HELD' || b.status === 'CHECKED_IN'
+  );
+  const historyBookings = bookings.filter((b) =>
+    b.status === 'COMPLETED' || b.status === 'CANCELLED' || b.status === 'NO_SHOW'
+  );
+  const displayedBookings = activeTab === 'upcoming' ? upcomingBookings : historyBookings;
 
   // Reschedule state
   const [rescheduleTarget, setRescheduleTarget] = useState<
@@ -159,6 +174,49 @@ export default function MyBookingsScreen({
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Permanent Lifetime Check-In PIN Card */}
+        <View style={styles.lifetimePinBanner} testID="my-bookings-lifetime-pin-banner">
+          <View style={styles.lifetimePinHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 16 }}>🔑</Text>
+              <Text style={styles.lifetimePinTitle}>YOUR LIFETIME CHECK-IN PIN</Text>
+            </View>
+            <View style={styles.lifetimePinBadge}>
+              <Text style={styles.lifetimePinBadgeText}>PERMANENT</Text>
+            </View>
+          </View>
+          <View style={styles.lifetimePinBody}>
+            <Text style={styles.lifetimePinDigits} testID="my-bookings-lifetime-pin-digits">
+              {lifetimePin || '4821'}
+            </Text>
+            <Text style={styles.lifetimePinDesc}>
+              Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits. It never changes or expires upon reschedule.
+            </Text>
+          </View>
+        </View>
+
+        {/* Sub-tabs: Upcoming vs History */}
+        <View style={styles.subTabsContainer} testID="my-bookings-tabs">
+          <TouchableOpacity
+            style={[styles.subTabButton, activeTab === 'upcoming' && styles.subTabButtonActive]}
+            onPress={() => setActiveTab('upcoming')}
+            testID="tab-upcoming-appointments"
+          >
+            <Text style={[styles.subTabText, activeTab === 'upcoming' && styles.subTabTextActive]}>
+              Upcoming ({upcomingBookings.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.subTabButton, activeTab === 'history' && styles.subTabButtonActive]}
+            onPress={() => setActiveTab('history')}
+            testID="tab-history-appointments"
+          >
+            <Text style={[styles.subTabText, activeTab === 'history' && styles.subTabTextActive]}>
+              History ({historyBookings.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {customerStrikes >= 2 && (
           <View style={styles.strikeAlertBanner} testID="my-bookings-strike-banner">
             <Text style={styles.strikeAlertIcon}>⚠️</Text>
@@ -171,16 +229,20 @@ export default function MyBookingsScreen({
           </View>
         )}
 
-        {bookings.length === 0 ? (
+        {displayedBookings.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📅</Text>
-            <Text style={styles.emptyTitle}>No Appointments Yet</Text>
+            <Text style={styles.emptyIcon}>{activeTab === 'upcoming' ? '📅' : '📂'}</Text>
+            <Text style={styles.emptyTitle}>
+              {activeTab === 'upcoming' ? 'No Upcoming Appointments' : 'No Past Appointments'}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              Explore Tirupati clinics, restaurants, turfs, and salons to book your first slot.
+              {activeTab === 'upcoming'
+                ? 'Explore Tirupati clinics, doctors, and specialists to book your next slot.'
+                : 'Your completed, cancelled, and attended appointments will be archived here.'}
             </Text>
           </View>
         ) : (
-          bookings.map((booking) => {
+          displayedBookings.map((booking) => {
             const slotDate = new Date(booking.slot_start);
             const timeString = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const dateString = slotDate.toLocaleDateString('en-IN', {
@@ -247,6 +309,14 @@ export default function MyBookingsScreen({
                 </View>
 
                 <Text style={styles.resourceName}>{booking.resource_name || 'Staff'}</Text>
+
+                {booking.booking_for_someone_else && (
+                  <View style={styles.familyPatientBadge} testID={`family-patient-${booking.id}`}>
+                    <Text style={styles.familyPatientText}>
+                      👥 Patient: {booking.patient_name || 'Family/Friend'} ({booking.patient_relationship || 'Family'})
+                    </Text>
+                  </View>
+                )}
 
                 <View style={styles.timeRow}>
                   <Text style={styles.timeIcon}>🕒</Text>
@@ -499,6 +569,102 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 40,
+  },
+  lifetimePinBanner: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    marginBottom: 16,
+  },
+  lifetimePinHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  lifetimePinTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#065f46',
+    letterSpacing: 0.5,
+  },
+  lifetimePinBadge: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  lifetimePinBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  lifetimePinBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  lifetimePinDigits: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#047857',
+    letterSpacing: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  lifetimePinDesc: {
+    flex: 1,
+    fontSize: 11,
+    color: '#065f46',
+    lineHeight: 15,
+  },
+  subTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  subTabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  subTabButtonActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  subTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  subTabTextActive: {
+    fontWeight: '800',
+    color: '#047857',
+  },
+  familyPatientBadge: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginTop: 6,
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  familyPatientText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1d4ed8',
   },
   emptyState: {
     padding: 40,

@@ -11,8 +11,9 @@ import {
   StatusBar,
   ActivityIndicator,
   Platform,
+  Animated,
 } from 'react-native';
-import { VERTICALS, normCategory, City } from '@appointments/shared';
+import { VERTICALS, normCategory, City, Booking } from '@appointments/shared';
 import {
   fetchProvidersByCategory,
   fetchNearbyProviders,
@@ -22,6 +23,7 @@ import {
   searchDirectoryOnSupabase,
   fetchActiveCities,
   joinCityWaitlist,
+  fetchBookingCheckinCode,
 } from '../services/api';
 
 interface VerticalVisual {
@@ -108,6 +110,156 @@ interface HomeScreenProps {
   onSelectProvider: (providerId: string) => void;
   onOpenMyBookings: () => void;
   onOpenProfile?: () => void;
+  upcomingBooking?: (Booking & { provider_name?: string; resource_name?: string }) | null;
+  onOpenPassModal?: (booking: Booking & { provider_name?: string; resource_name?: string }) => void;
+  onMarkReached?: (bookingId: string) => Promise<void>;
+}
+
+interface UpcomingLiveCardProps {
+  booking: Booking & { provider_name?: string; resource_name?: string };
+  onOpenPass?: (booking: Booking & { provider_name?: string; resource_name?: string }) => void;
+  onMarkReached?: (bookingId: string) => Promise<void>;
+  onOpenMyBookings?: () => void;
+}
+
+function UpcomingLiveCard({ booking, onOpenPass, onMarkReached, onOpenMyBookings }: UpcomingLiveCardProps) {
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const [checkinPin, setCheckinPin] = useState<string | null>(null);
+  const [isMarkingReached, setIsMarkingReached] = useState(false);
+
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.25,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, [pulseAnim]);
+
+  const slotDate = new Date(booking.slot_start);
+  const nowMs = Date.now();
+  const slotMs = slotDate.getTime();
+  const isWithin60m = nowMs >= slotMs - 60 * 60 * 1000;
+  const isToday = slotDate.toDateString() === new Date().toDateString();
+  const timeStr = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = isToday ? 'Today' : slotDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  useEffect(() => {
+    let mounted = true;
+    if (booking.id) {
+      fetchBookingCheckinCode(booking.id).then((pin) => {
+        if (mounted && pin) setCheckinPin(pin);
+      });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [booking.id]);
+
+  const handleSayReached = async () => {
+    if (!onMarkReached || isMarkingReached) return;
+    setIsMarkingReached(true);
+    try {
+      await onMarkReached(booking.id);
+    } finally {
+      setIsMarkingReached(false);
+    }
+  };
+
+  const isCheckedIn = booking.status === 'CHECKED_IN';
+  const isArrived = booking.is_present || isCheckedIn;
+
+  return (
+    <View style={styles.liveCard} testID="home-live-appointment-card">
+      <View style={styles.liveCardHeader}>
+        <View style={styles.liveIndicatorRow}>
+          <Animated.View style={[styles.pulsingGreenDot, { opacity: pulseAnim }]} testID="pulsing-live-indicator" />
+          <Text style={styles.liveIndicatorText}>🟢 LIVE UPCOMING APPOINTMENT</Text>
+        </View>
+        <View style={styles.liveTokenBadge}>
+          <Text style={styles.liveTokenBadgeText}>TOKEN #{booking.queue_position || 1}</Text>
+        </View>
+      </View>
+
+      <View style={styles.liveCardBody}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.liveDoctorName} numberOfLines={1}>
+            {booking.resource_name || 'Dr. Consultant / Specialist'}
+          </Text>
+          <Text style={styles.liveHospitalName} numberOfLines={1}>
+            🏥 {booking.provider_name || 'Tirupati Hospital & Clinic'}
+          </Text>
+          <Text style={styles.liveTimeText}>
+            🕒 {dateStr} at <Text style={{ fontWeight: '800', color: '#0f172a' }}>{timeStr}</Text>
+          </Text>
+        </View>
+      </View>
+
+      {/* Permanent Lifetime PIN Box */}
+      <View style={styles.livePinBox} testID="live-checkin-pin-box">
+        <View style={styles.livePinHeader}>
+          <Text style={styles.livePinTitle}>🔑 Permanent Check-in PIN</Text>
+          <Text style={styles.livePinBadge}>LIFETIME</Text>
+        </View>
+        {isWithin60m ? (
+          <View style={styles.livePinRow}>
+            <Text style={styles.livePinDigits} testID="live-pin-digits">
+              {checkinPin || '••••'}
+            </Text>
+            <Text style={styles.livePinHint}>Show/tell code at reception counter</Text>
+          </View>
+        ) : (
+          <View style={styles.livePinLockedRow}>
+            <Text style={styles.livePinLockedText}>
+              🔒 Reveals 60 minutes before slot ({new Date(slotMs - 60 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.liveCardActions}>
+        <TouchableOpacity
+          style={styles.livePassBtn}
+          onPress={() => onOpenPass?.(booking)}
+          testID="btn-live-view-pass"
+        >
+          <Text style={styles.livePassBtnText}>🎟️ View Pass & Queue</Text>
+        </TouchableOpacity>
+
+        {isCheckedIn ? (
+          <View style={styles.liveStatusPillGreen}>
+            <Text style={styles.liveStatusPillGreenText}>✓ Reception Checked In</Text>
+          </View>
+        ) : isArrived ? (
+          <View style={styles.liveStatusPillBlue}>
+            <Text style={styles.liveStatusPillBlueText}>📍 Reached Lobby</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.liveReachedBtn}
+            onPress={handleSayReached}
+            disabled={isMarkingReached}
+            testID="btn-live-say-reached"
+          >
+            <Text style={styles.liveReachedBtnText}>
+              {isMarkingReached ? 'Updating…' : "📍 I've Reached"}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
 }
 
 export default function HomeScreen({
@@ -116,6 +268,9 @@ export default function HomeScreen({
   onSelectProvider,
   onOpenMyBookings,
   onOpenProfile,
+  upcomingBooking,
+  onOpenPassModal,
+  onMarkReached,
 }: HomeScreenProps) {
   // First page shows only the 5 category mini logos when selectedCategory is null
   const [internalCategory, setInternalCategory] = useState<string | null>(null);
@@ -404,6 +559,15 @@ export default function HomeScreen({
           contentContainerStyle={styles.hubContent}
           showsVerticalScrollIndicator={false}
         >
+          {upcomingBooking && (
+            <UpcomingLiveCard
+              booking={upcomingBooking}
+              onOpenPass={onOpenPassModal}
+              onMarkReached={onMarkReached}
+              onOpenMyBookings={onOpenMyBookings}
+            />
+          )}
+
           <View style={styles.hubHeader}>
             <Text style={styles.hubTitle}>Choose a Service</Text>
             <Text style={styles.hubSubtitle}>
@@ -585,6 +749,15 @@ export default function HomeScreen({
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           >
+            {upcomingBooking && (
+              <UpcomingLiveCard
+                booking={upcomingBooking}
+                onOpenPass={onOpenPassModal}
+                onMarkReached={onMarkReached}
+                onOpenMyBookings={onOpenMyBookings}
+              />
+            )}
+
             <View style={styles.listHeaderRow}>
               <Text style={styles.sectionHeading}>
                 {searchQuery
@@ -821,6 +994,187 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
+  },
+  liveCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  liveCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    marginBottom: 10,
+  },
+  liveIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pulsingGreenDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10b981',
+  },
+  liveIndicatorText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#047857',
+    letterSpacing: 0.5,
+  },
+  liveTokenBadge: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  liveTokenBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  liveCardBody: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  liveDoctorName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  liveHospitalName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+    marginTop: 2,
+  },
+  liveTimeText: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
+  },
+  livePinBox: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+  },
+  livePinHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  livePinTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065f46',
+  },
+  livePinBadge: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#047857',
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  livePinRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 10,
+  },
+  livePinDigits: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#047857',
+    letterSpacing: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  livePinHint: {
+    fontSize: 11,
+    color: '#065f46',
+    flex: 1,
+  },
+  livePinLockedRow: {
+    paddingVertical: 2,
+  },
+  livePinLockedText: {
+    fontSize: 11,
+    color: '#047857',
+    fontWeight: '600',
+  },
+  liveCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  livePassBtn: {
+    flex: 1,
+    backgroundColor: '#047857',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  livePassBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  liveReachedBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  liveReachedBtnText: {
+    color: '#1d4ed8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  liveStatusPillGreen: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 10,
+  },
+  liveStatusPillGreenText: {
+    color: '#047857',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  liveStatusPillBlue: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 10,
+  },
+  liveStatusPillBlueText: {
+    color: '#1d4ed8',
+    fontSize: 12,
+    fontWeight: '700',
   },
   header: {
     paddingHorizontal: 20,
