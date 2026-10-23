@@ -526,20 +526,43 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
-                <div>
-                  <p className="text-sm font-bold text-slate-900">Auto-Forfeit Deposit on Verified No-Show</p>
-                  <p className="text-xs text-slate-500">When clinic manager marks patient as No-Show, lock deposit into merchant ledger and flag profile.</p>
+              {/* Fixed Platform Financial Policy: No-Show Breakdown & 60m Cutoff */}
+              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Standard Hospital Cancellation &amp; No-Show Policy
+                    </h3>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    SPEC Read-Only Rule
+                  </span>
                 </div>
-                <input
-                  id="forfeit-no-show-checkbox"
-                  name="forfeitOnNoShow"
-                  aria-label="Auto-Forfeit Deposit on Verified No-Show"
-                  type="checkbox"
-                  checked={forfeitOnNoShow}
-                  onChange={(e) => setForfeitOnNoShow(e.target.checked)}
-                  className="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
-                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Cancellation Cutoff</span>
+                    <p className="text-base font-bold text-slate-900 mt-0.5 font-mono">60 Minutes</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">100% refund before 60m cutoff</p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Doctor Retained</span>
+                    <p className="text-base font-bold text-emerald-700 mt-0.5 font-mono">₹50.00</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Doctor compensation on no-show</p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Platform Retention</span>
+                    <p className="text-base font-bold text-slate-700 mt-0.5 font-mono">₹10.00</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Payment gateway &amp; routing fee</p>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-emerald-900 bg-white/80 p-2.5 rounded-lg border border-emerald-100 leading-relaxed">
+                  <strong>Forfeiture Split:</strong> In the event of a verified patient No-Show, ₹50 is credited to the attending consultant&apos;s ledger, ₹10 is retained by the platform, and any remaining balance of the initial deposit is automatically refunded to the patient&apos;s original payment method.
+                </p>
               </div>
 
               {/* Cooling Period / Hospital Free Follow-up Policy */}

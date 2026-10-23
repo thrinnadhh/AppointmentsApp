@@ -21,7 +21,9 @@ import {
   Gamepad2,
   Utensils,
   Terminal,
-  Sparkles
+  Sparkles,
+  Layers,
+  FileText
 } from 'lucide-react';
 import { supabase, getCurrentUserProfile, signOutMerchant } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
@@ -148,23 +150,29 @@ export default function Navigation() {
         : []),
     ];
   } else {
-    // Team page accessible for hospital administrators, owners, and superadmins
-    const canSeeTeam =
+    // Hospital Admin access check
+    const canSeeHospitalAdmin =
       isHospitalVenue &&
       (isSuperAdmin ||
         isHospitalAdmin ||
         currentUser?.role === 'admin' ||
-        currentUser?.role === 'merchant' ||
         hospitalContext?.role === 'owner' ||
         hospitalContext?.role === 'admin');
 
+    const canSeeTeam =
+      isHospitalVenue &&
+      (canSeeHospitalAdmin ||
+        currentUser?.role === 'merchant');
+
     navItems = [
       { href: '/', label: 'Overview', icon: LayoutDashboard },
+      ...(canSeeHospitalAdmin ? [{ href: '/departments', label: 'Departments', icon: Layers }] : []),
       { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },
       { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users },
       { href: '/bookings', label: 'Bookings', icon: CalendarDays },
       { href: '/schedule', label: 'Schedule', icon: Clock },
       ...(canSeeTeam ? [{ href: '/team', label: 'Team', icon: UserCheck }] : []),
+      ...(canSeeHospitalAdmin ? [{ href: '/audit-logs', label: 'Audit Logs', icon: FileText }] : []),
       { href: '/settings', label: 'Settings', icon: Settings },
     ];
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Clock, 
@@ -305,6 +305,7 @@ export default function MerchantOverviewPage() {
     activeProvider: tenantProvider, 
     verticalConfig, 
     isSuperAdmin, 
+    isHospitalAdmin,
     isLocked, 
     memberships, 
     switchActiveProvider,
@@ -386,7 +387,9 @@ export default function MerchantOverviewPage() {
   }, [tenantProviderId]);
 
   const activeProvider = providers.find((p) => p.id === selectedProviderId) || tenantProvider || providers[0] || null;
-  const activeResources: Resource[] = (activeProvider?.resources as Resource[]) || [];
+  const activeResources: Resource[] = useMemo(() => {
+    return (activeProvider?.resources as Resource[]) || [];
+  }, [activeProvider?.resources]);
 
   // Operational control state with optimistic overrides
   const [overrideIsActive, setOverrideIsActive] = useState<boolean | null>(null);
@@ -418,9 +421,23 @@ export default function MerchantOverviewPage() {
   const [isSubmittingOffline, setIsSubmittingOffline] = useState(false);
 
   // Live Patient Queue Attendance Matrix filter state
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<string>('');
   const [merchantSelectedDoctorId, setMerchantSelectedDoctorId] = useState<string>('');
   const [matrixFilter, setMatrixFilter] = useState<'ALL' | 'PRESENT' | 'WAITING' | 'ABSENT' | 'LATE'>('ALL');
   const [selectedMatrixBookingId, setSelectedMatrixBookingId] = useState<string | null>(null);
+
+  const availableDepartments = useMemo(() => {
+    const depts = new Set<string>();
+    activeResources.forEach((r) => {
+      if (r.department) depts.add(r.department);
+    });
+    return Array.from(depts).sort();
+  }, [activeResources]);
+
+  const departmentFilteredResources = useMemo(() => {
+    if (!selectedDepartmentFilter) return activeResources;
+    return activeResources.filter((r) => (r.department || 'General') === selectedDepartmentFilter);
+  }, [activeResources, selectedDepartmentFilter]);
 
   useEffect(() => {
     if (activeProvider) {
@@ -1864,33 +1881,65 @@ export default function MerchantOverviewPage() {
             </div>
 
 
-            {/* Attendance Matrix Subheader & Resource Filter */}
+            {/* Attendance Matrix Subheader & Resource / Department Filter */}
             <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
                   <Users className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Live Queue &amp; Service Matrix ({todaysBookings.length} Tokens)</span>
                 </span>
+                {isHospitalAdmin && (
+                  <Link
+                    href="/departments"
+                    className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition"
+                  >
+                    <span>Manage Departments</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                )}
               </div>
 
-              {/* Resource filter dropdown */}
-              {activeResources.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-500">Filter by {verticalConfig.resourceLabelSingular}:</span>
-                  <select
-                    value={merchantSelectedDoctorId}
-                    onChange={(e) => setMerchantSelectedDoctorId(e.target.value)}
-                    className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                  >
-                    <option value="">All {verticalConfig.resourceLabelSingular}s ({activeResources.length})</option>
-                    {activeResources.map((doc) => (
-                      <option key={doc.id} value={doc.id}>
-                        {doc.name} ({doc.department || 'Active'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Resource & Department filter dropdowns */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {availableDepartments.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500">Department:</span>
+                    <select
+                      value={selectedDepartmentFilter}
+                      onChange={(e) => {
+                        setSelectedDepartmentFilter(e.target.value);
+                        setMerchantSelectedDoctorId('');
+                      }}
+                      className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    >
+                      <option value="">All Departments ({availableDepartments.length})</option>
+                      {availableDepartments.map((dept: string) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {activeResources.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500">{verticalConfig.resourceLabelSingular}:</span>
+                    <select
+                      value={merchantSelectedDoctorId}
+                      onChange={(e) => setMerchantSelectedDoctorId(e.target.value)}
+                      className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    >
+                      <option value="">All {verticalConfig.resourceLabelSingular}s ({departmentFilteredResources.length})</option>
+                      {departmentFilteredResources.map((doc: Resource) => (
+                        <option key={doc.id} value={doc.id}>
+                          {doc.name} ({doc.department || 'Active'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1988,10 +2037,15 @@ export default function MerchantOverviewPage() {
 
           {/* Live Patient Queue Attendance Matrix (Style 3) */}
           {(() => {
-            const baseBookings = (merchantSelectedDoctorId
-              ? todaysBookings.filter((b) => b.resource_id === merchantSelectedDoctorId)
-              : todaysBookings
-            ).filter((b) => b.status !== 'CANCELLED');
+            const baseBookings = todaysBookings.filter((b) => {
+              if (b.status === 'CANCELLED') return false;
+              if (merchantSelectedDoctorId && b.resource_id !== merchantSelectedDoctorId) return false;
+              if (selectedDepartmentFilter) {
+                const res = activeResources.find((r) => r.id === b.resource_id);
+                if ((res?.department || 'General') !== selectedDepartmentFilter) return false;
+              }
+              return true;
+            });
 
             const matrixCompletedCount = baseBookings.filter((b) => b.status === 'COMPLETED').length;
             const matrixPresentCount = baseBookings.filter((b) => (b.is_present || b.status === 'CHECKED_IN') && b.status !== 'COMPLETED').length;
