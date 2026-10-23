@@ -157,7 +157,7 @@ export interface MerchantBookingWithDetails {
 export async function manageLateQueueBooking(
   bookingId: string, 
   action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE', 
-  bufferOffset = 2
+  bufferOffset?: number
 ): Promise<{
   success: boolean;
   queue_position?: number;

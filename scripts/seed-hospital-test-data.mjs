@@ -1,4 +1,13 @@
 import fs from 'fs';
+import pg from 'pg';
+
+const { Pool } = pg;
+const pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+  max: 5,
+  idleTimeoutMillis: 2000,
+  allowExitOnIdle: true
+});
 
 /**
  * seed-hospital-test-data.mjs
@@ -41,19 +50,21 @@ export async function seedHospitalTestData() {
 
   // Helper to ensure an auth user exists and return their ID
   async function ensureUser(email, role = 'merchant', fullName = 'Test User') {
-    const listRes = await fetch(`${url}/auth/v1/admin/users?per_page=100`, {
-      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
-    });
-    const listData = await listRes.json();
-    const existing = (listData.users || []).find(u => u.email?.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    const userCheck = await pgPool.query(
+      'SELECT id, email FROM auth.users WHERE lower(email) = lower($1)',
+      [cleanEmail]
+    );
 
-    let userId = existing?.id;
-    if (!existing) {
+    let userId;
+    if (userCheck.rows.length > 0) {
+      userId = userCheck.rows[0].id;
+    } else {
       const createRes = await fetch(`${url}/auth/v1/admin/users`, {
         method: 'POST',
         headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
+          email: cleanEmail,
           password: TEST_PASSWORD,
           email_confirm: true,
           user_metadata: { role, full_name: fullName }
@@ -113,27 +124,24 @@ export async function seedHospitalTestData() {
 
   // 2. Create Providers
   async function createProvider(name, category_id, owner_id) {
-    const res = await fetch(`${url}/rest/v1/providers`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name,
-        category_id,
-        owner_id,
-        status: 'ACTIVE',
-        is_active: true,
-        address: 'Test Medical Road, Tirupati, AP',
-        phone: '+919999900000',
-        city: 'Tirupati',
-        latitude: 13.6288,
-        longitude: 79.4192
-      })
-    });
-    const data = await res.json();
-    if (!Array.isArray(data) || !data[0]) {
-      throw new Error(`Failed to create provider ${name}: ${JSON.stringify(data)}`);
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.trusted_write = 'true'");
+      const res = await client.query(
+        `INSERT INTO public.providers (name, category_id, owner_id, status, is_active, address, phone, city, latitude, longitude)
+         VALUES ($1, $2, $3, 'ACTIVE', true, 'Test Medical Road, Tirupati, AP', '+919999900000', 'Tirupati', 13.6288, 79.4192)
+         RETURNING *`,
+        [name, category_id, owner_id]
+      );
+      await client.query('COMMIT');
+      return res.rows[0];
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
     }
-    return data[0];
   }
 
   const hospA = await createProvider('[TEST-HOSP-A] Tirupati Apex Hospital', 'clinics', userMap['admin.apex']);
