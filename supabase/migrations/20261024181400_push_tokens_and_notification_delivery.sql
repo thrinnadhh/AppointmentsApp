@@ -1,4 +1,4 @@
--- Migration: 20261025000001_push_tokens_and_notification_delivery.sql
+-- Migration: 20261024181400_push_tokens_and_notification_delivery.sql
 -- Description: Creates dedicated push_tokens table with strict user isolation,
 --              removal of stale tokens on delivery errors, and grants.
 

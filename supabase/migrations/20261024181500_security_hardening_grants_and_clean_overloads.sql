@@ -1,5 +1,5 @@
 -- =============================================================================
--- Migration: 20261026000001_security_hardening_grants_and_clean_overloads.sql
+-- Migration: 20261024181500_security_hardening_grants_and_clean_overloads.sql
 -- Description:
 --   1. Grant table privileges on public.payments to service_role and authenticated.
 --      service_role needs SELECT, INSERT, UPDATE for webhook payment logging,

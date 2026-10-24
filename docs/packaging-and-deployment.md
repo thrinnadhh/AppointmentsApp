@@ -14,7 +14,7 @@
 | **Merchant & Admin Web** | `1.0.0` (Next.js 15.5.28) | Optimized Node Server / Static Bundle | Vercel / Cloud Run / Docker |
 | **Customer Mobile (Android)** | `1.0.0` (VersionCode `1`) | `.apk` (Preview/QA) & `.aab` (Play Store) | Google Play Internal Testing |
 | **Customer Mobile (iOS)** | `1.0.0` (Build `1`) | `.ipa` / TestFlight Bundle | Apple TestFlight / App Store |
-| **Database Migrations** | `20261026000001` (18 migrations) | PostgreSQL DDL & RLS Policies | Supabase Cloud Database |
+| **Database Migrations** | `20261024181600` (18 migrations) | PostgreSQL DDL & RLS Policies | Supabase Cloud Database |
 
 ---
 
