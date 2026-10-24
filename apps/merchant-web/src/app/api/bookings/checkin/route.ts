@@ -9,10 +9,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const code = (body.code || '').trim();
     let shopId = body.shopId || body.shop_id || null;
+    const isOfflineWalkIn = Boolean(body.is_offline_walk_in || body.offline_walk_in || body.walk_in);
+    const bookingId = body.booking_id || body.bookingId || null;
 
-    if (!code) {
+    if (!code && !isOfflineWalkIn) {
       return NextResponse.json(
         { success: false, error: 'INVALID_CODE', message: 'Check-in code is required' },
+        { status: 400 }
+      );
+    }
+
+    if (isOfflineWalkIn && !bookingId && !code) {
+      return NextResponse.json(
+        { success: false, error: 'MISSING_PARAM', message: 'Booking ID or check-in code is required for offline walk-in' },
         { status: 400 }
       );
     }
@@ -30,67 +39,92 @@ export async function POST(req: NextRequest) {
     // Check if caller is admin or authorized for the shop
     const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
 
-    // Look up the code in appointment_checkin_codes
-    let query = supabaseAdmin
-      .from('appointment_checkin_codes')
-      .select('id, booking_id, provider_id, customer_id, code, appointment_date')
-      .eq('code', code);
+    let booking: any = null;
+    let targetProviderId: string | null = shopId;
 
-    if (shopId) {
-      query = query.eq('provider_id', shopId);
-    }
+    if (isOfflineWalkIn && bookingId) {
+      // 1. Offline Walk-In direct booking lookup (bypasses PIN verification)
+      const { data: b, error: bErr } = await supabaseAdmin
+        .from('bookings')
+        .select('id, customer_id, provider_id, resource_id, slot_start, slot_end, status, is_present, checked_in_at')
+        .eq('id', bookingId)
+        .maybeSingle();
 
-    const { data: codeRecords, error: codeErr } = await query;
+      if (bErr || !b) {
+        return NextResponse.json(
+          { success: false, error: 'INVALID_BOOKING', message: 'Associated appointment not found' },
+          { status: 404 }
+        );
+      }
+      booking = b;
+      targetProviderId = b.provider_id;
+    } else if (code) {
+      // 2. Online or PIN-based check-in: look up in appointment_checkin_codes first
+      let query = supabaseAdmin
+        .from('appointment_checkin_codes')
+        .select('id, booking_id, provider_id, customer_id, code, appointment_date')
+        .eq('code', code);
 
-    if (codeErr || !codeRecords || codeRecords.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'INVALID_CODE', message: 'Invalid check-in code' },
-        { status: 404 }
-      );
-    }
+      if (shopId) {
+        query = query.eq('provider_id', shopId);
+      }
 
-    const codeRecord = codeRecords[0];
-    const targetProviderId = codeRecord.provider_id;
+      const { data: codeRecords, error: codeErr } = await query;
 
-    // Authorization check
-    if (!isAdmin) {
-      const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
-        p_user_id: caller.id,
-      });
-      const allowedList = Array.isArray(authProviders) ? authProviders : [];
-      let isAuthorized = allowedList.includes(targetProviderId);
+      if (!codeErr && codeRecords && codeRecords.length > 0) {
+        const codeRecord = codeRecords[0];
+        targetProviderId = codeRecord.provider_id;
 
-      if (!isAuthorized) {
-        // Also check if caller has a valid hospital role for this provider
-        const { data: hospRole } = await (supabaseAdmin.rpc as any)('hospital_role', {
-          p_provider_id: targetProviderId,
-          p_user_id: caller.id,
-        });
-        if (hospRole && ['admin', 'front_desk', 'consultant'].includes(hospRole)) {
-          isAuthorized = true;
+        const { data: b, error: bErr } = await supabaseAdmin
+          .from('bookings')
+          .select('id, customer_id, provider_id, resource_id, slot_start, slot_end, status, is_present, checked_in_at')
+          .eq('id', codeRecord.booking_id)
+          .maybeSingle();
+
+        if (b && !bErr) {
+          booking = b;
         }
       }
 
-      if (!isAuthorized) {
+      // 3. Fallback: Check customer permanent lifetime PIN in public.profiles
+      if (!booking) {
+        const { data: profileWithPin } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('permanent_checkin_pin', code)
+          .maybeSingle();
+
+        if (profileWithPin) {
+          let bQuery = supabaseAdmin
+            .from('bookings')
+            .select('id, customer_id, provider_id, resource_id, slot_start, slot_end, status, is_present, checked_in_at')
+            .eq('customer_id', profileWithPin.id)
+            .in('status', ['CONFIRMED', 'CHECKED_IN']);
+
+          if (shopId) {
+            bQuery = bQuery.eq('provider_id', shopId);
+          }
+
+          const { data: pinBookings } = await bQuery;
+          if (pinBookings && pinBookings.length > 0) {
+            // Pick CONFIRMED over CHECKED_IN, closest to current time
+            pinBookings.sort((a: any, b: any) => {
+              if (a.status === 'CONFIRMED' && b.status !== 'CONFIRMED') return -1;
+              if (b.status === 'CONFIRMED' && a.status !== 'CONFIRMED') return 1;
+              return Math.abs(new Date(a.slot_start).getTime() - Date.now()) - Math.abs(new Date(b.slot_start).getTime() - Date.now());
+            });
+            booking = pinBookings[0];
+            targetProviderId = booking.provider_id;
+          }
+        }
+      }
+
+      if (!booking) {
         return NextResponse.json(
-          { success: false, error: 'UNAUTHORIZED', message: 'You are not authorized for this clinic or hospital' },
-          { status: 403 }
+          { success: false, error: 'INVALID_CODE', message: 'Invalid check-in code' },
+          { status: 404 }
         );
       }
-    }
-
-    // Fetch the booking
-    const { data: booking, error: bErr } = await supabaseAdmin
-      .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, slot_start, slot_end, status, is_present, checked_in_at')
-      .eq('id', codeRecord.booking_id)
-      .single();
-
-    if (bErr || !booking) {
-      return NextResponse.json(
-        { success: false, error: 'INVALID_CODE', message: 'Associated appointment not found' },
-        { status: 404 }
-      );
     }
 
     // Front Desk assignment scoping: staff can only check in patients for their assigned doctors
@@ -152,6 +186,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const checkedInMethod = isOfflineWalkIn ? 'manual' : 'code';
+
     // Update the booking status to CHECKED_IN
     const { error: updateErr } = await supabaseAdmin
       .from('bookings')
@@ -160,7 +196,7 @@ export async function POST(req: NextRequest) {
         is_present: true,
         checked_in_at: now.toISOString(),
         checked_in_by: caller.id,
-        checked_in_method: 'code',
+        checked_in_method: checkedInMethod,
         customer_arrived_at: now.toISOString(),
         updated_at: now.toISOString(),
       })
@@ -181,6 +217,8 @@ export async function POST(req: NextRequest) {
       service_doctor: doctorName,
       slot_time: slotTimeStr,
       is_late: isLate,
+      is_offline_walk_in: isOfflineWalkIn,
+      checked_in_method: checkedInMethod,
       checked_in_at: now.toISOString(),
     });
   } catch (err) {

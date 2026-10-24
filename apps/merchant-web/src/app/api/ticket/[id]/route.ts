@@ -170,7 +170,7 @@ export async function GET(
     // 4. Fetch customer profile
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('full_name, email, phone')
+      .select('full_name, email, phone, permanent_checkin_pin')
       .eq('id', booking.customer_id)
       .maybeSingle();
 
@@ -201,7 +201,7 @@ export async function GET(
       .eq('booking_id', booking.id)
       .maybeSingle();
 
-    const displayCode = isWindowOpen || isCheckedIn ? (checkinCodeRecord?.code || '----') : null;
+    const displayCode = isWindowOpen || isCheckedIn ? (checkinCodeRecord?.code || profile?.permanent_checkin_pin || '----') : null;
 
     return NextResponse.json({
       success: true,
