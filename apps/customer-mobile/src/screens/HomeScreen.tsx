@@ -8,11 +8,12 @@ import {
   TextInput,
   Image,
   SafeAreaView,
-  StatusBar,
+  StatusBar as RNStatusBar,
   ActivityIndicator,
   Platform,
   Animated,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { VERTICALS, normCategory, City, Booking } from '@appointments/shared';
 import {
   fetchProvidersByCategory,
@@ -531,7 +532,7 @@ export default function HomeScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar style="dark" />
 
       {/* Top Header with App Logo & Location */}
       <View style={styles.header}>
@@ -1020,7 +1021,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
+    paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 28) : 0,
   },
   liveCard: {
     backgroundColor: '#ffffff',
