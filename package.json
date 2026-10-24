@@ -54,6 +54,9 @@
       "source-map-js": ">=1.2.2",
       "sharp": ">=0.35.5",
       "next": "15.5.28"
+    },
+    "patchedDependencies": {
+      "expo-notifications@58.1.6": "patches/expo-notifications@58.1.6.patch"
     }
   }
 }

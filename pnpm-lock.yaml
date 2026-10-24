@@ -17,6 +17,11 @@ overrides:
   sharp: '>=0.35.5'
   next: 15.5.28
 
+patchedDependencies:
+  expo-notifications@58.1.6:
+    hash: onbm3psd3ydkxawcbc74w2wq4m
+    path: patches/expo-notifications@58.1.6.patch
+
 importers:
 
   .:
@@ -47,7 +52,7 @@ importers:
         version: 58.0.5(expo@58.0.19)
       expo-notifications:
         specifier: ^58.1.6
-        version: 58.1.6(expo@58.0.19)(react-native@0.88.0)(react@19.3.0)(typescript@6.0.3)
+        version: 58.1.6(patch_hash=onbm3psd3ydkxawcbc74w2wq4m)(expo@58.0.19)(react-native@0.88.0)(react@19.3.0)(typescript@6.0.3)
       expo-splash-screen:
         specifier: ~58.0.11
         version: 58.0.11(expo@58.0.19)(typescript@6.0.3)
@@ -4630,7 +4635,7 @@ packages:
       '@expo/modules-macros-win32-x64': 0.22.0
     dev: false
 
-  /expo-notifications@58.1.6(expo@58.0.19)(react-native@0.88.0)(react@19.3.0)(typescript@6.0.3):
+  /expo-notifications@58.1.6(patch_hash=onbm3psd3ydkxawcbc74w2wq4m)(expo@58.0.19)(react-native@0.88.0)(react@19.3.0)(typescript@6.0.3):
     resolution: {integrity: sha512-O3Y4u1GyiReD+akm/hlHkLB/2FoW6bOflTUoONhwRsgmXr+jZQBZckdjmhk6TE/gQ2FRdsTfSCX4sUHdWA+LsQ==}
     peerDependencies:
       expo: '*'
@@ -4649,6 +4654,7 @@ packages:
       - supports-color
       - typescript
     dev: false
+    patched: true
 
   /expo-server@58.0.6:
     resolution: {integrity: sha512-6DBlSZwxk3J0y1j2s4XebAWNiwGaMp32NcWX7b2kJC2+EFf1g+pCcVmx8ylawt2tyLmbDHswm4MHOfrd4bqfvA==}
