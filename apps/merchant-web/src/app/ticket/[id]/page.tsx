@@ -15,7 +15,8 @@ import {
   Calendar,
   AlertCircle,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  Lock
 } from 'lucide-react';
 import { RollingTenSlotQueue } from '@/components/RollingTenSlotQueue';
 import { MonthlyAttendanceCalendar } from '@/components/MonthlyAttendanceCalendar';
@@ -75,6 +76,12 @@ export default function CustomerTicketPage({
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [justReconnected, setJustReconnected] = useState<boolean>(false);
 
+  // Phone verification state for unauthenticated web pass visitors (SMS/WhatsApp links)
+  const [requiresVerification, setRequiresVerification] = useState(false);
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleOnline = () => {
@@ -121,21 +128,64 @@ export default function CustomerTicketPage({
     }
   };
 
-  const fetchTicket = async (showLoading = false) => {
+  const fetchTicket = async (showLoading = false, digitsOverride?: string) => {
     if (showLoading) setLoading(true);
     try {
-      const res = await fetch(`/api/ticket/${id}`, { cache: 'no-store' });
+      const storedDigits = typeof window !== 'undefined' ? sessionStorage.getItem(`ticket_phone_${id}`) : null;
+      const digits = digitsOverride !== undefined ? digitsOverride : (phoneDigits || storedDigits || '');
+      const url = digits ? `/api/ticket/${id}?phone_last4=${encodeURIComponent(digits)}` : `/api/ticket/${id}`;
+      const res = await fetch(url, { cache: 'no-store' });
+
+      if (res.status === 401 || res.status === 403) {
+        const json = await res.json().catch(() => ({}));
+        if (json.requires_verification) {
+          setRequiresVerification(true);
+          if (digits) {
+            setVerifyError('Incorrect digits. Please check the last 4 digits of your registered phone number.');
+          }
+          setData(null);
+          return;
+        }
+        throw new Error(`Ticket not found (${res.status})`);
+      }
+
       if (!res.ok) {
         throw new Error(`Ticket not found (${res.status})`);
       }
+
       const json = await res.json();
+      if (digits) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`ticket_phone_${id}`, digits);
+        }
+        setPhoneDigits(digits);
+      }
       setData(json);
+      setRequiresVerification(false);
+      setVerifyError(null);
       setLastUpdated(new Date());
       setError(null);
+      fetchQueueAndHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load ticket');
     } finally {
       if (showLoading) setLoading(false);
+    }
+  };
+
+  const handleVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanDigits = phoneDigits.trim();
+    if (!/^\d{4}$/.test(cleanDigits)) {
+      setVerifyError('Please enter exactly 4 numbers (digits only).');
+      return;
+    }
+    setIsVerifying(true);
+    setVerifyError(null);
+    try {
+      await fetchTicket(false, cleanDigits);
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -302,6 +352,81 @@ export default function CustomerTicketPage({
         <RefreshCw className="w-10 h-10 text-emerald-600 animate-spin mb-4" />
         <h2 className="text-xl font-bold text-gray-800">Retrieving Appointment Ticket...</h2>
         <p className="text-sm text-gray-500 mt-1">Connecting to tri-test-hospital registry...</p>
+      </div>
+    );
+  }
+
+  if (requiresVerification) {
+    return (
+      <div data-testid="ticket-verification-gate" className="max-w-md mx-auto my-12 p-8 bg-white rounded-xl border border-gray-200 shadow-sm text-center">
+        <div className="w-14 h-14 bg-emerald-50 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-200">
+          <ShieldCheck className="w-7 h-7 text-emerald-700" />
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-semibold uppercase tracking-wider mb-2 border border-emerald-200">
+          <Lock className="w-3.5 h-3.5" />
+          Patient Access Verification
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Confirm Your Phone Number</h2>
+        <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+          To protect patient medical privacy, please enter the <strong className="text-gray-900 font-semibold">last 4 digits</strong> of the phone number used when booking this appointment.
+        </p>
+
+        <form onSubmit={handleVerifySubmit} className="mt-6 space-y-4 text-left">
+          <div>
+            <label htmlFor="phone_digits" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+              Last 4 Digits of Phone Number
+            </label>
+            <div className="relative">
+              <input
+                id="phone_digits"
+                data-testid="phone-verification-input"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                autoFocus
+                placeholder="••••"
+                value={phoneDigits}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setPhoneDigits(val);
+                  if (verifyError) setVerifyError(null);
+                }}
+                className="w-full text-center font-mono text-2xl font-bold tracking-[0.5em] px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 text-gray-900 transition"
+              />
+            </div>
+          </div>
+
+          {verifyError && (
+            <div data-testid="verification-error" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{verifyError}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            data-testid="phone-verification-submit"
+            disabled={isVerifying || phoneDigits.length !== 4}
+            className="w-full py-3 px-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-sm shadow-sm transition flex items-center justify-center gap-2"
+          >
+            {isVerifying ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Verifying...</span>
+              </>
+            ) : (
+              <>
+                <span>Unlock Appointment Pass</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <p className="text-xs text-gray-400 mt-5">
+          💡 Tip: Check the SMS or WhatsApp confirmation message received on your phone.
+        </p>
       </div>
     );
   }
