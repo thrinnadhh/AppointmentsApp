@@ -23,7 +23,8 @@ Roles: Hospital Admin, Front Desk, Consultant. Arrival tags: On Time, Early, Lat
   - Exceeding 5 strikes (6th no-show): account is blocked for 7 days (`blocked_until = NOW() + INTERVAL '7 days'`), display 'Your account is blocked for 7 days', and reset the strike counter to 0.
 - A patient who checked in but was not reached is NOT a no-show: free reschedule or full refund.
 ## Check-in
-- 4-digit check-in PIN is permanent and lifetime for the customer across all their bookings as long as they use the app. It does not change on reschedule or per-appointment.
+- 4-digit check-in PIN is permanent and lifetime tied directly to the customer profile across all their bookings as long as they use the app. It does not change on reschedule or per-appointment, ensuring streamlined hospital check-ins.
+- Offline walk-in bypass: Hospital staff processing offline or walk-in patients can check in patients directly via manual mark-present bypass (`is_offline_walk_in: true`) without requiring the customer's permanent PIN, while online bookings continue to verify the customer's permanent PIN.
 - PIN is shown to the customer on their ticket/booking pass from 60 minutes before the slot until check-in. Staff verify it through a function only and can never read codes. 5 wrong attempts lock that staff user for 60 seconds. Unauthorized, other-shop and invalid codes return the identical error. Manual mark-present exists as a logged fallback.
 ## Customer Mobile UX & Notifications
 - SMS & WhatsApp are primary communication channels.

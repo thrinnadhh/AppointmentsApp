@@ -211,3 +211,23 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
      - Providing the matching 4 digits (`?phone_last4=...` or `x-phone-last4` header) unlocks the appointment pass and check-in PIN (HTTP 200) without changing existing SMS/WhatsApp notification URL structures. Incorrect digits yield HTTP 403.
      - Upon successful verification, the 4 digits are cached in `sessionStorage` to allow seamless adaptive polling (6s / 35s) and tab refocus re-fetching without prompting the patient again.
      - Validated by Test 1F in `tests/e2e/stories/08-security-audit.test.mjs` and Playwright story suite (48/48 passing).
+
+---
+
+### Decision 12: Permanent Lifetime PIN Retention & Offline Walk-In Bypass
+- **Date**: 2026-10-24
+- **Status**: DECIDED (Implemented & Verified)
+- **Requirement & Architecture**:
+  1. **Permanent Lifetime PIN**:
+     - Retained `permanent_checkin_pin` column on `public.profiles`, strictly guarded by `guard_profile_governance()` trigger function against regular customer client tampering.
+     - Customer's 4-digit PIN is permanent across their account lifecycle and does not change per-appointment or upon reschedule.
+     - Confirmed booking code generation in `generate_appointment_checkin_code_for_booking` associates the appointment with the customer's permanent lifetime PIN.
+     - Both `/api/ticket/[id]` and `POST /api/bookings/checkin` resolve customer's permanent lifetime PIN directly from `profiles` as a first-class citizen or fallback.
+  2. **Offline Walk-In Bypass**:
+     - Updated `POST /api/bookings/checkin` to support offline/walk-in reception arrivals via `is_offline_walk_in: true` flag.
+     - When `is_offline_walk_in: true`, staff provide `booking_id` directly without requiring PIN entry.
+     - Standard role checks and front desk doctor scoping (`hospital_accessible_resource_ids`) remain enforced.
+     - Successfully records `checked_in_method = 'manual'` (per DB check constraint `checked_in_method IN ('code', 'manual')`), while PIN-based check-ins record `checked_in_method = 'code'`.
+  3. **SPEC.md Alignment**:
+     - Updated `docs/hospital/SPEC.md` Check-in section to explicitly define that check-in PIN is a permanent, lifetime code tied to the customer profile for streamlined hospital check-ins, with offline walk-in bypass supported for front desk staff.
+
