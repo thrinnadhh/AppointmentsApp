@@ -64,3 +64,4 @@ scripts/e2e-*.mjs
 strix-*.log
 .venv/
 scratch/
+.local/
