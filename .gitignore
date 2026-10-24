@@ -65,3 +65,5 @@ strix-*.log
 .venv/
 scratch/
 .local/
+tests/e2e/stories/story-manifest.json
+story-manifest.json
