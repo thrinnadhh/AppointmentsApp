@@ -58,17 +58,22 @@ export async function seedStoryCast(options = {}) {
     const cleanEmail = email.trim().toLowerCase();
     const password = generatePassword();
 
-    // Check existing
-    const existing = await pgPool.query('SELECT id FROM auth.users WHERE lower(email) = lower($1)', [cleanEmail]);
+    // Check existing by email or phone
+    const cleanPhone = phone ? phone.replace(/^\+/, '') : null;
+    const existing = await pgPool.query(
+      `SELECT id FROM auth.users WHERE lower(email) = lower($1) OR (phone IS NOT NULL AND $2::text IS NOT NULL AND phone = $2)`,
+      [cleanEmail, cleanPhone]
+    );
     let userId;
 
     if (existing.rows.length > 0) {
       userId = existing.rows[0].id;
-      // Update password
+      // Update password and ensure clean email
       await fetch(`${url}/auth/v1/admin/users/${userId}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
+          email: cleanEmail,
           password,
           email_confirm: true,
           phone: phone || undefined,
