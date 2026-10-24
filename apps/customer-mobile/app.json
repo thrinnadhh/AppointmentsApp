@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#059669"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.appointments.tirupati",
@@ -34,6 +29,14 @@
         {
           "icon": "./assets/icon.png",
           "color": "#059669"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#059669"
         }
       ]
     ],
