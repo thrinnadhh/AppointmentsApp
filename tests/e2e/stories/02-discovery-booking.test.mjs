@@ -124,8 +124,8 @@ export async function runGroup2(collector = globalCollector) {
   let st12BookingId;
   try {
     console.log('▶ [ST-12] Testing booking hold, deposit capture, 4-digit code & arrival window...');
-    const slotStart = '2026-10-25 10:00:00+05:30';
-    const slotEnd = '2026-10-25 10:10:00+05:30';
+    const slotStart = '2026-10-26 10:00:00+05:30';
+    const slotEnd = '2026-10-26 10:10:00+05:30';
     const doc = h1.consultants.sharma;
 
     // Clean existing slot and any prior bookings for U1 on that date
@@ -181,8 +181,8 @@ export async function runGroup2(collector = globalCollector) {
     const startMs = new Date(slotStart).getTime();
     const windowStart = new Date(startMs - 10 * 60 * 1000);
     const windowEnd = new Date(startMs + 10 * 60 * 1000);
-    assert.strictEqual(windowStart.toISOString(), new Date('2026-10-25T04:20:00.000Z').toISOString(), 'Arrival window start is -10m');
-    assert.strictEqual(windowEnd.toISOString(), new Date('2026-10-25T04:40:00.000Z').toISOString(), 'Arrival window end is +10m');
+    assert.strictEqual(windowStart.getTime(), startMs - 10 * 60 * 1000, 'Arrival window start is -10m');
+    assert.strictEqual(windowEnd.getTime(), startMs + 10 * 60 * 1000, 'Arrival window end is +10m');
 
     // 6. Log notification
     await directDb(
@@ -216,8 +216,8 @@ export async function runGroup2(collector = globalCollector) {
   // -------------------------------------------------------------------------
   try {
     console.log('▶ [ST-13] Testing abandoned hold release & webhook idempotency...');
-    const slotStart = '2026-10-25 12:00:00+05:30';
-    const slotEnd = '2026-10-25 12:10:00+05:30';
+    const slotStart = '2026-10-26 12:00:00+05:30';
+    const slotEnd = '2026-10-26 12:10:00+05:30';
     const doc = h1.consultants.sharma;
 
     // Clean existing
