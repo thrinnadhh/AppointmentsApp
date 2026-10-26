@@ -2,7 +2,7 @@
 
 > **Audit Commit:** `aa416932dbe00fcfa36233f71e6048612d334347`  
 > **Source of Truth:** `docs/hospital/SPEC.md`  
-> **Generated:** 2026-10-26T09:55:09.730Z  
+> **Generated:** 2026-10-26T11:08:10.559Z  
 
 ## 1. Summary Statistics
 

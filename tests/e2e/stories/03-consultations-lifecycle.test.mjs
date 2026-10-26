@@ -400,10 +400,10 @@ export async function runGroup3(collector = globalCollector) {
     // Now U1 books follow-up appointment within 7-day cooling period (e.g. 1 day in the future)
     const futureDate = new Date(Date.now() + 24 * 3600 * 1000);
     const dateStr = futureDate.toISOString().split('T')[0];
-    const followupStart = `${dateStr} 17:00:00+05:30`;
-    const followupEnd = `${dateStr} 17:10:00+05:30`;
-    await directDb("DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE customer_id = $1 AND slot_start = $2)", [u1.id, followupStart]);
-    await directDb("DELETE FROM public.bookings WHERE customer_id = $1 AND slot_start = $2", [u1.id, followupStart]);
+    const followupStart = `${dateStr} 19:00:00+05:30`;
+    const followupEnd = `${dateStr} 19:10:00+05:30`;
+    await directDb("DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE customer_id = $1 AND slot_start >= $2 AND slot_start <= $3)", [u1.id, `${dateStr} 18:00:00+05:30`, `${dateStr} 20:00:00+05:30`]);
+    await directDb("DELETE FROM public.bookings WHERE customer_id = $1 AND slot_start >= $2 AND slot_start <= $3", [u1.id, `${dateStr} 18:00:00+05:30`, `${dateStr} 20:00:00+05:30`]);
 
     const holdRes = await fetch(`${config.supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
       method: 'POST',

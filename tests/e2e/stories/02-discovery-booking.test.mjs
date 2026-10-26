@@ -124,8 +124,8 @@ export async function runGroup2(collector = globalCollector) {
   let st12BookingId;
   try {
     console.log('▶ [ST-12] Testing booking hold, deposit capture, 4-digit code & arrival window...');
-    const slotStart = '2026-10-26 16:30:00+05:30';
-    const slotEnd = '2026-10-26 16:40:00+05:30';
+    const slotStart = '2026-10-27 16:30:00+05:30';
+    const slotEnd = '2026-10-27 16:40:00+05:30';
     const doc = h1.consultants.sharma;
 
     // Clean existing slot and any prior bookings for U1 on that date
@@ -216,8 +216,8 @@ export async function runGroup2(collector = globalCollector) {
   // -------------------------------------------------------------------------
   try {
     console.log('▶ [ST-13] Testing abandoned hold release & webhook idempotency...');
-    const slotStart = '2026-10-26 17:00:00+05:30';
-    const slotEnd = '2026-10-26 17:10:00+05:30';
+    const slotStart = '2026-10-27 17:00:00+05:30';
+    const slotEnd = '2026-10-27 17:10:00+05:30';
     const doc = h1.consultants.sharma;
 
     // Clean existing

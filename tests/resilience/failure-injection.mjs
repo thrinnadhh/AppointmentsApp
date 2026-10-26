@@ -82,10 +82,9 @@ test('Gate 4: Failure Injection & Fault Tolerance', async (t) => {
       const txClient = await pool.connect();
       let caughtError = false;
 
+      const testBookingId = crypto.randomUUID();
       try {
         await txClient.query('BEGIN');
-
-        const testBookingId = crypto.randomUUID();
         await txClient.query(`
           INSERT INTO public.bookings (
             id, provider_id, customer_id, slot_start, slot_end, status, total_amount, deposit_amount
@@ -113,8 +112,8 @@ test('Gate 4: Failure Injection & Fault Tolerance', async (t) => {
       assert.equal(caughtError, true, 'Simulated error caught');
 
       const checkRes = await client.query(`
-        SELECT COUNT(*) FROM public.bookings WHERE status = 'HELD' AND slot_start > NOW() + INTERVAL '9 days'
-      `);
+        SELECT COUNT(*) FROM public.bookings WHERE id = $1
+      `, [testBookingId]);
       assert.equal(parseInt(checkRes.rows[0].count, 10), 0, 'Transaction rollback must leave ZERO orphaned booking records');
     });
 
