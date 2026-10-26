@@ -198,14 +198,23 @@ export function getStorageStatus(): {
   };
 }
 
+export interface GetPrivateDocumentSignedUrlOptions {
+  callerUserId?: string;
+  providerId?: string;
+  bookingId?: string;
+  role?: string;
+}
+
 /**
  * Generates a time-limited signed URL for private documents (prescriptions, clinical records).
  * Strictly forbids public URL generation for private buckets.
+ * Logs access in public.audit_logs for medical record read traceability (MED-02).
  */
 export async function getPrivateDocumentSignedUrl(
   storagePath: string,
   expiresInSeconds: number = 300,
-  bucket: string = 'prescriptions-and-records'
+  bucket: string = 'prescriptions-and-records',
+  options?: GetPrivateDocumentSignedUrlOptions
 ): Promise<{ signedUrl: string | null; error?: string }> {
   if (isPublicBucket(bucket)) {
     return { signedUrl: null, error: `Bucket ${bucket} is public; use getPublicUrl instead` };
@@ -223,12 +232,39 @@ export async function getPrivateDocumentSignedUrl(
       return { signedUrl: null, error: error?.message || 'Failed to generate signed URL' };
     }
 
+    // Log audit trail for accessing private medical documents (Finding MED-02)
+    const providerId =
+      options?.providerId ||
+      (storagePath.split('/')[0]?.match(/^[0-9a-f-]{36}$/i) ? storagePath.split('/')[0] : null);
+
+    if (providerId) {
+      const actorId =
+        options?.callerUserId ||
+        (await supabase.auth.getUser().then((res) => res.data.user?.id).catch(() => null)) ||
+        null;
+
+      await (supabase.from('audit_logs') as any).insert({
+        merchant_id: providerId,
+        actor_id: actorId,
+        action: 'READ_PRESCRIPTION_ATTACHMENT',
+        target: `${bucket}/${storagePath}`,
+        metadata: {
+          bucket,
+          storagePath,
+          expiresInSeconds: boundedTtl,
+        },
+        booking_id: options?.bookingId || null,
+        role: options?.role || 'staff',
+      });
+    }
+
     return { signedUrl: data.signedUrl };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Storage signing error';
     return { signedUrl: null, error: msg };
   }
 }
+
 
 export interface UploadPrivateDocumentOptions {
   providerId?: string;
