@@ -119,7 +119,7 @@ export async function GET(
     // 2. Fetch booking using admin client
     const { data: booking, error: bErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, reference_code, slot_start, slot_end, status, payment_status, deposit_amount, total_amount, is_present, checked_in_at, checked_in_method, customer_id, provider_id, resource_id')
+      .select('id, reference_code, slot_start, slot_end, status, payment_status, deposit_amount, total_amount, platform_fee_amount, consultation_fee_amount, platform_payment_status, consultation_payment_status, consultation_collected_at, is_present, checked_in_at, checked_in_method, customer_id, provider_id, resource_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -217,6 +217,11 @@ export async function GET(
         status: booking.status,
         payment_status: booking.payment_status,
         deposit_amount: booking.deposit_amount,
+        platform_fee_amount: booking.platform_fee_amount,
+        consultation_fee_amount: booking.consultation_fee_amount,
+        platform_payment_status: booking.platform_payment_status,
+        consultation_payment_status: booking.consultation_payment_status,
+        consultation_collected_at: booking.consultation_collected_at,
         is_present: booking.is_present,
         checked_in_at: booking.checked_in_at,
         checked_in_method: booking.checked_in_method

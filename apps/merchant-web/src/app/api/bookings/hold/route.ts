@@ -12,6 +12,10 @@ interface RpcHoldResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   hold_expires_at?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
@@ -351,6 +355,10 @@ export async function POST(req: NextRequest) {
         deposit_amount: result.deposit_amount,
         platform_fee: result.platform_fee,
         total_amount: result.total_amount,
+        platform_fee_amount: result.platform_fee_amount ?? result.platform_fee,
+        consultation_fee_amount: result.consultation_fee_amount,
+        platform_payment_status: (result.platform_payment_status as any) || 'PENDING',
+        consultation_payment_status: (result.consultation_payment_status as any) || 'PENDING_OFFLINE',
         hold_expires_at: result.hold_expires_at,
         is_followup: result.is_followup,
         followup_original_booking_id: result.followup_original_booking_id,
