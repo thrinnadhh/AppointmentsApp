@@ -9,6 +9,7 @@
 
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
+import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
 
@@ -35,14 +36,25 @@ async function runInteractiveTest() {
     // -------------------------------------------------------------------------
     // Step 1: Sign in via Merchant Login UI
     // -------------------------------------------------------------------------
-    console.log('1. Navigating to /login and signing in as H1 Admin...');
+    const manifestPath = path.resolve(process.cwd(), 'tests/e2e/stories/story-manifest.json');
+    let adminEmail = 'admin.story-h1@hospital-test.local';
+    let adminPassword = 'Story_5d5ee0b9956b!2026';
+    if (fs.existsSync(manifestPath)) {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      if (manifest.hospitals?.H1?.admin) {
+        adminEmail = manifest.hospitals.H1.admin.email;
+        adminPassword = manifest.hospitals.H1.admin.password;
+      }
+    }
+
+    console.log(`1. Navigating to /login and signing in as ${adminEmail}...`);
     await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
     
     // Wait for Next.js hydration marker on login form
     await page.locator('[data-hydrated="true"]').waitFor({ state: 'attached', timeout: 15000 });
     
-    await page.locator('input[data-testid="login-email"]').fill('admin.story-h1@hospital-test.local');
-    await page.locator('input[data-testid="login-password"]').fill('Story_5d5ee0b9956b!2026');
+    await page.locator('input[data-testid="login-email"]').fill(adminEmail);
+    await page.locator('input[data-testid="login-password"]').fill(adminPassword);
     await page.locator('button[data-testid="login-submit"]').click();
 
     // Wait for redirect to merchant dashboard
