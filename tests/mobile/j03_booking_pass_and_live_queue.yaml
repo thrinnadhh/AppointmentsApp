@@ -1,0 +1,24 @@
+appId: host.exp.exponent
+---
+# Journey J-03: My Bookings, Check-in PIN, Booking Pass, and Live Hospital Queue
+# Verified against SPEC.md (Lifetime PIN, token number, real-time consultation state)
+- launchApp
+- tapOn: "My Appointments"
+- assertVisible: "YOUR LIFETIME CHECK-IN PIN"
+- assertVisible: "4821"
+- tapOn: "View Pass"
+- assertVisible: "HOSPITAL OPD LIVE PASS & QUEUE"
+- assertVisible: "🎟️ My Token Pass"
+- assertVisible: "YOUR TOKEN"
+- assertVisible: "NOW SERVING"
+- scrollUntilVisible:
+    element: "RECEPTION CHECK-IN CODE"
+    direction: DOWN
+- assertVisible: "4821"
+- assertVisible: "Deposit Paid via UPI / Card"
+- tapOn: "🏥 Hospital Live Queue (#8)"
+- assertVisible: "Lakshmi Devi"
+- assertVisible: "🔵 SERVING"
+- assertVisible: "You (Patient Pass)"
+- assertVisible: "🔴 AWAITING"
+- tapOn: "Close appointment pass"

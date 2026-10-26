@@ -1,0 +1,26 @@
+appId: host.exp.exponent
+---
+# Journey J-07: Account Management, DPDP Privacy Preferences, Data Archive, and 30-Day Deletion
+# Verified against SPEC.md and screens-customer.md
+- launchApp
+- tapOn: "Account"
+- assertVisible: "Customer Profile & Sign In"
+- assertVisible: "Trinadh Test Patient"
+- scrollUntilVisible:
+    element: "Open Account, Privacy & Delete Account"
+    direction: DOWN
+- tapOn: "Open Account, Privacy & Delete Account"
+- assertVisible: "Account & Settings"
+- assertVisible: "ATTENDANCE STANDING"
+- assertVisible: "PRIVACY & DATA"
+- assertVisible: "📥 Export Personal Data Archive (JSON) →"
+- assertVisible: "PRIVACY PREFERENCES"
+- assertVisible: "Location for Nearby Discovery"
+- scrollUntilVisible:
+    element: "Delete Account"
+    direction: DOWN
+- tapOn: "Delete Account"
+- assertVisible: "Your account and all personal data will be permanently deleted after a 30-day grace period."
+- assertVisible: "CANCEL"
+- assertVisible: "SCHEDULE DELETION"
+- tapOn: "CANCEL"

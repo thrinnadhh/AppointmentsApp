@@ -1,0 +1,21 @@
+appId: host.exp.exponent
+---
+# Journey J-01: Onboarding, Territory / City Selection, and Category Discovery
+# Verified against SPEC.md and screens-customer.md
+- launchApp
+- assertVisible: "Explore"
+- tapOn:
+    point: "315, 182" # City Selector Badge (TIRUPATI, AP)
+- assertVisible: "Choose Territory"
+- assertVisible: "Live booking cities & pre-launch expansion"
+- assertVisible: "Tirupati"
+- assertVisible: "LIVE NOW"
+- assertVisible: "Chittoor"
+- assertVisible: "EXPANDING SOON"
+- assertVisible: "Nellore"
+- tapOn: "Close city selector"
+- assertVisible: "Choose a Service"
+- assertVisible: "Hospitals & Clinics"
+- assertVisible: "Salons & Spas"
+- assertVisible: "Restaurants & Dining"
+- assertVisible: "Gaming & Turf"
