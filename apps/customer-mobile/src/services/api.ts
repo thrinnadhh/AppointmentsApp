@@ -568,6 +568,10 @@ export interface CreateHoldSupabaseResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
   error?: string;
@@ -618,6 +622,10 @@ export async function createHoldOnSupabase(
         deposit_amount: json.deposit_amount,
         platform_fee: json.platform_fee,
         total_amount: json.total_amount,
+        platform_fee_amount: json.platform_fee_amount ?? json.platform_fee,
+        consultation_fee_amount: json.consultation_fee_amount,
+        platform_payment_status: json.platform_payment_status,
+        consultation_payment_status: json.consultation_payment_status,
         is_followup: json.is_followup,
         followup_original_booking_id: json.followup_original_booking_id,
       };
@@ -794,6 +802,8 @@ export interface CreateRazorpayOrderResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
   error?: string;
 }
 
@@ -829,6 +839,8 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
       deposit_amount: json.deposit_amount,
       platform_fee: json.platform_fee,
       total_amount: json.total_amount,
+      platform_fee_amount: json.platform_fee_amount,
+      consultation_fee_amount: json.consultation_fee_amount,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Network error initiating payment';
@@ -845,6 +857,8 @@ export interface VerifyPaymentResult {
   queue_position?: number;
   status?: string;
   payment_status?: string;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   error?: string;
 }
 
@@ -884,6 +898,8 @@ export async function verifyRazorpayPayment(params: {
       queue_position: json.queue_position,
       status: json.status,
       payment_status: json.payment_status,
+      platform_payment_status: json.platform_payment_status,
+      consultation_payment_status: json.consultation_payment_status,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Network error verifying payment';

@@ -625,12 +625,6 @@ export default function HomeScreen({
             </View>
           </View>
 
-          {/* Trust Banner on First Page */}
-          <View style={styles.trustBanner}>
-            <Text style={styles.trustBannerText}>
-              ⚡ Small ₹50–₹200 deposit guarantees your slot with zero waiting at venue.
-            </Text>
-          </View>
 
           {onOpenProfile && (
             <TouchableOpacity
@@ -875,9 +869,9 @@ export default function HomeScreen({
                         </View>
 
                         <View style={styles.depositPill}>
-                          <Text style={styles.depositLabel}>Deposit from </Text>
+                          <Text style={styles.depositLabel}>Platform Fee </Text>
                           <Text style={styles.depositAmount}>
-                            ₹{provider.resources[0]?.deposit_amount || 50}
+                            ₹10 • Reserve
                           </Text>
                         </View>
                       </View>

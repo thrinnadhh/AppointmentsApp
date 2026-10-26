@@ -590,11 +590,17 @@ export default function BookingPassModal({
 
                     <View style={styles.depositInfoBox}>
                       <View style={styles.depositRow}>
-                        <Text style={styles.depositTitle}>Deposit Paid via UPI / Card</Text>
-                        <Text style={styles.depositAmount}>₹{booking.deposit_amount}</Text>
+                        <Text style={styles.depositTitle}>Platform Fee (Paid Online)</Text>
+                        <Text style={styles.depositAmount}>₹{booking.platform_fee_amount ?? booking.platform_fee ?? 10}</Text>
+                      </View>
+                      <View style={[styles.depositRow, { marginTop: 6 }]}>
+                        <Text style={styles.depositTitle}>Doctor Consultation (Pay at Desk)</Text>
+                        <Text style={[styles.depositAmount, { color: booking.consultation_payment_status === 'COLLECTED_AT_DESK' ? '#047857' : '#b45309' }]}>
+                          ₹{booking.consultation_fee_amount ?? 500} {booking.consultation_payment_status === 'COLLECTED_AT_DESK' ? '✓ Paid' : '(Pending)'}
+                        </Text>
                       </View>
                       <Text style={styles.depositSubtext}>
-                        This deposit guarantees your slot and will be adjusted in your consultation bill.
+                        Online booking fee reserves your slot. Doctor's consultation fee is paid directly at the hospital reception.
                       </Text>
                     </View>
 

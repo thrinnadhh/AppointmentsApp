@@ -95,11 +95,11 @@ export default function CheckoutModal({
 
   const isFreeFollowup = Boolean(coolingEligibility?.eligible);
   const rawPlatformFee = getPlatformFee(categoryId);
-  const rawDepositAmount = resource ? Number(resource.deposit_amount) : 100;
+  const consultationFee = isFreeFollowup ? 0 : (resource ? Number(resource.price ?? 500) : 500);
 
   const platformFee = isFreeFollowup ? 0 : rawPlatformFee;
-  const depositAmount = isFreeFollowup ? 0 : rawDepositAmount;
-  const totalPayable = isFreeFollowup ? 0 : (depositAmount + platformFee);
+  // Under split-payment workflow, customer pays ONLY the platform fee online
+  const totalPayable = isFreeFollowup ? 0 : platformFee;
 
   useEffect(() => {
     let active = true;
@@ -362,7 +362,7 @@ export default function CheckoutModal({
             amount: orderRes.amount,
             currency: orderRes.currency || 'INR',
             name: 'Tirupati Appointments',
-            description: `Deposit for ${resource.name}`,
+            description: `Platform Booking Fee for ${resource.name}`,
             order_id: orderId,
             handler: async function (response: any) {
               try {
@@ -706,17 +706,11 @@ export default function CheckoutModal({
                 )}
               </View>
               <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Hold Deposit (Merchant Fee)</Text>
-                <Text style={[styles.priceValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
-                  {isFreeFollowup ? '₹0 (Waived)' : `₹${depositAmount}`}
-                </Text>
-              </View>
-              <View style={styles.priceRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.priceLabel}>Platform Booking Fee</Text>
+                  <Text style={styles.priceLabel}>Platform / Booking Fee</Text>
                   <View style={[styles.feeBadge, isFreeFollowup && { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
                     <Text style={[styles.feeBadgeText, isFreeFollowup && { color: '#047857' }]}>
-                      {isFreeFollowup ? 'Waived' : (platformFee === 50 ? 'Flat ₹50 Gaming/Turf' : 'Flat ₹10')}
+                      {isFreeFollowup ? 'Waived' : 'Pay Online Now'}
                     </Text>
                   </View>
                 </View>
@@ -725,13 +719,25 @@ export default function CheckoutModal({
                 </Text>
               </View>
               <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Remainder Fee</Text>
-                <Text style={styles.priceSub}>
-                  {isFreeFollowup ? '₹0 Follow-up' : 'Payable at venue'}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.priceLabel}>Doctor Consultation Fee</Text>
+                  <View style={[styles.feeBadge, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
+                    <Text style={[styles.feeBadgeText, { color: '#92400e' }]}>
+                      Pay at Hospital
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.priceValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${consultationFee}`}
                 </Text>
               </View>
               <View style={[styles.priceRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total Payable Now</Text>
+                <View>
+                  <Text style={styles.totalLabel}>Total Payable Online Now</Text>
+                  <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                    Reserves seat & generates check-in PIN
+                  </Text>
+                </View>
                 <Text style={[styles.totalValue, isFreeFollowup && { color: '#047857' }]}>
                   ₹{totalPayable}
                 </Text>
@@ -960,15 +966,15 @@ export default function CheckoutModal({
             {/* Fee Itemization — Consumer Protection (E-Commerce) Rules 2020 + GST readiness */}
             <View style={styles.feeBreakdown}>
               <View style={styles.feeRow}>
-                <Text style={styles.feeLabel}>Booking Deposit (refundable)</Text>
+                <Text style={styles.feeLabel}>Platform Booking Fee (Paid Online)</Text>
                 <Text style={[styles.feeValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
-                  {isFreeFollowup ? '₹0 (Waived)' : `₹${depositAmount}`}
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${platformFee}`}
                 </Text>
               </View>
               <View style={styles.feeRow}>
-                <Text style={styles.feeLabel}>Platform Convenience Fee</Text>
+                <Text style={styles.feeLabel}>Doctor Consultation (Pay at Hospital)</Text>
                 <Text style={[styles.feeValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
-                  {isFreeFollowup ? '₹0 (Waived)' : `₹${platformFee}`}
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${consultationFee}`}
                 </Text>
               </View>
               <View style={styles.feeRow}>
@@ -976,12 +982,12 @@ export default function CheckoutModal({
                 <Text style={[styles.feeValue, { color: '#94a3b8', fontSize: 11 }]}>Not applicable*</Text>
               </View>
               <View style={[styles.feeRow, styles.feeTotalRow]}>
-                <Text style={styles.feeTotalLabel}>Total charged now</Text>
+                <Text style={styles.feeTotalLabel}>Total charged online now</Text>
                 <Text style={[styles.feeTotalValue, isFreeFollowup && { color: '#047857' }]}>
                   ₹{totalPayable}
                 </Text>
               </View>
-              <Text style={styles.feeFootnote}>* GST will be shown once platform obtains GSTIN</Text>
+              <Text style={styles.feeFootnote}>* Pay doctor consultation fee directly at hospital reception desk</Text>
             </View>
 
             {payError && (
@@ -1029,7 +1035,7 @@ export default function CheckoutModal({
                     ? 'Account Blocked (7 Days)'
                     : isFreeFollowup
                     ? 'Confirm Free Follow-up Appointment (₹0)'
-                    : `Pay ₹${totalPayable} via Razorpay (UPI / Card)`}
+                    : `Pay Platform Fee ₹${totalPayable} to Reserve Slot`}
                 </Text>
               )}
             </TouchableOpacity>
