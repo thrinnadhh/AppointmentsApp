@@ -1,9 +1,9 @@
 # Scenario-Based Story Test Suite Report
 
-> **Execution Date:** 26/10/2026, 4:55:20 pm IST  
+> **Execution Date:** 26/10/2026, 6:56:38 pm IST  
 > **Suite Scope:** Groups 1 to 7 (ST-01 to ST-60)  
 > **Target Infrastructure:** 6 Hospitals (H1–H6), 6 Customers (U1–U6), Staff Roster, Platform Admin  
-> **Duration:** 5.31s  
+> **Duration:** 1.80s  
 
 ## 1. Executive Scoreboard
 
@@ -21,7 +21,7 @@
 | **ST-04** | H1, H3, H4 | Staff | ✅ PASS | Departments & consultants setup matches cast; 4th department member rejected (H3); inactive doctor hidden; Front Desk cannot perform admin setup. | Departments setup verified (H1 4 depts, 5 consultants); H3 Cardiology capped at 3 members; inactive doctor hidden; Front desk department creation blocked. |
 | **ST-10** | H1, H5 | U1 | ✅ PASS | Customer searching in Tirupati sees H1-H4; H5 (Nellore) is strictly hidden. Searching Nellore returns H5 only. | Tirupati query returned 12 providers excluding H5; Nellore query returned H5 exclusively. |
 | **ST-11** | H1, H4 | U1 | ✅ PASS | Dr. Sharma shows active scheduled slots; Dr. Leave (H4) shows 0 bookable slots. | Dr. Sharma has valid session availability; Dr. Leave is inactive and returned 0 available slots. |
-| **ST-12** | H1 | U1 | ✅ PASS | 5-minute hold created; ₹200 deposit confirms booking; 4-digit PIN exists; arrival window is slot ± 10m; notification logged. | Booking cea43919-dd87-402a-bf1a-e13dc62198ff confirmed with 4-digit PIN "5279", arrival window ±10m verified, notification logged. |
+| **ST-12** | H1 | U1 | ✅ PASS | 5-minute hold created; ₹200 deposit confirms booking; 4-digit PIN exists; arrival window is slot ± 10m; notification logged. | Booking 157834b8-7cf4-4d14-8aab-014864370a14 confirmed with 4-digit PIN "1172", arrival window ±10m verified, notification logged. |
 | **ST-13** | H1 | U2, U1 | ✅ PASS | Abandoned hold releases slot; duplicate payment webhook is idempotent with 1 payment record. | Expired hold reopened slot successfully; duplicate webhook updated existing record with zero double charge. |
 | **ST-14** | H1 | U1, U6 | ✅ PASS | 50 concurrent slot races: exactly one customer acquires the hold (50/50), loser gets clear conflict. | 50/50 runs yielded exactly 1 winner with zero double-bookings (100% concurrency safety). |
 | **ST-15** | H1, H2 | U1 | 📋 REPORT | One customer books overlapping slots with two different doctors: REPORT system behavior. | REPORT: Database allowed overlapping bookings for same customer with different doctors (Postgres exclusion constraint is per resource_id, not per customer_id). |
@@ -42,11 +42,11 @@
 | **ST-36** | H1 | FD-1, FD-2 | ✅ PASS | FD-1 accesses assigned doctors (Sharma & Patel); access to unassigned doctor (Reddy) blocked. | FD-1 assignments verified in doctor_front_desk_assignments: Dr. Sharma and Dr. Patel accessible; Dr. Reddy restricted to FD-2. |
 | **ST-37** | H1 | U1 | ✅ PASS | Medical Urgency Override moves patient to top with mandatory clinical reason logged to audit trail. | Urgency override succeeded: position moved to 1, audit log recorded with action QUEUE_OVERRIDE. |
 | **ST-38** | H4 | Doctor Emergency | 📋 REPORT | Consultant deactivated mid-day; report remaining queue handling (wait, reschedule, refund). | Consultant deactivated (is_active=false); 0 existing bookings preserved for admin resolution/refund. |
-| **ST-40** | H1-H5 | All | ✅ PASS | Total Deposits Collected = Total Refunds + Doctor Shares + Platform Shares + Forfeited Amounts. Zero double refunds. | Ledger reconciled across 5 hospitals (36 bookings). Invariant holds: Total ₹6500 = Refunded ₹2200 + Retained ₹4300. Zero double refunds. |
+| **ST-40** | H1-H5 | All | ✅ PASS | Total Deposits Collected = Total Refunds + Doctor Shares + Platform Shares + Forfeited Amounts. Zero double refunds. | Ledger reconciled across 5 hospitals (29 bookings). Invariant holds: Total ₹5110 = Refunded ₹2200 + Retained ₹2910. Zero double refunds. |
 | **ST-50** | All | U6 | ✅ PASS | Session invalidated; PII scrubbed to placeholder; push tokens & consents purged; financial history retained. | User banned until 2999; full_name=Deleted User; phone=NULL; consents purged; bookings preserved for audit. |
 | **ST-51** | H1 | TempUser | 📋 REPORT | REPORT: Current behavior for account deletion with active holds or confirmed bookings. | Deletion request enters 30-day grace period; active bookings remain 'CONFIRMED'. Upon execution, anonymize_user_data preserves booking record in 'CONFIRMED' status with scrubbed attachment_url for accounting compliance; bookings are NOT auto-cancelled. |
 | **ST-52** | Platform | U6 Phone | 📋 REPORT | REPORT: Current behavior when previously deleted phone attempts re-registration. | Phone +919848011106 OTP request status=200. Since previous account scrubbed auth.users.phone to NULL, Supabase Auth allows fresh OTP registration, creating a brand new isolated identity without restoring prior deleted records. |
-| **ST-53** | H1 | Staff | ✅ PASS | Staff revocation immediately denies authorization; consultant removal preserves bookings for admin action. | Staff status='revoked' immediately causes hospital_role() to return 'none'. Deactivating or de-allocating consultant preserves 9 future confirmed bookings without auto-cancellation; requires admin manual re-assignment or emergency-cancel. |
+| **ST-53** | H1 | Staff | ✅ PASS | Staff revocation immediately denies authorization; consultant removal preserves bookings for admin action. | Staff status='revoked' immediately causes hospital_role() to return 'none'. Deactivating or de-allocating consultant preserves 6 future confirmed bookings without auto-cancellation; requires admin manual re-assignment or emergency-cancel. |
 | **ST-60** | All | Matrix | ✅ PASS | Cross-customer, cross-hospital, and cross-doctor probes strictly isolated; 0 data leaks. | Complete 6-hospital and 6-customer isolation matrix verified: RLS and API reject cross-customer and cross-hospital probes with 0 leaks. |
 | **SEC-1A** | H1 | Anonymous | ✅ PASS | HTTP 401 Unauthorized | HTTP 401 |
 | **SEC-1B** | H1 | U2 | ✅ PASS | HTTP 403 Forbidden | HTTP 403 |
