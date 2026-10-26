@@ -181,7 +181,17 @@ export function middleware(req: NextRequest) {
     bearerToken.split('.').length === 3
   );
 
-  const isAuthenticated = hasAuthCookie || hasBearerToken;
+  const cronSecret = process.env.CRON_SECRET;
+  let isCronAuth = false;
+  if (pathname.startsWith('/api/cron/') && cronSecret && bearerToken && bearerToken.length === cronSecret.length) {
+    let diff = 0;
+    for (let i = 0; i < bearerToken.length; i++) {
+      diff |= bearerToken.charCodeAt(i) ^ cronSecret.charCodeAt(i);
+    }
+    isCronAuth = diff === 0;
+  }
+
+  const isAuthenticated = hasAuthCookie || hasBearerToken || isCronAuth;
 
   // 1. API Route Access Control: Enforce authentication for all sensitive / non-whitelisted routes
   if (pathname.startsWith('/api/')) {
