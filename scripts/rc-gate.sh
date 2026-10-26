@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # scripts/rc-gate.sh
 # Release-Candidate (RC) Verification Master Gate Runner
-# Commit SHA: aa416932dbe00fcfa36233f71e6048612d334347
-
-set -e
+# Commit SHA: $(git rev-parse HEAD)
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -14,8 +12,8 @@ echo "Commit SHA: $(git rev-parse HEAD)"
 echo "Timestamp:  $(date '+%Y-%m-%d %H:%M:%S %Z')"
 echo "================================================================================"
 
-declare -A GATE_STATUS
-declare -A GATE_EVIDENCE
+STATUS_ARRAY=()
+EVIDENCE_ARRAY=()
 
 run_gate() {
   local gate_id="$1"
@@ -29,19 +27,19 @@ run_gate() {
   echo "--------------------------------------------------------------------------------"
 
   if [ -z "$cmd" ]; then
-    GATE_STATUS["$gate_id"]="NOT RUN"
-    GATE_EVIDENCE["$gate_id"]="$evidence_file"
+    STATUS_ARRAY+=("NOT RUN")
+    EVIDENCE_ARRAY+=("$evidence_file")
     echo "⏸ Gate $gate_id marked as NOT RUN (manual hardware / waiver required)."
     return 0
   fi
 
   if eval "$cmd"; then
-    GATE_STATUS["$gate_id"]="PASS"
-    GATE_EVIDENCE["$gate_id"]="$evidence_file"
+    STATUS_ARRAY+=("PASS")
+    EVIDENCE_ARRAY+=("$evidence_file")
     echo "✔ [$gate_id] PASS"
   else
-    GATE_STATUS["$gate_id"]="FAIL"
-    GATE_EVIDENCE["$gate_id"]="$evidence_file"
+    STATUS_ARRAY+=("FAIL")
+    EVIDENCE_ARRAY+=("$evidence_file")
     echo "✖ [$gate_id] FAIL"
   fi
 }
@@ -124,8 +122,8 @@ TOTAL_NOTRUN=0
 for i in "${!GATES[@]}"; do
   gid="${GATES[$i]}"
   desc="${DESCS[$i]}"
-  stat="${GATE_STATUS[$gid]}"
-  evid="${GATE_EVIDENCE[$gid]}"
+  stat="${STATUS_ARRAY[$i]}"
+  evid="${EVIDENCE_ARRAY[$i]}"
 
   if [ "$stat" == "PASS" ]; then
     badge="PASS"

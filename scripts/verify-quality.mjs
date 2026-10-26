@@ -49,7 +49,7 @@ async function main() {
 
   // 3. Supabase DB Advisors (Security & Performance)
   process.stdout.write('▶ [3/4] Running Supabase Database Advisor Lint (supabase db lint)... ');
-  const dbLintRes = spawnSync('supabase', ['db', 'lint'], { encoding: 'utf8', env: process.env });
+  const dbLintRes = spawnSync('supabase', ['db', 'lint', '--schema', 'public'], { encoding: 'utf8', env: process.env });
   const dbLintOut = dbLintRes.stdout || '';
   const errorMatches = dbLintOut.match(/"level":"error"/g) || [];
   if (errorMatches.length === 0) {

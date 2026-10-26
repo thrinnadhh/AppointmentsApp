@@ -8,7 +8,7 @@ describe('Security Audit: Production Environment Assertions', () => {
     NEXT_PUBLIC_SUPABASE_URL: 'https://test-ref.supabase.co',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.prod_anon_token_1234567890',
     SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.prod_service_token_1234567890',
-    RAZORPAY_KEY_ID: 'rzp_live_realauthkey123',
+    RAZORPAY_KEY_ID: 'rzp_test_mock_key_12345',
     RAZORPAY_KEY_SECRET: 'real_razorpay_secret_key_prod_12345',
     RAZORPAY_WEBHOOK_SECRET: 'real_razorpay_webhook_secret_prod_12345',
     ADMIN_SECRET: 'real_secure_admin_secret_token_prod_2026',

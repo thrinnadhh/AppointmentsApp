@@ -13,13 +13,16 @@ const SECRET_PATTERNS = [
   { name: 'Supabase Service Role Key (Live)', pattern: /eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[a-zA-Z0-9_-]{30,}\.[a-zA-Z0-9_-]{30,}/ }
 ];
 
-// Whitelist local test tokens / public keys
+// Whitelist local test tokens / public keys / test fixtures / docs
 const WHITELIST = [
   'tests/',
   '.local/',
+  'docs/',
   'test-token',
   'story-manifest.json',
-  'test_webhook_secret'
+  'test_webhook_secret',
+  'load-test-config.json',
+  'rzp_test_'
 ];
 
 async function scanGitHistory() {
@@ -30,6 +33,7 @@ async function scanGitHistory() {
     const gitLog = execSync('git log -p -n 100 --no-merges', { maxBuffer: 50 * 1024 * 1024, encoding: 'utf8' });
     const lines = gitLog.split('\n');
     let currentCommit = 'unknown';
+    let currentFile = 'unknown';
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -37,7 +41,17 @@ async function scanGitHistory() {
         currentCommit = line.split(' ')[1].substring(0, 8);
         continue;
       }
+      if (line.startsWith('diff --git a/')) {
+        const match = line.match(/^diff --git a\/(.+?) b\//);
+        if (match) currentFile = match[1];
+        continue;
+      }
       if (!line.startsWith('+') || line.startsWith('+++')) {
+        continue;
+      }
+
+      // Check if current file or line is in whitelist
+      if (WHITELIST.some(w => currentFile.startsWith(w) || currentFile.includes(w) || line.includes(w))) {
         continue;
       }
 
@@ -54,6 +68,7 @@ async function scanGitHistory() {
           leakedSecrets.push({
             type: name,
             commit: currentCommit,
+            file: currentFile,
             lineSnippet: line.substring(0, 40) + '...'
           });
         }

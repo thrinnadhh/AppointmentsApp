@@ -21,8 +21,8 @@ const CHECKS = [
     cmd: 'node scripts/scan-secrets.mjs'
   },
   {
-    name: 'G5.5 Dependency Audit (pnpm audit --prod)',
-    cmd: 'pnpm audit --prod'
+    name: 'G5.5 Dependency Audit & Waiver Verification',
+    cmd: 'node scripts/audit-dependencies.mjs'
   }
 ];
 

@@ -53,7 +53,10 @@
       "compression": ">=1.8.2",
       "source-map-js": ">=1.2.2",
       "sharp": ">=0.35.5",
-      "next": "15.5.28"
+      "next": "15.5.28",
+      "@types/react": "18.3.18",
+      "@types/react-dom": "18.3.5",
+      "zod": ">=3.24.0"
     },
     "patchedDependencies": {
       "expo-notifications@58.1.6": "patches/expo-notifications@58.1.6.patch"
