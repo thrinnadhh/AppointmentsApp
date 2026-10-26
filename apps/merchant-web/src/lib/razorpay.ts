@@ -39,10 +39,15 @@ const KEY_ID = process.env.RAZORPAY_KEY_ID;
 const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-// Fail-fast production guard: Ensure critical payment secrets are configured
-if (process.env.NODE_ENV === 'production') {
-  if (!process.env.RAZORPAY_KEY_SECRET) {
-    throw new Error('CRITICAL SECURITY CONFIGURATION ERROR: RAZORPAY_KEY_SECRET environment variable is required in production.');
+/**
+ * Fail-fast runtime assertion: Ensure critical payment secrets are configured before executing live operations.
+ * Deferring check from top-level module load prevents build crashes during Next.js SSG / page data collection.
+ */
+export function assertRazorpayConfigured(): void {
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      throw new Error('CRITICAL SECURITY CONFIGURATION ERROR: RAZORPAY_KEY_SECRET environment variable is required in production.');
+    }
   }
 }
 
@@ -76,6 +81,10 @@ export function getRazorpayKeyId(): string {
  */
 export async function createRazorpayOrder(params: CreateOrderParams): Promise<RazorpayOrderResult> {
   const { amount, currency = 'INR', receipt, notes } = params;
+
+  if (process.env.NODE_ENV === 'production') {
+    assertRazorpayConfigured();
+  }
 
   // Sandbox / Mock mode — generate deterministic synthetic mock order when explicitly opted in non-production
   if (canMockPayments()) {
@@ -368,6 +377,10 @@ export async function fetchRazorpayOrder(orderId: string): Promise<RazorpayOrder
  */
 export async function initiateRazorpayRefund(params: RefundParams): Promise<RazorpayRefundResult> {
   const { paymentId, amount, notes } = params;
+
+  if (process.env.NODE_ENV === 'production') {
+    assertRazorpayConfigured();
+  }
 
   // Simulated failure hook for test runs (strictly non-production)
   if (canMockPayments() && (paymentId.includes('fail') || paymentId.includes('error'))) {
