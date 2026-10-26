@@ -24,6 +24,8 @@ const testFiles = [
   'tests/unit/security-audit-nextjs-dependencies.test.mjs',
   'tests/unit/security-audit-database-grants.test.mjs',
   'tests/unit/security-audit-production-env.test.mjs',
+  'tests/unit/build-secret-safety.test.mjs',
+  'tests/unit/database-advisor-fixes.test.mjs',
 ];
 
 let totalTests = 0;

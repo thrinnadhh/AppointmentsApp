@@ -1,15 +1,15 @@
 # Scenario-Based Story Test Suite Report
 
-> **Execution Date:** 26/10/2026, 4:50:59 pm IST  
+> **Execution Date:** 26/10/2026, 4:55:20 pm IST  
 > **Suite Scope:** Groups 1 to 7 (ST-01 to ST-60)  
 > **Target Infrastructure:** 6 Hospitals (H1–H6), 6 Customers (U1–U6), Staff Roster, Platform Admin  
-> **Duration:** 4.43s  
+> **Duration:** 5.31s  
 
 ## 1. Executive Scoreboard
 
 | Total Stories Tested | PASS | REPORT (Policy Decisions) | FAIL (Backlogged Defects) | BLOCKED |
 | :---: | :---: | :---: | :---: | :---: |
-| **48** | **42** | **5** | **1** | **0** |
+| **48** | **43** | **5** | **0** | **0** |
 
 ## 2. Detailed Results by Story Case
 
@@ -21,7 +21,7 @@
 | **ST-04** | H1, H3, H4 | Staff | ✅ PASS | Departments & consultants setup matches cast; 4th department member rejected (H3); inactive doctor hidden; Front Desk cannot perform admin setup. | Departments setup verified (H1 4 depts, 5 consultants); H3 Cardiology capped at 3 members; inactive doctor hidden; Front desk department creation blocked. |
 | **ST-10** | H1, H5 | U1 | ✅ PASS | Customer searching in Tirupati sees H1-H4; H5 (Nellore) is strictly hidden. Searching Nellore returns H5 only. | Tirupati query returned 12 providers excluding H5; Nellore query returned H5 exclusively. |
 | **ST-11** | H1, H4 | U1 | ✅ PASS | Dr. Sharma shows active scheduled slots; Dr. Leave (H4) shows 0 bookable slots. | Dr. Sharma has valid session availability; Dr. Leave is inactive and returned 0 available slots. |
-| **ST-12** | H1 | U1 | ✅ PASS | 5-minute hold created; ₹200 deposit confirms booking; 4-digit PIN exists; arrival window is slot ± 10m; notification logged. | Booking b4a8adea-1e9c-4395-a88d-732f74a2c44c confirmed with 4-digit PIN "5279", arrival window ±10m verified, notification logged. |
+| **ST-12** | H1 | U1 | ✅ PASS | 5-minute hold created; ₹200 deposit confirms booking; 4-digit PIN exists; arrival window is slot ± 10m; notification logged. | Booking cea43919-dd87-402a-bf1a-e13dc62198ff confirmed with 4-digit PIN "5279", arrival window ±10m verified, notification logged. |
 | **ST-13** | H1 | U2, U1 | ✅ PASS | Abandoned hold releases slot; duplicate payment webhook is idempotent with 1 payment record. | Expired hold reopened slot successfully; duplicate webhook updated existing record with zero double charge. |
 | **ST-14** | H1 | U1, U6 | ✅ PASS | 50 concurrent slot races: exactly one customer acquires the hold (50/50), loser gets clear conflict. | 50/50 runs yielded exactly 1 winner with zero double-bookings (100% concurrency safety). |
 | **ST-15** | H1, H2 | U1 | 📋 REPORT | One customer books overlapping slots with two different doctors: REPORT system behavior. | REPORT: Database allowed overlapping bookings for same customer with different doctors (Postgres exclusion constraint is per resource_id, not per customer_id). |
@@ -31,10 +31,7 @@
 | **ST-22** | H1 | U1 | ✅ PASS | Total ₹500 fee: ₹200 online deposit + ₹300 collected at front desk -> Status COMPLETED. | Online deposit ₹200 and front desk collection ₹300 reconciled to exact ₹500 fee; booking COMPLETED. |
 | **ST-23** | H1 | U1 | ✅ PASS | Same hospital reassignment (Sharma -> Patel, Neurology) succeeds; cross-provider rejected. | Reassignment to Dr. Patel succeeded; cross-provider reassignment blocked ("Target resource belongs to a different business/provider"). |
 | **ST-24** | H1 | U4 | ✅ PASS | No-show count increments 1 -> 2 -> 3; 3rd strike applies ₹60 penalty; 6th strike triggers 7-day block. | Strikes 1-2 courtesy refund; strike 3 applied ₹60 penalty (refund ₹140); strike 6 blocked account for 7 days. |
-| **ST-25** | H1 | U1 | ❌ FAIL | Follow-up within 7-day cooling period: is_followup=true, deposit=0, platform_fee=0, total=0. | Failed: Follow-up hold creation must succeed: {"error":"Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for someone else'.","success":false}
-
-false !== true
- |
+| **ST-25** | H1 | U1 | ✅ PASS | Follow-up within 7-day cooling period: is_followup=true, deposit=0, platform_fee=0, total=0. | Follow-up recognized: is_followup=true, deposit=₹0.00, platform_fee=₹0.00, total=₹0.00. |
 | **ST-26** | H1 | U1, U2 | ✅ PASS | Cancellation >2h before slot qualifies for refund; cancellation <2h forfeits deposit. | Cancellation >2h resulted in REFUND_PENDING; cancellation <2h resulted in FORFEITED deposit. |
 | **ST-30** | H1 | U1 | ✅ PASS | PIN verified; tagged On Time; transitions Checked In -> In Consultation -> Completed; code non-reusable. | 4-digit PIN verified; status transitioned to CHECKED_IN, IN_CONSULTATION, and COMPLETED with timestamps. |
 | **ST-31** | H1 | U1, U2 | ✅ PASS | On Time patient whose window is open is seen first; Early patient seen only if idle. | Queue prioritizes current window (U1 at position 1) over later slot (U2 at position 2). |
@@ -45,11 +42,11 @@ false !== true
 | **ST-36** | H1 | FD-1, FD-2 | ✅ PASS | FD-1 accesses assigned doctors (Sharma & Patel); access to unassigned doctor (Reddy) blocked. | FD-1 assignments verified in doctor_front_desk_assignments: Dr. Sharma and Dr. Patel accessible; Dr. Reddy restricted to FD-2. |
 | **ST-37** | H1 | U1 | ✅ PASS | Medical Urgency Override moves patient to top with mandatory clinical reason logged to audit trail. | Urgency override succeeded: position moved to 1, audit log recorded with action QUEUE_OVERRIDE. |
 | **ST-38** | H4 | Doctor Emergency | 📋 REPORT | Consultant deactivated mid-day; report remaining queue handling (wait, reschedule, refund). | Consultant deactivated (is_active=false); 0 existing bookings preserved for admin resolution/refund. |
-| **ST-40** | H1-H5 | All | ✅ PASS | Total Deposits Collected = Total Refunds + Doctor Shares + Platform Shares + Forfeited Amounts. Zero double refunds. | Ledger reconciled across 5 hospitals (31 bookings). Invariant holds: Total ₹5700 = Refunded ₹2200 + Retained ₹3500. Zero double refunds. |
+| **ST-40** | H1-H5 | All | ✅ PASS | Total Deposits Collected = Total Refunds + Doctor Shares + Platform Shares + Forfeited Amounts. Zero double refunds. | Ledger reconciled across 5 hospitals (36 bookings). Invariant holds: Total ₹6500 = Refunded ₹2200 + Retained ₹4300. Zero double refunds. |
 | **ST-50** | All | U6 | ✅ PASS | Session invalidated; PII scrubbed to placeholder; push tokens & consents purged; financial history retained. | User banned until 2999; full_name=Deleted User; phone=NULL; consents purged; bookings preserved for audit. |
 | **ST-51** | H1 | TempUser | 📋 REPORT | REPORT: Current behavior for account deletion with active holds or confirmed bookings. | Deletion request enters 30-day grace period; active bookings remain 'CONFIRMED'. Upon execution, anonymize_user_data preserves booking record in 'CONFIRMED' status with scrubbed attachment_url for accounting compliance; bookings are NOT auto-cancelled. |
 | **ST-52** | Platform | U6 Phone | 📋 REPORT | REPORT: Current behavior when previously deleted phone attempts re-registration. | Phone +919848011106 OTP request status=200. Since previous account scrubbed auth.users.phone to NULL, Supabase Auth allows fresh OTP registration, creating a brand new isolated identity without restoring prior deleted records. |
-| **ST-53** | H1 | Staff | ✅ PASS | Staff revocation immediately denies authorization; consultant removal preserves bookings for admin action. | Staff status='revoked' immediately causes hospital_role() to return 'none'. Deactivating or de-allocating consultant preserves 7 future confirmed bookings without auto-cancellation; requires admin manual re-assignment or emergency-cancel. |
+| **ST-53** | H1 | Staff | ✅ PASS | Staff revocation immediately denies authorization; consultant removal preserves bookings for admin action. | Staff status='revoked' immediately causes hospital_role() to return 'none'. Deactivating or de-allocating consultant preserves 9 future confirmed bookings without auto-cancellation; requires admin manual re-assignment or emergency-cancel. |
 | **ST-60** | All | Matrix | ✅ PASS | Cross-customer, cross-hospital, and cross-doctor probes strictly isolated; 0 data leaks. | Complete 6-hospital and 6-customer isolation matrix verified: RLS and API reject cross-customer and cross-hospital probes with 0 leaks. |
 | **SEC-1A** | H1 | Anonymous | ✅ PASS | HTTP 401 Unauthorized | HTTP 401 |
 | **SEC-1B** | H1 | U2 | ✅ PASS | HTTP 403 Forbidden | HTTP 403 |
