@@ -15,6 +15,9 @@ export type BookingStatus =
 
 export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'FORFEITED';
 
+export type PlatformPaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'WAIVED';
+export type ConsultationPaymentStatus = 'PENDING_OFFLINE' | 'COLLECTED_AT_DESK' | 'WAIVED' | 'REFUNDED';
+
 export type ResourceType = 'doctor' | 'table' | 'court' | 'stylist' | 'groomer' | 'vet';
 
 export interface DaySchedule {
@@ -120,6 +123,12 @@ export interface Booking {
   deposit_amount: number;
   platform_fee?: number | null;
   total_amount?: number | null;
+  platform_fee_amount?: number | null;
+  consultation_fee_amount?: number | null;
+  platform_payment_status?: PlatformPaymentStatus;
+  consultation_payment_status?: ConsultationPaymentStatus;
+  consultation_collected_at?: string | null;
+  consultation_collected_by?: string | null;
   hold_expires_at?: string | null;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
@@ -184,6 +193,10 @@ export interface CreateHoldResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: PlatformPaymentStatus;
+  consultation_payment_status?: ConsultationPaymentStatus;
   hold_expires_at?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
@@ -351,7 +364,9 @@ export interface CreateRazorpayOrderResponse {
   is_mock?: boolean;
   deposit_amount?: number; // merchant deposit in INR
   platform_fee?: number;   // platform fee in INR (₹10 or ₹50)
-  total_amount?: number;   // total payable in INR (deposit_amount + platform_fee)
+  total_amount?: number;   // total payable online in INR (platform_fee)
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
   error?: string;
 }
 
@@ -370,6 +385,8 @@ export interface VerifyRazorpayPaymentResponse {
   queue_position?: number;
   status?: string;
   payment_status?: string;
+  platform_payment_status?: PlatformPaymentStatus;
+  consultation_payment_status?: ConsultationPaymentStatus;
   error?: string;
 }
 

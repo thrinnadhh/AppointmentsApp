@@ -288,6 +288,12 @@ export type Database = {
           patient_relationship: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           platform_fee: number | null
+          platform_fee_amount: number | null
+          consultation_fee_amount: number | null
+          platform_payment_status: string | null
+          consultation_payment_status: string | null
+          consultation_collected_at: string | null
+          consultation_collected_by: string | null
           platform_fee_gst: number
           provider_id: string
           queue_position: number | null
@@ -334,6 +340,12 @@ export type Database = {
           patient_relationship?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
+          platform_fee_amount?: number | null
+          consultation_fee_amount?: number | null
+          platform_payment_status?: string | null
+          consultation_payment_status?: string | null
+          consultation_collected_at?: string | null
+          consultation_collected_by?: string | null
           platform_fee_gst?: number
           provider_id: string
           queue_position?: number | null
@@ -380,6 +392,12 @@ export type Database = {
           patient_relationship?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
+          platform_fee_amount?: number | null
+          consultation_fee_amount?: number | null
+          platform_payment_status?: string | null
+          consultation_payment_status?: string | null
+          consultation_collected_at?: string | null
+          consultation_collected_by?: string | null
           platform_fee_gst?: number
           provider_id?: string
           queue_position?: number | null
@@ -1532,6 +1550,13 @@ export type Database = {
       }
       confirm_booking_by_merchant: {
         Args: { p_booking_id: string }
+        Returns: Json
+      }
+      collect_consultation_fee: {
+        Args: {
+          p_booking_id: string
+          p_collected_by?: string | null
+        }
         Returns: Json
       }
       confirm_booking_payment: {
