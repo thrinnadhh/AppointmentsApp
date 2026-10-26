@@ -188,6 +188,29 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
     }
   };
 
+  const [exportingData, setExportingData] = useState(false);
+
+  const handleExportData = async () => {
+    if (!user) {
+      Alert.alert('Authentication Required', 'Please sign in to export your personal data archive.');
+      return;
+    }
+    setExportingData(true);
+    try {
+      const base = getApiBaseUrl();
+      const exportUrl = `${base}/api/account/export`;
+      await Linking.openURL(exportUrl);
+      Alert.alert(
+        'Data Export',
+        'Your personal data archive (profile, appointments, consents) is being downloaded in JSON format.'
+      );
+    } catch (err: any) {
+      Alert.alert('Export Error', err?.message || 'Could not trigger data export');
+    } finally {
+      setExportingData(false);
+    }
+  };
+
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color="#047857" /></View>;
   }
@@ -261,6 +284,20 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
           onPress={() => Linking.openURL('mailto:grievance@appointments4u.in')}
         >
           <Text style={styles.linkText}>Grievance Officer →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.link}
+          onPress={handleExportData}
+          disabled={exportingData}
+          testID="btn-export-data-archive"
+        >
+          {exportingData ? (
+            <ActivityIndicator size="small" color="#047857" />
+          ) : (
+            <Text style={[styles.linkText, { color: '#047857', fontWeight: '600' }]}>
+              📥 Export Personal Data Archive (JSON) →
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 

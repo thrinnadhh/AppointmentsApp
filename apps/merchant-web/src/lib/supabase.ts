@@ -280,7 +280,10 @@ export async function fetchMerchantBookingById(
   };
 }
 
-export async function revealCustomerContact(bookingId: string): Promise<{
+export async function revealCustomerContact(
+  bookingId: string,
+  reason: string = 'Operational check-in'
+): Promise<{
   success: boolean;
   phone?: string;
   full_name?: string;
@@ -288,6 +291,7 @@ export async function revealCustomerContact(bookingId: string): Promise<{
 }> {
   const { data, error } = await (supabase.rpc as any)('reveal_customer_contact', {
     p_booking_id: bookingId,
+    p_reason: reason,
   });
   if (error) {
     return { success: false, error: error.message };

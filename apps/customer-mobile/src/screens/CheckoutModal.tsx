@@ -167,6 +167,10 @@ export default function CheckoutModal({
   const [otherPatientPhone, setOtherPatientPhone] = useState<string>('');
   const [patientRelationship, setPatientRelationship] = useState<string>('Family');
 
+  // Minor patient verification & parental consent (DPDP Act §9)
+  const [isPatientMinor, setIsPatientMinor] = useState<boolean>(false);
+  const [guardianConsentGiven, setGuardianConsentGiven] = useState<boolean>(false);
+
   useEffect(() => {
     if (!visible) {
       setSecondsLeft(300);
@@ -177,6 +181,8 @@ export default function CheckoutModal({
       setOtherPatientName('');
       setOtherPatientPhone('');
       setPatientRelationship('Family');
+      setIsPatientMinor(false);
+      setGuardianConsentGiven(false);
       return;
     }
 
@@ -281,6 +287,11 @@ export default function CheckoutModal({
         const cleanPhone = otherPatientPhone.trim().replace(/\D/g, '');
         if (!cleanPhone || cleanPhone.length < 10) {
           setPayError("Please enter a valid 10-digit mobile number for the patient.");
+          setIsProcessing(false);
+          return;
+        }
+        if (isPatientMinor && !guardianConsentGiven) {
+          setPayError("Please confirm the parental/guardian consent declaration for minor patient.");
           setIsProcessing(false);
           return;
         }
@@ -605,6 +616,55 @@ export default function CheckoutModal({
                     <Text style={styles.gapExemptionText}>
                       🟢 <Text style={{ fontWeight: '700' }}>1-Hour Gap Rule Exemption:</Text> Appointments for different family members or friends have no minimum gap requirement and can be booked back-to-back or simultaneously.
                     </Text>
+                  </View>
+
+                  {/* Minor Verification & Parental Consent */}
+                  <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e293b' }}>
+                          Patient is under 18 years of age (Minor)
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                          Parent or lawful guardian consent is required under DPDP Act §9.
+                        </Text>
+                      </View>
+                      <Switch
+                        value={isPatientMinor}
+                        onValueChange={(val) => {
+                          setIsPatientMinor(val);
+                          if (!val) setGuardianConsentGiven(false);
+                        }}
+                        trackColor={{ false: '#cbd5e1', true: '#a7f3d0' }}
+                        thumbColor={isPatientMinor ? '#047857' : '#f8fafc'}
+                        testID="switch-minor-patient"
+                      />
+                    </View>
+
+                    {isPatientMinor && (
+                      <TouchableOpacity
+                        style={{
+                          marginTop: 10,
+                          backgroundColor: '#f0fdf4',
+                          borderWidth: 1,
+                          borderColor: '#bbf7d0',
+                          borderRadius: 8,
+                          padding: 10,
+                          flexDirection: 'row',
+                          alignItems: 'flex-start',
+                        }}
+                        activeOpacity={0.8}
+                        onPress={() => setGuardianConsentGiven(!guardianConsentGiven)}
+                        testID="checkbox-guardian-consent"
+                      >
+                        <Text style={{ fontSize: 16, marginRight: 8, marginTop: 1 }}>
+                          {guardianConsentGiven ? '☑️' : '⬜'}
+                        </Text>
+                        <Text style={{ flex: 1, fontSize: 11, color: '#166534', lineHeight: 16 }}>
+                          <Text style={{ fontWeight: '700' }}>Parental / Guardian Consent Declaration:</Text> I confirm that I am the parent or lawful guardian of this minor patient and consent to processing their appointment details for healthcare purposes.
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}
