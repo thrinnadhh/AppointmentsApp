@@ -16,7 +16,7 @@
     "dev:merchant": "pnpm --filter @appointments/merchant-web dev",
     "dev:mobile": "pnpm --filter @appointments/customer-mobile start",
     "db:wipe": "node scripts/wipe-test-data.mjs",
-    "db:seed": "node -e \"import('./scripts/seed-hospital-test-data.mjs').then(m => m.seedHospitalTestData())\",",
+    "db:seed": "node scripts/seed-hospital-test-data.mjs",
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
