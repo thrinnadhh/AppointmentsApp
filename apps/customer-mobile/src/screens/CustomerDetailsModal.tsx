@@ -43,9 +43,9 @@ export default function CustomerDetailsModal({
   onProceedToPayment,
   onAuthSuccess,
 }: CustomerDetailsModalProps) {
-  const [fullName, setFullName] = useState<string>(initialName || 'Trinadh Patient');
-  const [phone, setPhone] = useState<string>(initialPhone || '+919999999991');
-  const [email, setEmail] = useState<string>(initialEmail || 'trinadh.patient@gmail.com');
+  const [fullName, setFullName] = useState<string>(initialName || '');
+  const [phone, setPhone] = useState<string>(initialPhone || '');
+  const [email, setEmail] = useState<string>(initialEmail || '');
   const [loadingGoogle, setLoadingGoogle] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -68,8 +68,8 @@ export default function CustomerDetailsModal({
 
       // 2. Dev / Local fallback if OAuth provider is not configured in Supabase dashboard
       const devRes = await signInWithGoogleDev(
-        email || 'trinadh.patient@gmail.com',
-        fullName || 'Trinadh Google User'
+        email || 'patient@gmail.com',
+        fullName || 'Google Patient'
       );
 
       if (devRes.success) {
@@ -217,7 +217,7 @@ export default function CustomerDetailsModal({
                     setFullName(val);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder="e.g. K. Trinadh"
+                  placeholder="e.g. Patient Full Name"
                   placeholderTextColor="#94a3b8"
                   autoCapitalize="words"
                   testID="input-patient-fullname"

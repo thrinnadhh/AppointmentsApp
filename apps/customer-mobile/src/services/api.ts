@@ -1435,7 +1435,7 @@ export async function sendEmailOtp(email: string): Promise<{ success: boolean; e
     const { error } = await supabase.auth.signInWithOtp({ email: trimmed });
     if (error) {
       console.warn('Supabase email signInWithOtp error:', error.message);
-      if (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient')) {
+      if (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('patient')) {
         return { success: true };
       }
       return { success: false, error: error.message };
@@ -1456,7 +1456,7 @@ export async function verifyEmailOtp(
 ): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
   try {
     const trimmed = email.trim();
-    if (token.trim() === '123456' && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient'))) {
+    if (token.trim() === '123456' && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('patient'))) {
       return { success: true };
     }
     const { data, error } = await supabase.auth.verifyOtp({
@@ -1581,8 +1581,8 @@ export async function signInWithGoogle(): Promise<{ success: boolean; url?: stri
  * without requiring third-party OAuth configuration in the Supabase Dashboard.
  */
 export async function signInWithGoogleDev(
-  email: string = 'trinadh.patient@gmail.com',
-  name: string = 'Trinadh Google User'
+  email: string = 'patient@gmail.com',
+  name: string = 'Google Patient'
 ): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
   try {
     const testPhone = '+919999999991';

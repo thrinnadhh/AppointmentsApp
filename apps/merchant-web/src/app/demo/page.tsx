@@ -48,7 +48,7 @@ interface DemoBookingState {
   estimated_wait_minutes: number | null;
 }
 
-const INITIAL_TRINADH_HOSPITAL_QUEUE: HospitalQueueToken[] = [
+const INITIAL_APEX_HOSPITAL_QUEUE: HospitalQueueToken[] = [
   {
     tokenNumber: 1,
     patientName: 'Suresh Babu',
@@ -120,8 +120,8 @@ const DEFAULT_SAMPLE_BOOKINGS: DemoBookingState[] = [
     reference_code: 'TNH-CARD-04',
     customer_name: 'Venkatesh Rao',
     customer_phone: '+91 98490 12345',
-    provider_name: 'Trinadh Multi-Speciality Hospital',
-    resource_name: 'Dr. K. Trinadh (Chief Physician & Cardiologist)',
+    provider_name: 'Apex Multi-Speciality Hospital',
+    resource_name: 'Dr. K. Sharma (Chief Physician & Cardiologist)',
     slot_start: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
     slot_end: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     status: 'CONFIRMED',
@@ -137,7 +137,7 @@ const DEFAULT_SAMPLE_BOOKINGS: DemoBookingState[] = [
     reference_code: 'TNH-DENT-02',
     customer_name: 'Ananya Reddy',
     customer_phone: '+91 97012 34567',
-    provider_name: 'Trinadh Multi-Speciality Hospital',
+    provider_name: 'Apex Multi-Speciality Hospital',
     resource_name: 'Dr. S. P. V. Raman (Dental Surgeon)',
     slot_start: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
     slot_end: new Date(Date.now() + 50 * 60 * 1000).toISOString(),
@@ -174,7 +174,7 @@ export default function InteractiveDemoPage() {
   const [mobileActiveTab, setMobileActiveTab] = useState<'pass' | 'queue'>('pass');
 
   // Hospital Live OPD Queue State (Tokens #1 to #N)
-  const [hospitalQueue, setHospitalQueue] = useState<HospitalQueueToken[]>(INITIAL_TRINADH_HOSPITAL_QUEUE);
+  const [hospitalQueue, setHospitalQueue] = useState<HospitalQueueToken[]>(INITIAL_APEX_HOSPITAL_QUEUE);
   const [lateComersQueue, setLateComersQueue] = useState<Array<{
     turnNumber: number;
     patientName: string;
@@ -206,7 +206,7 @@ export default function InteractiveDemoPage() {
 
   // Telemetry log events
   const [eventLogs, setEventLogs] = useState<Array<{ id: string; time: string; text: string; type: 'info' | 'success' | 'warn' }>>([
-    { id: '1', time: new Date().toLocaleTimeString(), text: 'Trinadh Hospital OPD Live Queue Initialized (Tokens #1 to #8)', type: 'info' },
+    { id: '1', time: new Date().toLocaleTimeString(), text: 'Apex Hospital OPD Live Queue Initialized (Tokens #1 to #8)', type: 'info' },
   ]);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -374,7 +374,7 @@ export default function InteractiveDemoPage() {
     setVerifySuccess(null);
     setVerifyError(null);
     setCodeInput('');
-    setHospitalQueue(INITIAL_TRINADH_HOSPITAL_QUEUE);
+    setHospitalQueue(INITIAL_APEX_HOSPITAL_QUEUE);
     setLateComersQueue([
       {
         turnNumber: 12,
@@ -434,7 +434,7 @@ export default function InteractiveDemoPage() {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Simulate <strong>Trinadh Multi-Speciality Hospital</strong>: tokens #1 to #N, green present indicator on OTP match, red for unarrived, and dynamic late-comers queue.
+            Simulate <strong>Apex Multi-Speciality Hospital</strong>: tokens #1 to #N, green present indicator on OTP match, red for unarrived, and dynamic late-comers queue.
           </p>
         </div>
 
@@ -479,7 +479,7 @@ export default function InteractiveDemoPage() {
                 : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            1. Trinadh Hospital OPD Queue (Tokens #1–#8)
+            1. Apex Hospital OPD Queue (Tokens #1–#8)
           </button>
           <button
             onClick={() => handleResetSample(1)}
@@ -587,7 +587,7 @@ export default function InteractiveDemoPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Live Hospital OPD Token</span>
                         <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                          Dr. K. Trinadh
+                          Dr. K. Sharma
                         </span>
                       </div>
 
@@ -633,7 +633,7 @@ export default function InteractiveDemoPage() {
                         </div>
                         <div className="p-2.5 rounded-xl bg-white/80 border border-emerald-200 text-xs text-emerald-900">
                           <p className="font-medium">
-                            Please take a seat in the OPD waiting lobby. Dr. K. Trinadh will call <strong>Token #4</strong> shortly.
+                            Please take a seat in the OPD waiting lobby. Dr. K. Sharma will call <strong>Token #4</strong> shortly.
                           </p>
                         </div>
                       </div>
@@ -718,7 +718,7 @@ export default function InteractiveDemoPage() {
                   <div className="space-y-2.5">
                     <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
                       <div>
-                        <p className="font-bold text-slate-900">Trinadh Hospital OPD Queue</p>
+                        <p className="font-bold text-slate-900">Apex Hospital OPD Queue</p>
                         <p className="text-[10px] text-slate-500">8 total appointments scheduled today</p>
                       </div>
                       <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -821,7 +821,7 @@ export default function InteractiveDemoPage() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                  Trinadh Hospital Reception Desk Console
+                  Apex Hospital Reception Desk Console
                 </h2>
                 <p className="text-xs text-slate-500">
                   Front-desk check-in terminal with instant verification &amp; late queue controls
@@ -831,7 +831,7 @@ export default function InteractiveDemoPage() {
 
             <div className="text-right">
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                Venue: Trinadh Hospital
+                Venue: Apex Hospital
               </span>
             </div>
           </div>
@@ -952,19 +952,19 @@ export default function InteractiveDemoPage() {
           </div>
 
           {/* ========================================================================= */}
-          {/* TRINADH HOSPITAL LIVE OPD QUEUE BOARD (TOKENS #1 TO #8)                   */}
+          {/* APEX HOSPITAL LIVE OPD QUEUE BOARD (TOKENS #1 TO #8)                   */}
           {/* ========================================================================= */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span>🏥 Trinadh Hospital OPD Queue Board</span>
+                  <span>🏥 Apex Hospital OPD Queue Board</span>
                   <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                     Tokens #1 to #8
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Doctor: <strong>Dr. K. Trinadh</strong> • Colors: 🟢 Green = Present, 🔴 Red = Awaiting, ⏰ Amber = Late Queue
+                  Doctor: <strong>Dr. K. Sharma</strong> • Colors: 🟢 Green = Present, 🔴 Red = Awaiting, ⏰ Amber = Late Queue
                 </p>
               </div>
 

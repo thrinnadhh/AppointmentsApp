@@ -68,9 +68,9 @@ export default function App() {
   const [checkoutVisible, setCheckoutVisible] = useState<boolean>(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState<boolean>(false);
   const [patientBookingDetails, setPatientBookingDetails] = useState<CustomerBookingDetails>({
-    fullName: 'Trinadh Patient',
-    phone: '+919999999991',
-    email: 'trinadh.patient@gmail.com',
+    fullName: '',
+    phone: '',
+    email: '',
   });
   const [assignedTokenNumber, setAssignedTokenNumber] = useState<number | undefined>(undefined);
   const [passModalVisible, setPassModalVisible] = useState<boolean>(false);
@@ -88,10 +88,10 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [isEmailVerified, setIsEmailVerified] = useState<boolean>(false);
-  const [authPhone, setAuthPhone] = useState<string>('+919999999991');
+  const [authPhone, setAuthPhone] = useState<string>('');
   const [authOtp, setAuthOtp] = useState<string>('');
   const [otpSent, setOtpSent] = useState<boolean>(false);
-  const [authEmail, setAuthEmail] = useState<string>('trinadh.patient@appointments4u.in');
+  const [authEmail, setAuthEmail] = useState<string>('');
   const [authEmailOtp, setAuthEmailOtp] = useState<string>('');
   const [emailOtpSent, setEmailOtpSent] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState<boolean>(false);
@@ -105,10 +105,10 @@ export default function App() {
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
-    name: 'Trinadh Test Patient',
-    phone: '+91 98765 43210',
-    email: 'trinadh.patient@appointments4u.in',
-    city: 'Tirupati, AP',
+    name: '',
+    phone: '',
+    email: '',
+    city: '',
   });
 
   // Check existing Supabase session on app startup
@@ -399,10 +399,10 @@ export default function App() {
       setOtpSent(false);
       setAuthOtp('');
       setCustomerProfile({
-        name: 'Ravi Teja',
-        phone: '+91 98765 43210',
-        email: 'ravi.teja@customer.tirupati.in',
-        city: 'Tirupati, AP',
+        name: '',
+        phone: '',
+        email: '',
+        city: '',
       });
       setConfirmationToast('Signed out. Switched to Guest mode.');
       setTimeout(() => setConfirmationToast(null), 4000);
@@ -1041,7 +1041,7 @@ export default function App() {
                           style={styles.authTextInput}
                           value={authEmail}
                           onChangeText={setAuthEmail}
-                          placeholder="trinadh.patient@appointments4u.in"
+                          placeholder="patient@example.com"
                           placeholderTextColor="#94a3b8"
                           keyboardType="email-address"
                           autoCapitalize="none"

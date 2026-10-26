@@ -296,7 +296,7 @@ export default function BookingPassModal({
                 </View>
               </View>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {booking.provider_name || 'Trinadh Multi-Speciality Hospital'}
+                {booking.provider_name || 'Hospital OPD'}
               </Text>
             </View>
             <TouchableOpacity
@@ -392,10 +392,10 @@ export default function BookingPassModal({
                   <View style={styles.opdHighlightTop}>
                     <View>
                       <Text style={styles.opdDoctorTitle}>
-                        {booking.resource_name || 'Dr. K. Trinadh (Chief Physician)'}
+                        {booking.resource_name || 'Doctor Consultation'}
                       </Text>
                       <Text style={styles.opdHospitalSub}>
-                        {booking.provider_name || 'Trinadh Multi-Speciality Hospital'} • OPD Room 101
+                        {booking.provider_name || 'Hospital'} • OPD Room
                       </Text>
                     </View>
                     <View style={styles.myTokenBadge}>
@@ -526,7 +526,7 @@ export default function BookingPassModal({
                           </View>
                         </View>
                         <Text style={styles.checkedInNotice}>
-                          Please have a seat in the waiting lobby. Dr. Trinadh will call Token #{myTokenNumber} shortly.
+                          Please have a seat in the waiting lobby. The doctor will call Token #{myTokenNumber} shortly.
                         </Text>
                       </View>
                     ) : (liveStatus === 'CONFIRMED' && isWindowOpen) ? (
@@ -764,10 +764,10 @@ export default function BookingPassModal({
                 <View style={styles.queueBoardBanner}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.queueBoardHospitalName}>
-                      {booking.provider_name || 'Trinadh Multi-Speciality Hospital'}
+                      {booking.provider_name || 'Hospital'}
                     </Text>
                     <Text style={styles.queueBoardDoctorSub}>
-                      {booking.resource_name || 'Dr. K. Trinadh (Chief Physician & Cardiologist)'}
+                      {booking.resource_name || 'Doctor OPD'}
                     </Text>
                     <Text style={styles.queueBoardSessionText}>
                       Today's Morning OPD Session • Room 101
