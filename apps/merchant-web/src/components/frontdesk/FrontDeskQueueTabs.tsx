@@ -38,6 +38,11 @@ export interface FrontDeskQueueBooking {
   department_name?: string;
   queue_position?: number;
   deposit_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
+  consultation_collected_at?: string;
 }
 
 interface FrontDeskQueueTabsProps {
@@ -52,6 +57,7 @@ interface FrontDeskQueueTabsProps {
   onEndConsultation: (bookingId: string) => Promise<void>;
   onManualMarkPresent: (booking: FrontDeskQueueBooking) => void;
   onMarkNoShow: (bookingId: string, depositAmount?: number) => Promise<void>;
+  onCollectConsultationFee?: (bookingId: string) => Promise<void>;
   isProcessingAction: boolean;
 }
 
@@ -67,6 +73,7 @@ export default function FrontDeskQueueTabs({
   onEndConsultation,
   onManualMarkPresent,
   onMarkNoShow,
+  onCollectConsultationFee,
   isProcessingAction,
 }: FrontDeskQueueTabsProps) {
   const [activeTab, setActiveTab] = useState<'waiting' | 'standby' | 'expected' | 'completed'>('waiting');
@@ -286,6 +293,29 @@ export default function FrontDeskQueueTabs({
                               <span>Arrived: {new Date(booking.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                             )}
                           </div>
+                          {/* Split Payment Fee Badges */}
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              ✓ Online Platform Fee: ₹{booking.platform_fee_amount ?? 10} (PAID)
+                            </span>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${
+                              booking.consultation_payment_status === 'COLLECTED_AT_DESK'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-900 border-amber-200'
+                            }`}>
+                              Doctor Fee: ₹{booking.consultation_fee_amount ?? 500} ({booking.consultation_payment_status === 'COLLECTED_AT_DESK' ? 'PAID AT RECEPTION' : 'PAY AT RECEPTION'})
+                            </span>
+                            {booking.consultation_payment_status !== 'COLLECTED_AT_DESK' && onCollectConsultationFee && (
+                              <button
+                                type="button"
+                                disabled={isProcessingAction}
+                                onClick={() => onCollectConsultationFee(booking.id)}
+                                className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-2xs cursor-pointer disabled:opacity-50"
+                              >
+                                Collect Fee
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -365,6 +395,29 @@ export default function FrontDeskQueueTabs({
                             <span>Original Slot: <strong className="font-mono text-slate-700">{new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
                             <span className="text-amber-800 font-medium">Eligible for next free gap</span>
                           </div>
+                          {/* Split Payment Fee Badges */}
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              ✓ Online Platform Fee: ₹{booking.platform_fee_amount ?? 10} (PAID)
+                            </span>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${
+                              booking.consultation_payment_status === 'COLLECTED_AT_DESK'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-900 border-amber-200'
+                            }`}>
+                              Doctor Fee: ₹{booking.consultation_fee_amount ?? 500} ({booking.consultation_payment_status === 'COLLECTED_AT_DESK' ? 'PAID AT RECEPTION' : 'PAY AT RECEPTION'})
+                            </span>
+                            {booking.consultation_payment_status !== 'COLLECTED_AT_DESK' && onCollectConsultationFee && (
+                              <button
+                                type="button"
+                                disabled={isProcessingAction}
+                                onClick={() => onCollectConsultationFee(booking.id)}
+                                className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-2xs cursor-pointer disabled:opacity-50"
+                              >
+                                Collect Fee
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -442,12 +495,30 @@ export default function FrontDeskQueueTabs({
                               {booking.customer.phone}
                             </span>
                           )}
-                          {booking.deposit_amount && (
-                            <span className="font-mono text-emerald-800">
-                              Deposit: ₹{booking.deposit_amount}
+                          </div>
+                          {/* Split Payment Fee Badges */}
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              ✓ Online Platform Fee: ₹{booking.platform_fee_amount ?? 10} (PAID)
                             </span>
-                          )}
-                        </div>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${
+                              booking.consultation_payment_status === 'COLLECTED_AT_DESK'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-900 border-amber-200'
+                            }`}>
+                              Doctor Fee: ₹{booking.consultation_fee_amount ?? 500} ({booking.consultation_payment_status === 'COLLECTED_AT_DESK' ? 'PAID AT RECEPTION' : 'PAY AT RECEPTION'})
+                            </span>
+                            {booking.consultation_payment_status !== 'COLLECTED_AT_DESK' && onCollectConsultationFee && (
+                              <button
+                                type="button"
+                                disabled={isProcessingAction}
+                                onClick={() => onCollectConsultationFee(booking.id)}
+                                className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-2xs cursor-pointer disabled:opacity-50"
+                              >
+                                Collect Fee
+                              </button>
+                            )}
+                          </div>
                       </div>
 
                       {/* Action buttons */}

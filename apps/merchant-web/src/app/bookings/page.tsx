@@ -807,7 +807,9 @@ export default function BookingsManagementPage() {
                         />
                       )}
                       <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
-                        {booking.is_followup ? 'Deposit: ₹0 (Free Follow-up Consultation)' : `Deposit: ₹${booking.deposit_amount} (${booking.payment_status})`}
+                        {booking.is_followup
+                          ? 'Free Follow-up (₹0)'
+                          : `Platform Fee: ₹${(booking as any).platform_fee_amount ?? (booking as any).platform_fee ?? 10} (${(booking as any).platform_payment_status || booking.payment_status || 'CAPTURED'}) • Consultation: ₹${(booking as any).consultation_fee_amount ?? 500} (${(booking as any).consultation_payment_status === 'COLLECTED_AT_DESK' ? 'PAID AT DESK' : 'PAY AT RECEPTION'})`}
                       </span>
                       {booking.customer_arrived_at && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">

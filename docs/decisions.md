@@ -41,9 +41,7 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
 | 2026-10-26 | Phase RC Gate Verification & Release Audit (Commit aa41693) | DECIDED | Completed full Release-Candidate verification across gates G1–G14. Returned NO-GO verdict citing 4 High blockers: (1) Step 1 clean-clone build failure from build-time secret assertions; (2) 680 TypeScript errors from React 18/19 Lucide type conflicts; (3) 2 High CVEs in Expo CLI dependencies; (4) 11 Supabase database advisor errors in stored procedures. Delivered scripts/rc-gate.sh, docs/release/rc-report.md, docs/release/spec-coverage-matrix.md, tests/fuzz/stateful-api-fuzz.mjs, tests/resilience/failure-injection.mjs, scripts/reconcile-money.mjs, scripts/drill-backup-restore.mjs, and scripts/data-invariants.sql. |
 | 2026-10-26 | Phase RC Fix Layer 1: Database Advisor & Stored Procedure Integrity (DEF-RC-04) | DECIDED | Applied migration `20261026000002_fix_db_advisors_and_stored_procedures.sql`: (1) Corrected `cancel_doctor_emergency` table reference from non-existent `hospital_department_members` to `department_members` and dropped obsolete 4-arg overload with differing parameter order; (2) Replaced invalid enum literal `'PENDING'` with `'PENDING_PAYMENT'` in `confirm_booking_by_merchant`; (3) Replaced invalid enum literal `'PAID'` with `'CAPTURED'` in `reschedule_booking_slot`; (4) Removed non-existent column reference `r.category_id` from `search_directory` and `search_directory_public` in favor of valid resource fields. Verified with `tests/unit/database-advisor-fixes.test.mjs` (5/5 PASS) and `supabase db lint` (0 public schema errors). |
 | 2026-10-26 | Phase RC Fix Layer 2: API & Build Secret Safety (DEF-RC-01) | DECIDED | Deferred runtime secret validation (`RAZORPAY_KEY_SECRET`) in `apps/merchant-web/src/lib/razorpay.ts` from top-level module evaluation to runtime operation invocations (`assertRazorpayConfigured()`), and guarded `ALLOW_MOCK_PAYMENTS` assertion in `src/env.mjs` with `!isBuildPhase`. Next.js production build succeeds cleanly (51/51 pages generated) without requiring runtime secrets during build phase, while maintaining strict runtime security throws in production. Verified with `tests/unit/build-secret-safety.test.mjs` (2/2 PASS) and `pnpm build`. |
-
-
-
+| 2026-10-26 | Split Payment Workflow: Online Platform Fee Only & Reception Consultation Fee | DECIDED | Patients pay ONLY the platform booking fee online (e.g. ₹10/₹50) via Razorpay to reserve their slot and receive their check-in PIN. Doctor consultation fee (e.g. ₹500) is marked `PENDING_OFFLINE` to be collected at the hospital front desk on arrival. Added split columns to `bookings` (`platform_fee_amount`, `consultation_fee_amount`, `platform_payment_status`, `consultation_payment_status`), RPC `collect_consultation_fee`, updated customer checkout and front desk reception UI. |
 
 ---
 
@@ -243,4 +241,31 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
      - Successfully records `checked_in_method = 'manual'` (per DB check constraint `checked_in_method IN ('code', 'manual')`), while PIN-based check-ins record `checked_in_method = 'code'`.
   3. **SPEC.md Alignment**:
      - Updated `docs/hospital/SPEC.md` Check-in section to explicitly define that check-in PIN is a permanent, lifetime code tied to the customer profile for streamlined hospital check-ins, with offline walk-in bypass supported for front desk staff.
+
+---
+
+### Decision 13: Split Payment Workflow (Platform Fee Online, Consultation Fee at Hospital Reception)
+- **Date**: 2026-10-26
+- **Status**: DECIDED (Implemented & Verified in Phase 9)
+- **Requirement & Architecture**:
+  1. **Online Platform Fee**:
+     - During checkout, patient pays ONLY the platform booking fee online (e.g. ₹10 or ₹50) via Razorpay to reserve their slot and guarantee their queue position.
+     - Capturing the platform payment instantly triggers slot reservation, booking confirmation, queue locking, and permanent lifetime check-in PIN issuance.
+     - Total charged online through Razorpay order strictly matches `platform_fee_amount`.
+  2. **Offline Doctor Consultation Fee**:
+     - Doctor consultation fee (e.g. ₹500) is marked as "Pay at Hospital" with status `PENDING_OFFLINE`.
+     - Patient pays the consultation fee directly to reception staff when arriving at the hospital.
+     - Front desk receptionists can click "Collect Fee" to invoke `collect_consultation_fee` RPC, marking status `COLLECTED_AT_DESK` with staff attribution and timestamp.
+  3. **Database Schema & RPCs**:
+     - Added `platform_fee_amount numeric(10,2)`, `consultation_fee_amount numeric(10,2)`, `platform_payment_status text`, `consultation_payment_status text`, `consultation_collected_at timestamptz`, and `consultation_collected_by uuid` to `public.bookings`.
+     - Check constraints: `platform_payment_status IN ('PENDING', 'CAPTURED', 'REFUNDED', 'WAIVED')` and `consultation_payment_status IN ('PENDING_OFFLINE', 'COLLECTED_AT_DESK', 'WAIVED', 'REFUNDED')`.
+     - Updated `create_booking_hold` to set `deposit_amount` (online charge) to platform fee, initialize `platform_payment_status = 'PENDING'`, and `consultation_payment_status = 'PENDING_OFFLINE'`.
+     - Updated `confirm_booking_payment` to set `platform_payment_status = 'CAPTURED'` and `consultation_payment_status = 'PENDING_OFFLINE'`.
+     - Added `collect_consultation_fee(p_booking_id uuid, p_collected_by uuid)` with role validation (`admin`, `staff`, `doctor`, or front desk assignment).
+     - Updated `public.merchant_bookings` view to expose split payment fields.
+  4. **Customer Mobile UI**:
+     - Removed obsolete ₹50-₹200 deposit banner from `HomeScreen.tsx`.
+     - `CheckoutModal.tsx` breaks down charges clearly: Platform Fee (Paid Online Now) vs Doctor Consultation Fee (Pay at Hospital). Pay CTA clearly states: `Pay Platform Fee ₹[Amount] to Reserve Slot`.
+     - `BookingPassModal.tsx` displays dual payment statuses: Platform Fee (PAID) and Doctor Consultation (PAY AT DESK / PAID).
+
 
