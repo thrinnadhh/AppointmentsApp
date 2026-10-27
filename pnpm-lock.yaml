@@ -10,7 +10,7 @@ overrides:
   brace-expansion: '>=5.0.12'
   uuid: '>=11.1.1'
   braces: '>=3.0.3'
-  node-forge: '>=1.4.0'
+  node-forge: '>=1.4.1'
   shell-quote: '>=1.11.0'
   compression: '>=1.8.2'
   source-map-js: '>=1.2.2'
@@ -1027,7 +1027,7 @@ packages:
       glob: 13.0.6
       lan-network: 0.2.1
       multitars: 1.0.2
-      node-forge: 1.4.0
+      node-forge: 1.4.1
       npm-package-arg: 11.0.3
       ora: 3.4.0
       picomatch: 4.0.7
@@ -1065,7 +1065,7 @@ packages:
     resolution: {integrity: sha512-zP0tnfqrFFRL8INtOaQ6XwEYfdIpIH9vrEo7y0bHQGQa50z4/QWXE5CI4nRUHxqFW4MVWOwXFg1hom1aAZHNkQ==}
     engines: {node: '>=22.13.0'}
     dependencies:
-      node-forge: 1.4.0
+      node-forge: 1.4.1
     dev: false
 
   /@expo/config-plugins@58.0.10(typescript@6.0.3):
@@ -6469,8 +6469,8 @@ packages:
       whatwg-url: 5.0.0
     dev: false
 
-  /node-forge@1.4.0:
-    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+  /node-forge@1.4.1:
+    resolution: {integrity: sha512-w5/MfWaeMrpR/5ba6fZyAUTLSuE6aYz7H/3cYrqwZEmf5eQS3IaaLgJt4MBv7HglGFWmV22K8h4U18RJQmw/ow==}
     engines: {node: '>= 6.13.0'}
     dev: false
 
