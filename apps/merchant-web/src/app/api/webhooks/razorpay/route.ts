@@ -38,14 +38,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing x-razorpay-signature header' }, { status: 401 });
     }
 
+    if (!/^[a-f0-9]{64}$/i.test(signature)) {
+      return NextResponse.json({ error: 'Malformed x-razorpay-signature header' }, { status: 400 });
+    }
+
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)
       .update(rawBody)
       .digest('hex');
 
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expectedBuf = Buffer.from(expectedSignature, 'utf8');
+
     const isMatch =
-      signature.length === expectedSignature.length &&
-      crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+      sigBuf.length === expectedBuf.length &&
+      crypto.timingSafeEqual(sigBuf, expectedBuf);
 
     if (!isMatch) {
       return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 });
@@ -66,6 +73,22 @@ export async function POST(req: NextRequest) {
     const paymentCurrency = payment?.currency ?? order?.currency ?? 'INR';
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    // Check payment ledger for already-processed event ID (idempotency)
+    if (paymentId) {
+      const { data: existingPayment } = await supabaseAdmin
+        .from('payments')
+        .select('id, booking_id, status')
+        .eq('gateway_payment_id', paymentId)
+        .maybeSingle();
+
+      if (existingPayment && existingPayment.status === 'CAPTURED') {
+        return NextResponse.json(
+          { success: true, booking_id: existingPayment.booking_id, idempotent: true, status: 'CONFIRMED' },
+          { status: 200 }
+        );
+      }
+    }
 
     // Handle payment.captured or order.paid
     if (event === 'payment.captured' || event === 'order.paid') {
@@ -106,18 +129,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 6. Idempotency Check: if booking is already confirmed with this payment
-      if (booking.status === 'CONFIRMED' && booking.gateway_payment_id === paymentId) {
+      // 6. Idempotency Check: if booking is already confirmed or captured
+      if (booking.status === 'CONFIRMED' || booking.payment_status === 'CAPTURED') {
         return NextResponse.json(
-          { success: true, booking_id: booking.id, idempotent: true, status: 'CONFIRMED' },
-          { status: 200 }
-        );
-      }
-
-      // If already confirmed with any payment, return idempotent success
-      if (booking.status === 'CONFIRMED') {
-        return NextResponse.json(
-          { success: true, booking_id: booking.id, idempotent: true, status: 'CONFIRMED' },
+          { success: true, booking_id: booking.id, idempotent: true, status: booking.status },
           { status: 200 }
         );
       }

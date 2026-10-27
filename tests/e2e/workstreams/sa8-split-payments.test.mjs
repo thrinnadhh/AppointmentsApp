@@ -44,12 +44,17 @@ describe('Workstream SA8: Split-Payment Flow Verification', () => {
 
   const { url, appUrl, serviceHeaders } = getDbConfig();
 
-  // Read webhook secret from apps/merchant-web/.env.local
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const secretMatch = envContent.match(/RAZORPAY_WEBHOOK_SECRET="([^"]+)"/);
-  const webhookSecret = secretMatch
-    ? secretMatch[1]
-    : '4db7bab98814a119b6623780cca8595c148f0fc9d722884743a979a12aab37e3';
+  // Read webhook secret from environment or apps/merchant-web/.env.local
+  let webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!webhookSecret && fs.existsSync('apps/merchant-web/.env.local')) {
+    const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
+    const secretMatch = envContent.match(/RAZORPAY_WEBHOOK_SECRET="([^"]+)"/);
+    if (secretMatch) webhookSecret = secretMatch[1];
+  }
+  if (!webhookSecret) {
+    console.error('FATAL: RAZORPAY_WEBHOOK_SECRET environment variable is missing.');
+    process.exit(1);
+  }
 
   before(async () => {
     writer = new SubAgentReportWriter('SA8_SPLIT', 'Split-Payment Workflow Verification');
