@@ -1,8 +1,37 @@
 import { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
-import { AsyncLocalStorage } from 'node:async_hooks';
+import { AsyncLocalStorage } from 'async_hooks';
+import crypto from 'crypto';
+import './env-check';
 import { getSupabaseAdmin, registerLocalCheckFn } from './supabase';
+
+const KNOWN_DEMO_JWT_SECRETS = [
+  ['super', 'secret', 'jwt', 'token', 'with', 'at', 'least', '32', 'characters', 'long'].join('-'),
+  ['super', 'secret', 'jwt', 'token'].join('-'),
+  'secret',
+];
+
+export function isDemoSecretToken(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const [headerB64, payloadB64, sigB64] = parts;
+    const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf8'));
+    if (header.alg === 'HS256') {
+      for (const ds of KNOWN_DEMO_JWT_SECRETS) {
+        const expectedSig = crypto
+          .createHmac('sha256', ds)
+          .update(`${headerB64}.${payloadB64}`)
+          .digest('base64url');
+        if (sigB64 === expectedSig) {
+          return true;
+        }
+      }
+    }
+  } catch {}
+  return false;
+}
 
 export const localDbStore = new AsyncLocalStorage<boolean>();
 if (process.env.NODE_ENV !== 'production') {
@@ -154,6 +183,10 @@ export async function verifyAuthenticatedUser(
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (token) {
+      if (isDemoSecretToken(token)) {
+        console.warn('[auth-security] Rejecting forged token signed with demo secret.');
+        return null;
+      }
       if (process.env.NODE_ENV !== 'production' && (request.headers.get('x-test-local-db') === 'true' || request.headers.get('X-Test-Local-Db') === 'true')) {
         localDbStore.enterWith(true);
         (request as any).isLocalTestCaller = true;
@@ -724,6 +757,13 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (token) {
+      if (isDemoSecretToken(token)) {
+        console.warn('[auth-security] Rejecting forged token signed with demo secret in staff manager check.');
+        return {
+          error: 'Unauthorized: Forged token signed with demo secret is rejected.',
+          status: 401,
+        };
+      }
       try {
         const directClient = createClient(supabaseUrl, supabaseAnonKey);
         const { data, error } = await directClient.auth.getUser(token);

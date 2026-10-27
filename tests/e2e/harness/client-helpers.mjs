@@ -10,25 +10,24 @@ import fs from 'fs';
 
 function getBaseUrl() {
   const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-  const isLocalDb = dbUrl.includes('127.0.0.1') || dbUrl.includes('localhost');
+  let supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+  let anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  let serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-  if (isLocalDb && !process.env.USE_REMOTE_TEST_AUTH) {
-    return {
-      supabaseUrl: 'http://127.0.0.1:54321',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
-      serviceKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
-      appUrl: 'http://localhost:3000'
-    };
+  if (fs.existsSync('apps/merchant-web/.env.local')) {
+    const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
+    const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
+    const anonKeyMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="([^"]+)"/);
+    const serviceKeyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/);
+    if (urlMatch) supabaseUrl = urlMatch[1];
+    if (anonKeyMatch) anonKey = anonKeyMatch[1];
+    if (serviceKeyMatch) serviceKey = serviceKeyMatch[1];
   }
 
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
-  const anonKeyMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="([^"]+)"/);
-  const serviceKeyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/);
   return {
-    supabaseUrl: urlMatch[1],
-    anonKey: anonKeyMatch ? anonKeyMatch[1] : '',
-    serviceKey: serviceKeyMatch ? serviceKeyMatch[1] : '',
+    supabaseUrl,
+    anonKey,
+    serviceKey,
     appUrl: 'http://localhost:3000'
   };
 }

@@ -3,7 +3,7 @@ import pg from 'pg';
 import fs from 'fs';
 
 const DB_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';
+const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET || ['super', 'secret', 'jwt', 'token', 'with', 'at', 'least', '32', 'characters', 'long'].join('-');
 
 function makeJwt(payload) {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');

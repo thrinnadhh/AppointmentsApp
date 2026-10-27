@@ -81,7 +81,6 @@ export function registerLocalCheckFn(fn: () => boolean) {
 // NEXT_PUBLIC_ prefix, or it would be bundled into client-side JS.
 // Built lazily on first use so importing this module never throws for code
 // that only needs the plain `supabase` client above.
-import './env-check';
 
 let _supabaseAdmin: (typeof supabase) | null = null;
 let _localSupabaseAdmin: (typeof supabase) | null = null;

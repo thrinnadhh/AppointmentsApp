@@ -1,31 +1,31 @@
+import crypto from 'crypto';
+
 /**
  * Environment & Security Credential Validator
  * 
  * Guards against the use of well-known public demo secrets, default tokens,
  * and compromised credentials in production/staging environments.
+ * Uses SHA-256 hashes so that secret strings never appear in the codebase.
  */
 
-export const KNOWN_DEMO_JWT_SECRETS = new Set([
-  'super-secret-jwt-token-with-at-least-32-characters-long',
-  'super-secret-jwt-token-with-at-least-32-characters-long!',
-  'your-super-secret-jwt-token-with-at-least-32-characters-long',
-]);
-
-export const KNOWN_DEMO_KEYS = new Set([
-  // Supabase local dev demo anon key
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
-  // Supabase local dev demo service_role key
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
-]);
-
-export const COMPROMISED_WEBHOOK_SECRETS = new Set([
-  '4db7bab98814a119b6623780cca8595c148f0fc9d722884743a979a12aab37e3',
+export const KNOWN_DEMO_HASHES = new Set([
+  // Supabase public demo JWT secret hash
+  'a064b502e61d27e94b8717290e5e1b32e36720e9fbdf952ec81a84c07128cb37',
+  // Supabase public demo JWT secret with exclamation hash
+  '60155b4be4bc5b19d5d8fb8ddce1d59666f7f2b1d3d622ddcc2b4899555c4779',
+  // Supabase public demo JWT template secret hash
+  'd01f99c33959bc65ae82046faaa559642be94195155f9f60ba106198f1ec01c7',
+  // Compromised test webhook secret hash
+  'e2c040d9980d0d8fbde0347ee61b9a117ba2be7e0e7a25032545d6542fbfe60b',
+  // Demo service_role key hash
+  '70541e07fd4f900b66e289f5be55c85f9bef1def4924a5b0c518c45ea1688c12',
 ]);
 
 export function isDemoKeyOrSecret(val?: string | null): boolean {
   if (!val) return false;
   const trimmed = val.trim();
-  if (KNOWN_DEMO_JWT_SECRETS.has(trimmed) || KNOWN_DEMO_KEYS.has(trimmed) || COMPROMISED_WEBHOOK_SECRETS.has(trimmed)) {
+  const hash = crypto.createHash('sha256').update(trimmed).digest('hex');
+  if (KNOWN_DEMO_HASHES.has(hash)) {
     return true;
   }
   // Also check if decoded JWT claims issuer is supabase-demo
@@ -33,14 +33,12 @@ export function isDemoKeyOrSecret(val?: string | null): boolean {
     try {
       const parts = trimmed.split('.');
       if (parts.length >= 2) {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
         if (payload.iss === 'supabase-demo') {
           return true;
         }
       }
-    } catch {
-      // ignore parse error
-    }
+    } catch {}
   }
   return false;
 }
@@ -60,7 +58,7 @@ export function validateSecurityConfig(env: Record<string, string | undefined> =
   // 1. SUPABASE_JWT_SECRET validation (if configured on backend/server)
   const jwtSecret = env.SUPABASE_JWT_SECRET || env.JWT_SECRET;
   if (jwtSecret) {
-    if (KNOWN_DEMO_JWT_SECRETS.has(jwtSecret.trim())) {
+    if (isDemoKeyOrSecret(jwtSecret)) {
       throw new Error(
         'CRITICAL SECURITY CONFIGURATION ERROR: SUPABASE_JWT_SECRET equals the public default demo secret! ' +
         'This allows arbitrary JWT token forgery and administrative bypass. Set a unique, high-entropy secret in production.'
@@ -109,7 +107,7 @@ export function validateSecurityConfig(env: Record<string, string | undefined> =
   // 4. RAZORPAY_WEBHOOK_SECRET validation
   const webhookSecret = env.RAZORPAY_WEBHOOK_SECRET;
   if (webhookSecret) {
-    if (COMPROMISED_WEBHOOK_SECRETS.has(webhookSecret.trim())) {
+    if (isDemoKeyOrSecret(webhookSecret)) {
       throw new Error(
         'CRITICAL SECURITY CONFIGURATION ERROR: RAZORPAY_WEBHOOK_SECRET is using a compromised/leaked secret value! ' +
         'Generate a new webhook secret in the Razorpay dashboard immediately.'
