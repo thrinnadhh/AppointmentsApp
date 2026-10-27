@@ -8,11 +8,12 @@ import {
   TextInput,
   Image,
   SafeAreaView,
-  StatusBar,
+  StatusBar as RNStatusBar,
   ActivityIndicator,
   Platform,
   Animated,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { VERTICALS, normCategory, City, Booking } from '@appointments/shared';
 import {
   fetchProvidersByCategory,
@@ -154,6 +155,20 @@ function UpcomingLiveCard({ booking, onOpenPass, onMarkReached, onOpenMyBookings
   const timeStr = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = isToday ? 'Today' : slotDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
+  const arrivalWindowStart = new Date(slotMs - 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const arrivalWindowEnd = new Date(slotMs + 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const arrivalWindowString = `${arrivalWindowStart} – ${arrivalWindowEnd}`;
+
+  const [isNotificationDenied, setIsNotificationDenied] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
+      if (Notification.permission === 'denied') {
+        setIsNotificationDenied(true);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     if (booking.id) {
@@ -202,8 +217,21 @@ function UpcomingLiveCard({ booking, onOpenPass, onMarkReached, onOpenMyBookings
           <Text style={styles.liveTimeText}>
             🕒 {dateStr} at <Text style={{ fontWeight: '800', color: '#0f172a' }}>{timeStr}</Text>
           </Text>
+          <Text style={styles.liveArrivalWindowText}>
+            ⏱️ Arrival Window: <Text style={{ fontWeight: '700', color: '#047857' }}>{arrivalWindowString}</Text> (±10m)
+          </Text>
         </View>
       </View>
+
+      {/* Push Notifications Denied Notice */}
+      {isNotificationDenied && (
+        <View style={styles.homePushDeniedBanner} testID="home-push-denied-notice">
+          <Text style={{ fontSize: 13 }}>🔔</Text>
+          <Text style={styles.homePushDeniedText}>
+            Push notifications disabled. All updates and PIN codes will be sent via WhatsApp &amp; SMS.
+          </Text>
+        </View>
+      )}
 
       {/* Permanent Lifetime PIN Box */}
       <View style={styles.livePinBox} testID="live-checkin-pin-box">
@@ -504,7 +532,7 @@ export default function HomeScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar style="dark" />
 
       {/* Top Header with App Logo & Location */}
       <View style={styles.header}>
@@ -597,12 +625,6 @@ export default function HomeScreen({
             </View>
           </View>
 
-          {/* Trust Banner on First Page */}
-          <View style={styles.trustBanner}>
-            <Text style={styles.trustBannerText}>
-              ⚡ Small ₹50–₹200 deposit guarantees your slot with zero waiting at venue.
-            </Text>
-          </View>
 
           {onOpenProfile && (
             <TouchableOpacity
@@ -847,9 +869,9 @@ export default function HomeScreen({
                         </View>
 
                         <View style={styles.depositPill}>
-                          <Text style={styles.depositLabel}>Deposit from </Text>
+                          <Text style={styles.depositLabel}>Platform Fee </Text>
                           <Text style={styles.depositAmount}>
-                            ₹{provider.resources[0]?.deposit_amount || 50}
+                            ₹10 • Reserve
                           </Text>
                         </View>
                       </View>
@@ -993,7 +1015,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
+    paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 28) : 0,
   },
   liveCard: {
     backgroundColor: '#ffffff',
@@ -1065,6 +1087,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748b',
     marginTop: 4,
+  },
+  liveArrivalWindowText: {
+    fontSize: 12,
+    color: '#334155',
+    marginTop: 3,
+    fontWeight: '500',
+  },
+  homePushDeniedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 10,
+  },
+  homePushDeniedText: {
+    fontSize: 11,
+    color: '#475569',
+    flex: 1,
+    lineHeight: 14,
   },
   livePinBox: {
     backgroundColor: '#ecfdf5',

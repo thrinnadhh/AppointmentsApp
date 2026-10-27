@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
         customer_arrived_at: is_present ? nowIso : null,
         checked_in_at: is_present ? nowIso : null,
         checked_in_by: caller.id,
-        checked_in_method: 'offline_reception',
+        checked_in_method: is_present ? 'manual' : null,
         updated_at: nowIso,
       })
       .select()

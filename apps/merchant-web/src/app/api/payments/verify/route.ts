@@ -4,6 +4,7 @@ import { verifyRazorpaySignature, canMockPayments } from '@/lib/razorpay';
 import { checkRateLimit } from '@/lib/redis';
 import { VerifyRazorpayPaymentRequest, VerifyRazorpayPaymentResponse, getPlatformFee } from '@appointments/shared';
 import { getClientIp } from '@/lib/auth-admin';
+import { parseSafeJson, PayloadLimitExceededError } from '@/lib/validation-limits';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +20,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const body = (await req.json()) as Partial<VerifyRazorpayPaymentRequest>;
+    let body: Partial<VerifyRazorpayPaymentRequest>;
+    try {
+      body = await parseSafeJson<Partial<VerifyRazorpayPaymentRequest>>(req);
+    } catch (parseErr) {
+      if (parseErr instanceof PayloadLimitExceededError) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: parseErr.message },
+          { status: 413 }
+        );
+      }
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Invalid JSON payload' },
+        { status: 400 }
+      );
+    }
     const {
       booking_id,
       razorpay_payment_id,
@@ -81,7 +96,7 @@ export async function POST(req: NextRequest) {
     // 2. Fetch booking and enforce strict state & order binding
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, status, payment_status, gateway_order_id, gateway_payment_id, hold_expires_at')
+      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, expected_payment_amount_paise, platform_payment_status, consultation_payment_status, status, payment_status, gateway_order_id, gateway_payment_id, hold_expires_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -100,6 +115,8 @@ export async function POST(req: NextRequest) {
           booking_id,
           status: 'CONFIRMED',
           payment_status: 'CAPTURED',
+          platform_payment_status: 'CAPTURED',
+          consultation_payment_status: (booking as any).consultation_payment_status || 'PENDING_OFFLINE',
         },
         { status: 200 }
       );
@@ -237,12 +254,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const expectedDepositPaise = Math.round(Number(booking.deposit_amount || 0) * 100);
-    const expectedTotalPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 0) * 100);
+    // Strict 1-to-1 payment amount verification: compare strictly to stored expected amount
+    const expectedAmountPaise = (booking as any).expected_payment_amount_paise != null
+      ? Number((booking as any).expected_payment_amount_paise)
+      : Math.round(Number(booking.platform_fee_amount || booking.deposit_amount || 10) * 100);
 
-    if (razorpayOrder.amount !== expectedDepositPaise && razorpayOrder.amount !== expectedTotalPaise) {
+    if (razorpayOrder.amount !== expectedAmountPaise) {
       return NextResponse.json<VerifyRazorpayPaymentResponse>(
-        { success: false, error: 'Tampered payment amount' },
+        { success: false, error: `Tampered payment amount: expected ${expectedAmountPaise} paise, received ${razorpayOrder.amount} paise` },
         { status: 400 }
       );
     }
@@ -266,21 +285,21 @@ export async function POST(req: NextRequest) {
     if (isRazorpayConfigured()) {
       const paymentDetails = await fetchRazorpayPayment(razorpay_payment_id);
       if (paymentDetails && paymentDetails.order_id !== 'order_test_mock') {
-        const expectedPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 100) * 100);
-        if (paymentDetails.amount !== expectedPaise) {
+        if (paymentDetails.amount !== expectedAmountPaise) {
           return NextResponse.json<VerifyRazorpayPaymentResponse>(
-            { success: false, error: `Payment amount mismatch: expected ${expectedPaise} paise, received ${paymentDetails.amount} paise` },
+            { success: false, error: `Payment amount mismatch: expected ${expectedAmountPaise} paise, received ${paymentDetails.amount} paise` },
             { status: 400 }
           );
         }
       }
     }
 
-    // 3. Settle booking payment via Supabase RPC
+    // 3. Settle booking payment via Supabase RPC (online platform fee captured, consultation pending offline)
+    const settleAmount = Number(booking.platform_fee_amount || booking.deposit_amount || 10);
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
       p_gateway_payment_id: razorpay_payment_id,
-      p_deposit_amount: Number(booking.deposit_amount),
+      p_deposit_amount: settleAmount,
     });
 
     if (rpcError) {
@@ -318,7 +337,7 @@ export async function POST(req: NextRequest) {
 
     const { data: bkg } = await supabaseAdmin
       .from('bookings')
-      .select('resource_id, slot_start, provider_id, deposit_amount, platform_fee, total_amount')
+      .select('resource_id, slot_start, provider_id, deposit_amount, platform_fee, total_amount, platform_fee_amount')
       .eq('id', booking_id)
       .single();
 
@@ -329,12 +348,12 @@ export async function POST(req: NextRequest) {
         .eq('id', bkg.provider_id)
         .maybeSingle();
       const fee = getPlatformFee(prov?.category_id);
-      const dep = Number(bkg.deposit_amount) || 100;
       await supabaseAdmin
         .from('bookings')
         .update({
           platform_fee: fee,
-          total_amount: dep + fee,
+          platform_fee_amount: fee,
+          total_amount: fee,
         })
         .eq('id', booking_id);
     }
@@ -344,10 +363,9 @@ export async function POST(req: NextRequest) {
       await releaseSlotLock(`${bkg.resource_id}:${bkg.slot_start}`);
     }
 
-
     const { data: confirmedBkg } = await supabaseAdmin
       .from('bookings')
-      .select('queue_position, reference_code')
+      .select('queue_position, reference_code, platform_payment_status, consultation_payment_status')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -359,6 +377,8 @@ export async function POST(req: NextRequest) {
         queue_position: confirmedBkg?.queue_position ?? 1,
         status: 'CONFIRMED',
         payment_status: 'CAPTURED',
+        platform_payment_status: (confirmedBkg?.platform_payment_status as any) || 'CAPTURED',
+        consultation_payment_status: (confirmedBkg?.consultation_payment_status as any) || 'PENDING_OFFLINE',
       },
       { status: 200 }
     );

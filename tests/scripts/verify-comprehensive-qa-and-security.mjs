@@ -20,7 +20,11 @@ const SUPABASE_URL = getEnvVal('NEXT_PUBLIC_SUPABASE_URL') || 'http://127.0.0.1:
 const ANON_KEY = getEnvVal('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 const SERVICE_KEY = getEnvVal('SUPABASE_SERVICE_ROLE_KEY');
 const RAZORPAY_SECRET = getEnvVal('RAZORPAY_KEY_SECRET') || 'JAUY65EHjNtKy0H3UsHmnya4';
-const RAZORPAY_WEBHOOK_SECRET = getEnvVal('RAZORPAY_WEBHOOK_SECRET') || '4db7bab98814a119b6623780cca8595c148f0fc9d722884743a979a12aab37e3';
+const RAZORPAY_WEBHOOK_SECRET = getEnvVal('RAZORPAY_WEBHOOK_SECRET') || process.env.RAZORPAY_WEBHOOK_SECRET;
+if (!RAZORPAY_WEBHOOK_SECRET) {
+  console.error('FATAL: RAZORPAY_WEBHOOK_SECRET environment variable is missing.');
+  process.exit(1);
+}
 const ADMIN_SECRET = getEnvVal('ADMIN_SECRET') || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 const API_BASE = 'http://localhost:3000';
 

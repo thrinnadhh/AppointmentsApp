@@ -79,4 +79,69 @@ test.describe.serial('Phase 5d: Hospital Customer Web Ticket & OPD Booking Pass'
       await expect(page.getByText(/Verified/i).first()).toBeVisible();
     }
   });
+
+  test('5. OPD Arrival Window (±10 Mins) and ceiling rule displays on ticket', async ({ page }) => {
+    await page.goto(`${baseUrl}/ticket/demo`);
+
+    // Verify arrival window card exists
+    const arrivalCard = page.getByTestId('ticket-arrival-window');
+    await expect(arrivalCard).toBeVisible({ timeout: 15000 });
+    await expect(arrivalCard.getByText(/OPD Arrival Window \(±10 Mins\)/i)).toBeVisible();
+    await expect(arrivalCard.getByText(/Booked time is a ceiling/i)).toBeVisible();
+  });
+
+  test('6. Verified Present in Waiting Lounge hides PIN code after check-in', async ({ page }) => {
+    await page.route('**/api/ticket/demo-checkedin', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          is_window_open: true,
+          window_opens_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+          booking: {
+            id: 'demo-checkedin-id',
+            resource_id: 'demo-res-1',
+            provider_id: 'demo-provider-id',
+            reference_code: 'TEST-CHECKEDIN-PASS',
+            slot_start: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+            slot_end: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            status: 'CHECKED_IN',
+            payment_status: 'CAPTURED',
+            deposit_amount: 100,
+            is_present: true,
+            checked_in_at: new Date().toISOString(),
+            checked_in_method: 'PASS_CODE',
+            queue_position: 1,
+          },
+          customer: {
+            name: 'Checked In Patient',
+            email: 'checkedin.patient@hospital.local',
+            phone: '+919999900001',
+          },
+          hospital: {
+            name: 'Tirupati Apex Hospital',
+            address: 'Test Medical Road, Tirupati, AP',
+            phone: '+919999900000',
+          },
+          doctor: {
+            id: 'demo-res-1',
+            name: 'Dr. A. Sharma (Neurologist)',
+            department: 'Neurology',
+            duration_minutes: 30,
+            price: 500,
+          },
+          checkin_code: null,
+        }),
+      });
+    });
+
+    await page.goto(`${baseUrl}/ticket/demo-checkedin`);
+
+    // In checked in state, verified banner is displayed
+    await expect(page.getByText(/Verified Present in Waiting Lounge/i)).toBeVisible({ timeout: 15000 });
+
+    // 4-digit code must be hidden
+    await expect(page.getByTestId('customer-checkin-pin')).not.toBeVisible();
+  });
 });

@@ -1,0 +1,16 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore dependencies, build outputs, and test artifacts"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)\.pnpm-store/''',
+  '''(^|/)\.next/''',
+  '''(^|/)strix_runs/''',
+  '''(^|/)\.source-aware/''',
+  '''(^|/)\.expo/''',
+  '''(^|/)\.env(\..+)?$''',
+  '''(^|/)poc_.*\.py$''',
+  '''(^|/)story-manifest\.json$'''
+]

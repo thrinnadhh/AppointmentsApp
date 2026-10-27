@@ -95,11 +95,11 @@ export default function CheckoutModal({
 
   const isFreeFollowup = Boolean(coolingEligibility?.eligible);
   const rawPlatformFee = getPlatformFee(categoryId);
-  const rawDepositAmount = resource ? Number(resource.deposit_amount) : 100;
+  const consultationFee = isFreeFollowup ? 0 : (resource ? Number(resource.price ?? 500) : 500);
 
   const platformFee = isFreeFollowup ? 0 : rawPlatformFee;
-  const depositAmount = isFreeFollowup ? 0 : rawDepositAmount;
-  const totalPayable = isFreeFollowup ? 0 : (depositAmount + platformFee);
+  // Under split-payment workflow, customer pays ONLY the platform fee online
+  const totalPayable = isFreeFollowup ? 0 : platformFee;
 
   useEffect(() => {
     let active = true;
@@ -167,6 +167,10 @@ export default function CheckoutModal({
   const [otherPatientPhone, setOtherPatientPhone] = useState<string>('');
   const [patientRelationship, setPatientRelationship] = useState<string>('Family');
 
+  // Minor patient verification & parental consent (DPDP Act §9)
+  const [isPatientMinor, setIsPatientMinor] = useState<boolean>(false);
+  const [guardianConsentGiven, setGuardianConsentGiven] = useState<boolean>(false);
+
   useEffect(() => {
     if (!visible) {
       setSecondsLeft(300);
@@ -177,6 +181,8 @@ export default function CheckoutModal({
       setOtherPatientName('');
       setOtherPatientPhone('');
       setPatientRelationship('Family');
+      setIsPatientMinor(false);
+      setGuardianConsentGiven(false);
       return;
     }
 
@@ -208,6 +214,21 @@ export default function CheckoutModal({
         month: 'short',
       })
     : '';
+
+  const slotStartMs = slot ? new Date(slot.start_time).getTime() : 0;
+  const arrivalWindowStart = slotStartMs
+    ? new Date(slotStartMs - 10 * 60 * 1000).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+  const arrivalWindowEnd = slotStartMs
+    ? new Date(slotStartMs + 10 * 60 * 1000).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+  const arrivalWindowString = `${arrivalWindowStart} – ${arrivalWindowEnd}`;
 
   const handleAttachPrescription = async () => {
     setIsUploadingAttachment(true);
@@ -266,6 +287,11 @@ export default function CheckoutModal({
         const cleanPhone = otherPatientPhone.trim().replace(/\D/g, '');
         if (!cleanPhone || cleanPhone.length < 10) {
           setPayError("Please enter a valid 10-digit mobile number for the patient.");
+          setIsProcessing(false);
+          return;
+        }
+        if (isPatientMinor && !guardianConsentGiven) {
+          setPayError("Please confirm the parental/guardian consent declaration for minor patient.");
           setIsProcessing(false);
           return;
         }
@@ -336,7 +362,7 @@ export default function CheckoutModal({
             amount: orderRes.amount,
             currency: orderRes.currency || 'INR',
             name: 'Tirupati Appointments',
-            description: `Deposit for ${resource.name}`,
+            description: `Platform Booking Fee for ${resource.name}`,
             order_id: orderId,
             handler: async function (response: any) {
               try {
@@ -591,6 +617,55 @@ export default function CheckoutModal({
                       🟢 <Text style={{ fontWeight: '700' }}>1-Hour Gap Rule Exemption:</Text> Appointments for different family members or friends have no minimum gap requirement and can be booked back-to-back or simultaneously.
                     </Text>
                   </View>
+
+                  {/* Minor Verification & Parental Consent */}
+                  <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e293b' }}>
+                          Patient is under 18 years of age (Minor)
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                          Parent or lawful guardian consent is required under DPDP Act §9.
+                        </Text>
+                      </View>
+                      <Switch
+                        value={isPatientMinor}
+                        onValueChange={(val) => {
+                          setIsPatientMinor(val);
+                          if (!val) setGuardianConsentGiven(false);
+                        }}
+                        trackColor={{ false: '#cbd5e1', true: '#a7f3d0' }}
+                        thumbColor={isPatientMinor ? '#047857' : '#f8fafc'}
+                        testID="switch-minor-patient"
+                      />
+                    </View>
+
+                    {isPatientMinor && (
+                      <TouchableOpacity
+                        style={{
+                          marginTop: 10,
+                          backgroundColor: '#f0fdf4',
+                          borderWidth: 1,
+                          borderColor: '#bbf7d0',
+                          borderRadius: 8,
+                          padding: 10,
+                          flexDirection: 'row',
+                          alignItems: 'flex-start',
+                        }}
+                        activeOpacity={0.8}
+                        onPress={() => setGuardianConsentGiven(!guardianConsentGiven)}
+                        testID="checkbox-guardian-consent"
+                      >
+                        <Text style={{ fontSize: 16, marginRight: 8, marginTop: 1 }}>
+                          {guardianConsentGiven ? '☑️' : '⬜'}
+                        </Text>
+                        <Text style={{ flex: 1, fontSize: 11, color: '#166534', lineHeight: 16 }}>
+                          <Text style={{ fontWeight: '700' }}>Parental / Guardian Consent Declaration:</Text> I confirm that I am the parent or lawful guardian of this minor patient and consent to processing their appointment details for healthcare purposes.
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               )}
             </View>
@@ -606,6 +681,12 @@ export default function CheckoutModal({
                 <Text style={styles.summaryLabel}>Scheduled Time</Text>
                 <Text style={styles.summaryValue}>
                   {timeString} ({dateString})
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Arrival Window</Text>
+                <Text style={[styles.summaryValue, { color: '#047857', fontWeight: '700' }]}>
+                  {arrivalWindowString} (±10m)
                 </Text>
               </View>
               <View style={styles.summaryRow}>
@@ -625,17 +706,11 @@ export default function CheckoutModal({
                 )}
               </View>
               <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Hold Deposit (Merchant Fee)</Text>
-                <Text style={[styles.priceValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
-                  {isFreeFollowup ? '₹0 (Waived)' : `₹${depositAmount}`}
-                </Text>
-              </View>
-              <View style={styles.priceRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.priceLabel}>Platform Booking Fee</Text>
+                  <Text style={styles.priceLabel}>Platform / Booking Fee</Text>
                   <View style={[styles.feeBadge, isFreeFollowup && { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
                     <Text style={[styles.feeBadgeText, isFreeFollowup && { color: '#047857' }]}>
-                      {isFreeFollowup ? 'Waived' : (platformFee === 50 ? 'Flat ₹50 Gaming/Turf' : 'Flat ₹10')}
+                      {isFreeFollowup ? 'Waived' : 'Pay Online Now'}
                     </Text>
                   </View>
                 </View>
@@ -644,13 +719,25 @@ export default function CheckoutModal({
                 </Text>
               </View>
               <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Remainder Fee</Text>
-                <Text style={styles.priceSub}>
-                  {isFreeFollowup ? '₹0 Follow-up' : 'Payable at venue'}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.priceLabel}>Doctor Consultation Fee</Text>
+                  <View style={[styles.feeBadge, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
+                    <Text style={[styles.feeBadgeText, { color: '#92400e' }]}>
+                      Pay at Hospital
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.priceValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${consultationFee}`}
                 </Text>
               </View>
               <View style={[styles.priceRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total Payable Now</Text>
+                <View>
+                  <Text style={styles.totalLabel}>Total Payable Online Now</Text>
+                  <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                    Reserves seat & generates check-in PIN
+                  </Text>
+                </View>
                 <Text style={[styles.totalValue, isFreeFollowup && { color: '#047857' }]}>
                   ₹{totalPayable}
                 </Text>
@@ -830,14 +917,15 @@ export default function CheckoutModal({
             </View>
 
             {/* Cancellation Policy — Consumer Protection (E-Commerce) Rules 2020 */}
-            <View style={styles.policyCard}>
+            <View style={styles.policyCard} testID="cancellation-policy-card">
               <Text style={styles.policyTitle}>🛡️ Cancellation & Refund Policy</Text>
               <Text style={styles.policyText}>
-                {'✅ Free cancellation up to 1 hour before your slot — full deposit refunded.\n'}
-                {'↩️  Reschedule free within the same window — deposit carries over.\n'}
-                {'⚠️  Two times no-show — No issue or penalty (100% deposit refunded).\n'}
-                {'⚠️  3rd to 5th no-show — ₹60 penalty (₹50 to hospital, ₹10 to Appointments app), rest refunded.\n'}
-                {'🚫  Exceeding 5 no-shows — Account blocked for 7 days.'}
+                {'✅ Free cancellation & reschedule up to 60 minutes before slot — 100% deposit refunded.\n'}
+                {'⚠️  Within 60 minutes of slot: Deposit is forfeited to the clinic.\n'}
+                {'🛡️ Business/Emergency cancellation: 100% full refund (deposit + platform fee).\n'}
+                {'ℹ️  Two times no-show: 100% courtesy deposit refund, no penalty.\n'}
+                {'⚠️  3rd to 5th no-show: ₹60 penalty (₹50 to hospital, ₹10 to Appointments app), rest refunded.\n'}
+                {'🚫  Exceeding 5 no-shows: Account blocked for 7 days.'}
               </Text>
               <Text style={styles.policyLinkText}
                 onPress={() => Linking.openURL('https://appointments4u.in/refund-policy')}
@@ -846,27 +934,28 @@ export default function CheckoutModal({
               </Text>
             </View>
 
-            {/* Late Arrival Grace Policy (+2 Token Rule) */}
-            <View style={styles.lateArrivalCard} testID="late-arrival-notice">
+            {/* Hospital OPD Arrival Window (±10 Mins) & Standby Policy */}
+            <View style={styles.lateArrivalCard} testID="arrival-window-notice">
               <View style={styles.lateArrivalHeader}>
                 <Text style={styles.lateArrivalIcon}>⏱️</Text>
-                <Text style={styles.lateArrivalTitle}>Late Arrival Grace Policy (+2 Token Buffer)</Text>
+                <Text style={styles.lateArrivalTitle}>Arrival Window: Booked Time ± 10 Minutes</Text>
               </View>
               <Text style={styles.lateArrivalSubtitle}>
-                Running late? Don't worry — your appointment remains valid if not cancelled:
+                Your expected arrival window for this appointment is:
               </Text>
+              <View style={styles.arrivalWindowHighlightBox} testID="arrival-window-box">
+                <Text style={styles.arrivalWindowRangeText}>{arrivalWindowString}</Text>
+                <Text style={styles.arrivalWindowBadge}>±10 MIN WINDOW</Text>
+              </View>
               <View style={styles.lateArrivalRuleBox}>
                 <Text style={styles.lateArrivalRuleText}>
-                  • When you arrive at the venue, tap <Text style={{ fontWeight: '700', color: '#059669' }}>"Say Reached"</Text> in the app.
+                  • <Text style={{ fontWeight: '700', color: '#047857' }}>Ceiling Rule:</Text> The booked time ({timeString}) is a ceiling. Starting earlier is always allowed when you are present and the doctor is free.
                 </Text>
                 <Text style={styles.lateArrivalRuleText}>
-                  • You will automatically be queued <Text style={{ fontWeight: '700', color: '#0f172a' }}>2 tokens after the ongoing token</Text> so current visitors are not disrupted.
+                  • <Text style={{ fontWeight: '700', color: '#0284c7' }}>On-Time Priority:</Text> Arriving within your window ({arrivalWindowString}) guarantees priority over late arrivals.
                 </Text>
-              </View>
-              <View style={styles.lateArrivalExampleBox}>
-                <Text style={styles.lateArrivalExampleTitle}>💡 Exact Example:</Text>
-                <Text style={styles.lateArrivalExampleText}>
-                  If your scheduled token was <Text style={styles.boldHighlight}>#2</Text>, but you arrive while token <Text style={styles.boldHighlight}>#10</Text> is ongoing, you will be placed at token <Text style={styles.boldHighlight}>#12</Text> upon arrival.
+                <Text style={styles.lateArrivalRuleText}>
+                  • <Text style={{ fontWeight: '700', color: '#b45309' }}>Standby Queue (Late Arrivals):</Text> Arriving &gt;10 minutes late places you in the Standby Queue in original booking order. The doctor will see you between on-time patients when a slot fits. Nobody is dropped!
                 </Text>
               </View>
             </View>
@@ -877,15 +966,15 @@ export default function CheckoutModal({
             {/* Fee Itemization — Consumer Protection (E-Commerce) Rules 2020 + GST readiness */}
             <View style={styles.feeBreakdown}>
               <View style={styles.feeRow}>
-                <Text style={styles.feeLabel}>Booking Deposit (refundable)</Text>
+                <Text style={styles.feeLabel}>Platform Booking Fee (Paid Online)</Text>
                 <Text style={[styles.feeValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
-                  {isFreeFollowup ? '₹0 (Waived)' : `₹${depositAmount}`}
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${platformFee}`}
                 </Text>
               </View>
               <View style={styles.feeRow}>
-                <Text style={styles.feeLabel}>Platform Convenience Fee</Text>
+                <Text style={styles.feeLabel}>Doctor Consultation (Pay at Hospital)</Text>
                 <Text style={[styles.feeValue, isFreeFollowup && { color: '#047857', fontWeight: '700' }]}>
-                  {isFreeFollowup ? '₹0 (Waived)' : `₹${platformFee}`}
+                  {isFreeFollowup ? '₹0 (Waived)' : `₹${consultationFee}`}
                 </Text>
               </View>
               <View style={styles.feeRow}>
@@ -893,12 +982,12 @@ export default function CheckoutModal({
                 <Text style={[styles.feeValue, { color: '#94a3b8', fontSize: 11 }]}>Not applicable*</Text>
               </View>
               <View style={[styles.feeRow, styles.feeTotalRow]}>
-                <Text style={styles.feeTotalLabel}>Total charged now</Text>
+                <Text style={styles.feeTotalLabel}>Total charged online now</Text>
                 <Text style={[styles.feeTotalValue, isFreeFollowup && { color: '#047857' }]}>
                   ₹{totalPayable}
                 </Text>
               </View>
-              <Text style={styles.feeFootnote}>* GST will be shown once platform obtains GSTIN</Text>
+              <Text style={styles.feeFootnote}>* Pay doctor consultation fee directly at hospital reception desk</Text>
             </View>
 
             {payError && (
@@ -946,7 +1035,7 @@ export default function CheckoutModal({
                     ? 'Account Blocked (7 Days)'
                     : isFreeFollowup
                     ? 'Confirm Free Follow-up Appointment (₹0)'
-                    : `Pay ₹${totalPayable} via Razorpay (UPI / Card)`}
+                    : `Pay Platform Fee ₹${totalPayable} to Reserve Slot`}
                 </Text>
               )}
             </TouchableOpacity>
@@ -1524,6 +1613,34 @@ const styles = StyleSheet.create({
     color: '#78350f',
     marginBottom: 8,
     fontWeight: '500',
+  },
+  arrivalWindowHighlightBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  arrivalWindowRangeText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#92400e',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  arrivalWindowBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#047857',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   lateArrivalRuleBox: {
     backgroundColor: '#fef3c7',

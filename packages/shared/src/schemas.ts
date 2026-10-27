@@ -19,6 +19,10 @@ export interface CreateHoldResponse {
   reference_code?: string;
   deposit_amount?: number;
   platform_fee?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   total_amount?: number;
   hold_expires_at?: string;
   is_followup?: boolean;
@@ -39,6 +43,10 @@ export interface ConfirmPaymentResponse {
   queue_position?: number;
   status?: string;
   payment_status?: string;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
   error?: string;
 }
 

@@ -20,6 +20,12 @@ const testFiles = [
   'tests/unit/hospital-server-api-matrix.test.mjs',
   'tests/unit/hospital-no-show-policy.test.mjs',
   'tests/unit/hospital-lifetime-pin-and-patient-gap.test.mjs',
+  'tests/unit/hospital-push-notifications.test.mjs',
+  'tests/unit/security-audit-nextjs-dependencies.test.mjs',
+  'tests/unit/security-audit-database-grants.test.mjs',
+  'tests/unit/security-audit-production-env.test.mjs',
+  'tests/unit/build-secret-safety.test.mjs',
+  'tests/unit/database-advisor-fixes.test.mjs',
 ];
 
 let totalTests = 0;

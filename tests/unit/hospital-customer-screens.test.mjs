@@ -151,7 +151,9 @@ describe('Phase 5d: Hospital Customer Screens & Booking Pass Suite', () => {
 
   describe('1. 60-Minute Check-In Code Visibility Gate (SPEC line 16)', () => {
     it('locks and masks check-in code when appointment is more than 60 minutes in the future', async () => {
-      const res = await fetch(`${appBaseUrl}/api/ticket/${futureBooking.id}`);
+      const res = await fetch(`${appBaseUrl}/api/ticket/${futureBooking.id}`, {
+        headers: { Authorization: `Bearer ${tokens.patient1.token}` },
+      });
       assert.equal(res.status, 200);
       const data = await res.json();
 
@@ -162,7 +164,9 @@ describe('Phase 5d: Hospital Customer Screens & Booking Pass Suite', () => {
     });
 
     it('reveals 4-digit check-in code when appointment is within 60 minutes of slot start', async () => {
-      const res = await fetch(`${appBaseUrl}/api/ticket/${nearBooking.id}`);
+      const res = await fetch(`${appBaseUrl}/api/ticket/${nearBooking.id}`, {
+        headers: { Authorization: `Bearer ${tokens.patient1.token}` },
+      });
       assert.equal(res.status, 200);
       const data = await res.json();
 

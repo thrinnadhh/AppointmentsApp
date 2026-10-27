@@ -57,6 +57,8 @@ export const REQUIRED_PRODUCTION_VARS = [
   'ADMIN_SECRET',
   'CRON_SECRET',
   'DELETION_TOKEN_SECRET',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
 ];
 
 export const APP_KEY_PREFIXES = [
@@ -138,6 +140,14 @@ export function validateEnv(env = process.env, options = {}) {
     if (env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
       errors.push('NEXT_PUBLIC_SUPABASE_URL cannot point to a placeholder domain in production.');
     }
+
+    if (env.NEXT_PUBLIC_SUPABASE_URL && !env.NEXT_PUBLIC_SUPABASE_URL.startsWith('https://')) {
+      errors.push('NEXT_PUBLIC_SUPABASE_URL must use https:// protocol in production.');
+    }
+
+    if (env.NEXT_PUBLIC_APP_URL && !env.NEXT_PUBLIC_APP_URL.startsWith('https://')) {
+      errors.push('NEXT_PUBLIC_APP_URL must use https:// protocol in production.');
+    }
   }
 
   if (errors.length > 0 && throwOnError) {
@@ -162,7 +172,7 @@ const isBuildPhase =
 // Auto-validate on startup unless explicitly opted out (e.g. for lightweight scripts or build phase)
 if (process.env.SKIP_ENV_VALIDATION !== 'true') {
   // Production Security Assertion: Never permit payment mocking in production environments
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
+  if (process.env.NODE_ENV === 'production' && !isBuildPhase && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
     throw new Error('FATAL SECURITY VIOLATION: ALLOW_MOCK_PAYMENTS cannot be set to "true" in production environments.');
   }
 

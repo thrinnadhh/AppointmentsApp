@@ -7,6 +7,7 @@ import {
   AlertTriangle, 
   ShieldAlert, 
   CheckCircle2, 
+  ArrowLeft,
   Loader2 
 } from 'lucide-react';
 import Navigation from '@/components/Navigation';
@@ -20,6 +21,34 @@ import MedicalUrgencyOverrideModal from '@/components/consultation/MedicalUrgenc
 
 export default function DoctorConsultationWorkspacePage() {
   const { activeProvider, isHospitalAdmin, isSuperAdmin, verticalConfig } = useMerchantTenant();
+
+  // Eager URL search parameter resolution
+  const [urlDoctorId, setUrlDoctorId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('doctor_id') || params.get('resource_id');
+    }
+    return null;
+  });
+
+  const [demoRole, setDemoRole] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('demo_role');
+    }
+    return null;
+  });
+
+  const [demoAssigned, setDemoAssigned] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('assigned');
+    }
+    return null;
+  });
+
+  const isDemo = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('demo') === '1' || 
+    process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+  );
 
   // State
   const [loading, setLoading] = useState(true);
@@ -52,6 +81,106 @@ export default function DoctorConsultationWorkspacePage() {
     setLoading(true);
     setError(null);
     try {
+      if (isDemo) {
+        const demoDocs: DoctorOption[] = [
+          { id: 'demo-consultant-1', name: 'Dr. A. Sharma', department: 'Neurology' },
+          { id: 'demo-consultant-2', name: 'Dr. R. Patel', department: 'Cardiology' },
+        ];
+        setAllDoctors(demoDocs);
+
+        const role = demoRole === 'admin' ? 'admin' : (demoRole === 'front_desk' ? 'front_desk' : 'consultant');
+        const assignedDoctorIds = demoAssigned === 'none'
+          ? []
+          : (role === 'admin' ? ['demo-consultant-1', 'demo-consultant-2'] : ['demo-consultant-1']);
+
+        const mockCtx: HospitalAccessContext = {
+          role: role as any,
+          merchantId: 'demo-hospital-id',
+          departmentId: 'dept-neuro',
+          departmentName: 'Neurology',
+          allowedModules: ['appointments', 'queue_schedule'],
+          isHospital: true,
+          userId: 'demo-consultant-user',
+          assignedDoctorIds,
+        };
+        setHospitalContext(mockCtx);
+
+        let targetDocId = 'demo-consultant-1';
+        if (urlDoctorId) {
+          targetDocId = urlDoctorId;
+        }
+        setSelectedDoctorId(targetDocId);
+
+        const targetDoc = demoDocs.find((d) => d.id === targetDocId) || demoDocs[0];
+        setSelectedDoctorName(targetDoc.name);
+        setSelectedDoctorDept(targetDoc.department || 'General');
+
+        const today = new Date().toISOString().split('T')[0];
+        const mockBookings: ActiveConsultationBooking[] = [
+          {
+            id: 'demo-b-1',
+            reference_code: 'APPT-DEMO-01',
+            patient_name: 'Rahul Sharma',
+            slot_start: `${today}T10:00:00.000Z`,
+            slot_end: `${today}T10:15:00.000Z`,
+            status: 'CHECKED_IN',
+            arrival_tag: 'On Time',
+            checked_in_method: 'Verified Code',
+            customer: { full_name: 'Rahul Sharma', phone: '+919876543210' },
+          },
+          {
+            id: 'demo-b-2',
+            reference_code: 'APPT-DEMO-02',
+            patient_name: 'Ananya Iyer',
+            slot_start: `${today}T10:30:00.000Z`,
+            slot_end: `${today}T10:45:00.000Z`,
+            status: 'CHECKED_IN',
+            arrival_tag: 'Early',
+            checked_in_method: 'Verified Code',
+            customer: { full_name: 'Ananya Iyer', phone: '+919876543211' },
+          },
+          {
+            id: 'demo-b-3',
+            reference_code: 'APPT-DEMO-03',
+            patient_name: 'Vikram Malhotra',
+            slot_start: `${today}T09:30:00.000Z`,
+            slot_end: `${today}T09:45:00.000Z`,
+            status: 'CHECKED_IN',
+            arrival_tag: 'Late',
+            checked_in_method: 'Verified Code',
+            customer: { full_name: 'Vikram Malhotra', phone: '+919876543212' },
+          },
+          {
+            id: 'demo-b-4',
+            reference_code: 'APPT-DEMO-04',
+            patient_name: 'Sunita Verma',
+            slot_start: `${today}T09:00:00.000Z`,
+            slot_end: `${today}T09:15:00.000Z`,
+            status: 'COMPLETED',
+            arrival_tag: 'On Time',
+            checked_in_method: 'Verified Code',
+            updated_at: `${today}T09:14:30.000Z`,
+            customer: { full_name: 'Sunita Verma', phone: '+919876543213' },
+          },
+          {
+            id: 'demo-b-5',
+            reference_code: 'APPT-DEMO-05',
+            patient_name: 'Deepak Rao',
+            slot_start: `${today}T11:30:00.000Z`,
+            slot_end: `${today}T11:45:00.000Z`,
+            status: 'BOOKED',
+            arrival_tag: 'Expected',
+            customer: { full_name: 'Deepak Rao', phone: '+919876543214' },
+          },
+        ];
+        setBookings(mockBookings);
+        setFrontDeskStaff([
+          { name: 'Reception Desk 1', idCardNumber: 'HOSP-FD-NEURO', email: 'reception@hospital.com' },
+        ]);
+        setLoading(false);
+        return;
+      }
+
       // 1. Fetch Hospital Access Context
       const ctxRes = await fetch('/api/hospital/context');
       let ctx: HospitalAccessContext | null = null;
@@ -74,7 +203,9 @@ export default function DoctorConsultationWorkspacePage() {
 
       // Determine which doctor is active
       let targetDocId = '';
-      if (ctx?.role === 'consultant' && ctx.assignedDoctorIds?.length > 0) {
+      if (urlDoctorId && (ctx?.role === 'admin' || ctx?.role === 'owner' || isHospitalAdmin || isSuperAdmin)) {
+        targetDocId = urlDoctorId;
+      } else if (ctx?.role === 'consultant' && ctx.assignedDoctorIds?.length > 0) {
         targetDocId = ctx.assignedDoctorIds[0];
       } else if (mappedDocs.length > 0) {
         targetDocId = mappedDocs[0].id;
@@ -93,7 +224,7 @@ export default function DoctorConsultationWorkspacePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isDemo, demoRole, demoAssigned, urlDoctorId, isHospitalAdmin, isSuperAdmin]);
 
   useEffect(() => {
     initWorkspace();
@@ -101,7 +232,7 @@ export default function DoctorConsultationWorkspacePage() {
 
   // Load Bookings & Front Desk Staff for the selected doctor
   const loadDoctorData = useCallback(async () => {
-    if (!selectedDoctorId) return;
+    if (!selectedDoctorId || isDemo) return;
     setRefreshing(true);
     try {
       // 1. Fetch bookings
@@ -137,7 +268,6 @@ export default function DoctorConsultationWorkspacePage() {
           );
         }
       } catch (teamErr) {
-        // Non-admin might get 403 on full assignments list; fallback gracefully
         setFrontDeskStaff([
           { name: 'Neurology Reception Desk', idCardNumber: 'HOSP-FD-NEURO' }
         ]);
@@ -147,13 +277,13 @@ export default function DoctorConsultationWorkspacePage() {
     } finally {
       setRefreshing(false);
     }
-  }, [selectedDoctorId]);
+  }, [selectedDoctorId, isDemo]);
 
   useEffect(() => {
-    if (selectedDoctorId) {
+    if (selectedDoctorId && !isDemo) {
       loadDoctorData();
     }
-  }, [selectedDoctorId, loadDoctorData]);
+  }, [selectedDoctorId, isDemo, loadDoctorData]);
 
   // Categorize bookings
   const activeBooking = useMemo(() => {
@@ -177,7 +307,7 @@ export default function DoctorConsultationWorkspacePage() {
       .sort((a, b) => new Date(b.updated_at || b.slot_end).getTime() - new Date(a.updated_at || a.slot_end).getTime());
   }, [bookings]);
 
-  // Determine Up Next candidate using Queue Engine
+  // Determine Up Next candidate using Queue Engine logic
   const { upNextCandidate, priorityReason } = useMemo(() => {
     if (waitingPatients.length > 0) {
       const first = waitingPatients[0];
@@ -204,6 +334,19 @@ export default function DoctorConsultationWorkspacePage() {
     setIsCallingNext(true);
     setError(null);
     try {
+      if (isDemo) {
+        const updated = bookings.map((b) => 
+          b.id === upNextCandidate.id 
+            ? { ...b, status: 'IN_CONSULTATION', updated_at: new Date().toISOString() } 
+            : b
+        );
+        setBookings(updated);
+        setSuccessBanner(`Consultation started for ${upNextCandidate.patient_name || 'Patient'}`);
+        setClinicalNotes('');
+        setIsCallingNext(false);
+        return;
+      }
+
       const res = await fetch('/api/bookings/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,10 +372,23 @@ export default function DoctorConsultationWorkspacePage() {
     setIsCompleting(true);
     setError(null);
     try {
+      if (isDemo) {
+        const updated = bookings.map((b) => 
+          b.id === activeBooking.id 
+            ? { ...b, status: 'COMPLETED', updated_at: new Date().toISOString(), consultation_notes: clinicalNotes } 
+            : b
+        );
+        setBookings(updated);
+        setSuccessBanner('Consultation successfully completed and recorded in medical history.');
+        setClinicalNotes('');
+        setIsCompleting(false);
+        return;
+      }
+
       const res = await fetch('/api/bookings/end', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: activeBooking.id }),
+        body: JSON.stringify({ booking_id: activeBooking.id, notes: clinicalNotes }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -254,6 +410,19 @@ export default function DoctorConsultationWorkspacePage() {
     setIsSubmittingOverride(true);
     setError(null);
     try {
+      if (isDemo) {
+        const otherWaiting = waitingPatients.filter((b) => b.id !== selectedBookingForOverride.id);
+        const reorderedWaiting = targetPosition === 1 
+          ? [selectedBookingForOverride, ...otherWaiting] 
+          : [...otherWaiting.slice(0, targetPosition - 1), selectedBookingForOverride, ...otherWaiting.slice(targetPosition - 1)];
+        
+        const otherBookings = bookings.filter((b) => !waitingPatients.some((w) => w.id === b.id));
+        setBookings([...reorderedWaiting, ...otherBookings]);
+        setSuccessBanner(`Medical urgency override applied: moved to position #${targetPosition} (Logged: ${reason})`);
+        setIsSubmittingOverride(false);
+        return;
+      }
+
       const res = await fetch('/api/bookings/override', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -294,24 +463,98 @@ export default function DoctorConsultationWorkspacePage() {
     }
   };
 
-  // Role Gate Check: Only Consultants, Hospital Admins, or SuperAdmin
-  const isAuthorizedRole = 
-    isSuperAdmin ||
-    isHospitalAdmin ||
-    hospitalContext?.role === 'admin' ||
-    hospitalContext?.role === 'owner' ||
-    hospitalContext?.role === 'consultant';
+  // 1. Role Authority Classification
+  const isConsultant = hospitalContext?.role === 'consultant';
+  const isAdminOrOwner = isSuperAdmin || isHospitalAdmin || hospitalContext?.role === 'admin' || hospitalContext?.role === 'owner';
+  const myAssignedDoctorId = hospitalContext?.assignedDoctorIds?.[0];
 
-  if (!loading && hospitalContext && !isAuthorizedRole) {
+  // 2. Security Check: Cross-consultant URL probe denied (SPEC line 5)
+  // If the authenticated user is a Consultant and URL specifies a doctor_id that is NOT their own assigned doctor
+  const isForeignDoctorUrlProbe = Boolean(
+    isConsultant &&
+    urlDoctorId &&
+    urlDoctorId !== myAssignedDoctorId
+  );
+
+  // 3. Security Check: Consultant has zero assigned doctor resources
+  const hasNoAssignedDoctors = Boolean(
+    isConsultant &&
+    (!hospitalContext?.assignedDoctorIds || hospitalContext.assignedDoctorIds.length === 0)
+  );
+
+  // 4. Security Check: Unauthorized Role (Front desk, customer, or outsider)
+  const isUnauthorizedRole = !loading && hospitalContext && !isConsultant && !isAdminOrOwner;
+
+  // Render 403 Forbidden: Another Consultant's Desk Unreachable
+  if (!loading && isForeignDoctorUrlProbe) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div data-testid="consultant-foreign-doctor-forbidden" className="min-h-screen bg-slate-50">
         <Navigation />
         <main className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100">
+          <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-xs">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Denied: Another Consultant&apos;s Desk Unreachable</h1>
+          <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+            Per hospital security policy (<code className="text-rose-700 bg-rose-50 px-1 py-0.5 rounded font-mono">SPEC line 5</code>), 
+            Consultants are strictly scoped to their own consultation room and queue. 
+            You are not authorized to view or manage consultations for another doctor.
+          </p>
+          <button
+            type="button"
+            data-testid="return-to-my-desk-btn"
+            onClick={() => {
+              setUrlDoctorId(null);
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('doctor_id');
+                url.searchParams.delete('resource_id');
+                window.history.replaceState({}, '', url.toString());
+              }
+              if (myAssignedDoctorId) {
+                handleSelectDoctor(myAssignedDoctorId);
+              }
+            }}
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-xs cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Return to My Consultation Desk</span>
+          </button>
+        </main>
+      </div>
+    );
+  }
+
+  // Render 403 Forbidden: No Consultant Desk Assigned
+  if (!loading && hasNoAssignedDoctors) {
+    return (
+      <div data-testid="consultant-no-assignments-forbidden" className="min-h-screen bg-slate-50">
+        <Navigation />
+        <main className="max-w-2xl mx-auto px-4 py-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-100 shadow-xs">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">No Consultant Desk Assigned</h1>
+          <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+            Your account is verified as a Consultant, but you are not currently assigned to any active doctor consultation desk. 
+            Please contact your Hospital Administrator to bind your user profile to a clinical consultant resource.
+          </p>
+        </main>
+      </div>
+    );
+  }
+
+  // Render 403 Forbidden: Role Restricted (Front desk or customer)
+  if (!loading && isUnauthorizedRole) {
+    return (
+      <div data-testid="consultant-role-forbidden" className="min-h-screen bg-slate-50">
+        <Navigation />
+        <main className="max-w-2xl mx-auto px-4 py-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-xs">
             <ShieldAlert className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Consultant Desk Restricted</h1>
-          <p className="text-sm text-slate-600 mb-6">
+          <p className="text-sm text-slate-600 mb-6 leading-relaxed">
             This workspace is strictly reserved for bound Hospital Consultants and Hospital Administrators. 
             Front Desk staff must use the Reception Check-In Desk.
           </p>
@@ -344,7 +587,7 @@ export default function DoctorConsultationWorkspacePage() {
 
         {/* Error Alert */}
         {error && (
-          <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl flex items-center justify-between text-xs font-medium">
+          <div data-testid="consultant-error-banner" className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl flex items-center justify-between text-xs font-medium">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{error}</span>
@@ -361,7 +604,7 @@ export default function DoctorConsultationWorkspacePage() {
 
         {/* Loading Skeleton */}
         {loading ? (
-          <div className="space-y-6">
+          <div data-testid="consultant-loading-skeleton" className="space-y-6">
             <div className="h-44 bg-white border border-slate-200 rounded-2xl animate-pulse" />
             <div className="h-72 bg-white border border-slate-200 rounded-2xl animate-pulse" />
           </div>
@@ -371,12 +614,12 @@ export default function DoctorConsultationWorkspacePage() {
             <ConsultationSessionHeader
               doctorName={selectedDoctorName}
               departmentName={selectedDoctorDept}
-              hospitalName={activeProvider?.name || 'Hospital Vertical'}
+              hospitalName={activeProvider?.name || 'Apex General Hospital'}
               frontDeskStaff={frontDeskStaff}
               sessionStatus={sessionStatus}
               onToggleStatus={setSessionStatus}
               onEmergencyDeparture={handleEmergencyDeparture}
-              isHospitalAdmin={isHospitalAdmin || isSuperAdmin}
+              isHospitalAdmin={isAdminOrOwner}
               allDoctors={allDoctors}
               selectedDoctorId={selectedDoctorId}
               onSelectDoctor={handleSelectDoctor}
@@ -387,6 +630,7 @@ export default function DoctorConsultationWorkspacePage() {
               <span>Real-time clinical queue synchronized with hospital reception.</span>
               <button
                 type="button"
+                data-testid="sync-queue-btn"
                 onClick={loadDoctorData}
                 disabled={refreshing}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium transition cursor-pointer shadow-2xs"

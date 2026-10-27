@@ -1,8 +1,12 @@
 import { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
-import { AsyncLocalStorage } from 'node:async_hooks';
+import { AsyncLocalStorage } from 'async_hooks';
+import crypto from 'crypto';
+import './env-check';
 import { getSupabaseAdmin, registerLocalCheckFn } from './supabase';
+
+
 
 export const localDbStore = new AsyncLocalStorage<boolean>();
 if (process.env.NODE_ENV !== 'production') {
@@ -36,9 +40,8 @@ export const E2E_ADMIN_BYPASS_SECRET = process.env.SUPERADMIN_E2E_TOKEN || proce
 // Privileged E2E bypass must be explicitly opted in AND use a strong, non-default
 // secret. `NODE_ENV !== 'production'` alone is NOT sufficient: an accidentally
 // non-production deployment would otherwise expose the bypass to the internet.
-const LEGACY_DEFAULT_SECRET = ['tirupati', 'superadmin', 'e2e', '2026'].join('-');
 const COMMITTED_DEFAULT_E2E_SECRETS = new Set([
-  LEGACY_DEFAULT_SECRET,
+  ['tirupati', 'superadmin', 'e2e', '2026'].join('-'),
   ['test', 'cron', 'secret', '2026'].join('_'),
   ['mock', 'secret', 'key', '1234567890'].join('_'),
   ['mock', 'webhook', 'secret'].join('_'),
@@ -118,14 +121,14 @@ export async function verifyAuthenticatedUser(
     if (isE2EBypassEnabled()) {
       const adminBypass = request.headers.get('x-admin-bypass-key');
       const merchantBypass = request.headers.get('x-merchant-bypass-key');
-      const isValidBypass = (val: string | null) => Boolean(val && (val === E2E_ADMIN_BYPASS_SECRET || val === LEGACY_DEFAULT_SECRET));
+      const isValidBypass = (val: string | null) => Boolean(val && val === E2E_ADMIN_BYPASS_SECRET);
 
       // Only allow customer header override in non-production environments when explicitly opted-in for E2E testing
       // Strictly prevent privilege escalation: test customer header can NEVER impersonate admin UUID or live users
       if (process.env.ENABLE_E2E_BYPASS === 'true') {
         const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
         const bypassSecret = adminBypass || merchantBypass || request.headers.get('x-e2e-secret');
-        const isAuthorizedSecret = isValidBypass(bypassSecret) || testCustomerId === '99999999-9999-9999-9999-999999999991';
+        const isAuthorizedSecret = isValidBypass(bypassSecret);
 
         if (
           testCustomerId &&
@@ -160,7 +163,7 @@ export async function verifyAuthenticatedUser(
         try {
           const localClient = createClient(
             'http://127.0.0.1:54321',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+            supabaseAnonKey
           );
           const localRes = await localClient.auth.getUser(token);
           if (!localRes.error && localRes.data?.user) {
@@ -179,7 +182,7 @@ export async function verifyAuthenticatedUser(
           try {
             const localClient = createClient(
               'http://127.0.0.1:54321',
-              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+              supabaseAnonKey
             );
             const localRes = await localClient.auth.getUser(token);
             if (!localRes.error && localRes.data?.user) {
@@ -469,7 +472,7 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
   // 1. Non-production E2E test bypass header check
   if (isE2EBypassEnabled()) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
-    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET || bypassHeader === LEGACY_DEFAULT_SECRET) {
+    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
       return {
         user: {
           id: '88888888-8888-8888-8888-888888888881',
@@ -562,7 +565,7 @@ export async function verifyAdminOrCityDirectorRequest(request: NextRequest): Pr
   // 1. Non-production E2E test bypass header check
   if (isE2EBypassEnabled()) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
-    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET || bypassHeader === LEGACY_DEFAULT_SECRET) {
+    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
       const cityDirectorId = request.headers.get('x-city-director-id');
       if (cityDirectorId) {
         const supabaseAdmin = getSupabaseAdmin();
@@ -676,7 +679,7 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
   // 1. Non-production E2E test bypass header check
   if (isE2EBypassEnabled()) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
-    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET || bypassHeader === LEGACY_DEFAULT_SECRET) {
+    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
       return {
         user: {
           id: '88888888-8888-8888-8888-888888888881',
@@ -692,7 +695,7 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
     }
 
     const merchantBypass = request.headers.get('x-merchant-bypass-key');
-    if (merchantBypass === E2E_ADMIN_BYPASS_SECRET || merchantBypass === LEGACY_DEFAULT_SECRET) {
+    if (merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
       const merchantUserId = request.headers.get('x-merchant-user-id');
       if (merchantUserId) {
         const supabaseAdmin = getSupabaseAdmin();
@@ -734,7 +737,7 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
           try {
             const localClient = createClient(
               'http://127.0.0.1:54321',
-              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+              supabaseAnonKey
             );
             const localRes = await localClient.auth.getUser(token);
             if (!localRes.error && localRes.data?.user) {

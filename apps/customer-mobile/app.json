@@ -6,22 +6,44 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#059669"
-    },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.appointments.tirupati"
+      "bundleIdentifier": "com.appointments.tirupati",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#059669"
       },
-      "package": "com.appointments.tirupati"
+      "package": "com.appointments.tirupati",
+      "versionCode": 1,
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS"
+      ]
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#059669"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#059669"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ec19baed-cfbd-49dc-abd9-90524229673b"
+      }
+    }
   }
 }

@@ -24,9 +24,17 @@ dist/
 *.tsbuildinfo
 next-env.d.ts
 
-# OS & IDE
+# OS, IDE & Signing Keys
 .DS_Store
 *.pem
+*.key
+*.jwk
+*.jwks.json
+*signing-key*
+*signing_keys*
+signing_keys.json
+jwt_keys/
+keys/
 .vscode/
 .idea/
 
@@ -64,3 +72,6 @@ scripts/e2e-*.mjs
 strix-*.log
 .venv/
 scratch/
+.local/
+tests/e2e/stories/story-manifest.json
+story-manifest.json

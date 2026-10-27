@@ -827,7 +827,10 @@ describe('Priority 5 Security Remediation: Strix Deep Scan Findings (vuln-0001 -
   it('verifies vuln-0001 & vuln-0002: package.json pins braces and node-forge overrides', () => {
     const pkgJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
     assert.strictEqual(pkgJson.pnpm.overrides.braces, '>=3.0.3');
-    assert.strictEqual(pkgJson.pnpm.overrides['node-forge'], '>=1.4.0');
+    assert.ok(
+      pkgJson.pnpm.overrides['node-forge'] === '>=1.4.0' || pkgJson.pnpm.overrides['node-forge'] === '>=1.4.1',
+      'node-forge override must be at least >=1.4.0'
+    );
   });
 });
 

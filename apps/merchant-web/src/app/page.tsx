@@ -607,6 +607,11 @@ export default function MerchantOverviewPage() {
           checked_in_at: checkinTime || undefined,
           doctor_name: b.resource_name,
           deposit_amount: b.deposit_amount,
+          platform_fee_amount: (b as any).platform_fee_amount ?? (b as any).platform_fee ?? 10,
+          consultation_fee_amount: (b as any).consultation_fee_amount ?? 500,
+          platform_payment_status: (b as any).platform_payment_status ?? 'CAPTURED',
+          consultation_payment_status: (b as any).consultation_payment_status ?? 'PENDING_OFFLINE',
+          consultation_collected_at: (b as any).consultation_collected_at ?? undefined,
         };
       })
       .sort((a, b) => {
@@ -633,6 +638,11 @@ export default function MerchantOverviewPage() {
           checked_in_at: checkinTime || undefined,
           doctor_name: b.resource_name,
           deposit_amount: b.deposit_amount,
+          platform_fee_amount: (b as any).platform_fee_amount ?? (b as any).platform_fee ?? 10,
+          consultation_fee_amount: (b as any).consultation_fee_amount ?? 500,
+          platform_payment_status: (b as any).platform_payment_status ?? 'CAPTURED',
+          consultation_payment_status: (b as any).consultation_payment_status ?? 'PENDING_OFFLINE',
+          consultation_collected_at: (b as any).consultation_collected_at ?? undefined,
         };
       })
       .sort((a, b) => new Date(a.slot_start).getTime() - new Date(b.slot_start).getTime());
@@ -652,6 +662,11 @@ export default function MerchantOverviewPage() {
         arrival_tag: 'On Time' as const,
         doctor_name: b.resource_name,
         deposit_amount: b.deposit_amount,
+        platform_fee_amount: (b as any).platform_fee_amount ?? (b as any).platform_fee ?? 10,
+        consultation_fee_amount: (b as any).consultation_fee_amount ?? 500,
+        platform_payment_status: (b as any).platform_payment_status ?? 'CAPTURED',
+        consultation_payment_status: (b as any).consultation_payment_status ?? 'COLLECTED_AT_DESK',
+        consultation_collected_at: (b as any).consultation_collected_at ?? undefined,
       }));
   }, [hospitalTodayBookings]);
 
@@ -675,6 +690,11 @@ export default function MerchantOverviewPage() {
         arrival_tag: 'Expected' as const,
         doctor_name: b.resource_name,
         deposit_amount: b.deposit_amount,
+        platform_fee_amount: (b as any).platform_fee_amount ?? (b as any).platform_fee ?? 10,
+        consultation_fee_amount: (b as any).consultation_fee_amount ?? 500,
+        platform_payment_status: (b as any).platform_payment_status ?? 'CAPTURED',
+        consultation_payment_status: (b as any).consultation_payment_status ?? 'PENDING_OFFLINE',
+        consultation_collected_at: (b as any).consultation_collected_at ?? undefined,
       }));
   }, [hospitalTodayBookings]);
 
@@ -890,6 +910,32 @@ export default function MerchantOverviewPage() {
       void loadData();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Mark No Show failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskCollectFee = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/bookings/collect-fee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to collect consultation fee');
+      }
+      setRecentNotification('✓ Consultation fee marked as collected at hospital reception');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Fee collection failed');
     } finally {
       setIsProcessingFrontDeskAction(false);
     }
@@ -2156,6 +2202,7 @@ export default function MerchantOverviewPage() {
                 setIsManualCheckinModalOpen(true);
               }}
               onMarkNoShow={handleFrontDeskMarkNoShow}
+              onCollectConsultationFee={handleFrontDeskCollectFee}
               isProcessingAction={isProcessingFrontDeskAction}
             />
 

@@ -164,7 +164,7 @@ export default function ConsentScreen({ onConsentsGranted }: Props) {
             time via <Text style={styles.bold}>Settings → Account → Delete Account</Text>.
           </Text>
           <Text style={styles.legalText}>
-            Grievance Officer: {'{{GRIEVANCE_OFFICER_NAME}}'} ({'{{GRIEVANCE_OFFICER_EMAIL}}'}) · Address: {'{{GRIEVANCE_OFFICER_ADDRESS}}'} · Response within 48 hours.
+            Grievance Officer: N. Trinadh (grievance@appointments4u.in) · Address: D.No 18-1-506, K.T. Road, Bhavani Nagar, Tirupati, Andhra Pradesh 517501, India · Response within 48 hours.
           </Text>
         </View>
       </ScrollView>
