@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
  */
 async function getAuthenticatedUser(req: NextRequest): Promise<{ id: string; email?: string } | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseAnonKey) return null;
 
   // 1. Check Authorization Bearer header
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');

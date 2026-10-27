@@ -81,12 +81,20 @@ export function registerLocalCheckFn(fn: () => boolean) {
 // NEXT_PUBLIC_ prefix, or it would be bundled into client-side JS.
 // Built lazily on first use so importing this module never throws for code
 // that only needs the plain `supabase` client above.
+import './env-check';
+
 let _supabaseAdmin: (typeof supabase) | null = null;
 let _localSupabaseAdmin: (typeof supabase) | null = null;
 
 export function getLocalSupabaseAdmin(): typeof supabase {
+  if (typeof window !== 'undefined') {
+    throw new Error('FATAL: getLocalSupabaseAdmin is server-only and cannot be invoked in the browser bundle.');
+  }
   if (!_localSupabaseAdmin) {
-    const localKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+    const localKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!localKey) {
+      throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY — required for server-only administrative operations');
+    }
     _localSupabaseAdmin = createClient<Database>('http://127.0.0.1:54321', localKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     }) as unknown as typeof supabase;
@@ -95,6 +103,9 @@ export function getLocalSupabaseAdmin(): typeof supabase {
 }
 
 export function getSupabaseAdmin(callerOrReq?: any): typeof supabase {
+  if (typeof window !== 'undefined') {
+    throw new Error('FATAL: getSupabaseAdmin is server-only and cannot be invoked in the browser bundle.');
+  }
   if (process.env.NODE_ENV !== 'production') {
     if (
       callerOrReq?.isLocalTestCaller ||
