@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       const body = await resp.json().catch(() => ({}));
       console.error('[OTP] Supabase OTP error:', body);
       return NextResponse.json(
-        { error: body?.msg || body?.message || 'Failed to send OTP' },
+        { error: "We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again." },
         { status: resp.status }
       );
     }
@@ -94,6 +94,9 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     console.error('[OTP] Send endpoint error:', err);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again." },
+      { status: 500 }
+    );
   }
 }

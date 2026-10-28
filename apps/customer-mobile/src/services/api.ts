@@ -1298,12 +1298,17 @@ export async function sendPhoneOtp(rawPhone: string): Promise<{ success: boolean
     const { error } = await supabase.auth.signInWithOtp({ phone });
     if (error) {
       console.warn('Supabase signInWithOtp error:', error.message);
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        error: "We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again.",
+      };
     }
     return { success: true };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to send OTP';
-    return { success: false, error: msg };
+  } catch {
+    return {
+      success: false,
+      error: "We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again.",
+    };
   }
 }
 

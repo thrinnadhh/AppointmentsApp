@@ -144,6 +144,19 @@ Execution report for the transition of messaging infrastructure from SMS/mock no
   - Preserved Expo push notifications, and records genuine push execution in `notification_logs` with `channel = 'push'`, `status = 'SENT'`, and `provider_message_id = pushTicketId`.
 - Configured Edge Functions in `supabase/config.toml` (`whatsapp-webhook`, `whatsapp-sender`, `whatsapp-auth-hook` with `verify_jwt = false`).
 
+## Step 5: WhatsApp Login Code Results (Feature Flag: Default OFF)
+- Created Edge Function: `supabase/functions/whatsapp-auth-hook/index.ts`:
+  - Implements Supabase Auth "Send SMS" webhook hook.
+  - Feature flag: Defaults to `OFF` via `ENABLE_WHATSAPP_AUTH_HOOK = 'false'`. If disabled, immediately short-circuits.
+  - Standard Webhooks cryptographic signature validation: verifies `webhook-signature` using HMAC-SHA256 with `SEND_SMS_HOOK_SECRET` over `${webhook_id}.${webhook_timestamp}.${rawBody}` with a 5-minute replay tolerance window. Rejects invalid signatures with HTTP 401.
+  - Meta Template shape: Dispatches believed authentication shape (UNVERIFIED) with body text parameter and URL button parameter for template `auth_code`.
+  - Resend cooldown: Enforces a 60-second cooldown per phone number against rapid repeated code requests (returns HTTP 429).
+  - Code confidentiality: Never logs or stores the raw OTP code anywhere. In `notification_logs`, `template_params` stores `['[redacted]']` and message content logs `[redacted]`.
+  - Sensitive data masking: In console logs, phone numbers are masked to display only the last 4 digits (e.g. `********0001`).
+  - Error abstraction: When dispatch fails, returns the exact customer-facing error message: `"We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again."` without leaking internal errors or trace data.
+  - Customer mobile app updated: `apps/customer-mobile/src/services/api.ts` and `apps/customer-mobile/App.tsx` updated to surface this friendly error message.
+  - Database schema: Created migration `supabase/migrations/20261029000004_allow_null_booking_id_for_auth_notifications.sql` allowing `booking_id` to be `NULL` in `notification_logs` to record authentication events before a booking exists.
+
 ---
 
 ## Decisions
@@ -154,3 +167,5 @@ Execution report for the transition of messaging infrastructure from SMS/mock no
 5. **Status Enum Check**: Updated `chk_notification_logs_status` to include `'SKIPPED'` alongside `'QUEUED', 'SENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED'`.
 6. **Single Parameter Builder**: `build_template_params` accepts both polymorphic `JSONB` and `UUID` overloads to allow execution from Postgres triggers, RPC calls, and external test harnesses.
 7. **Secure Webhook HMAC**: Webhook enforces constant-time comparison against `X-Hub-Signature-256` using Web Crypto API. If `WA_APP_SECRET` is unset or invalid, payload is rejected with 401.
+8. **Nullable booking_id for Auth Codes**: `notification_logs.booking_id` made nullable so authentication code events can be safely logged without violating foreign key constraints when no booking exists.
+9. **Feature Flag Default OFF**: The WhatsApp login code hook is disabled by default (`ENABLE_WHATSAPP_AUTH_HOOK = false`) to guarantee zero unintended interference with existing SMS / local mock OTP authentication.

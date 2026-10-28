@@ -268,13 +268,15 @@ export default function App() {
       const res = await sendPhoneOtp(authPhone);
       if (res.success) {
         setOtpSent(true);
-        setConfirmationToast('OTP sent! Test OTP is 123456');
+        setConfirmationToast('Code sent on WhatsApp! Test OTP is 123456');
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {
-        setAuthError(res.error || 'Failed to send OTP');
+        setAuthError(
+          res.error || "We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again."
+        );
       }
-    } catch (err: unknown) {
-      setAuthError(err instanceof Error ? err.message : 'Error sending OTP');
+    } catch {
+      setAuthError("We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again.");
     } finally {
       setAuthLoading(false);
     }
@@ -790,7 +792,7 @@ export default function App() {
               {/* Phone OTP Authentication Card */}
               <View style={styles.authCard}>
                 <View style={styles.authCardHeader}>
-                  <Text style={styles.authCardTitle}>2. Phone Verification (SMS OTP)</Text>
+                  <Text style={styles.authCardTitle}>2. Phone Verification (WhatsApp Code)</Text>
                 </View>
                 <Text style={styles.authCardSubtitle}>
                   {isAuthenticated
