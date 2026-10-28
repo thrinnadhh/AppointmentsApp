@@ -1,8 +1,6 @@
 // Supabase Edge Function: send-booking-notification
-// Dispatches automated WhatsApp, SMS, and Push notifications for booking confirmations,
-// 1-hour and 30-minute pre-slot reminders, and cancellations.
-// Strictly authenticates caller and derives recipient details from booking & profile records,
-// rejecting client-supplied arbitrary phone numbers.
+// Dispatches automated WhatsApp queue insertion and Expo push notifications.
+// Strictly authenticates caller and derives recipient details from booking & profile records.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
@@ -43,8 +41,8 @@ function getCorsHeaders(req: Request) {
 type NotificationEventType =
   | 'BOOKING_CONFIRMED'
   | 'BOOKING_REMINDER_1H'
-  | 'BOOKING_REMINDER_30M'
-  | 'BOOKING_CANCELLED';
+  | 'BOOKING_CANCELLED'
+  | 'REFUND_PROCESSED';
 
 interface NotificationRequest {
   booking_id: string;
@@ -67,8 +65,8 @@ serve(async (req: Request) => {
         supported_events: [
           'BOOKING_CONFIRMED',
           'BOOKING_REMINDER_1H',
-          'BOOKING_REMINDER_30M',
           'BOOKING_CANCELLED',
+          'REFUND_PROCESSED',
         ],
         timestamp: new Date().toISOString(),
       }),
@@ -94,7 +92,7 @@ serve(async (req: Request) => {
     }
 
     const token = authHeader.replace(/^Bearer\s+/i, '');
-    let isInternalServiceRole = token === supabaseServiceKey;
+    const isInternalServiceRole = token === supabaseServiceKey;
 
     let callerUserId: string | null = null;
     if (!isInternalServiceRole) {
@@ -114,10 +112,8 @@ serve(async (req: Request) => {
     const ALLOWED_EVENT_TYPES = new Set([
       'BOOKING_CONFIRMED',
       'BOOKING_REMINDER_1H',
-      'BOOKING_REMINDER_30M',
       'BOOKING_CANCELLED',
-      'RESOURCE_REASSIGNED',
-      'REFUND_FAILED_ALERT',
+      'REFUND_PROCESSED',
     ]);
 
     if (!ALLOWED_EVENT_TYPES.has(event_type)) {
@@ -171,6 +167,7 @@ serve(async (req: Request) => {
     }
 
     // ── 2. Invoke atomic database notification procedure ─────────────────────
+    // Queues WhatsApp notification into notification_logs table (channel: 'whatsapp')
     const { data: dispatchResult, error: dispatchError } = await supabase.rpc(
       'dispatch_booking_notification',
       {
@@ -183,12 +180,12 @@ serve(async (req: Request) => {
       throw new Error(`Dispatch failed: ${dispatchError.message}`);
     }
 
-    // ── 3. Derive push token strictly from customer profile in database ──────
-    let pushResult = { sent: false, channel: 'expo-push' };
+    // ── 3. Handle Expo Push Notification & Log Result with Channel 'push' ────
+    let pushResult = { sent: false, channel: 'push', message_id: null as string | null };
     if (booking.customer_id) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('expo_push_token')
+        .select('expo_push_token, full_name, phone')
         .eq('id', booking.customer_id)
         .maybeSingle();
 
@@ -200,7 +197,7 @@ serve(async (req: Request) => {
 
         if (isProductionEnv && isMockToken) {
           console.warn('[send-booking-notification] Skipping mock push token in production:', profile.expo_push_token);
-          pushResult = { sent: false, channel: 'expo-push', reason: 'mock_token_rejected_in_production' } as any;
+          pushResult = { sent: false, channel: 'push', message_id: null };
         } else {
           try {
             const pushRes = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -214,11 +211,52 @@ serve(async (req: Request) => {
                 data: { booking_id, event_type },
               }),
             });
+
+            const pushBody = await pushRes.json().catch(() => ({}));
+            const pushTicketId = pushBody?.data?.id || `push_${Date.now()}`;
+
             if (pushRes.ok) {
-              pushResult = { sent: true, channel: 'expo-push' };
+              pushResult = { sent: true, channel: 'push', message_id: pushTicketId };
+
+              // Log genuine push result in notification_logs table
+              await supabase.from('notification_logs').insert({
+                booking_id,
+                recipient_phone: profile.phone || 'push-device',
+                recipient_name: profile.full_name || 'Customer',
+                event_type,
+                channel: 'push',
+                status: 'SENT',
+                provider_message_id: pushTicketId,
+                provider_response: pushBody,
+                sent_at: new Date().toISOString(),
+                message_content: `Push notification dispatched for ${event_type}`,
+              });
+            } else {
+              pushResult = { sent: false, channel: 'push', message_id: null };
+              await supabase.from('notification_logs').insert({
+                booking_id,
+                recipient_phone: profile.phone || 'push-device',
+                recipient_name: profile.full_name || 'Customer',
+                event_type,
+                channel: 'push',
+                status: 'FAILED',
+                last_error: JSON.stringify(pushBody),
+                message_content: `Failed push notification for ${event_type}`,
+              });
             }
-          } catch (pushErr) {
-            console.warn('[send-booking-notification] Push dispatch error:', pushErr);
+          } catch (pushErr: unknown) {
+            const errMsg = pushErr instanceof Error ? pushErr.message : 'Push exception';
+            console.warn('[send-booking-notification] Push dispatch error:', errMsg);
+            await supabase.from('notification_logs').insert({
+              booking_id,
+              recipient_phone: profile.phone || 'push-device',
+              recipient_name: profile.full_name || 'Customer',
+              event_type,
+              channel: 'push',
+              status: 'FAILED',
+              last_error: errMsg,
+              message_content: `Exception in push dispatch: ${errMsg}`,
+            });
           }
         }
       }

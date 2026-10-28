@@ -124,6 +124,26 @@ Execution report for the transition of messaging infrastructure from SMS/mock no
   - All 30-minute reminder code paths removed from reminder scheduler.
   - Event triggers on `public.bookings`: `CONFIRMED` -> `BOOKING_CONFIRMED`, `CANCELLED` -> `BOOKING_CANCELLED`, `payment_status = 'REFUNDED'` -> `REFUND_PROCESSED`.
 
+## Step 4: Sender and Webhook Results
+- Created Edge Function: `supabase/functions/whatsapp-sender/index.ts`:
+  - Claims up to 20 notifications per execution via `claim_queued_notifications` RPC (`FOR UPDATE SKIP LOCKED`).
+  - Pre-flight parameter contract validation: validates parameter count against template registry (e.g. 4 for `booking_confirmed`, 3 for `reminder_1h`, 3 for `booking_cancelled`, 2 for `refund_processed`, 1 for `auth_code`).
+  - Strict phone format validation (`^91\d{10}$`); invalid formats marked `FAILED` immediately without calling Meta API.
+  - Formats payload per Meta Graph API specs with components `type: 'body'`.
+  - Dispatches `POST https://graph.facebook.com/${GRAPH_API_VERSION}/${WA_PHONE_NUMBER_ID}/messages` with Bearer auth.
+  - On HTTP 200: captures `messages[0].id` and sets `status = 'SENT'`, `sent_at = NOW()`, `last_error = null`.
+  - On failure / network error: implements exponential retry backoff (1m, 5m, 15m) up to 3 attempts, then transitions to `FAILED`.
+  - Scheduled via `supabase/migrations/20261029000003_whatsapp_sender_cron.sql` using `pg_cron` (`process-whatsapp-queue`, `* * * * *`) and `pg_net`. Reads Supabase URL and service role key securely from vault or DB settings.
+- Created Edge Function: `supabase/functions/whatsapp-webhook/index.ts`:
+  - GET endpoint handles Meta challenge handshake with `hub.mode = 'subscribe'` and `hub.verify_token = WA_VERIFY_TOKEN`.
+  - POST endpoint extracts raw request body and performs HMAC-SHA256 signature verification (`X-Hub-Signature-256`) with `WA_APP_SECRET` using constant-time comparison. Rejects unauthorized / invalid payloads with HTTP 401.
+  - Parses delivery and read receipts (`delivered`, `read`, `failed`), updating `notification_logs` by matching `provider_message_id`. Sets `delivered_at`, `read_at`, and `last_error`.
+  - Harmless on duplicates (idempotent UPDATE). Ignores unknown IDs without errors.
+- Refactored `supabase/functions/send-booking-notification/index.ts`:
+  - Removed obsolete 30-minute reminder code paths (`BOOKING_REMINDER_30M`).
+  - Preserved Expo push notifications, and records genuine push execution in `notification_logs` with `channel = 'push'`, `status = 'SENT'`, and `provider_message_id = pushTicketId`.
+- Configured Edge Functions in `supabase/config.toml` (`whatsapp-webhook`, `whatsapp-sender`, `whatsapp-auth-hook` with `verify_jwt = false`).
+
 ---
 
 ## Decisions
@@ -133,3 +153,4 @@ Execution report for the transition of messaging infrastructure from SMS/mock no
 4. **Strict Service Role**: In accordance with security conventions, `claim_queued_notifications` and `dispatch_booking_notification` are restricted to `service_role` and `postgres`.
 5. **Status Enum Check**: Updated `chk_notification_logs_status` to include `'SKIPPED'` alongside `'QUEUED', 'SENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED'`.
 6. **Single Parameter Builder**: `build_template_params` accepts both polymorphic `JSONB` and `UUID` overloads to allow execution from Postgres triggers, RPC calls, and external test harnesses.
+7. **Secure Webhook HMAC**: Webhook enforces constant-time comparison against `X-Hub-Signature-256` using Web Crypto API. If `WA_APP_SECRET` is unset or invalid, payload is rejected with 401.

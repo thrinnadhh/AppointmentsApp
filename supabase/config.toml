@@ -410,3 +410,18 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+[functions.whatsapp-webhook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/whatsapp-webhook/index.ts"
+
+[functions.whatsapp-sender]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/whatsapp-sender/index.ts"
+
+[functions.whatsapp-auth-hook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/whatsapp-auth-hook/index.ts"
