@@ -91,8 +91,22 @@ Execution report for the transition of messaging infrastructure from SMS/mock no
 
 ---
 
+## Step 2: Queue Foundation Results
+- Migration: `supabase/migrations/20261029000001_whatsapp_queue_foundation.sql` (applied and verified against local database).
+- `notification_logs` schema verified:
+  - Columns: `provider_message_id TEXT`, `template_name TEXT`, `template_params JSONB DEFAULT '[]'`, `attempts INT DEFAULT 0`, `last_error TEXT`, `delivered_at TIMESTAMPTZ`, `read_at TIMESTAMPTZ`, `next_attempt_at TIMESTAMPTZ DEFAULT NOW()`.
+  - Status values enforced: `QUEUED`, `SENDING`, `SENT`, `DELIVERED`, `READ`, `FAILED`, `SKIPPED`. Default is `'QUEUED'`.
+  - Check constraint verified: `chk_notification_logs_status`.
+  - Safe row deduplication performed on `(booking_id, event_type, channel)`.
+  - Unique index created: `uq_idx_notification_logs_booking_event_channel` on `(booking_id, event_type, channel)`.
+  - Partial polling index created: `idx_notification_logs_claim_queue` on `(next_attempt_at ASC, created_at ASC) WHERE status = 'QUEUED'`.
+  - Claim RPC `public.claim_queued_notifications(p_limit INT DEFAULT 20)` implemented with `FOR UPDATE SKIP LOCKED`. Security hardened with `SECURITY DEFINER SET search_path = public, pg_temp`, caller guard `auth.role() = 'service_role' OR SESSION_USER = 'postgres'`, execution revoked from `PUBLIC`, `anon`, and `authenticated`, and granted solely to `service_role`.
+
+---
+
 ## Decisions
 1. **Paise vs. Rupees**: Stored amounts (`bookings.deposit_amount`, `payments.amount`) are verified to be in standard INR (Rupees, `NUMERIC(10,2)`). The `refund_processed` template requires plain number without symbols or commas.
 2. **Consent Default**: In accordance with user rules ("explicit un-ticked-by-default tick"), `ConsentScreen.tsx` will have `whatsapp_notifications` defaulted to `false`.
 3. **Queue Deduplication**: To guarantee idempotency, notification logs deduplicate on `(booking_id, event_type, channel)`. Any duplicate dispatch triggers `ON CONFLICT DO NOTHING`.
 4. **Strict Service Role**: In accordance with security conventions, `claim_queued_notifications` and `dispatch_booking_notification` are restricted to `service_role` and `postgres`.
+5. **Status Enum Check**: Updated `chk_notification_logs_status` to include `'SKIPPED'` alongside `'QUEUED', 'SENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED'`.
