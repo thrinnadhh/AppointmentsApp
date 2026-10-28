@@ -141,7 +141,6 @@ export interface MerchantBookingWithDetails {
   updated_at: string;
   attachment_url?: string | null;
   reminder_1h_sent_at?: string | null;
-  reminder_30m_sent_at?: string | null;
   is_present?: boolean;
   customer_arrived_at?: string | null;
   queue_position?: number | null;
@@ -219,7 +218,7 @@ export async function fetchMerchantBookings(
       slot_start, slot_end, status, payment_status, deposit_amount, platform_fee,
       total_amount, is_followup, followup_original_booking_id, gateway_payment_id,
       hold_expires_at, created_at, updated_at, attachment_url, reminder_1h_sent_at,
-      reminder_30m_sent_at, is_present, customer_name, customer_phone, no_show_count,
+      is_present, customer_name, customer_phone, no_show_count,
       resource_name, resource_type, provider_name, department_name, queue_position,
       estimated_wait_minutes, checked_in_at
     `)
@@ -257,7 +256,7 @@ export async function fetchMerchantBookingById(
       slot_start, slot_end, status, payment_status, deposit_amount, platform_fee,
       total_amount, is_followup, followup_original_booking_id, gateway_payment_id,
       hold_expires_at, created_at, updated_at, attachment_url, reminder_1h_sent_at,
-      reminder_30m_sent_at, is_present, customer_name, customer_phone, no_show_count,
+      is_present, customer_name, customer_phone, no_show_count,
       resource_name, resource_type, provider_name, department_name, queue_position,
       estimated_wait_minutes, checked_in_at
     `)

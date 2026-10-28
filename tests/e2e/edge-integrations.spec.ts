@@ -346,7 +346,7 @@ test.describe('Cross-System Integration — Edge Cases', () => {
       .from('notification_logs')
       .select('id, event_type, status')
       .eq('booking_id', booking_id)
-      .in('event_type', ['BOOKING_REMINDER_1H', 'BOOKING_REMINDER_30M'])
+      .eq('event_type', 'BOOKING_REMINDER_1H')
       .eq('status', 'QUEUED');
 
     expect(queuedReminders ?? []).toHaveLength(0);

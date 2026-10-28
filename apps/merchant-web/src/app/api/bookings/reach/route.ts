@@ -101,16 +101,19 @@ export async function POST(req: NextRequest) {
           .maybeSingle();
 
         if (profile?.phone) {
-          await supabaseAdmin.from('notification_logs').insert({
-            booking_id: booking_id,
-            recipient_phone: profile.phone,
-            recipient_name: profile.full_name || 'Patient',
-            event_type: 'LATE_ARRIVAL_QUEUE_UPDATE',
-            channel: 'WHATSAPP',
-            status: 'DELIVERED',
-            message_content: `Namaste ${profile.full_name || 'Patient'}! ${queueNotice}`,
-            sent_at: new Date().toISOString(),
-          });
+          await (supabaseAdmin.from('notification_logs') as any).upsert(
+            {
+              booking_id: booking_id,
+              recipient_phone: profile.phone,
+              recipient_name: profile.full_name || 'Patient',
+              event_type: 'LATE_ARRIVAL_QUEUE_UPDATE',
+              channel: 'whatsapp',
+              status: 'QUEUED',
+              message_content: `Namaste ${profile.full_name || 'Patient'}! ${queueNotice}`,
+              sent_at: new Date().toISOString(),
+            },
+            { onConflict: 'booking_id,event_type,channel', ignoreDuplicates: true }
+          );
         }
       } catch (notifyErr) {
         console.warn('[ReachRoute] Error writing late queue notification log:', notifyErr);

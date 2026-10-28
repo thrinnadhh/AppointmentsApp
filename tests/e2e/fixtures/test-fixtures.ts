@@ -20,8 +20,8 @@ export interface BookingApiHelper {
   rescheduleBooking: (bookingId: string, newSlotStart: string, newSlotEnd: string) => Promise<{ success: boolean }>;
   sendNotification: (params: {
     bookingId: string;
-    eventType?: 'BOOKING_CONFIRMED' | 'BOOKING_REMINDER_1H' | 'BOOKING_REMINDER_30M';
-    channel?: 'whatsapp' | 'sms';
+    eventType?: 'BOOKING_CONFIRMED' | 'BOOKING_REMINDER_1H';
+    channel?: 'whatsapp';
     recipientPhone?: string;
   }) => Promise<{ success: boolean; dispatch?: unknown }>;
   joinWaitlist: (params: {

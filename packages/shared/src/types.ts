@@ -129,7 +129,6 @@ export interface Booking {
   updated_at: string;
   attachment_url?: string | null;
   reminder_1h_sent_at?: string | null;
-  reminder_30m_sent_at?: string | null;
   is_present?: boolean;
   customer_arrived_at?: string | null;
   checked_in_at?: string | null;
@@ -185,23 +184,31 @@ export interface CreateHoldResult {
 export type NotificationEventType =
   | 'BOOKING_CONFIRMED'
   | 'BOOKING_REMINDER_1H'
-  | 'BOOKING_REMINDER_30M'
   | 'BOOKING_CANCELLED'
-  | 'BOOKING_COMPLETED';
+  | 'REFUND_PROCESSED'
+  | 'AUTH_CODE';
 
-export type NotificationChannel = 'whatsapp' | 'sms' | 'email' | 'push';
+export type NotificationChannel = 'whatsapp' | 'push';
 
 export interface NotificationLog {
   id: string;
-  booking_id: string;
+  booking_id?: string | null;
   recipient_phone: string;
   recipient_name?: string | null;
   event_type: NotificationEventType | string;
   channel: NotificationChannel | string;
-  status: 'QUEUED' | 'SENT' | 'FAILED' | string;
-  message_content: string;
+  status: 'QUEUED' | 'SENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'SKIPPED' | string;
+  template_name?: string | null;
+  template_params?: any;
+  provider_message_id?: string | null;
+  attempts?: number;
+  last_error?: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  next_attempt_at?: string | null;
+  message_content?: string;
   provider_response?: Record<string, unknown> | null;
-  sent_at: string;
+  sent_at?: string;
   created_at: string;
 }
 

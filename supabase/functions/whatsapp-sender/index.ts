@@ -18,7 +18,38 @@ const TEMPLATE_PARAM_COUNTS: Record<string, number> = {
   booking_cancelled: 3,
   refund_processed: 2,
   auth_code: 1,
-};
+/** Dynamic CORS headers without wildcard */
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || req.headers.get('origin') || '';
+  let allowedOrigin = 'https://appointments4u.in';
+
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      const host = url.hostname;
+      if (
+        host === 'appointments4u.in' ||
+        host.endsWith('.appointments4u.in') ||
+        host === 'appointments-merchant.vercel.app' ||
+        (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app')) ||
+        host === 'appointments4u.pages.dev' ||
+        host.endsWith('.appointments4u.pages.dev') ||
+        host === 'localhost' ||
+        host === '127.0.0.1'
+      ) {
+        allowedOrigin = origin;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+}
 
 Deno.serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
@@ -79,7 +110,6 @@ Deno.serve(async (req: Request) => {
           .update({
             status: 'FAILED',
             last_error: 'Invalid recipient phone format: must be 91XXXXXXXXXX',
-            updated_at: new Date().toISOString(),
           })
           .eq('id', row.id);
 
@@ -96,7 +126,6 @@ Deno.serve(async (req: Request) => {
           .update({
             status: 'FAILED',
             last_error: `Unknown template: ${templateName}`,
-            updated_at: new Date().toISOString(),
           })
           .eq('id', row.id);
 
@@ -112,7 +141,6 @@ Deno.serve(async (req: Request) => {
           .update({
             status: 'FAILED',
             last_error: errMsg,
-            updated_at: new Date().toISOString(),
           })
           .eq('id', row.id);
 
@@ -132,7 +160,6 @@ Deno.serve(async (req: Request) => {
           .update({
             status: 'FAILED',
             last_error: errMsg,
-            updated_at: new Date().toISOString(),
           })
           .eq('id', row.id);
 
@@ -150,7 +177,6 @@ Deno.serve(async (req: Request) => {
             status: 'QUEUED',
             last_error: notConfiguredMsg,
             next_attempt_at: new Date(Date.now() + 60 * 1000).toISOString(),
-            updated_at: new Date().toISOString(),
           })
           .eq('id', row.id);
 
@@ -207,7 +233,6 @@ Deno.serve(async (req: Request) => {
               provider_response: respData,
               sent_at: new Date().toISOString(),
               last_error: null,
-              updated_at: new Date().toISOString(),
             })
             .eq('id', row.id);
 
@@ -216,10 +241,11 @@ Deno.serve(async (req: Request) => {
         } else {
           // Failure response from Meta API
           const errData = await metaRes.json().catch(() => ({ status: metaRes.status, statusText: metaRes.statusText }));
+          const is4xx = metaRes.status >= 400 && metaRes.status < 500;
           const attempts = row.attempts || 1;
-          const isFinalAttempt = attempts >= 3;
+          const isFinalAttempt = is4xx || attempts >= 3;
 
-          console.warn(`[whatsapp-sender] Meta API error for ${row.id} (HTTP ${metaRes.status}, Attempt ${attempts}/3):`, JSON.stringify(errData));
+          console.warn(`[whatsapp-sender] Meta API error for ${row.id} (HTTP ${metaRes.status}, Attempt ${attempts}/3, is4xx=${is4xx}):`, JSON.stringify(errData));
 
           if (isFinalAttempt) {
             await supabase
@@ -227,13 +253,12 @@ Deno.serve(async (req: Request) => {
               .update({
                 status: 'FAILED',
                 last_error: JSON.stringify(errData),
-                updated_at: new Date().toISOString(),
               })
               .eq('id', row.id);
 
-            results.push({ id: row.id, status: 'FAILED', error: errData });
+            results.push({ id: row.id, status: 'FAILED', error: errData, is4xx });
           } else {
-            // Exponential backoff: 1 minute after attempt 1, 5 minutes after attempt 2, 15 minutes after attempt 3
+            // Exponential backoff for 5xx errors: 1 minute after attempt 1, 5 minutes after attempt 2, 15 minutes after attempt 3
             const backoffMinutes = [1, 5, 15][attempts - 1] ?? 15;
             const nextAttemptAt = new Date(Date.now() + backoffMinutes * 60 * 1000).toISOString();
 
@@ -243,7 +268,6 @@ Deno.serve(async (req: Request) => {
                 status: 'QUEUED',
                 next_attempt_at: nextAttemptAt,
                 last_error: JSON.stringify(errData),
-                updated_at: new Date().toISOString(),
               })
               .eq('id', row.id);
 
@@ -263,7 +287,6 @@ Deno.serve(async (req: Request) => {
             .update({
               status: 'FAILED',
               last_error: errMessage,
-              updated_at: new Date().toISOString(),
             })
             .eq('id', row.id);
 
@@ -278,7 +301,6 @@ Deno.serve(async (req: Request) => {
               status: 'QUEUED',
               next_attempt_at: nextAttemptAt,
               last_error: errMessage,
-              updated_at: new Date().toISOString(),
             })
             .eq('id', row.id);
 

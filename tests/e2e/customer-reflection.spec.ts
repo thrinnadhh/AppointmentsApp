@@ -438,16 +438,15 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     );
     const channels = confirmedLogs.map((l) => l.channel);
     expect(channels).toContain('whatsapp');
-    expect(channels).toContain('sms');
 
-    // 4. Test 1-Hour and 30-Minute Reminders trigger
-    // Update booking slot_start to 50 mins from now to test 1-hour window (40-75 min)
+    // 4. Test 1-Hour Reminder trigger
+    // Update booking slot_start to 60 mins from now to test 1-hour window (55-65 min)
     const setSlotRes1 = await request.post('http://localhost:3000/api/admin/notifications', {
       headers: adminHeaders,
       data: {
         action: 'set_slot_time',
         booking_id: testBooking.id,
-        minutes_from_now: 50,
+        minutes_from_now: 60,
       },
     });
     expect(setSlotRes1.status()).toBe(200);
@@ -469,33 +468,6 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     );
     expect(reminder1hLogs.length).toBeGreaterThan(0);
 
-    // Update booking slot_start to 20 mins from now to test 30-minute window (10-35 min)
-    const setSlotRes2 = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: adminHeaders,
-      data: {
-        action: 'set_slot_time',
-        booking_id: testBooking.id,
-        minutes_from_now: 20,
-      },
-    });
-    expect(setSlotRes2.status()).toBe(200);
-
-    const reminderRes2 = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: adminHeaders,
-      data: { action: 'check_reminders' },
-    });
-    expect(reminderRes2.status()).toBe(200);
-
-    // Verify 30-minute reminder logged
-    const logsRes30m = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`, {
-      headers: adminHeaders,
-    });
-    const logsJson30m = await logsRes30m.json();
-    const reminder30mLogs = (logsJson30m.notifications as Array<{ event_type: string }>).filter(
-      (l) => l.event_type === 'BOOKING_REMINDER_30M'
-    );
-    expect(reminder30mLogs.length).toBeGreaterThan(0);
-
     // 5. Test Cancellation notification dispatch
     const cancelRes = await request.post('http://localhost:3000/api/admin/notifications', {
       headers: adminHeaders,
@@ -510,13 +482,13 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     const merchantPortal = new MerchantPortalPage(page);
     await merchantPortal.gotoBookings();
 
-    // Find and click the WA/SMS Logs button
-    const logsBtn = page.getByRole('button', { name: /WA\/SMS Logs/i }).first();
+    // Find and click the WhatsApp Logs button
+    const logsBtn = page.getByRole('button', { name: /WhatsApp Logs|WA Logs/i }).first();
     await expect(logsBtn).toBeVisible({ timeout: 10000 });
     await logsBtn.click();
 
-    // Verify WhatsApp & SMS modal appears
-    await expect(page.getByText('WhatsApp & SMS Communications')).toBeVisible();
+    // Verify WhatsApp modal appears
+    await expect(page.getByText('WhatsApp Notifications')).toBeVisible();
 
     // Close modal
     const closeBtn = page.getByRole('button', { name: 'Close', exact: true });

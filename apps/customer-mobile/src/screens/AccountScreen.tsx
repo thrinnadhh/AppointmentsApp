@@ -20,6 +20,7 @@ interface DeletionStatus {
 interface ConsentState {
   location_detection: boolean;
   marketing_notifications: boolean;
+  whatsapp_notifications: boolean;
   loaded: boolean;
 }
 
@@ -32,7 +33,7 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
   const [deletion, setDeletion]         = useState<DeletionStatus | null>(null);
   const [loadingDelete, setLoadingDelete] = useState(false);
   const [loading, setLoading]           = useState(true);
-  const [consents, setConsents]         = useState<ConsentState>({ location_detection: false, marketing_notifications: false, loaded: false });
+  const [consents, setConsents]         = useState<ConsentState>({ location_detection: false, marketing_notifications: false, whatsapp_notifications: false, loaded: false });
   const [savingConsent, setSavingConsent] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
             .from('user_consents')
             .select('purpose, granted')
             .eq('user_id', user.id)
-            .in('purpose', ['location_detection', 'marketing_notifications']);
+            .in('purpose', ['location_detection', 'marketing_notifications', 'whatsapp_notifications']);
 
           if (rows) {
             const map: Record<string, boolean> = {};
@@ -55,6 +56,7 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
             setConsents({
               location_detection: map['location_detection'] ?? false,
               marketing_notifications: map['marketing_notifications'] ?? false,
+              whatsapp_notifications: map['whatsapp_notifications'] ?? false,
               loaded: true,
             });
           }
@@ -85,7 +87,7 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
     if (onClose) onClose();
   };
 
-  const toggleConsent = async (purpose: 'location_detection' | 'marketing_notifications', value: boolean) => {
+  const toggleConsent = async (purpose: 'location_detection' | 'marketing_notifications' | 'whatsapp_notifications', value: boolean) => {
     if (!user) return;
     setSavingConsent(purpose);
     try {
@@ -261,6 +263,22 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
             : <Switch
                 value={consents.marketing_notifications}
                 onValueChange={(v) => toggleConsent('marketing_notifications', v)}
+                trackColor={{ false: '#e2e8f0', true: '#059669' }}
+                thumbColor="#ffffff"
+              />
+          }
+        </View>
+
+        <View style={[styles.consentRow, { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12, marginTop: 4 }]}>
+          <View style={styles.consentLabelGroup}>
+            <Text style={styles.consentLabel}>WhatsApp Appointment Updates</Text>
+            <Text style={styles.consentSub}>Booking confirmation and reminder notifications on WhatsApp</Text>
+          </View>
+          {savingConsent === 'whatsapp_notifications'
+            ? <ActivityIndicator size="small" color="#059669" />
+            : <Switch
+                value={consents.whatsapp_notifications}
+                onValueChange={(v) => toggleConsent('whatsapp_notifications', v)}
                 trackColor={{ false: '#e2e8f0', true: '#059669' }}
                 thumbColor="#ffffff"
               />
