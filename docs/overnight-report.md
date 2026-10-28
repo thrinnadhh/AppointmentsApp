@@ -102,6 +102,28 @@ Execution report for the transition of messaging infrastructure from SMS/mock no
   - Partial polling index created: `idx_notification_logs_claim_queue` on `(next_attempt_at ASC, created_at ASC) WHERE status = 'QUEUED'`.
   - Claim RPC `public.claim_queued_notifications(p_limit INT DEFAULT 20)` implemented with `FOR UPDATE SKIP LOCKED`. Security hardened with `SECURITY DEFINER SET search_path = public, pg_temp`, caller guard `auth.role() = 'service_role' OR SESSION_USER = 'postgres'`, execution revoked from `PUBLIC`, `anon`, and `authenticated`, and granted solely to `service_role`.
 
+## Step 3: Params and Events Results
+- Migration: `supabase/migrations/20261029000002_whatsapp_params_and_events.sql` (applied and verified).
+- Single source of truth parameter builder implemented: `public.build_template_params(event_type, booking)`:
+  - Strict parameter order per registry:
+    - `booking_confirmed`: `[1 customer first name, 2 provider name, 3 slot date-time, 4 reference]`
+    - `reminder_1h`: `[1 provider name, 2 slot time, 3 reference]`
+    - `booking_cancelled`: `[1 provider name, 2 slot date-time, 3 reference]`
+    - `refund_processed`: `[1 amount, 2 reference]`
+    - `auth_code`: `[1 one-time code]`
+  - Parameter formatting verified:
+    - Slot date-time formatted in `Asia/Kolkata` as `"30 Oct 2026, 5:30 PM"` (handles UTC conversion across day/midnight boundaries).
+    - Slot time formatted in `Asia/Kolkata` as `"5:30 PM"`.
+    - Customer first name: extracted via `split_part(trim(name), ' ', 1)`; empty or whitespace defaults to `"there"`.
+    - Amount: formatted as plain number without currency symbols or commas, converting from paise when specified.
+    - Reference: formatted exactly as stored (`TPT-XXXXXX`).
+  - Parameter sanitization helper `public.sanitize_template_param` trims, collapses tabs/newlines/multiple spaces into a single space, limits length to 100 characters, and guarantees non-empty values.
+  - Opt-in consent enforcement: `dispatch_booking_notification` checks `user_consents` for `purpose = 'whatsapp_notifications'`. If consent is missing, writes a record with `status = 'SKIPPED'` and `last_error = 'Customer has not granted whatsapp_notifications consent'` (`ON CONFLICT DO NOTHING`).
+  - Mobile UI updated: `apps/customer-mobile/src/screens/ConsentScreen.tsx` updated to make `whatsapp_notifications` un-ticked by default (`default: false`).
+  - Automated 1-hour reminders: `public.check_and_send_booking_reminders()` scheduled via `pg_cron` every minute (`* * * * *`). Scans for `CONFIRMED` bookings starting in 55-65 minutes, skipping cancelled bookings and bookings created <60 minutes before slot start.
+  - All 30-minute reminder code paths removed from reminder scheduler.
+  - Event triggers on `public.bookings`: `CONFIRMED` -> `BOOKING_CONFIRMED`, `CANCELLED` -> `BOOKING_CANCELLED`, `payment_status = 'REFUNDED'` -> `REFUND_PROCESSED`.
+
 ---
 
 ## Decisions
@@ -110,3 +132,4 @@ Execution report for the transition of messaging infrastructure from SMS/mock no
 3. **Queue Deduplication**: To guarantee idempotency, notification logs deduplicate on `(booking_id, event_type, channel)`. Any duplicate dispatch triggers `ON CONFLICT DO NOTHING`.
 4. **Strict Service Role**: In accordance with security conventions, `claim_queued_notifications` and `dispatch_booking_notification` are restricted to `service_role` and `postgres`.
 5. **Status Enum Check**: Updated `chk_notification_logs_status` to include `'SKIPPED'` alongside `'QUEUED', 'SENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED'`.
+6. **Single Parameter Builder**: `build_template_params` accepts both polymorphic `JSONB` and `UUID` overloads to allow execution from Postgres triggers, RPC calls, and external test harnesses.

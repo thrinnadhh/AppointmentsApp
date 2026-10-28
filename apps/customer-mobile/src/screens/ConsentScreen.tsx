@@ -70,6 +70,13 @@ const CONSENTS: ConsentItem[] = [
     required: false,
     default: false,
   },
+  {
+    purpose: 'whatsapp_notifications',
+    label: 'WhatsApp Appointment Updates',
+    description: 'Receive real-time booking confirmations, queue status updates, and reminder notifications directly on WhatsApp.',
+    required: false,
+    default: false,
+  },
 ];
 
 interface Props {
