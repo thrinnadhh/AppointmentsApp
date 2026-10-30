@@ -62,6 +62,22 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // 0. Verify Authorization: service_role key or CRON_SECRET required
+  const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
+  const token = authHeader?.replace(/^Bearer\s+/i, '').trim();
+  const cronSecret = Deno.env.get('CRON_SECRET');
+
+  const isAuthorized =
+    (token && token === supabaseServiceKey) ||
+    (cronSecret && token === cronSecret);
+
+  if (!token || !isAuthorized) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Unauthorized: Valid service role key or CRON_SECRET required' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
