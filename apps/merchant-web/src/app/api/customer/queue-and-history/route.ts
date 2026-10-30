@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 import { 
   buildRollingTenSlotQueue, 
   calculateMonthlyAttendance,
@@ -7,6 +8,8 @@ import {
 } from '@/lib/queue-scheduler';
 
 export const dynamic = 'force-dynamic';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,8 +27,9 @@ export async function GET(req: NextRequest) {
     const currentMonth = monthParam ? parseInt(monthParam, 10) : now.getMonth() + 1;
 
     const supabaseAdmin = getSupabaseAdmin();
+    const caller = await verifyAuthenticatedUser(req);
 
-    // 1. Resolve context if booking_id is provided
+    // 1. Resolve & validate context
     let targetBooking: {
       id: string;
       customer_id: string;
@@ -37,31 +41,99 @@ export async function GET(req: NextRequest) {
     } | null = null;
 
     if (bookingId) {
+      if (!UUID_REGEX.test(bookingId)) {
+        return NextResponse.json({ error: 'Invalid booking ID format' }, { status: 400 });
+      }
+
       const { data: b } = await supabaseAdmin
         .from('bookings')
         .select('id, customer_id, provider_id, resource_id, reference_code, slot_start, slot_end')
         .eq('id', bookingId)
         .maybeSingle();
 
-      if (b) {
-        targetBooking = b;
-        customerId = customerId || b.customer_id;
-        providerId = providerId || b.provider_id;
-        resourceId = resourceId || b.resource_id;
+      if (!b) {
+        return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+      }
+
+      targetBooking = b;
+      providerId = providerId || b.provider_id;
+      resourceId = resourceId || b.resource_id;
+
+      // If caller is authenticated customer owning the booking, link customerId
+      if (caller && caller.id === b.customer_id) {
+        customerId = b.customer_id;
       }
     }
 
-    // Resolve customer by phone if provided and customerId is not yet known
-    if (!customerId && phone) {
+    // Auth gate for querying customer phone
+    if (phone) {
+      if (!caller) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Session required to query by phone' },
+          { status: 401 }
+        );
+      }
+
       const cleanPhone = phone.replace(/\D/g, '').slice(-10);
       const { data: prof } = await supabaseAdmin
         .from('profiles')
-        .select('id')
+        .select('id, phone')
         .eq('phone', cleanPhone)
         .maybeSingle();
 
-      if (prof) {
-        customerId = prof.id;
+      if (!prof) {
+        return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+      }
+
+      if (caller.id !== prof.id) {
+        const isStaff = providerId ? await isCallerAuthorizedForProvider(caller.id, providerId) : false;
+        const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+        if (!isStaff && !isAdmin) {
+          return NextResponse.json(
+            { error: 'Forbidden: Cannot access another customer history' },
+            { status: 403 }
+          );
+        }
+      }
+      customerId = prof.id;
+    } else if (customerId) {
+      // Auth gate for querying explicit customer_id
+      if (!caller) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Session required to query customer history' },
+          { status: 401 }
+        );
+      }
+
+      if (caller.id !== customerId) {
+        const isStaff = providerId ? await isCallerAuthorizedForProvider(caller.id, providerId) : false;
+        const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+        if (!isStaff && !isAdmin) {
+          return NextResponse.json(
+            { error: 'Forbidden: Cannot access another customer history' },
+            { status: 403 }
+          );
+        }
+      }
+    } else if (!bookingId) {
+      // Neither bookingId, customerId, nor phone provided
+      if (!caller) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Session required' },
+          { status: 401 }
+        );
+      }
+      customerId = caller.id;
+    }
+
+    // Check if caller is authorized staff/admin for unmasking queue
+    let isStaffOrAdmin = false;
+    if (caller) {
+      const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+      if (isAdmin) {
+        isStaffOrAdmin = true;
+      } else if (providerId) {
+        isStaffOrAdmin = await isCallerAuthorizedForProvider(caller.id, providerId);
       }
     }
 
@@ -163,18 +235,23 @@ export async function GET(req: NextRequest) {
 
     const { data: rawQueueBookings } = await query;
 
-    const queueBookings: ScheduledBookingInput[] = (rawQueueBookings || []).map((b: any) => ({
-      id: b.id,
-      reference_code: b.reference_code,
-      slot_start: b.slot_start,
-      slot_end: b.slot_end,
-      status: b.status,
-      is_present: b.is_present,
-      customer_id: b.customer_id,
-      customer_name: b.profiles?.full_name || 'Patient',
-      queue_position: b.queue_position,
-      is_late_queue: Boolean(b.queue_position && !b.is_present),
-    }));
+    const queueBookings: ScheduledBookingInput[] = (rawQueueBookings || []).map((b: any) => {
+      const isOwnBooking = (targetBooking && b.id === targetBooking.id) || (caller && b.customer_id === caller.id);
+      const canSeePII = isStaffOrAdmin || isOwnBooking;
+
+      return {
+        id: b.id,
+        reference_code: canSeePII ? b.reference_code : (b.reference_code ? `•••${b.reference_code.slice(-3)}` : '••••'),
+        slot_start: b.slot_start,
+        slot_end: b.slot_end,
+        status: b.status,
+        is_present: b.is_present,
+        customer_id: canSeePII ? b.customer_id : 'anonymous',
+        customer_name: canSeePII ? (b.profiles?.full_name || 'Patient') : 'Patient',
+        queue_position: b.queue_position,
+        is_late_queue: Boolean(b.queue_position && !b.is_present),
+      };
+    });
 
     // Anchor time: starting at current minute or earliest slot today
     const anchorTime = targetBooking
@@ -184,55 +261,50 @@ export async function GET(req: NextRequest) {
     const queue = buildRollingTenSlotQueue({
       bookings: queueBookings,
       slotDurationMinutes: doctorDetails.duration_minutes,
-      currentBookingId: bookingId,
+      currentBookingId: bookingId || undefined,
       anchorStartTime: anchorTime,
     });
 
-    // 4. Fetch Monthly Attendance for Customer (or provider appointments if customer not specified)
-    const monthStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1, 0, 0, 0)).toISOString();
-    const monthEnd = new Date(Date.UTC(currentYear, currentMonth, 0, 23, 59, 59, 999)).toISOString();
-
-    let historyQuery = supabaseAdmin
-      .from('bookings')
-      .select(`
-        id,
-        reference_code,
-        slot_start,
-        slot_end,
-        status,
-        is_present,
-        customer_id,
-        queue_position,
-        profiles (full_name),
-        resources (name, department)
-      `)
-      .gte('slot_start', monthStart)
-      .lte('slot_start', monthEnd)
-      .order('slot_start', { ascending: true });
+    // 4. Fetch Monthly Attendance for Customer (only if authenticated and authorized for that customer)
+    let historyBookings: ScheduledBookingInput[] = [];
 
     if (customerId) {
-      historyQuery = historyQuery.eq('customer_id', customerId);
-    } else if (resourceId) {
-      historyQuery = historyQuery.eq('resource_id', resourceId);
-    } else if (providerId) {
-      historyQuery = historyQuery.eq('provider_id', providerId);
+      const monthStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1, 0, 0, 0)).toISOString();
+      const monthEnd = new Date(Date.UTC(currentYear, currentMonth, 0, 23, 59, 59, 999)).toISOString();
+
+      const { data: rawHistory } = await supabaseAdmin
+        .from('bookings')
+        .select(`
+          id,
+          reference_code,
+          slot_start,
+          slot_end,
+          status,
+          is_present,
+          customer_id,
+          queue_position,
+          profiles (full_name),
+          resources (name, department)
+        `)
+        .eq('customer_id', customerId)
+        .gte('slot_start', monthStart)
+        .lte('slot_start', monthEnd)
+        .order('slot_start', { ascending: true });
+
+      historyBookings = (rawHistory || []).map((b: any) => ({
+        id: b.id,
+        reference_code: b.reference_code,
+        slot_start: b.slot_start,
+        slot_end: b.slot_end,
+        status: b.status,
+        is_present: b.is_present,
+        customer_id: b.customer_id,
+        customer_name: b.profiles?.full_name || 'Patient',
+        doctor_name: b.resources?.name || doctorDetails.name,
+        department: b.resources?.department || doctorDetails.department,
+        queue_position: b.queue_position,
+      }));
     }
-
-    const { data: rawHistory } = await historyQuery;
-
-    const historyBookings: ScheduledBookingInput[] = (rawHistory || []).map((b: any) => ({
-      id: b.id,
-      reference_code: b.reference_code,
-      slot_start: b.slot_start,
-      slot_end: b.slot_end,
-      status: b.status,
-      is_present: b.is_present,
-      customer_id: b.customer_id,
-      customer_name: b.profiles?.full_name || 'Patient',
-      doctor_name: b.resources?.name || doctorDetails.name,
-      department: b.resources?.department || doctorDetails.department,
-      queue_position: b.queue_position,
-    }));
 
     const attendance = calculateMonthlyAttendance({
       bookings: historyBookings,

@@ -66,10 +66,14 @@ export async function POST(request: NextRequest) {
       });
 
       if (res.ok) {
-        edgeFunctionResponse = await res.json();
+        edgeFunctionResponse = await res.json().catch(() => ({}));
       } else {
-        const text = await res.text();
-        edgeFunctionResponse = { status: res.status, fallback: text };
+        const text = await res.text().catch(() => '');
+        edgeFunctionResponse = {
+          status: res.status,
+          deployed: false,
+          fallback: text || 'Edge function crash-alert returned non-200',
+        };
       }
     } catch (edgeErr) {
       edgeFunctionResponse = {

@@ -14,6 +14,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customer_id');
     const providerId = searchParams.get('provider_id');
+    const rawLimit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const rawOffset = parseInt(searchParams.get('offset') || '0', 10);
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     if (!customerId && !providerId) {
       return NextResponse.json({ error: 'Missing customer_id or provider_id parameter' }, { status: 400 });
@@ -67,7 +71,9 @@ export async function GET(req: NextRequest) {
       query = query.eq('provider_id', providerId);
     }
 
-    const { data, error } = await query.order('slot_start', { ascending: false });
+    const { data, error } = await query
+      .order('slot_start', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

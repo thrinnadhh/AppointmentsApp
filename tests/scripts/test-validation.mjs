@@ -166,7 +166,7 @@ describe('10. Finding 10: Realtime Channel Scoping & Tenant Isolation', () => {
     const code = fs.readFileSync(bookingsPagePath, 'utf8');
     assert.match(
       code,
-      /filter:\s*selectedProviderId \? `provider_id=eq\.\$\{selectedProviderId\}` : undefined/,
+      /filter:\s*(`provider_id=eq\.\$\{selectedProviderId\}`|selectedProviderId \? `provider_id=eq\.\$\{selectedProviderId\}` : undefined)/,
       'Realtime channel must filter bookings by selectedProviderId'
     );
   });

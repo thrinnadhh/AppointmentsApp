@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const paymentStatus = searchParams.get('payment_status');
     const needsReconciliation = searchParams.get('needs_reconciliation') === 'true';
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const rawLimit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const rawOffset = parseInt(searchParams.get('offset') || '0', 10);
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     const supabaseAdmin = getSupabaseAdmin();
 

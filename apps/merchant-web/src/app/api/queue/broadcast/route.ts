@@ -1,18 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 
 export const dynamic = 'force-dynamic';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   try {
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+    const isServiceRole = 
+      Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY && 
+      authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`);
+
+    let isAuthorized = isServiceRole;
+
     const body = await req.json();
     const { doctor_id, date, currently_serving_token, waiting_count } = body;
 
-    if (!doctor_id || !date) {
+    if (!doctor_id || !UUID_REGEX.test(doctor_id) || !date) {
       return NextResponse.json(
-        { error: 'Missing doctor_id or date' },
+        { error: 'Invalid or missing doctor_id or date' },
         { status: 400 }
       );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    if (!isAuthorized) {
+      const caller = await verifyAuthenticatedUser(req);
+      if (!caller) {
+        return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
+      }
+
+      const { data: resource } = await supabaseAdmin
+        .from('resources')
+        .select('id, provider_id')
+        .eq('id', doctor_id)
+        .maybeSingle();
+
+      if (!resource) {
+        return NextResponse.json({ error: 'Doctor resource not found' }, { status: 404 });
+      }
+
+      const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+      const isStaff = await isCallerAuthorizedForProvider(caller.id, resource.provider_id);
+
+      if (!isAdmin && !isStaff) {
+        return NextResponse.json({ error: 'Forbidden: Caller not authorized for this doctor' }, { status: 403 });
+      }
     }
 
     const channelName = `doctor-queue-${doctor_id}-${date}`;

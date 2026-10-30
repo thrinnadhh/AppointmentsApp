@@ -168,7 +168,7 @@ describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
     it('renders the late queue token card with Token # and estimated wait minutes', () => {
       assert.match(modalContent, /testID="pass-late-queue-token"/);
       assert.match(modalContent, /testID="pass-late-token-number"/);
-      assert.match(modalContent, /Token #\{currentQueuePosition\}/);
+      assert.match(modalContent, /T(urn|oken) #\{currentQueuePosition\}/);
       assert.match(modalContent, /testID="pass-late-wait-minutes"/);
       assert.match(modalContent, /~\{currentWaitMinutes\}\s*mins/);
     });

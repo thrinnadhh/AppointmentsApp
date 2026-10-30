@@ -68,3 +68,5 @@ scratch/
 signing_keys.json
 supabase/signing_keys.json
 supabase/roles.sql
+tests/e2e/stories/story-manifest.json
+story-manifest.json

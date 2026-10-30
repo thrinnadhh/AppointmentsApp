@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { sanitizeLogData } from '@appointments/shared';
+import { getClientIp } from '@/lib/auth-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +27,7 @@ function checkRateLimit(ip: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     // 1. Ingestion Rate Limiting
-    const forwarded = request.headers.get('x-forwarded-for');
-    const ip = (forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1') || 'unknown';
+    const ip = getClientIp(request) || '127.0.0.1';
     if (!checkRateLimit(ip)) {
       return NextResponse.json(
         { error: 'Rate limit exceeded: Too many log submissions. Please try again later.' },

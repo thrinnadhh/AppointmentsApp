@@ -251,7 +251,7 @@ export default function BookingPassModal({
   const handleSave = () => {
     Alert.alert(
       'Pass Saved',
-      'Appointment pass saved to your wallet. You will receive an SMS reminder before your turn.'
+      'Appointment pass saved to your wallet. You will receive a WhatsApp reminder before your turn.'
     );
   };
 

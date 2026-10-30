@@ -47,7 +47,6 @@ export default function SettingsPage() {
   const [minDeposit, setMinDeposit] = useState('50');
 
   // Notification State
-  const [smsAlerts, setSmsAlerts] = useState(true);
   const [whatsappConfirmations, setWhatsappConfirmations] = useState(true);
   const [autoConfirmHolds, setAutoConfirmHolds] = useState(true);
   const [reminderOffsetHours, setReminderOffsetHours] = useState('2');
@@ -427,22 +426,6 @@ export default function SettingsPage() {
             </h2>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
-                <div>
-                  <p className="text-sm font-bold text-slate-900">SMS Booking Notifications</p>
-                  <p className="text-xs text-slate-500">Send instant SMS with appointment time and venue address to customer upon deposit confirmation.</p>
-                </div>
-                <input
-                  id="sms-alerts-checkbox"
-                  name="smsAlerts"
-                  aria-label="Enable SMS Booking Notifications"
-                  type="checkbox"
-                  checked={smsAlerts}
-                  onChange={(e) => setSmsAlerts(e.target.checked)}
-                  className="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
-                />
-              </div>
-
               <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
                 <div>
                   <p className="text-sm font-bold text-slate-900">WhatsApp Appointment Confirmation</p>

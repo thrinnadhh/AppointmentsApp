@@ -221,7 +221,10 @@ describe('Step 2: Ticket Page Freshness & Adaptive Polling Suite', () => {
     // Call broadcast endpoint to emit Realtime broadcast to all viewers
     const bcastRes = await fetch(`${BASE_URL}/api/queue/broadcast`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+      },
       body: JSON.stringify({
         doctor_id: doctorId,
         date: todayStr,

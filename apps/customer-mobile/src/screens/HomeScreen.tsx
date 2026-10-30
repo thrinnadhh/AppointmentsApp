@@ -349,7 +349,7 @@ export default function HomeScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Top Header with App Logo & Location */}
       <View style={styles.header}>

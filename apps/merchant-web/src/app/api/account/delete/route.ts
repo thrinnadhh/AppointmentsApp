@@ -2,8 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 
-async function getRouteSupabaseClient() {
+async function getRouteSupabaseClient(req?: NextRequest) {
+  const authHeader = req?.headers?.get('authorization') || req?.headers?.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
+  }
   const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,7 +47,7 @@ async function getRouteSupabaseClient() {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const supabase = await getRouteSupabaseClient();
+    const supabase = await getRouteSupabaseClient(req);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -41,8 +57,7 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 500) : null;
 
-    const supabaseAdmin = getSupabaseAdmin();
-    const { data, error } = await (supabaseAdmin.rpc as any)('request_account_deletion', {
+    const { data, error } = await (supabase.rpc as any)('request_account_deletion', {
       p_reason: reason,
     });
 
@@ -63,9 +78,9 @@ export async function DELETE(req: NextRequest) {
  * GET /api/account/delete
  * Returns status of a pending deletion request for the authenticated user.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await getRouteSupabaseClient();
+    const supabase = await getRouteSupabaseClient(req);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
