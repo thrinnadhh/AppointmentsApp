@@ -3,13 +3,19 @@ import { checkRateLimit } from '@/lib/redis';
 import { getClientIp } from '@/lib/auth-admin';
 import parsePhoneNumber from 'libphonenumber-js';
 
+const OTP_GLOBAL_PER_MINUTE_CAP = Number(process.env.OTP_GLOBAL_PER_MINUTE_CAP) || 30;
+const OTP_GLOBAL_PER_DAY_CAP = Number(process.env.OTP_GLOBAL_PER_DAY_CAP) || 500;
+
 /**
  * POST /api/auth/otp/send
- * Proxy for Supabase phone OTP with aggressive rate limiting.
+ * Proxy for Supabase phone OTP with multi-layer rate limiting:
+ *   1. Per-IP limit: 5 OTP requests per 10 minutes (when trusted IP is present)
+ *   2. Per-phone limit: 3 OTP requests per 5 minutes per E.164 phone number
+ *   3. Global per-minute cap: 30 OTP requests per 60 seconds across all callers
+ *   4. Global per-day cap: 500 OTP requests per 86,400 seconds across all callers
  *
- * Limits: 3 OTP requests per phone per 5 minutes.
- * This prevents SMS toll fraud where attackers send OTPs to premium-rate numbers.
- * At ₹0.18/OTP, 10,000 unthrottled requests = ₹1,800 billed instantly.
+ * This prevents SMS/WhatsApp toll-fraud & pumping attacks even under distributed
+ * IP rotation and missing-IP fallback.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -33,6 +39,21 @@ export async function POST(req: NextRequest) {
 
     const e164 = parsedPhone.format('E.164');
 
+    // ── IP-level rate limit: 5 unique OTP attempts per IP per 10 minutes ─────
+    // Bind to trusted edge headers or rightmost trusted proxy; if missing, log and rely on per-phone limit
+    const ip = getClientIp(req);
+    if (ip) {
+      const ipLimit = await checkRateLimit(`otp-ip:${ip}`, 5, 600);
+      if (!ipLimit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many requests from this network. Please wait 10 minutes.' },
+          { status: 429, headers: { 'Retry-After': String(ipLimit.reset - Math.floor(Date.now() / 1000)) } }
+        );
+      }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/auth/otp/send' });
+    }
+
     // ── Phone-scoped rate limit: 3 OTPs per 5 minutes per number ─────────────
     const { allowed, remaining, reset } = await checkRateLimit(`otp:${e164}`, 3, 300);
     if (!allowed) {
@@ -48,17 +69,52 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── IP-level rate limit: 5 unique OTP attempts per IP per 10 minutes ─────
-    // Bind to framework-verified IP, trusted edge headers, or rightmost trusted proxy
-    const ip = getClientIp(req);
-    if (ip) {
-      const ipLimit = await checkRateLimit(`otp-ip:${ip}`, 5, 600);
-      if (!ipLimit.allowed) {
-        return NextResponse.json(
-          { error: 'Too many requests from this network. Please wait 10 minutes.' },
-          { status: 429, headers: { 'Retry-After': String(ipLimit.reset - Math.floor(Date.now() / 1000)) } }
-        );
-      }
+    // ── Global per-minute and per-day caps (Correction C7) ───────────────────
+    const isTestBypassAuthorized =
+      process.env.NODE_ENV !== 'production' &&
+      Boolean(process.env.SUPERADMIN_E2E_TOKEN) &&
+      req.headers.get('x-admin-bypass-key') === process.env.SUPERADMIN_E2E_TOKEN;
+
+    const bucketScope = isTestBypassAuthorized
+      ? (req.headers.get('x-test-otp-bucket-scope') || 'default').trim()
+      : 'default';
+    const minuteCap =
+      isTestBypassAuthorized && Number(req.headers.get('x-test-otp-global-minute-cap')) > 0
+        ? Number(req.headers.get('x-test-otp-global-minute-cap'))
+        : OTP_GLOBAL_PER_MINUTE_CAP;
+    const dayCap =
+      isTestBypassAuthorized && Number(req.headers.get('x-test-otp-global-day-cap')) > 0
+        ? Number(req.headers.get('x-test-otp-global-day-cap'))
+        : OTP_GLOBAL_PER_DAY_CAP;
+
+    const globalMinuteLimit = await checkRateLimit(`otp-global:minute:${bucketScope}`, minuteCap, 60);
+    if (!globalMinuteLimit.allowed) {
+      console.warn('[RateLimit] otp_global_minute_cap_exceeded', { minuteCap, bucketScope });
+      return NextResponse.json(
+        { error: 'Global per-minute OTP rate limit exceeded. Please try again in a minute.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.max(1, globalMinuteLimit.reset - Math.floor(Date.now() / 1000))),
+            'X-RateLimit-Scope': 'global-minute',
+          },
+        }
+      );
+    }
+
+    const globalDayLimit = await checkRateLimit(`otp-global:day:${bucketScope}`, dayCap, 86_400);
+    if (!globalDayLimit.allowed) {
+      console.warn('[RateLimit] otp_global_day_cap_exceeded', { dayCap, bucketScope });
+      return NextResponse.json(
+        { error: 'Daily global OTP send cap reached. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.max(1, globalDayLimit.reset - Math.floor(Date.now() / 1000))),
+            'X-RateLimit-Scope': 'global-day',
+          },
+        }
+      );
     }
 
     // ── Delegate to Supabase Auth (server-side, SUPABASE_SERVICE_ROLE_KEY) ───

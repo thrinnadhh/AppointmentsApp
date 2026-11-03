@@ -1,8 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const envLocal = fs.existsSync('apps/merchant-web/.env.local')
+  ? fs.readFileSync('apps/merchant-web/.env.local', 'utf8')
+  : '';
+const envUrl = envLocal.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\n]+)"?/)?.[1];
+const envAnonKey = envLocal.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="?([^"\n]+)"?/)?.[1];
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || envUrl || 'http://127.0.0.1:54321';
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || envAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 const API_BASE = 'http://localhost:3000';
 
 describe('F-02: City Waitlist Security, Validation & Deduplication', () => {

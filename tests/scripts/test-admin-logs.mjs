@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { sanitizeLogData, createAppLogger } from './packages/shared/src/logger.ts';
+import { sanitizeLogData, createAppLogger } from '../../packages/shared/src/logger.ts';
 
 console.log('--- Testing Admin Application Logging & Observability System ---');
 

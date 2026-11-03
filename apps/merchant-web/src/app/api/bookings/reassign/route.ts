@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 import { ReassignResourceRequest, ReassignResourceResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, status')
+      .select('id, customer_id, provider_id, resource_id, status')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -39,7 +40,19 @@ export async function POST(req: NextRequest) {
     }
 
     const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, false);
-    if (!isAuthorized) {
+    const currentResourceCheck = await authorizeHospitalResourceOrMerchant(
+      req,
+      caller.id,
+      booking.provider_id,
+      booking.resource_id
+    );
+    const targetResourceCheck = await authorizeHospitalResourceOrMerchant(
+      req,
+      caller.id,
+      booking.provider_id,
+      new_resource_id
+    );
+    if (!isAuthorized || !currentResourceCheck.authorized || !targetResourceCheck.authorized) {
       return NextResponse.json<ReassignResourceResponse>(
         { success: false, error: 'Unauthorized: Only authorized merchant staff or administrators can reassign resources' },
         { status: 403 }

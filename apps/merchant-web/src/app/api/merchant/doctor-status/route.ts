@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAuthenticatedUser, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,10 +25,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isAuthorized = await isCallerAuthorizedForProvider(caller.id, provider_id);
-    if (!isAuthorized) {
+    const authCheck = await authorizeHospitalResourceOrMerchant(req, caller.id, provider_id, resource_id);
+    if (!authCheck.authorized) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized: Not staff or admin for this hospital' },
+        { success: false, error: 'Unauthorized: Not authorized for this doctor or hospital' },
         { status: 403 }
       );
     }

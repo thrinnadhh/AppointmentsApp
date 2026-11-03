@@ -24,6 +24,8 @@ import {
 } from 'react-native';
 import { supabase } from '../services/api';
 
+declare const process: { env: Record<string, string | undefined> };
+
 const CONSENT_VERSION = '1.0';
 
 interface ConsentItem {
@@ -84,6 +86,11 @@ interface Props {
 }
 
 export default function ConsentScreen({ onConsentsGranted }: Props) {
+  const grievanceOfficerName = process.env.EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME?.trim() || '';
+  const grievanceOfficerEmail = process.env.EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL?.trim() || '';
+  const grievanceOfficerPhone = process.env.EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE?.trim() || '';
+  const grievanceOfficerAddress = process.env.EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS?.trim() || '';
+
   const [values, setValues] = useState<Record<string, boolean>>(
     Object.fromEntries(CONSENTS.map(c => [c.purpose, c.default]))
   );
@@ -171,7 +178,7 @@ export default function ConsentScreen({ onConsentsGranted }: Props) {
             time via <Text style={styles.bold}>Settings → Account → Delete Account</Text>.
           </Text>
           <Text style={styles.legalText}>
-            Grievance Officer: {'{{GRIEVANCE_OFFICER_NAME}}'} ({'{{GRIEVANCE_OFFICER_EMAIL}}'}) · Address: {'{{GRIEVANCE_OFFICER_ADDRESS}}'} · Response within 48 hours.
+            Grievance Officer: {grievanceOfficerName} ({grievanceOfficerEmail}, {grievanceOfficerPhone}) · Address: {grievanceOfficerAddress} · Response within 48 hours.
           </Text>
         </View>
       </ScrollView>

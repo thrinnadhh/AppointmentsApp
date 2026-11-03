@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAuthenticatedUser, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,9 +45,9 @@ export async function POST(req: NextRequest) {
       }
 
       const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
-      const isStaff = await isCallerAuthorizedForProvider(caller.id, resource.provider_id);
+      const authCheck = await authorizeHospitalResourceOrMerchant(req, caller.id, resource.provider_id, doctor_id);
 
-      if (!isAdmin && !isStaff) {
+      if (!isAdmin && !authCheck.authorized) {
         return NextResponse.json({ error: 'Forbidden: Caller not authorized for this doctor' }, { status: 403 });
       }
     }

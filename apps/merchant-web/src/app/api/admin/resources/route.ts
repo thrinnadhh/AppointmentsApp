@@ -224,6 +224,7 @@ export async function POST(request: NextRequest) {
           attributes: {
             email: cleanEmail,
             user_id: doctorUserId,
+            front_desk_members: [],
           },
         }).eq('id', resourceId);
       }
@@ -343,6 +344,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const currentAttr = (resource as any)?.attributes || {};
+    if (Array.isArray(currentAttr.front_desk_members)) {
+      currentAttr.front_desk_members = currentAttr.front_desk_members.map(
+        ({ id_card_number: _ignored, ...member }: Record<string, any>) => member
+      );
+    }
     let doctorUserId = currentAttr.user_id || null;
 
     if (doctorEmail !== undefined) {

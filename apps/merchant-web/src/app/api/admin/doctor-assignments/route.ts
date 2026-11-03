@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
       console.warn('doctor_front_desk_assignments upsert error, falling back to attributes:', err);
     }
 
-    // 2. Synchronize onto doctor's resource.attributes for client resilience
+    // 2. Synchronize onto doctor's resource.attributes for client resilience (strip id_card_number from public attributes)
     const currentAttr: Record<string, any> = (doctor.attributes && typeof doctor.attributes === 'object' && !Array.isArray(doctor.attributes))
       ? (doctor.attributes as Record<string, any>)
       : {};
@@ -285,12 +285,13 @@ export async function POST(request: NextRequest) {
       full_name: targetFullName,
       email: targetEmail,
       phone: targetPhone,
-      id_card_number: cleanIdCard,
       assigned_at: new Date().toISOString(),
     };
 
     const updatedList = [
-      ...existingList.filter((m: any) => m.user_id !== targetUserId && m.email !== targetEmail),
+      ...existingList
+        .filter((m: any) => m.user_id !== targetUserId && m.email !== targetEmail)
+        .map(({ id_card_number: _ignored, ...rest }: any) => rest),
       newMemberEntry,
     ];
 
@@ -307,7 +308,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Front Desk Manager "${targetFullName}" assigned to Dr. ${doctor.name}`,
-      member: newMemberEntry,
+      member: { ...newMemberEntry, id_card_number: cleanIdCard },
     }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';

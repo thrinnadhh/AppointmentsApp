@@ -63,10 +63,12 @@ scripts/e2e-*.mjs
 *.log
 strix-*.log
 .venv/
-scratch/
 .local/
 signing_keys.json
-supabase/signing_keys.json
-supabase/roles.sql
 tests/e2e/stories/story-manifest.json
 story-manifest.json
+supabase/signing_keys.json
+supabase/roles.sql
+scripts/test-seed-manifest.json
+*signing_keys*.json
+scratch/

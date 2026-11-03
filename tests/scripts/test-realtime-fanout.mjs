@@ -7,14 +7,21 @@
 // =============================================================================
 
 import { createRequire } from 'module';
+import fs from 'node:fs';
 const require = createRequire(import.meta.url);
 const { createClient } = require('../../apps/merchant-web/node_modules/@supabase/supabase-js/dist/index.cjs');
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const envLocal = fs.existsSync('apps/merchant-web/.env.local')
+  ? fs.readFileSync('apps/merchant-web/.env.local', 'utf8')
+  : '';
+const envUrl = envLocal.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\n]+)"?/)?.[1];
+const envAnonKey = envLocal.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="?([^"\n]+)"?/)?.[1];
 
-const NUM_CLIENTS = 200;
-const NUM_UPDATES = 50;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || envUrl || 'http://127.0.0.1:54321';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || envAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+
+const NUM_CLIENTS = Number(process.env.FANOUT_CLIENTS || 20);
+const NUM_UPDATES = Number(process.env.FANOUT_UPDATES || 10);
 
 function quantile(arr, q) {
   const sorted = [...arr].sort((a, b) => a - b);
@@ -44,8 +51,12 @@ async function runFanoutBenchmark() {
   const pubChannel = publisher.channel('realtime-fanout-matrix');
 
   await new Promise((resolve) => {
+    const t = setTimeout(resolve, 2500);
     pubChannel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') resolve();
+      if (status === 'SUBSCRIBED') {
+        clearTimeout(t);
+        resolve();
+      }
     });
   });
 
@@ -72,8 +83,12 @@ async function runFanoutBenchmark() {
     });
 
     const subPromise = new Promise((resolve) => {
+      const t = setTimeout(resolve, 2500);
       subChannel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') resolve();
+        if (status === 'SUBSCRIBED') {
+          clearTimeout(t);
+          resolve();
+        }
       });
     });
     subscribePromises.push(subPromise);

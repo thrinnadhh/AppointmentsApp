@@ -201,10 +201,11 @@ describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
       assert.match(screenContent, /⏰ Turn #\{booking\.queue_position\}/);
     });
 
-    it('renders late arrival notice box explaining the +2 member buffer', () => {
+    it('renders late arrival notice box with engine-computed queue_position and wait estimate (no +2 buffer)', () => {
       assert.match(screenContent, /testID=\{`late-queue-notice-\$\{booking\.id\}`\}/);
-      assert.match(screenContent, /Assigned Queue Token #\{booking\.queue_position\}/);
+      assert.match(screenContent, /#\{booking\.queue_position\}/);
       assert.match(screenContent, /Estimated wait:\s*~?\$\{booking\.estimated_wait_minutes\}\s*mins/);
+      assert.doesNotMatch(screenContent, /\+2\s*(token|slot|buffer)/i);
     });
 
     it('defines styling for lateTurnBadge and lateQueueNoticeBox', () => {

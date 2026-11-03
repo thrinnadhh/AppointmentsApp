@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { ON_TIME_GRACE_MS } from '@/lib/queue-scheduler';
 import { 
   CheckCircle2, 
   Clock, 
@@ -116,15 +117,20 @@ export default function BookingsManagementPage() {
   const handleExpireStaleStandby = async () => {
     try {
       const targetProvider = selectedProviderId !== 'ALL' ? selectedProviderId : undefined;
-      const { data, error } = await (supabase.rpc as any)('expire_stale_standby_queue', {
-        p_threshold_minutes: 45,
-        p_provider_id: targetProvider
+      const response = await fetch('/api/bookings/late-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'EXPIRE_STALE_STANDBY',
+          threshold_minutes: 45,
+          provider_id: targetProvider,
+        }),
       });
-      if (error) {
-        setFeedbackToast(`⚠️ ${error.message}`);
+      const res = await response.json();
+      if (!response.ok || !res.success) {
+        setFeedbackToast(`⚠️ ${res.error || 'Failed to run standby sweep'}`);
       } else {
-        const res = data as any;
-        setFeedbackToast(`🧹 Standby Sweep: Expired ${res.expired_count} overdue patients (>45m wait).`);
+        setFeedbackToast(`🧹 Standby Sweep: Expired ${res.expired_count ?? 0} overdue patients (>45m wait).`);
         await loadData();
       }
     } catch {
@@ -761,7 +767,7 @@ export default function BookingsManagementPage() {
                           Wait: ~{booking.estimated_wait_minutes}m
                         </span>
                       ) : null}
-                      {!booking.is_present && booking.status === 'CONFIRMED' && new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                      {!booking.is_present && booking.status === 'CONFIRMED' && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
                           ⏳ NOT ARRIVED (STANDBY)
                         </span>
@@ -870,20 +876,20 @@ export default function BookingsManagementPage() {
                         </button>
                       )}
 
-                      {/* Late Arrival +2 Buffer Action when slot has started */}
-                      {new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                      {/* Late Arrival Check-In Action when grace window has elapsed */}
+                      {new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
                         <button
                           onClick={() => handleOpenLateCheckin(booking)}
                           className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 transition shadow-2xs cursor-pointer"
-                          title="Patient arrived after slot time: Place after 2 member appointments and send SMS/WhatsApp notification"
+                          title="Patient arrived after grace window: Check in to late queue for next fitting gap and send SMS/WhatsApp notification"
                           data-testid={`late-checkin-btn-${booking.id}`}
                         >
                           <Clock className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                          Arrived Late (+2 Queue)
+                          Arrived Late (Late Queue)
                         </button>
                       )}
 
-                      {!booking.is_present && new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                      {!booking.is_present && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
                         <button
                           onClick={() => handleMoveToStandby(booking)}
                           className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition border border-slate-200 cursor-pointer"

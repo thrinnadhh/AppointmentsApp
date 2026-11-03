@@ -39,7 +39,10 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:54321 http://localhost:54321 ws://127.0.0.1:54321 ws://localhost:54321 https://api.razorpay.com https://lumberjack.razorpay.com https://*.supabase.co wss://*.supabase.co; frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com;",
+            value:
+              process.env.NODE_ENV === 'production'
+                ? "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.supabase.co wss://*.supabase.co; frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com;"
+                : "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:54321 http://localhost:54321 ws://127.0.0.1:54321 ws://localhost:54321 https://api.razorpay.com https://lumberjack.razorpay.com https://*.supabase.co wss://*.supabase.co; frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com;",
           },
         ],
       },

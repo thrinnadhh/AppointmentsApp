@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { validateBookingStatusTransition } from '@/lib/hospital-access';
+import { toClinicDateString } from '@appointments/shared/queue-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin();
     const { data: booking, error: fetchError } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, status, version, updated_at')
+      .select('id, customer_id, provider_id, resource_id, slot_start, status, version, updated_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -104,6 +105,20 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Updated by someone else, please refresh', code: 'CONCURRENT_UPDATE' },
         { status: 409 }
       );
+    }
+
+    // Phase 3 Item 3 (R7 persistence): mark any absent earlier bookings for this consultant today as skipped
+    if (booking.resource_id && booking.slot_start) {
+      const slotDate = toClinicDateString(booking.slot_start);
+      await supabaseAdmin
+        .from('bookings')
+        .update({ skipped_at: now })
+        .eq('resource_id', booking.resource_id)
+        .eq('is_present', false)
+        .is('skipped_at', null)
+        .in('status', ['CONFIRMED', 'CHECKED_IN'])
+        .gte('slot_start', `${slotDate}T00:00:00+05:30`)
+        .lt('slot_start', booking.slot_start);
     }
 
     return NextResponse.json({

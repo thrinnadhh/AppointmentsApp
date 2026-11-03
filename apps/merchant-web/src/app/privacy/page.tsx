@@ -10,6 +10,25 @@ export default function PrivacyPolicyPage() {
   const lastUpdated = '22 September 2026';
   const version = '1.0';
 
+  const grievanceOfficerName = process.env.NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME?.trim();
+  const grievanceOfficerEmail = process.env.NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL?.trim();
+  const grievanceOfficerPhone = process.env.NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE?.trim();
+  const grievanceOfficerAddress = process.env.NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS?.trim();
+  const grievanceOfficerDesignation =
+    process.env.NEXT_PUBLIC_GRIEVANCE_OFFICER_DESIGNATION?.trim() ||
+    'Data Protection & Grievance Officer';
+
+  if (
+    !grievanceOfficerName ||
+    !grievanceOfficerEmail ||
+    !grievanceOfficerPhone ||
+    !grievanceOfficerAddress
+  ) {
+    throw new Error(
+      'Missing required Grievance Officer environment variables (NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME, NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL, NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE, NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS).'
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -45,7 +64,7 @@ export default function PrivacyPolicyPage() {
             <strong>Appointments4u</strong> (also referred to as &ldquo;the Platform&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) is a technology scheduling intermediary that operates a hyperlocal booking platform for service providers (clinics, salons, restaurants, gaming zones, and pet-care providers) in Tirupati, India.
           </p>
           <p className="mt-3">
-            We are a <strong>Data Fiduciary</strong> under the DPDPA 2023. Our Grievance Officer can be reached at <a href="mailto:grievance@appointments4u.in" className="text-emerald-700 underline font-medium">grievance@appointments4u.in</a>. We respond within 48 hours.
+            We are a <strong>Data Fiduciary</strong> under the DPDPA 2023. Our Grievance Officer can be reached at <a href={`mailto:${grievanceOfficerEmail}`} className="text-emerald-700 underline font-medium">{grievanceOfficerEmail}</a>. We respond within 48 hours.
           </p>
         </Section>
 
@@ -129,10 +148,11 @@ export default function PrivacyPolicyPage() {
 
         <Section title="6. Grievance Officer">
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 leading-relaxed">
-            <p><strong>Grievance Officer:</strong> {'{{GRIEVANCE_OFFICER_NAME}}'}</p>
-            <p className="mt-1"><strong>Designation:</strong> {'{{GRIEVANCE_OFFICER_DESIGNATION}}'}</p>
-            <p className="mt-1"><strong>Address:</strong> {'{{GRIEVANCE_OFFICER_ADDRESS}}'}</p>
-            <p className="mt-1"><strong>Email:</strong> <a href="mailto:grievance@appointments4u.in" className="underline">{'{{GRIEVANCE_OFFICER_EMAIL}}'}</a></p>
+            <p><strong>Grievance Officer:</strong> {grievanceOfficerName}</p>
+            <p className="mt-1"><strong>Designation:</strong> {grievanceOfficerDesignation}</p>
+            <p className="mt-1"><strong>Address:</strong> {grievanceOfficerAddress}</p>
+            <p className="mt-1"><strong>Phone:</strong> {grievanceOfficerPhone}</p>
+            <p className="mt-1"><strong>Email:</strong> <a href={`mailto:${grievanceOfficerEmail}`} className="underline">{grievanceOfficerEmail}</a></p>
             <p className="mt-1"><strong>Response time:</strong> Within 48 hours of receipt (DPDPA §13 compliance)</p>
             <p className="mt-2 text-amber-700 text-xs">If your grievance is not resolved within 30 days, you may approach the Data Protection Board of India.</p>
           </div>
@@ -152,7 +172,7 @@ export default function PrivacyPolicyPage() {
         <div className="border-t border-slate-200 pt-8 flex flex-wrap gap-4 text-sm text-slate-500">
           <Link href="/terms" className="hover:text-emerald-700 transition-colors">Terms of Service</Link>
           <Link href="/refund-policy" className="hover:text-emerald-700 transition-colors">Refund Policy</Link>
-          <a href="mailto:grievance@appointments4u.in" className="hover:text-emerald-700 transition-colors">Contact Grievance Officer</a>
+          <a href={`mailto:${grievanceOfficerEmail}`} className="hover:text-emerald-700 transition-colors">Contact Grievance Officer</a>
         </div>
       </div>
     </div>

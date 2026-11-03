@@ -24,8 +24,14 @@ const pgPool = new Pool({
 
 const BASE_URL = 'http://localhost:3000';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const envLocal = fs.existsSync('apps/merchant-web/.env.local')
+  ? fs.readFileSync('apps/merchant-web/.env.local', 'utf8')
+  : '';
+const envUrl = envLocal.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\n]+)"?/)?.[1];
+const envAnonKey = envLocal.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="?([^"\n]+)"?/)?.[1];
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || envUrl || 'http://127.0.0.1:54321';
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || envAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
   let providerId;
@@ -38,8 +44,8 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
   let newHoldBookingId;
 
   before(async () => {
-    const today = new Date();
-    todayStr = today.toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    todayStr = tomorrow.toISOString().slice(0, 10);
 
     // 1. Pick a provider and resource
     const res = await pgPool.query(
@@ -125,6 +131,7 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
     const slot3Start = `${todayStr}T11:00:00.000Z`;
     const slot3End = `${todayStr}T11:15:00.000Z`;
 
+    await pgPool.query("SELECT set_config('request.jwt.claim.role', 'service_role', false)");
     const rpcRes = await pgPool.query(
       `SELECT public.create_booking_hold($1, $2::timestamptz, $3::timestamptz, $4) as result`,
       [resourceId, slot3Start, slot3End, customerId]
@@ -146,6 +153,7 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
     const slot4Start = `${todayStr}T12:00:00.000Z`;
     const slot4End = `${todayStr}T12:15:00.000Z`;
 
+    await pgPool.query("SELECT set_config('request.jwt.claim.role', 'service_role', false)");
     const rpcRes = await pgPool.query(
       `SELECT public.create_booking_hold($1, $2::timestamptz, $3::timestamptz, $4) as result`,
       [resourceId, slot4Start, slot4End, customerId]

@@ -142,7 +142,7 @@ export function clearProvidersCache(): void {
 }
 
 export const PUBLIC_PROVIDER_FIELDS =
-  'id, owner_id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, cooling_period_days, weekly_hours, created_at, updated_at, resources(*)';
+  'id, category_id, sub_category_id, name, description, address, city, latitude, longitude, opening_time, closing_time, photos, status, is_active, cooling_period_days, weekly_hours, created_at, updated_at, resources(*)';
 
 // Enhanced Supabase Service for Customer Mobile Application
 export async function fetchProvidersByCategory(categoryId?: string): Promise<ProviderWithDetails[]> {
@@ -194,9 +194,10 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
         updated_at: r.updated_at,
       }));
 
+      const provRecord = prov as Record<string, unknown>;
       return {
         id: prov.id,
-        owner_id: prov.owner_id,
+        owner_id: (provRecord.owner_id as string) ?? '',
         category_id: prov.category_id,
         sub_category_id: prov.sub_category_id,
         name: prov.name,
@@ -205,8 +206,8 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
         city: prov.city,
         latitude: Number(prov.latitude),
         longitude: Number(prov.longitude),
-        phone: prov.phone,
-        email: prov.email,
+        phone: (provRecord.phone as string) ?? '',
+        email: (provRecord.email as string) ?? '',
         opening_time: prov.opening_time,
         closing_time: prov.closing_time,
         photos: prov.photos,
@@ -358,9 +359,10 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
       updated_at: r.updated_at,
     }));
 
+    const dataRecord = data as Record<string, unknown>;
     const result: ProviderWithDetails = {
       id: data.id,
-      owner_id: data.owner_id,
+      owner_id: (dataRecord.owner_id as string) ?? '',
       category_id: data.category_id,
       sub_category_id: data.sub_category_id,
       name: data.name,
@@ -369,8 +371,8 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
       city: data.city,
       latitude: Number(data.latitude),
       longitude: Number(data.longitude),
-      phone: data.phone,
-      email: data.email,
+      phone: (dataRecord.phone as string) ?? '',
+      email: (dataRecord.email as string) ?? '',
       opening_time: data.opening_time,
       closing_time: data.closing_time,
       photos: data.photos,
@@ -682,46 +684,13 @@ export async function confirmBookingPaymentOnSupabase(
     }
   }
 
-  try {
-    const updatePayload: {
-      status: 'CONFIRMED';
-      payment_status: 'CAPTURED';
-      gateway_payment_id: string;
-      updated_at: string;
-      attachment_url?: string | null;
-    } = {
-      status: 'CONFIRMED',
-      payment_status: 'CAPTURED',
-      gateway_payment_id: paymentGatewayId,
-      updated_at: new Date().toISOString(),
-    };
-    if (attachmentUrl) {
-      updatePayload.attachment_url = attachmentUrl;
-    }
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .update(updatePayload)
-      .eq('id', bookingId)
-      .select();
-
-    if (error) {
-      if (isDev) {
-        console.warn('Direct confirmation bypassed or fell back in dev mode:', error.message);
-        return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED' }];
-      }
-      throw error;
-    }
-    return data;
-  } catch (err) {
-    if (isDev) {
-      console.warn('Confirm booking dev fallback:', err);
-      return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED' }];
-    }
-    console.error('Error confirming booking in Supabase:', err);
-    mobileLogger.forComponent('MobileApi').error('Booking confirmation failed', err, { bookingId });
-    throw err;
+  if (isDev) {
+    console.warn('Confirm booking dev fallback for booking:', bookingId);
+    return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED', attachment_url: attachmentUrl ?? null }];
   }
+  const err = new Error('Booking confirmation requires server API /api/bookings/confirm or /api/payments/verify');
+  mobileLogger.forComponent('MobileApi').error('Booking confirmation failed', err, { bookingId });
+  throw err;
 }
 
 export interface CreateRazorpayOrderResult {
@@ -834,7 +803,7 @@ export async function verifyRazorpayPayment(params: {
 
 export async function cancelBookingOnSupabase(bookingId: string, slotStart: string) {
   const diffMinutes = Math.round((new Date(slotStart).getTime() - Date.now()) / (1000 * 60));
-  const isLate = diffMinutes <= 30;
+  const isLate = diffMinutes <= 60;
 
   try {
     if (API_BASE_URL) {
@@ -860,7 +829,7 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
           return { data: json, isLate };
         }
       } catch {
-        // Fall through to RPC or direct update
+        // Fall through to RPC
       }
     }
 
@@ -868,22 +837,8 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
       p_booking_id: bookingId,
       p_reason: isLate ? 'Customer cancelled (<60 min)' : 'Customer cancelled (>=60 min)',
     });
-    if (!rpcError) {
-      return { data: rpcData, isLate };
-    }
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .update({
-        status: 'CANCELLED',
-        payment_status: isLate ? 'FORFEITED' : 'REFUNDED',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId)
-      .select();
-
-    if (error) throw error;
-    return { data, isLate };
+    if (rpcError) throw rpcError;
+    return { data: rpcData, isLate };
   } catch (err) {
     console.error('Error cancelling booking on Supabase:', err);
     mobileLogger.forComponent('MobileApi').error('Booking cancellation failed', err, { bookingId });
@@ -892,51 +847,43 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
 }
 
 export async function fetchBookedSlots(resourceId: string, date: Date): Promise<string[]> {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    throw new Error('Slot availability API base URL is not configured');
+  }
+
+  const session = (await supabase.auth.getSession()).data?.session;
+  const headers: Record<string, string> = {};
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
   try {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const resp = await fetch(
+      `${baseUrl}/api/slots/availability?resource_id=${encodeURIComponent(resourceId)}&date=${encodeURIComponent(date.toISOString())}`,
+      { headers, signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
 
-    // Fast direct database query (50ms response, zero dependency on local IP)
-    const { data, error } = await supabase
-      .from('bookings')
-      .select('slot_start')
-      .eq('resource_id', resourceId)
-      .in('status', ['HELD', 'CONFIRMED', 'PENDING_PAYMENT'])
-      .gte('slot_start', startOfDay.toISOString())
-      .lte('slot_start', endOfDay.toISOString());
-
-    if (!error && data) {
-      return data.map((b) => new Date(b.slot_start).toISOString());
+    if (!resp.ok) {
+      const errBody = await resp.json().catch(() => ({}));
+      throw new Error(
+        errBody?.error || `Failed to load slot availability (HTTP ${resp.status})`
+      );
     }
 
-    // Fall back to server API endpoint with 2s timeout
-    const baseUrl = getApiBaseUrl();
-    if (baseUrl) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      try {
-        const resp = await fetch(
-          `${baseUrl}/api/slots/booked?resource_id=${encodeURIComponent(resourceId)}&date=${encodeURIComponent(date.toISOString())}`,
-          { signal: controller.signal }
-        );
-        clearTimeout(timeoutId);
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json.success && Array.isArray(json.booked_slots)) {
-            return json.booked_slots;
-          }
-        }
-      } catch {
-        clearTimeout(timeoutId);
-      }
+    const json = await resp.json();
+    if (!json?.success || !Array.isArray(json.booked_slots)) {
+      throw new Error('Invalid slot availability response from server');
     }
 
-    return [];
+    return json.booked_slots;
   } catch (err) {
+    clearTimeout(timeoutId);
     console.warn('fetchBookedSlots error:', err);
-    return [];
+    throw err instanceof Error ? err : new Error('Unable to load slot availability');
   }
 }
 
@@ -985,7 +932,7 @@ export function generateAvailableSlots(
           const start = new Date(selectedDate);
           start.setHours(hour, min, 0, 0);
           const end = new Date(start.getTime() + (slotDuration > 0 ? slotDuration : slotStep) * 60000);
-          const isBusy = (hour === 13 && min === 0);
+          const isBusy = false;
           const isPast = isSelectedDateToday && start.getTime() <= (now.getTime() + 5 * 60 * 1000);
           const isBooked = bookedSlotStarts.some(
             (bs) => Math.abs(new Date(bs).getTime() - start.getTime()) < 60000
@@ -1022,9 +969,7 @@ export function generateAvailableSlots(
       const start = new Date(selectedDate);
       start.setHours(hour, min, 0, 0);
       const end = new Date(start.getTime() + (defaultSlotDuration > 0 ? defaultSlotDuration : defaultSlotStep) * 60000);
-      
-      // Mark one slot as busy for demonstration
-      const isBusy = (hour === 12 && min === 0) || (hour === 15 && min === 30);
+      const isBusy = false;
       const isPast = isSelectedDateToday && start.getTime() <= (now.getTime() + 5 * 60 * 1000);
       const isBooked = bookedSlotStarts.some(
         (bs) => Math.abs(new Date(bs).getTime() - start.getTime()) < 60000
@@ -1082,23 +1027,8 @@ export async function rescheduleBookingOnSupabase(
       p_new_slot_start: newSlotStart,
       p_new_slot_end: newSlotEnd,
     });
-    if (!rpcError) {
-      return { success: true, data: rpcData };
-    }
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .update({
-        slot_start: newSlotStart,
-        slot_end: newSlotEnd,
-        status: 'CONFIRMED',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId)
-      .select();
-
-    if (error) throw error;
-    return { success: true, data };
+    if (rpcError) throw rpcError;
+    return { success: true, data: rpcData };
   } catch (err) {
     console.error('Error rescheduling booking:', err);
     throw err;
@@ -1130,28 +1060,15 @@ export async function markBookingReached(bookingId: string): Promise<{ success: 
           if (json.success) return json;
         }
       } catch {
-        // Fallback directly to RPC or Supabase update
+        // Fallback directly to RPC
       }
     }
 
     const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('mark_customer_reached', {
       p_booking_id: bookingId,
     });
-    if (!rpcError && rpcData) {
-      return { success: true };
-    }
-
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
-        is_present: true,
-        customer_arrived_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId);
-
-    if (updateError) throw updateError;
-    return { success: true };
+    if (rpcError) throw rpcError;
+    return { success: Boolean(rpcData ?? true) };
   } catch (err) {
     console.error('Error marking booking as reached:', err);
     throw err;
@@ -1364,7 +1281,7 @@ export async function sendEmailOtp(email: string): Promise<{ success: boolean; e
     const { error } = await supabase.auth.signInWithOtp({ email: trimmed });
     if (error) {
       console.warn('Supabase email signInWithOtp error:', error.message);
-      if (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient')) {
+      if (isDev && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient'))) {
         return { success: true };
       }
       return { success: false, error: error.message };
@@ -1385,7 +1302,7 @@ export async function verifyEmailOtp(
 ): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
   try {
     const trimmed = email.trim();
-    if (token.trim() === '123456' && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient'))) {
+    if (isDev && token.trim() === '123456' && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient'))) {
       return { success: true };
     }
     const { data, error } = await supabase.auth.verifyOtp({
@@ -1394,7 +1311,7 @@ export async function verifyEmailOtp(
       type: 'email',
     });
     if (error) {
-      if (token.trim() === '123456') return { success: true };
+      if (isDev && token.trim() === '123456') return { success: true };
       console.warn('Supabase email verifyOtp error:', error.message);
       return { success: false, error: error.message };
     }
@@ -1404,7 +1321,7 @@ export async function verifyEmailOtp(
       session: data?.session,
     };
   } catch (err: unknown) {
-    if (token.trim() === '123456') return { success: true };
+    if (isDev && token.trim() === '123456') return { success: true };
     const msg = err instanceof Error ? err.message : 'Failed to verify email OTP';
     return { success: false, error: msg };
   }

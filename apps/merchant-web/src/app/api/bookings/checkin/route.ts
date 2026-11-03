@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { checkRateLimit } from '@/lib/redis';
+import { getAccessContext, canAccessDoctor, authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
+import { toClinicDateString } from '@/lib/queue-scheduler';
+import { ON_TIME_GRACE_MS } from '@appointments/shared/queue-engine';
 
 export const dynamic = 'force-dynamic';
+
+const getIstDateString = toClinicDateString;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const code = (body.code || '').trim();
-    let shopId = body.shopId || body.shop_id || null;
+    let shopId = body.shopId || body.shop_id || body.provider_id || null;
 
     if (!code) {
       return NextResponse.json(
@@ -22,6 +28,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'UNAUTHORIZED', message: 'Authentication required' },
         { status: 401 }
+      );
+    }
+
+    const provider_id = shopId || 'global';
+    const rl = await checkRateLimit(`checkin:${caller.id}:${provider_id}`, 10, 300);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'RATE_LIMITED', message: 'Too many check-in attempts. Please wait before trying again.' },
+        { status: 429 }
       );
     }
 
@@ -95,7 +110,61 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch patient name & doctor name
+    // Enforce per-consultant access for hospital front-desk/consultant staff
+    if (!isAdmin) {
+      const accessCtx = await getAccessContext(req, targetProviderId);
+      const resourceAuth = await authorizeHospitalResourceOrMerchant(
+        req,
+        caller.id,
+        targetProviderId,
+        booking.resource_id
+      );
+      if (!canAccessDoctor(accessCtx, booking.resource_id) && !resourceAuth.authorized) {
+        return NextResponse.json(
+          { success: false, error: 'FORBIDDEN', message: 'You are not authorized to check in patients for this doctor' },
+          { status: 403 }
+        );
+      }
+      if (!resourceAuth.authorized) {
+        return NextResponse.json(
+          { success: false, error: 'FORBIDDEN', message: 'You are not authorized to check in patients for this doctor' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const now = new Date();
+    if (getIstDateString(new Date(booking.slot_start)) !== getIstDateString(now)) {
+      return NextResponse.json(
+        { success: false, error: 'INVALID_DATE', message: 'Check-in is only allowed on the scheduled appointment date (IST)' },
+        { status: 409 }
+      );
+    }
+
+    const isLate = now.getTime() > (new Date(booking.slot_start).getTime() + ON_TIME_GRACE_MS);
+
+    // If already checked in — do not leak patient PII in 409 error response
+    if (booking.status === 'CHECKED_IN' || booking.is_present) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'ALREADY_CHECKED_IN',
+          message: 'This appointment has already been checked in',
+          is_late: isLate,
+          checked_in_at: booking.checked_in_at || now.toISOString(),
+        },
+        { status: 409 }
+      );
+    }
+
+    if (booking.status !== 'CONFIRMED') {
+      return NextResponse.json(
+        { success: false, error: 'INVALID_STATUS', message: `Cannot check in. Appointment status is ${booking.status}` },
+        { status: 409 }
+      );
+    }
+
+    // Fetch patient name & doctor name only after valid check-in verification
     const [{ data: patientProfile }, { data: doctorResource }] = await Promise.all([
       supabaseAdmin.from('profiles').select('full_name').eq('id', booking.customer_id).maybeSingle(),
       supabaseAdmin.from('resources').select('name').eq('id', booking.resource_id).maybeSingle(),
@@ -109,31 +178,6 @@ export async function POST(req: NextRequest) {
       hour12: true,
       timeZone: 'Asia/Kolkata',
     });
-
-    const now = new Date();
-    const isLate = now.getTime() > (new Date(booking.slot_start).getTime() + 10 * 60 * 1000);
-
-    // If already checked in
-    if (booking.status === 'CHECKED_IN' || booking.is_present) {
-      return NextResponse.json({
-        success: false,
-        error: 'ALREADY_CHECKED_IN',
-        message: 'This appointment has already been checked in',
-        booking_id: booking.id,
-        patient_name: patientName,
-        service_doctor: doctorName,
-        slot_time: slotTimeStr,
-        is_late: isLate,
-        checked_in_at: booking.checked_in_at || now.toISOString(),
-      });
-    }
-
-    if (booking.status !== 'CONFIRMED') {
-      return NextResponse.json(
-        { success: false, error: 'INVALID_STATUS', message: `Cannot check in. Appointment status is ${booking.status}` },
-        { status: 400 }
-      );
-    }
 
     // Update the booking status to CHECKED_IN
     const { error: updateErr } = await supabaseAdmin

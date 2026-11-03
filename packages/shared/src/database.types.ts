@@ -288,6 +288,7 @@ export type Database = {
           reminder_1h_sent_at: string | null
           reminder_30m_sent_at: string | null
           resource_id: string
+          skipped_at: string | null
           slot_end: string
           slot_start: string
           status: Database["public"]["Enums"]["booking_status"]
@@ -327,6 +328,7 @@ export type Database = {
           reminder_1h_sent_at?: string | null
           reminder_30m_sent_at?: string | null
           resource_id: string
+          skipped_at?: string | null
           slot_end: string
           slot_start: string
           status?: Database["public"]["Enums"]["booking_status"]
@@ -366,6 +368,7 @@ export type Database = {
           reminder_1h_sent_at?: string | null
           reminder_30m_sent_at?: string | null
           resource_id?: string
+          skipped_at?: string | null
           slot_end?: string
           slot_start?: string
           status?: Database["public"]["Enums"]["booking_status"]
@@ -1153,6 +1156,7 @@ export type Database = {
           provider_id: string
           type: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           attributes?: Json
@@ -1169,6 +1173,7 @@ export type Database = {
           provider_id: string
           type: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           attributes?: Json
@@ -1185,6 +1190,7 @@ export type Database = {
           provider_id?: string
           type?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1761,6 +1767,7 @@ export type Database = {
         | "REFUNDED"
         | "FORFEITED"
         | "REFUND_PENDING"
+        | "REFUND_IN_PROGRESS"
         | "REFUND_FAILED"
       provider_status: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED"
       user_role: "customer" | "merchant" | "admin" | "city_director"
@@ -1911,6 +1918,7 @@ export const Constants = {
         "REFUNDED",
         "FORFEITED",
         "REFUND_PENDING",
+        "REFUND_IN_PROGRESS",
         "REFUND_FAILED",
       ],
       provider_status: ["PENDING_APPROVAL", "ACTIVE", "SUSPENDED"],

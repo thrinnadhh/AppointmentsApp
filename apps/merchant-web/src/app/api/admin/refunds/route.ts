@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAdminRequest } from '@/lib/auth-admin';
+import { initiateRazorpayRefund } from '@/lib/razorpay';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,6 +102,56 @@ export async function GET(request: NextRequest) {
         refund_pending_count: pendingCount,
       },
       bookings: items,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const bookingId = typeof body?.booking_id === 'string' && body.booking_id.trim() ? body.booking_id.trim() : undefined;
+
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = (supabaseAdmin
+      .from('bookings') as any)
+      .select('id, payment_status, refund_amount, deposit_amount, total_amount')
+      .in('payment_status', ['REFUND_PENDING', 'REFUND_FAILED'])
+      .limit(25);
+
+    if (bookingId) {
+      query = query.eq('id', bookingId);
+    }
+
+    const { data: bookings, error: bookingsErr } = await query;
+    if (bookingsErr) {
+      return NextResponse.json({ error: bookingsErr.message }, { status: 400 });
+    }
+
+    const results = [];
+    for (const b of bookings || []) {
+      const refundAmountInr = Number(b.refund_amount ?? b.deposit_amount ?? b.total_amount ?? 0);
+      const res = await initiateRazorpayRefund({
+        supabaseAdmin,
+        bookingId: b.id,
+        refundAmountInr,
+        reason: 'Admin Manual Refund Reconciliation',
+        actorId: authResult.user.id,
+      });
+      results.push(res);
+    }
+
+    return NextResponse.json({
+      success: true,
+      processed: results.length,
+      results,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';

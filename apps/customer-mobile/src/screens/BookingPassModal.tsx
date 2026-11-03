@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { Booking } from '@appointments/shared';
-import { fetchBookingCheckinCode, supabase } from '../services/api';
+import { fetchBookingCheckinCode, getApiBaseUrl, supabase } from '../services/api';
 
 interface BookingPassModalProps {
   visible: boolean;
@@ -53,6 +53,7 @@ export default function BookingPassModal({
   const [liveCheckedInAt, setLiveCheckedInAt] = useState<string | null>(booking?.checked_in_at || null);
   const [liveQueuePosition, setLiveQueuePosition] = useState<number | null>(booking?.queue_position || null);
   const [liveWaitMinutes, setLiveWaitMinutes] = useState<number | null>(booking?.estimated_wait_minutes || null);
+  const [liveQueueItems, setLiveQueueItems] = useState<HospitalQueueTokenItem[]>([]);
 
   useEffect(() => {
     if (booking) {
@@ -65,12 +66,77 @@ export default function BookingPassModal({
 
   useEffect(() => {
     if (!booking?.id || !visible) return;
-    if (booking.status !== 'CONFIRMED' && booking.status !== 'CHECKED_IN') return;
 
     let isMounted = true;
-    fetchBookingCheckinCode(booking.id).then((code) => {
-      if (isMounted) setCheckinCode(code);
-    });
+    const loadTicketAndQueue = async () => {
+      if (booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN') {
+        const code = await fetchBookingCheckinCode(booking.id);
+        if (isMounted && code) {
+          setCheckinCode(code);
+        }
+      }
+
+      try {
+        const baseUrl = getApiBaseUrl();
+        const session = (await supabase.auth.getSession()).data?.session;
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
+        const [ticketResp, queueResp] = await Promise.allSettled([
+          fetch(`${baseUrl}/api/ticket/${encodeURIComponent(booking.id)}`, { headers }),
+          fetch(`${baseUrl}/api/customer/queue-and-history?booking_id=${encodeURIComponent(booking.id)}`, { headers }),
+        ]);
+
+        if (isMounted && ticketResp.status === 'fulfilled' && ticketResp.value.ok) {
+          const ticketJson = await ticketResp.value.json();
+          if (ticketJson?.checkin_code) {
+            setCheckinCode(ticketJson.checkin_code);
+          }
+          if (ticketJson?.booking?.status) {
+            setLiveStatus(ticketJson.booking.status);
+          }
+          if (ticketJson?.booking?.checked_in_at) {
+            setLiveCheckedInAt(ticketJson.booking.checked_in_at);
+          }
+        }
+
+        if (isMounted && queueResp.status === 'fulfilled' && queueResp.value.ok) {
+          const queueJson = await queueResp.value.json();
+          if (Array.isArray(queueJson?.queue) && queueJson.queue.length > 0) {
+            const mapped: HospitalQueueTokenItem[] = queueJson.queue
+              .filter((slot: any) => slot.type !== 'FREE_GAP')
+              .map((slot: any, idx: number) => {
+                const isSelf = Boolean(slot.isCurrentPatient || slot.bookingId === booking.id);
+                let itemStatus: HospitalQueueTokenItem['status'] = 'NOT_PRESENT';
+                if (slot.type === 'SERVING') {
+                  itemStatus = 'IN_CONSULTATION';
+                } else if (slot.type === 'BOOKED_PRESENT' || slot.type === 'LATE_ACCOMMODATED') {
+                  itemStatus = 'PRESENT_READY';
+                } else if (slot.type === 'LATE_WAITING') {
+                  itemStatus = 'LATE_QUEUE';
+                }
+                return {
+                  tokenNumber: slot.tokenNumber ?? slot.slotIndex ?? idx + 1,
+                  patientName: isSelf ? 'You (Patient Pass)' : (slot.patientName || 'Patient'),
+                  slotTime: `${slot.formattedStartTime || ''} - ${slot.formattedEndTime || ''}`.trim(),
+                  expectedTime: slot.formattedStartTime || '',
+                  status: itemStatus,
+                  isCurrentCustomer: isSelf,
+                };
+              });
+            if (mapped.length > 0) {
+              setLiveQueueItems(mapped);
+            }
+          }
+        }
+      } catch {
+        // Fallback to single current-booking item when offline
+      }
+    };
+
+    loadTicketAndQueue();
 
     return () => {
       isMounted = false;
@@ -142,78 +208,38 @@ export default function BookingPassModal({
 
   // Derive user token number (e.g. from assignedTokenNumber, booking.queue_position, or default 1)
   const myTokenNumber = assignedTokenNumber ?? booking.queue_position ?? 1;
+  const slotEndDate = new Date(booking.slot_end || slotDate.getTime() + 15 * 60 * 1000);
+  const endTimeString = slotEndDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Build the complete Hospital OPD queue roster (Tokens #1 to #8)
-  const hospitalQueueRoster: HospitalQueueTokenItem[] = [
-    {
-      tokenNumber: 1,
-      patientName: 'Suresh Babu',
-      slotTime: '09:00 - 09:15 AM',
-      expectedTime: '09:00 AM',
-      status: 'COMPLETED',
-    },
-    {
-      tokenNumber: 2,
-      patientName: 'Lakshmi Devi',
-      slotTime: '09:15 - 09:30 AM',
-      expectedTime: '09:15 AM',
-      status: 'IN_CONSULTATION', // Now Serving
-    },
-    {
-      tokenNumber: 3,
-      patientName: 'Rajesh Sharma',
-      slotTime: '09:30 - 09:45 AM',
-      expectedTime: '09:30 AM',
-      status: 'PRESENT_READY', // Present in lobby
-    },
-    {
-      tokenNumber: 4,
-      patientName: 'You (Patient Pass)',
-      slotTime: '09:45 - 10:00 AM',
-      expectedTime: '09:45 AM',
-      isCurrentCustomer: true,
-      code: checkinCode || '4821',
-      status: isCheckedIn
-        ? 'PRESENT_READY'
-        : isLateQueue
-        ? 'LATE_QUEUE'
-        : 'NOT_PRESENT',
-      lateTurnNumber: currentQueuePosition || undefined,
-      estimatedWaitMinutes: isLateQueue ? currentWaitMinutes || 35 : 15,
-    },
-    {
-      tokenNumber: 5,
-      patientName: 'Priya Nair',
-      slotTime: '10:00 - 10:15 AM',
-      expectedTime: '10:00 AM',
-      status: 'NOT_PRESENT',
-      estimatedWaitMinutes: 30,
-    },
-    {
-      tokenNumber: 6,
-      patientName: 'Anand Mohan',
-      slotTime: '10:15 - 10:30 AM',
-      expectedTime: '10:15 AM',
-      status: 'NOT_PRESENT',
-      estimatedWaitMinutes: 45,
-    },
-    {
-      tokenNumber: 7,
-      patientName: 'Haritha P.',
-      slotTime: '10:30 - 10:45 AM',
-      expectedTime: '10:30 AM',
-      status: 'NOT_PRESENT',
-      estimatedWaitMinutes: 60,
-    },
-    {
-      tokenNumber: 8,
-      patientName: 'Subba Rao',
-      slotTime: '10:45 - 11:00 AM',
-      expectedTime: '10:45 AM',
-      status: 'NOT_PRESENT',
-      estimatedWaitMinutes: 75,
-    },
-  ];
+  // Build the Hospital OPD queue roster from live backend queue data, falling back to the patient's own slot
+  const hospitalQueueRoster: HospitalQueueTokenItem[] =
+    liveQueueItems.length > 0
+      ? liveQueueItems
+      : [
+          {
+            tokenNumber: myTokenNumber,
+            patientName: 'You (Patient Pass)',
+            slotTime: `${timeString} - ${endTimeString}`,
+            expectedTime: timeString,
+            isCurrentCustomer: true,
+            code: checkinCode || undefined,
+            status:
+              liveStatus === 'IN_PROGRESS'
+                ? 'IN_CONSULTATION'
+                : isCheckedIn
+                ? 'PRESENT_READY'
+                : isLateQueue
+                ? 'LATE_QUEUE'
+                : 'NOT_PRESENT',
+            lateTurnNumber: currentQueuePosition || undefined,
+            estimatedWaitMinutes: isLateQueue ? currentWaitMinutes || 15 : 0,
+          },
+        ];
+
+  const nowServingItem =
+    hospitalQueueRoster.find((t) => t.status === 'IN_CONSULTATION') ||
+    hospitalQueueRoster.find((t) => t.status === 'PRESENT_READY') ||
+    hospitalQueueRoster[0];
 
   // Summary counts for the session
   const totalTokens = hospitalQueueRoster.length;
@@ -221,7 +247,7 @@ export default function BookingPassModal({
     (t) => t.status === 'PRESENT_READY' || t.status === 'IN_CONSULTATION'
   ).length;
   const notPresentCount = hospitalQueueRoster.filter((t) => t.status === 'NOT_PRESENT').length;
-  const lateQueueCount = isLateQueue ? 1 : 0;
+  const lateQueueCount = hospitalQueueRoster.filter((t) => t.status === 'LATE_QUEUE').length || (isLateQueue ? 1 : 0);
 
   const handleSayReached = async () => {
     if (!booking) return;
@@ -339,9 +365,9 @@ export default function BookingPassModal({
                       <Text style={styles.presenceBadgeLate}>
                         ⏰ LATE COMERS QUEUE (TURN #{currentQueuePosition})
                       </Text>
-                      <Text style={styles.presenceTitleLate}>Rescheduled (+2 Buffer Rule)</Text>
+                      <Text style={styles.presenceTitleLate}>Gap Accommodation Active</Text>
                       <Text style={styles.presenceSubtextLate}>
-                        Slot arrival missed. Accommodated 2 tokens after the ongoing consultation. Estimated wait: ~{currentWaitMinutes || 35} mins.
+                        Slot arrival missed. You will be served in the next fitting gap without delaying scheduled on-time patients. Estimated wait: ~{currentWaitMinutes || 15} mins.
                       </Text>
                     </View>
                   </View>
@@ -382,8 +408,12 @@ export default function BookingPassModal({
                   <View style={styles.liveMetricsRow}>
                     <View style={styles.metricCol}>
                       <Text style={styles.metricLabel}>NOW SERVING</Text>
-                      <Text style={styles.metricValNow}>Token #2</Text>
-                      <Text style={styles.metricSub}>In Consultation</Text>
+                      <Text style={styles.metricValNow}>
+                        {nowServingItem ? `Token #${nowServingItem.tokenNumber}` : `Token #${myTokenNumber}`}
+                      </Text>
+                      <Text style={styles.metricSub}>
+                        {nowServingItem?.status === 'IN_CONSULTATION' ? 'In Consultation' : 'Next Ready'}
+                      </Text>
                     </View>
                     <View style={styles.metricDividerVertical} />
                     <View style={styles.metricCol}>
@@ -511,7 +541,7 @@ export default function BookingPassModal({
                           <Text style={styles.checkinCodeBadge}>RECEPTION CHECK-IN CODE</Text>
                         </View>
                         <Text style={styles.checkinCodeNumber} testID="pass-checkin-code-number">
-                          {checkinCode || '4821'}
+                          {checkinCode || '••••'}
                         </Text>
                         <Text style={styles.checkinCodeInstruction}>
                           Show or tell this code at reception counter
@@ -596,7 +626,7 @@ export default function BookingPassModal({
                           </Text>
                         </View>
                         <Text style={styles.lateQueueNoticeText}>
-                          You have been accommodated after 2 member appointments (+2 buffer) due to late arrival.
+                          You are checked in to the late queue and will be served in the next fitting gap without delaying on-time patients.
                         </Text>
                         {currentWaitMinutes ? (
                           <View style={styles.lateWaitRow}>
@@ -612,10 +642,10 @@ export default function BookingPassModal({
                         <View style={styles.lateArrivalPassNote} testID="pass-late-arrival-note">
                           <View style={styles.lateArrivalPassHeader}>
                             <Text style={styles.lateArrivalPassIcon}>⏱️</Text>
-                            <Text style={styles.lateArrivalPassTitle}>Late Arrival Rule (+2 Token Buffer)</Text>
+                            <Text style={styles.lateArrivalPassTitle}>Late Arrival Policy (Gap Accommodation)</Text>
                           </View>
                           <Text style={styles.lateArrivalPassText}>
-                            Arriving late? Don't worry! Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"I've Reached"</Text> below when you arrive. You will be placed <Text style={{ fontWeight: '700', color: '#0f172a' }}>2 tokens after the ongoing token</Text> (e.g. token #2 ongoing → queued at turn #4).
+                            Arriving late? Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"I've Reached"</Text> below when you arrive. Late arrivals join the consultant's standby queue and are served in the next fitting gap without delaying scheduled on-time patients.
                           </Text>
                         </View>
                       )
@@ -702,7 +732,7 @@ export default function BookingPassModal({
                   <View style={[styles.queueMetricCard, styles.metricBorderAmber]}>
                     <Text style={[styles.queueMetricCardNum, { color: '#b45309' }]}>{lateQueueCount}</Text>
                     <Text style={[styles.queueMetricCardLabel, { color: '#92400e' }]}>⏰ Late Queue</Text>
-                    <Text style={styles.queueMetricCardSub}>+2 Buffer</Text>
+                    <Text style={styles.queueMetricCardSub}>Gap Fit</Text>
                   </View>
                 </View>
 
@@ -712,9 +742,15 @@ export default function BookingPassModal({
                     <View style={styles.nowServingPulseDot} />
                     <View>
                       <Text style={styles.nowServingSpotlightLabel}>⚡ CURRENTLY IN CONSULTATION</Text>
-                      <Text style={styles.nowServingSpotlightToken}>TOKEN #2: Lakshmi Devi</Text>
+                      <Text style={styles.nowServingSpotlightToken}>
+                        {nowServingItem
+                          ? `TOKEN #${nowServingItem.tokenNumber}: ${nowServingItem.patientName}`
+                          : `TOKEN #${myTokenNumber}: You (Patient Pass)`}
+                      </Text>
                       <Text style={styles.nowServingSpotlightSub}>
-                        Started at 09:15 AM • Est. completion: ~09:30 AM
+                        {nowServingItem?.slotTime
+                          ? `Scheduled window: ${nowServingItem.slotTime}`
+                          : `Scheduled at ${timeString}`}
                       </Text>
                     </View>
                   </View>
@@ -851,10 +887,10 @@ export default function BookingPassModal({
                 {/* 4. LATE COMERS QUEUE Section */}
                 <View style={styles.lateComersSection}>
                   <View style={styles.lateComersHeader}>
-                    <Text style={styles.lateComersTitle}>⏰ Late Comers Queue (+2 Buffer Rescheduled)</Text>
+                    <Text style={styles.lateComersTitle}>⏰ Late Comers Queue (Gap Accommodation)</Text>
                   </View>
                   <Text style={styles.lateComersExplainer}>
-                    Patients who arrive late past their scheduled slot are rescheduled with the +2 buffer rule (placed 2 tokens after the ongoing consultation) to protect on-time patients.
+                    Patients who arrive after the 5-minute grace window join the late queue and are accommodated in the next fitting gap so on-time scheduled patients are never delayed.
                   </Text>
 
                   {isLateQueue ? (
@@ -863,11 +899,11 @@ export default function BookingPassModal({
                         <View style={styles.lateQueueBadgeSmall}>
                           <Text style={styles.lateQueueBadgeSmallText}>LATE TURN #{currentQueuePosition}</Text>
                         </View>
-                        <Text style={styles.lateQueueWaitText}>~{currentWaitMinutes || 35} mins wait</Text>
+                        <Text style={styles.lateQueueWaitText}>~{currentWaitMinutes || 15} mins wait</Text>
                       </View>
-                      <Text style={styles.lateQueuePatientName}>You (Token #4 Rescheduled)</Text>
+                      <Text style={styles.lateQueuePatientName}>You (Queue Position #{currentQueuePosition})</Text>
                       <Text style={styles.lateQueuePatientSub}>
-                        Arrived late. Queued 2 tokens after ongoing consultation. Please remain seated in lobby.
+                        Arrived after scheduled slot. Waiting for the next fitting consultation gap. Please remain seated in lobby.
                       </Text>
                     </View>
                   ) : (

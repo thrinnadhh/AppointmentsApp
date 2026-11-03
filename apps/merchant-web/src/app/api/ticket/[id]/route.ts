@@ -6,32 +6,6 @@ export const dynamic = 'force-dynamic';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function maskPhone(phone?: string | null): string {
-  if (!phone) return '';
-  const digits = phone.trim();
-  if (digits.length <= 4) return '••••';
-  return `${digits.slice(0, 3)}••••${digits.slice(-4)}`;
-}
-
-function maskEmail(email?: string | null): string {
-  if (!email) return '';
-  const parts = email.split('@');
-  if (parts.length !== 2) return '••••@••••';
-  const name = parts[0];
-  const domain = parts[1];
-  const maskedName = name.length <= 2 ? `${name[0]}*` : `${name.slice(0, 2)}•••${name.slice(-1)}`;
-  return `${maskedName}@${domain}`;
-}
-
-function maskName(name?: string | null): string {
-  if (!name) return 'Valued Patient';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) {
-    return parts[0].length <= 2 ? parts[0] : `${parts[0][0]}***`;
-  }
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-}
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -48,7 +22,7 @@ export async function GET(
     // 1. Fetch booking
     const { data: booking, error: bErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, reference_code, slot_start, slot_end, status, payment_status, deposit_amount, total_amount, is_present, checked_in_at, checked_in_method, customer_id, provider_id, resource_id')
+      .select('id, reference_code, slot_start, slot_end, status, payment_status, deposit_amount, total_amount, is_present, queue_position, checked_in_at, checked_in_method, customer_id, provider_id, resource_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -58,7 +32,41 @@ export async function GET(
 
     // 2. Determine authorization level
     const caller = await verifyAuthenticatedUser(req);
+    const isBookingOwner = Boolean(caller && caller.id === booking.customer_id);
     const isAuthorized = caller ? await isCallerAuthorizedForBooking(caller.id, booking, true) : false;
+
+    if (!isAuthorized) {
+      const { data: publicResource } = await supabaseAdmin
+        .from('resources')
+        .select('id, duration_minutes')
+        .eq('id', booking.resource_id)
+        .maybeSingle();
+
+      return NextResponse.json({
+        success: true,
+        booking: {
+          id: booking.id,
+          resource_id: booking.resource_id,
+          slot_start: booking.slot_start,
+          slot_end: booking.slot_end,
+          status: booking.status,
+          is_present: booking.is_present,
+          queue_position: booking.queue_position ?? null,
+          reference_code: null,
+          payment_status: null,
+          deposit_amount: null,
+          checked_in_at: null,
+          checked_in_method: null,
+        },
+        customer: null,
+        hospital: null,
+        doctor: {
+          id: publicResource?.id || booking.resource_id,
+          duration_minutes: publicResource?.duration_minutes || 2,
+        },
+        checkin_code: null,
+      });
+    }
 
     // 3. Fetch customer profile
     const { data: profile } = await supabaseAdmin
@@ -81,15 +89,15 @@ export async function GET(
       .eq('id', booking.resource_id)
       .maybeSingle();
 
-    // 6. Fetch check-in code if authorized
-    let checkinCode = '••••';
-    if (isAuthorized) {
+    // 6. Fetch check-in code ONLY if caller is the booking owner (staff should never see the patient's secret PIN)
+    let checkinCode: string | null = null;
+    if (isBookingOwner) {
       const { data: checkinCodeRecord } = await supabaseAdmin
         .from('appointment_checkin_codes')
         .select('code, appointment_date')
         .eq('booking_id', booking.id)
         .maybeSingle();
-      checkinCode = checkinCodeRecord?.code || '----';
+      checkinCode = checkinCodeRecord?.code || null;
     }
 
     return NextResponse.json({
@@ -105,13 +113,14 @@ export async function GET(
         payment_status: booking.payment_status,
         deposit_amount: booking.deposit_amount,
         is_present: booking.is_present,
+        queue_position: booking.queue_position ?? null,
         checked_in_at: booking.checked_in_at,
         checked_in_method: booking.checked_in_method
       },
       customer: {
-        name: isAuthorized ? (profile?.full_name || 'Valued Patient') : maskName(profile?.full_name),
-        email: isAuthorized ? (profile?.email || '') : maskEmail(profile?.email),
-        phone: isAuthorized ? (profile?.phone || '') : maskPhone(profile?.phone)
+        name: profile?.full_name || 'Valued Patient',
+        email: profile?.email || '',
+        phone: profile?.phone || ''
       },
       hospital: {
         name: provider?.name || 'Hospital',
@@ -125,7 +134,7 @@ export async function GET(
         duration_minutes: resource?.duration_minutes || 2,
         price: resource?.price || 500
       },
-      checkin_code: checkinCode
+      checkin_code: isBookingOwner ? checkinCode : null
     });
   } catch (error) {
     console.error('Error fetching ticket data:', error);

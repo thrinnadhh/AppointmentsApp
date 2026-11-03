@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { evaluateConsultantQueue, ON_TIME_GRACE_MS } from '@/lib/queue-scheduler';
 import { 
   Clock, 
   CheckCircle2, 
@@ -1988,15 +1989,25 @@ export default function MerchantOverviewPage() {
 
           {/* Live Patient Queue Attendance Matrix (Style 3) */}
           {(() => {
-            const baseBookings = (merchantSelectedDoctorId
-              ? todaysBookings.filter((b) => b.resource_id === merchantSelectedDoctorId)
+            const targetConsultantId =
+              merchantSelectedDoctorId ||
+              todaysBookings.find((b) => b.status !== 'CANCELLED')?.resource_id ||
+              null;
+            const baseBookings = (targetConsultantId
+              ? todaysBookings.filter((b) => b.resource_id === targetConsultantId)
               : todaysBookings
             ).filter((b) => b.status !== 'CANCELLED');
+
+            const consultantQueueEval = evaluateConsultantQueue(baseBookings, {
+              now: new Date(),
+              resourceId: targetConsultantId,
+            });
+            const standbyIdSet = new Set(consultantQueueEval.standbyQueue.map((s) => s.id));
 
             const matrixCompletedCount = baseBookings.filter((b) => b.status === 'COMPLETED').length;
             const matrixPresentCount = baseBookings.filter((b) => (b.is_present || b.status === 'CHECKED_IN') && b.status !== 'COMPLETED').length;
             const matrixAbsentCount = baseBookings.filter((b) => b.status === 'NO_SHOW').length;
-            const matrixLateCount = baseBookings.filter((b) => Boolean(b.queue_position)).length;
+            const matrixLateCount = baseBookings.filter((b) => standbyIdSet.has(b.id) || Boolean(b.queue_position && new Date(b.checked_in_at || b.customer_arrived_at || b.slot_start).getTime() - new Date(b.slot_start).getTime() > ON_TIME_GRACE_MS)).length;
             const matrixWaitingCount = baseBookings.filter((b) => !b.is_present && b.status !== 'CHECKED_IN' && b.status !== 'NO_SHOW' && b.status !== 'COMPLETED').length;
 
             const filteredMatrixBookings = baseBookings.filter((b) => {

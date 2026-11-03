@@ -120,17 +120,18 @@ async function runPolicyVerificationSuite() {
 
     await client.query("DELETE FROM public.bookings WHERE provider_id = $1 AND status IN ('WAITING', 'UP_NEXT')", [prov.id]);
 
-    // Create 3 bookings:
-    // b1 (Standby): checked in at 09:00 IST for 08:50 slot (late arrival; 60 mins ago at 10:00 -> EXPIRED)
-    // b2 (Standby): checked in at 09:30 IST for 09:20 slot (late arrival; 30 mins ago at 10:00 -> NOT EXPIRED)
-    // b3 (On-Time): checked in at 08:45 IST for 08:50 slot (on-time early arrival; 75 mins ago at 10:00 -> MUST NOT EXPIRE!)
+    // Create 4 bookings to verify both rules:
+    // b1 (Unarrived remote standby): is_present = false, customer_arrived_at = 09:05 IST for 08:50 slot (+15m late; 55m wait at 10:00 -> EXPIRED!)
+    // b2 (Active remote standby): is_present = false, customer_arrived_at = 09:35 IST for 09:20 slot (+15m late; 25m wait at 10:00 -> NOT EXPIRED)
+    // b3 (Checked-in late patient): is_present = true, checked_in_at = 09:05 IST for 08:40 slot (+25m late; 55m wait at 10:00 -> MUST NEVER EXPIRE because physically checked-in!)
+    // b4 (Checked-in on-time patient): is_present = true, checked_in_at = 08:45 IST for 08:50 slot (early arrival; 75m wait at 10:00 -> MUST NEVER EXPIRE!)
     const b1Res = await client.query(
       `INSERT INTO public.bookings (
         customer_id, provider_id, resource_id, slot_start, slot_end,
-        status, payment_status, deposit_amount, is_present, checked_in_at
+        status, payment_status, deposit_amount, is_present, customer_arrived_at, queue_position
       ) VALUES (
         $1, $2, $3, '2026-10-22T08:50:00+05:30', '2026-10-22T09:05:00+05:30',
-        'WAITING', 'CAPTURED', 100, true, '2026-10-22T09:00:00+05:30'
+        'WAITING', 'CAPTURED', 100, false, '2026-10-22T09:05:00+05:30', 10
       ) RETURNING id`,
       [c1.id, prov.id, doc.id]
     );
@@ -139,10 +140,10 @@ async function runPolicyVerificationSuite() {
     const b2Res = await client.query(
       `INSERT INTO public.bookings (
         customer_id, provider_id, resource_id, slot_start, slot_end,
-        status, payment_status, deposit_amount, is_present, checked_in_at
+        status, payment_status, deposit_amount, is_present, customer_arrived_at, queue_position
       ) VALUES (
         $1, $2, $3, '2026-10-22T09:20:00+05:30', '2026-10-22T09:35:00+05:30',
-        'WAITING', 'CAPTURED', 100, true, '2026-10-22T09:30:00+05:30'
+        'WAITING', 'CAPTURED', 100, false, '2026-10-22T09:35:00+05:30', 11
       ) RETURNING id`,
       [c2.id, prov.id, doc.id]
     );
@@ -153,36 +154,54 @@ async function runPolicyVerificationSuite() {
         customer_id, provider_id, resource_id, slot_start, slot_end,
         status, payment_status, deposit_amount, is_present, checked_in_at
       ) VALUES (
+        $1, $2, $3, '2026-10-22T08:40:00+05:30', '2026-10-22T08:55:00+05:30',
+        'WAITING', 'CAPTURED', 100, true, '2026-10-22T09:05:00+05:30'
+      ) RETURNING id`,
+      [(c3 || c1).id, prov.id, doc.id]
+    );
+    const b3Id = b3Res.rows[0].id;
+
+    const b4Res = await client.query(
+      `INSERT INTO public.bookings (
+        customer_id, provider_id, resource_id, slot_start, slot_end,
+        status, payment_status, deposit_amount, is_present, checked_in_at
+      ) VALUES (
         $1, $2, $3, '2026-10-22T08:50:00+05:30', '2026-10-22T09:05:00+05:30',
         'WAITING', 'CAPTURED', 100, true, '2026-10-22T08:45:00+05:30'
       ) RETURNING id`,
       [(c3 || c1).id, prov.id, doc.id]
     );
-    const b3Id = b3Res.rows[0].id;
+    const b4Id = b4Res.rows[0].id;
 
     // Call public.expire_stale_standby_queue(45, prov.id)
     const rpcRes = await client.query(`SELECT public.expire_stale_standby_queue(45, $1) AS result`, [prov.id]);
     const rpcResult = rpcRes.rows[0].result;
 
     assert.equal(rpcResult.success, true, 'RPC returned success');
-    assert.equal(rpcResult.expired_count, 1, 'Exactly 1 booking expired (only overdue standby b1)');
-    assert.ok(rpcResult.expired_booking_ids.includes(b1Id), 'b1 is in expired IDs');
-    assert.ok(!rpcResult.expired_booking_ids.includes(b3Id), 'b3 (on-time delayed patient) must NOT be expired');
+    assert.equal(rpcResult.expired_count, 1, 'Exactly 1 booking expired (only unarrived overdue standby b1)');
+    assert.ok(rpcResult.expired_booking_ids.includes(b1Id), 'b1 (never physically arrived) is in expired IDs');
+    assert.ok(!rpcResult.expired_booking_ids.includes(b3Id), 'b3 (checked-in late patient) must NEVER be auto-expired');
+    assert.ok(!rpcResult.expired_booking_ids.includes(b4Id), 'b4 (on-time delayed patient) must NEVER be auto-expired');
 
-    // Verify b1 status in DB (expired standby)
+    // Verify b1 status in DB (expired unarrived standby)
     const b1Check = await client.query(`SELECT status, is_present FROM public.bookings WHERE id = $1`, [b1Id]);
     assert.equal(b1Check.rows[0].status, 'NO_SHOW', 'b1 status transitioned to NO_SHOW');
-    assert.equal(b1Check.rows[0].is_present, false, 'b1 is_present is now false');
+    assert.equal(b1Check.rows[0].is_present, false, 'b1 is_present is false');
 
-    // Verify b2 status in DB (active standby, remains waiting)
+    // Verify b2 status in DB (active unarrived standby within 45m, remains waiting)
     const b2Check = await client.query(`SELECT status, is_present FROM public.bookings WHERE id = $1`, [b2Id]);
     assert.equal(b2Check.rows[0].status, 'WAITING', 'b2 remains in WAITING status');
-    assert.equal(b2Check.rows[0].is_present, true, 'b2 remains present');
+    assert.equal(b2Check.rows[0].is_present, false, 'b2 remains unarrived standby');
 
-    // Verify b3 status in DB (on-time delayed patient, strictly preserved!)
+    // Verify b3 status in DB (checked-in late patient, strictly preserved!)
     const b3Check = await client.query(`SELECT status, is_present FROM public.bookings WHERE id = $1`, [b3Id]);
-    assert.equal(b3Check.rows[0].status, 'WAITING', 'b3 remains in WAITING status despite 75m doctor delay');
+    assert.equal(b3Check.rows[0].status, 'WAITING', 'b3 (checked-in late patient) remains in WAITING status');
     assert.equal(b3Check.rows[0].is_present, true, 'b3 remains present');
+
+    // Verify b4 status in DB (on-time delayed patient, strictly preserved!)
+    const b4Check = await client.query(`SELECT status, is_present FROM public.bookings WHERE id = $1`, [b4Id]);
+    assert.equal(b4Check.rows[0].status, 'WAITING', 'b4 remains in WAITING status despite 75m doctor delay');
+    assert.equal(b4Check.rows[0].is_present, true, 'b4 remains present');
 
     // Verify notification log
     const notifCheck = await client.query(
@@ -226,7 +245,8 @@ async function runPolicyVerificationSuite() {
       createdEmergIds.push(insRes.rows[0].id);
     }
 
-    // Call cancel_doctor_emergency RPC
+    // Call cancel_doctor_emergency RPC as service_role
+    await client.query("SELECT set_config('request.jwt.claim.role', 'service_role', true)");
     const emergRes = await client.query(
       `SELECT public.cancel_doctor_emergency($1, '2026-10-22T13:00:00+05:30', 'Doctor Acute Medical Emergency') AS result`,
       [doc.id]

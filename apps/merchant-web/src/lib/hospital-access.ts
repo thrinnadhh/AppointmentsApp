@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 import { HospitalAccessContext, HospitalModule, HospitalRole } from '@appointments/shared';
 
 export const ALL_HOSPITAL_MODULES: HospitalModule[] = [
@@ -206,21 +206,101 @@ export async function getAccessContext(
       };
     }
 
-    // 3. Database Single Source of Truth Evaluation via SQL Helpers
+    // 3. Database Single Source of Truth Evaluation via SQL Helpers + Per-Consultant Assignment Tables
     const { data: roleData, error: roleError } = await (supabaseAdmin.rpc as any)('hospital_role', {
       p_provider_id: resolvedMerchantId,
       p_user_id: caller.id,
     });
 
-    const role: HospitalRole = (!roleError && roleData) ? (roleData as HospitalRole) : 'none';
+    let role: HospitalRole = (!roleError && roleData) ? (roleData as HospitalRole) : 'none';
 
-    // Fetch accessible resource IDs
+    // Fetch accessible resource IDs from RPC
     const { data: resourceData } = await (supabaseAdmin.rpc as any)('hospital_accessible_resource_ids', {
       p_provider_id: resolvedMerchantId,
       p_user_id: caller.id,
     });
 
-    const assignedDoctorIds: string[] = Array.isArray(resourceData) ? resourceData : [];
+    const rpcResourceIds: string[] = Array.isArray(resourceData) ? resourceData : [];
+
+    // Explicitly inspect doctor_front_desk_assignments, resources, and merchant_memberships
+    // so that a front-desk manager or consultant with merchant_memberships.role = 'staff'
+    // is strictly scoped to their assigned doctors and never treated as hospital_admin.
+    const [
+      { data: isPlatformAdmin },
+      { data: membershipRow },
+      { data: frontDeskRows },
+      { data: providerResources },
+    ] = await Promise.all([
+      (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id }),
+      supabaseAdmin
+        .from('merchant_memberships')
+        .select('role')
+        .eq('provider_id', resolvedMerchantId)
+        .eq('user_id', caller.id)
+        .maybeSingle(),
+      (supabaseAdmin.from('doctor_front_desk_assignments' as any) as any)
+        .select('doctor_id')
+        .eq('provider_id', resolvedMerchantId)
+        .eq('user_id', caller.id),
+      supabaseAdmin
+        .from('resources')
+        .select('id, user_id, attributes')
+        .eq('provider_id', resolvedMerchantId),
+    ]);
+
+    const isExplicitAdmin =
+      Boolean(isPlatformAdmin) ||
+      (process.env.NODE_ENV !== 'production' && caller.id === '88888888-8888-8888-8888-888888888881') ||
+      provider.owner_id === caller.id ||
+      membershipRow?.role === 'owner' ||
+      membershipRow?.role === 'admin' ||
+      (membershipRow?.role as string) === 'manager';
+
+    const consultantDoctorIds: string[] = [];
+    const frontDeskDoctorIds: string[] = Array.isArray(frontDeskRows)
+      ? frontDeskRows.map((r: any) => String(r.doctor_id)).filter(Boolean)
+      : [];
+
+    for (const res of (providerResources || []) as any[]) {
+      const attrs = (res.attributes && typeof res.attributes === 'object') ? res.attributes : {};
+      if (
+        res.user_id === caller.id ||
+        attrs.user_id === caller.id ||
+        (callerEmail && typeof attrs.email === 'string' && attrs.email.toLowerCase().trim() === callerEmail)
+      ) {
+        consultantDoctorIds.push(res.id);
+      }
+      if (Array.isArray(attrs.front_desk_members)) {
+        const matched = attrs.front_desk_members.some(
+          (m: any) =>
+            m?.user_id === caller.id ||
+            (callerEmail && typeof m?.email === 'string' && m.email.toLowerCase().trim() === callerEmail)
+        );
+        if (matched && !frontDeskDoctorIds.includes(res.id)) {
+          frontDeskDoctorIds.push(res.id);
+        }
+      }
+    }
+
+    let assignedDoctorIds: string[] = [];
+    if (isExplicitAdmin) {
+      role = 'admin';
+      assignedDoctorIds = Array.from(
+        new Set([...rpcResourceIds, ...((providerResources || []).map((r: any) => r.id))])
+      );
+    } else if (consultantDoctorIds.length > 0 || role === 'consultant') {
+      role = 'consultant';
+      assignedDoctorIds = Array.from(new Set([...rpcResourceIds, ...consultantDoctorIds]));
+    } else if (frontDeskDoctorIds.length > 0 || role === 'front_desk') {
+      role = 'front_desk';
+      assignedDoctorIds = Array.from(new Set([...rpcResourceIds, ...frontDeskDoctorIds]));
+    } else if (role === 'admin' && membershipRow?.role === 'staff') {
+      // Never elevate a 'staff' membership without explicit admin/owner role to hospital admin
+      role = 'front_desk';
+      assignedDoctorIds = rpcResourceIds;
+    } else {
+      assignedDoctorIds = rpcResourceIds;
+    }
 
     // 4. Resolve Department and Allowed Modules
     let departmentId: string | null = null;
@@ -344,4 +424,63 @@ export function canAccessDepartment(
     return Boolean(ctx.departmentId && departmentId && ctx.departmentId === departmentId);
   }
   return false;
+}
+
+/**
+ * Checks if the context can view/modify records for a given consultant/doctor resource
+ */
+export function canAccessDoctor(
+  ctx: HospitalAccessContext,
+  doctorResourceId: string | null | undefined
+): boolean {
+  if (!ctx.isHospital) return true;
+  if (isHospitalAdmin(ctx)) return true;
+  if (ctx.role === 'front_desk' || ctx.role === 'consultant') {
+    return Boolean(doctorResourceId && ctx.assignedDoctorIds.includes(doctorResourceId));
+  }
+  return false;
+}
+
+/**
+ * Evaluates both provider-level authorization and hospital per-consultant RBAC.
+ * - For non-hospital providers: returns { authorized: true, assignedDoctorIds: null } if caller is authorized for provider.
+ * - For hospital providers:
+ *   - Hospital Admin / Owner / Platform Admin: { authorized: true, assignedDoctorIds: null }
+ *   - Front Desk / Consultant: { authorized: resourceId ? assignedDoctorIds.includes(resourceId) : assignedDoctorIds.length > 0, assignedDoctorIds }
+ */
+export async function authorizeHospitalResourceOrMerchant(
+  req: NextRequest,
+  callerId: string,
+  providerId: string,
+  resourceId?: string | null
+): Promise<{ authorized: boolean; assignedDoctorIds: string[] | null }> {
+  const isProviderAuthorized = await isCallerAuthorizedForProvider(callerId, providerId);
+  const ctx = await getAccessContext(req, providerId);
+
+  if (!isProviderAuthorized && ctx.role === 'none') {
+    return { authorized: false, assignedDoctorIds: [] };
+  }
+
+  if (!ctx.isHospital) {
+    return { authorized: isProviderAuthorized, assignedDoctorIds: null };
+  }
+
+  if (isHospitalAdmin(ctx)) {
+    return { authorized: true, assignedDoctorIds: null };
+  }
+
+  if (ctx.role === 'front_desk' || ctx.role === 'consultant') {
+    if (resourceId) {
+      return {
+        authorized: ctx.assignedDoctorIds.includes(resourceId),
+        assignedDoctorIds: ctx.assignedDoctorIds,
+      };
+    }
+    return {
+      authorized: ctx.assignedDoctorIds.length > 0,
+      assignedDoctorIds: ctx.assignedDoctorIds,
+    };
+  }
+
+  return { authorized: false, assignedDoctorIds: [] };
 }

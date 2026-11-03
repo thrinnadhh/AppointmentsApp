@@ -83,7 +83,9 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       const doctorLeft = Boolean((resource?.attributes as Record<string, unknown> | null)?.doctor_left);
-      const isTestBypass = Boolean((body as Record<string, unknown>)?.force_e2e_bypass || caller?.id === '88888888-8888-8888-8888-888888888881');
+      const isTestBypass =
+        process.env.NODE_ENV !== 'production' &&
+        Boolean((body as Record<string, unknown>)?.force_e2e_bypass || caller?.id === '88888888-8888-8888-8888-888888888881');
 
       if (!isTestBypass) {
         if (!isSlotTimeUp) {

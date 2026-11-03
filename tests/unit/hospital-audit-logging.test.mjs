@@ -56,6 +56,10 @@ describe('Subtask 7: Comprehensive Hospital Audit Logging', () => {
     neuroDocId = neuroDoc.id;
 
     // Ensure doctor front desk assignment for neuroDesk -> neuroDoc
+    await fetch(
+      `${supabaseUrl}/rest/v1/doctor_front_desk_assignments?doctor_id=eq.${neuroDocId}&user_id=eq.${tokens.neuroDesk.user.id}`,
+      { method: 'DELETE', headers: serviceHeaders }
+    );
     await fetch(`${supabaseUrl}/rest/v1/doctor_front_desk_assignments`, {
       method: 'POST',
       headers: serviceHeaders,
@@ -63,7 +67,6 @@ describe('Subtask 7: Comprehensive Hospital Audit Logging', () => {
         provider_id: hospA.id,
         doctor_id: neuroDocId,
         user_id: tokens.neuroDesk.user.id,
-        is_active: true,
       }),
     });
   });
@@ -235,21 +238,21 @@ describe('Subtask 7: Comprehensive Hospital Audit Logging', () => {
       }
     );
 
-    // Admin creates an assignment
-    const assignRes = await fetch(`${supabaseUrl}/rest/v1/doctor_front_desk_assignments`, {
+    // Admin creates an assignment via the supported server route
+    const assignRes = await fetch(`${appBaseUrl}/api/admin/doctor-assignments`, {
       method: 'POST',
       headers: {
-        ...serviceHeaders,
+        'Content-Type': 'application/json',
         Authorization: `Bearer ${tokens.adminApex.token}`,
       },
       body: JSON.stringify({
-        provider_id: hospA.id,
-        doctor_id: neuroDocId,
-        user_id: tokens.patient1.user.id,
-        id_card_number: 'AUDIT-FD-999',
+        providerId: hospA.id,
+        doctorId: neuroDocId,
+        userId: tokens.patient1.user.id,
+        idCardNumber: 'AUDIT-FD-999',
       }),
     });
-    assert.ok(assignRes.status >= 200 && assignRes.status < 300);
+    assert.ok(assignRes.status >= 200 && assignRes.status < 300, `Expected 2xx from /api/admin/doctor-assignments, got ${assignRes.status}`);
 
     const logs = await (
       await fetch(

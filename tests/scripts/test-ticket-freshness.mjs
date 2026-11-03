@@ -13,6 +13,7 @@
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import pg from 'pg';
 import { createClient } from '../../apps/merchant-web/node_modules/@supabase/supabase-js/dist/index.mjs';
 
@@ -25,9 +26,16 @@ const pgPool = new Pool({
   allowExitOnIdle: true,
 });
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIMBg-xBh-pxzxqdXxkXzgvXekv-PxPxkXzgvXekv8';
+const envLocal = fs.existsSync('apps/merchant-web/.env.local')
+  ? fs.readFileSync('apps/merchant-web/.env.local', 'utf8')
+  : '';
+const envUrl = envLocal.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\n]+)"?/)?.[1];
+const envAnonKey = envLocal.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="?([^"\n]+)"?/)?.[1];
+const envServiceKey = envLocal.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\n]+)"?/)?.[1];
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || envUrl || 'http://127.0.0.1:54321';
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || envAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || envServiceKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIMBg-xBh-pxzxqdXxkXzgvXekv-PxPxkXzgvXekv8';
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -60,7 +68,7 @@ describe('Step 2: Ticket Page Freshness & Adaptive Polling Suite', () => {
 
     // 2. Fetch or create test customers
     const custRes = await pgPool.query(
-      `SELECT p.id, u.email FROM profiles p JOIN auth.users u ON p.id = u.id WHERE u.email ILIKE '%customer%' LIMIT 3`
+      `SELECT p.id, u.email FROM profiles p JOIN auth.users u ON p.id = u.id WHERE u.email ILIKE '%customer%' OR p.role = 'customer' LIMIT 3`
     );
     assert.ok(custRes.rows.length >= 3, 'At least 3 test customers must exist');
     const custA = custRes.rows[0].id;
@@ -69,10 +77,16 @@ describe('Step 2: Ticket Page Freshness & Adaptive Polling Suite', () => {
 
     // Sign in custC to obtain real customer JWT
     const supabaseAnon = createClient(SUPABASE_URL, ANON_KEY);
-    const { data: authData, error: authErr } = await supabaseAnon.auth.signInWithPassword({
+    let { data: authData, error: authErr } = await supabaseAnon.auth.signInWithPassword({
       email: custRes.rows[2].email,
       password: 'TestPassword123!',
     });
+    if (authErr || !authData?.session) {
+      ({ data: authData, error: authErr } = await supabaseAnon.auth.signInWithPassword({
+        email: custRes.rows[2].email,
+        password: 'HospitalTest2026!',
+      }));
+    }
     if (!authErr && authData?.session) {
       customerC_Token = authData.session.access_token;
     }
@@ -216,6 +230,7 @@ describe('Step 2: Ticket Page Freshness & Adaptive Polling Suite', () => {
     // Complete Patient A using authorized RPC, advancing doctor queue to Patient B
     const t0 = Date.now();
 
+    await pgPool.query("SELECT set_config('request.jwt.claim.role', 'service_role', false)");
     await pgPool.query(`SELECT complete_booking($1)`, [bookingA_Id]);
 
     // Call broadcast endpoint to emit Realtime broadcast to all viewers
@@ -258,9 +273,10 @@ describe('Step 2: Ticket Page Freshness & Adaptive Polling Suite', () => {
     assert.ok(latencyB < 10.0, `Link viewer latency ${latencyB}s must be under 10s`);
 
     try {
-      clientA_Supabase.removeChannel(channelA);
-      clientB_Supabase.removeChannel(channelB);
-      setTimeout(() => process.exit(0), 100);
+      await clientA_Supabase.removeAllChannels();
+      await clientB_Supabase.removeAllChannels();
+      clientA_Supabase.realtime.disconnect();
+      clientB_Supabase.realtime.disconnect();
     } catch {}
     } catch (err) {
       console.error('ERROR IN TEST 3:', err);

@@ -2,37 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { sanitizeLogData } from '@appointments/shared';
 import { getClientIp } from '@/lib/auth-admin';
+import { checkRateLimit } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
-// Rate limiter: Max 60 log submissions per minute per IP
-const RATE_LIMIT_WINDOW_MS = 60000;
-const MAX_LOGS_PER_WINDOW = 60;
-const ipRequestCounts = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = ipRequestCounts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    ipRequestCounts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= MAX_LOGS_PER_WINDOW) {
-    return false;
-  }
-  entry.count++;
-  return true;
-}
-
 export async function POST(request: NextRequest) {
   try {
-    // 1. Ingestion Rate Limiting
-    const ip = getClientIp(request) || '127.0.0.1';
-    if (!checkRateLimit(ip)) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded: Too many log submissions. Please try again later.' },
-        { status: 429 }
-      );
+    // 1. Ingestion Rate Limiting via Redis (Max 60 log submissions per minute per IP; never uses a shared IP bucket)
+    const ip = getClientIp(request);
+    if (ip) {
+      const rl = await checkRateLimit(`logs-ingest:${ip}`, 60, 60);
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { error: 'Rate limit exceeded: Too many log submissions. Please try again later.' },
+          { status: 429 }
+        );
+      }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/logs/ingest' });
     }
 
     // 2. Read raw body with length check (max 64KB)
@@ -52,6 +39,16 @@ export async function POST(request: NextRequest) {
     const metadata = typeof sanitized.metadata === 'object' && sanitized.metadata !== null ? sanitized.metadata : {};
     const deviceInfo = typeof sanitized.device_info === 'object' && sanitized.device_info !== null ? sanitized.device_info : {};
     const sessionId = typeof sanitized.session_id === 'string' ? sanitized.session_id : null;
+
+    if (!ip && sessionId) {
+      const sessionRl = await checkRateLimit(`logs-ingest:session:${sessionId}`, 30, 60);
+      if (!sessionRl.allowed) {
+        return NextResponse.json(
+          { error: 'Rate limit exceeded for session. Please try again later.' },
+          { status: 429 }
+        );
+      }
+    }
 
     const severity = typeof sanitized.severity === 'string' ? sanitized.severity : null;
     const category = typeof sanitized.category === 'string' ? sanitized.category : 'OTHER';

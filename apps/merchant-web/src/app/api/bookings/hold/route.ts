@@ -22,6 +22,25 @@ export async function POST(req: NextRequest) {
   let slotKey = '';
   let lockToken = '';
   try {
+    // IP Rate Limit: prioritize platform-verified IP or rightmost trusted proxy before client headers
+    // Leverages getClientIp with fallback to req.headers.get('x-real-ip') and req.headers.get('cf-connecting-ip')
+    const clientIp = getClientIp(req);
+    const isTestEnv = process.env.NODE_ENV !== 'production';
+    if (clientIp) {
+      const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, isTestEnv ? 500 : 30, 60);
+      if (!ipRateLimit.allowed) {
+        return NextResponse.json<CreateHoldResponse>(
+          {
+            success: false,
+            error: 'Too many reservation attempts from this network. Please wait a minute.',
+          },
+          { status: 429 }
+        );
+      }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/bookings/hold' });
+    }
+
     const body = (await req.json()) as Partial<CreateHoldRequest>;
     const { resource_id, slot_start, slot_end, customer_id } = body;
 
@@ -71,23 +90,6 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Invalid slot duration: duration must be between 5 minutes and 8 hours' },
         { status: 400 }
       );
-    }
-
-    // IP Rate Limit: prioritize platform-verified IP or rightmost trusted proxy before client headers
-    // Leverages getClientIp with fallback to req.headers.get('x-real-ip') and req.headers.get('cf-connecting-ip')
-    const clientIp = getClientIp(req);
-    const isTestEnv = process.env.NODE_ENV !== 'production';
-    if (clientIp) {
-      const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, isTestEnv ? 500 : 30, 60);
-      if (!ipRateLimit.allowed) {
-        return NextResponse.json<CreateHoldResponse>(
-          {
-            success: false,
-            error: 'Too many reservation attempts from this network. Please wait a minute.',
-          },
-          { status: 429 }
-        );
-      }
     }
 
     // Customer Rate Limit: max 10 reservation attempts per customer per minute (relaxed in test)

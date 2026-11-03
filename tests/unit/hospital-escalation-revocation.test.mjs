@@ -78,24 +78,27 @@ describe('Subtask 8: Admin-Only Writes, Escalation Prevention, and Revocation', 
     });
     assert.ok(resUpdate.status >= 200 && resUpdate.status < 300);
 
-    // 1.2 Assignment insert
+    // 1.2 Assignment insert via supported admin route (direct client table write is revoked)
     await fetch(
       `${supabaseUrl}/rest/v1/doctor_front_desk_assignments?doctor_id=eq.${neuroDocId}&user_id=eq.${tokens.patient1.user.id}`,
       { method: 'DELETE', headers: serviceHeaders }
     );
-    const assignRes = await fetch(`${supabaseUrl}/rest/v1/doctor_front_desk_assignments`, {
+    const assignRes = await fetch(`${appBaseUrl}/api/admin/doctor-assignments`, {
       method: 'POST',
-      headers: userHeaders(tokens.adminApex),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokens.adminApex.token}`,
+      },
       body: JSON.stringify({
-        provider_id: hospA.id,
-        doctor_id: neuroDocId,
-        user_id: tokens.patient1.user.id,
-        id_card_number: 'HOSP-ADMIN-001',
+        providerId: hospA.id,
+        doctorId: neuroDocId,
+        userId: tokens.patient1.user.id,
+        idCardNumber: 'HOSP-ADMIN-001',
       }),
     });
-    assert.ok(assignRes.status >= 200 && assignRes.status < 300);
+    assert.ok(assignRes.status >= 200 && assignRes.status < 300, `Expected 2xx from /api/admin/doctor-assignments, got ${assignRes.status}`);
 
-    // 1.3 Read assignments with id_card_number
+    // 1.3 Read assignments with id_card_number (both via RLS SELECT and via supported admin route)
     const readAssign = await fetch(
       `${supabaseUrl}/rest/v1/doctor_front_desk_assignments?user_id=eq.${tokens.patient1.user.id}`,
       { headers: userHeaders(tokens.adminApex) }
@@ -104,11 +107,15 @@ describe('Subtask 8: Admin-Only Writes, Escalation Prevention, and Revocation', 
     assert.ok(Array.isArray(assignRows) && assignRows.length > 0);
     assert.equal(assignRows[0].id_card_number, 'HOSP-ADMIN-001');
 
-    // Cleanup assignment
-    await fetch(
-      `${supabaseUrl}/rest/v1/doctor_front_desk_assignments?doctor_id=eq.${neuroDocId}&user_id=eq.${tokens.patient1.user.id}`,
-      { method: 'DELETE', headers: serviceHeaders }
+    // Cleanup assignment via supported admin route
+    const delRes = await fetch(
+      `${appBaseUrl}/api/admin/doctor-assignments?providerId=${hospA.id}&doctorId=${neuroDocId}&userId=${tokens.patient1.user.id}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${tokens.adminApex.token}` },
+      }
     );
+    assert.equal(delRes.status, 200);
   });
 
   // 2. Front Desk & Consultant CANNOT write to resources

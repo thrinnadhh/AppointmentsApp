@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { localDbStore } from '@/lib/auth-admin';
+import { localDbStore, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
@@ -160,27 +160,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. AUTHORIZATION: CALLER MUST BE BOOKING'S CUSTOMER, AUTHORIZED MERCHANT, OR PLATFORM ADMIN
+    // 3. AUTHORIZATION: CALLER MUST BE BOOKING'S CUSTOMER, AUTHORIZED RESOURCE STAFF/MERCHANT, OR PLATFORM ADMIN
     const caller = await getAuthenticatedCaller(req);
     if (caller) {
       const isServiceRole = caller.email === 'service_role@supabase.internal';
-      const isCustomer = caller.id === booking.customer_id;
-      let isAuthorizedMerchant = false;
-      let isPlatformAdmin = isServiceRole;
+      const isAuthorized = isServiceRole || (await isCallerAuthorizedForBooking(caller.id, booking, true));
 
-      if (!isCustomer && !isServiceRole) {
-        const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
-          p_user_id: caller.id,
-        });
-        isAuthorizedMerchant = Array.isArray(authProviders) && authProviders.includes(booking.provider_id);
-
-        const { data: adminCheck } = await (supabaseAdmin.rpc as any)('is_admin', {
-          p_user_id: caller.id,
-        });
-        isPlatformAdmin = Boolean(adminCheck);
-      }
-
-      if (!isCustomer && !isAuthorizedMerchant && !isPlatformAdmin) {
+      if (!isAuthorized) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: 'Forbidden: You are not authorized to confirm this booking' },
           { status: 403 }
@@ -194,6 +180,18 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Unauthorized: Authentication or payment signature required to confirm booking' },
         { status: 401 }
       );
+    } else {
+      const isValidUnauthSig = verifyRazorpaySignature({
+        orderId: razorpay_order_id,
+        paymentId: gateway_payment_id,
+        signature: razorpay_signature,
+      });
+      if (!isValidUnauthSig) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Unauthorized: Invalid payment signature' },
+          { status: 401 }
+        );
+      }
     }
 
     // 3b. MOCK PAYMENT & ORDER ID GUARDS

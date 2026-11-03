@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { isCallerHospitalAdminForProvider, verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { getAccessContext, isHospitalAdmin } from '@/lib/hospital-access';
+import { initiateRazorpayRefund } from '@/lib/razorpay';
 
 export interface DoctorEmergencyCancelRequest {
   doctor_resource_id: string;
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
     // Check that the doctor resource exists
     const { data: resource, error: resErr } = await supabaseAdmin
       .from('resources')
-      .select('id, provider_id, name')
+      .select('id, provider_id, name, user_id')
       .eq('id', doctor_resource_id)
       .maybeSingle();
 
@@ -52,6 +54,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<DoctorEmergencyCancelResponse>(
         { success: false, error: 'Doctor resource not found' },
         { status: 404 }
+      );
+    }
+
+    // Authorize caller for the target consultant BEFORE calling the RPC:
+    // Caller must be either the Hospital Admin of that hospital (or Super Admin)
+    // or that specific consultant themselves. Front-desk staff, other consultants,
+    // and unrelated users/customers are rejected with 403 Forbidden.
+    const isAdminForHospital = await isCallerHospitalAdminForProvider(
+      caller.id,
+      resource.provider_id
+    );
+    const accessCtx = await getAccessContext(req, resource.provider_id);
+    const isTargetConsultant =
+      (Boolean(resource.user_id) && resource.user_id === caller.id) ||
+      (accessCtx.role === 'consultant' && accessCtx.assignedDoctorIds.includes(doctor_resource_id));
+
+    if (!isAdminForHospital && !isHospitalAdmin(accessCtx) && !isTargetConsultant) {
+      return NextResponse.json<DoctorEmergencyCancelResponse>(
+        {
+          success: false,
+          error:
+            'Forbidden: Only the consultant themselves or the Hospital Admin for this hospital can trigger an emergency cancellation',
+        },
+        { status: 403 }
       );
     }
 
@@ -70,6 +96,30 @@ export async function POST(req: NextRequest) {
     }
 
     const result = rpcData as unknown as DoctorEmergencyCancelResponse;
+
+    if (Array.isArray(result?.affected_booking_ids) && result.affected_booking_ids.length > 0) {
+      const { data: affectedBookings } = await (supabaseAdmin
+        .from('bookings') as any)
+        .select('id, payment_status, refund_amount, deposit_amount, total_amount')
+        .in('id', result.affected_booking_ids);
+
+      const refundableBookings = (affectedBookings || []).filter(
+        (b: any) =>
+          b.payment_status === 'REFUND_PENDING' &&
+          Number(b.refund_amount ?? b.deposit_amount ?? 0) > 0
+      );
+
+      for (const b of refundableBookings) {
+        await initiateRazorpayRefund({
+          supabaseAdmin,
+          bookingId: b.id,
+          refundAmountInr: Number(b.refund_amount ?? b.deposit_amount),
+          reason: reason || 'Doctor Emergency Cancellation',
+          actorId: caller.id,
+        });
+      }
+    }
+
     return NextResponse.json<DoctorEmergencyCancelResponse>(result, { status: 200 });
   } catch (err: any) {
     return NextResponse.json<DoctorEmergencyCancelResponse>(

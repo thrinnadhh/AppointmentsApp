@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAuthenticatedUser, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
+import { ACTIVE_SLOT_BOOKING_STATUSES, toClinicDateString } from '@appointments/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,10 +34,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isAuthorized = await isCallerAuthorizedForProvider(caller.id, provider_id);
-    if (!isAuthorized) {
+    const authCheck = await authorizeHospitalResourceOrMerchant(req, caller.id, provider_id, resource_id);
+    if (!authCheck.authorized) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized: You are not authorized staff or admin for this hospital' },
+        { success: false, error: 'Unauthorized: You are not authorized for this consultant or hospital' },
         { status: 403 }
       );
     }
@@ -86,15 +88,13 @@ export async function POST(req: NextRequest) {
       });
 
       if (userCreateErr || !newUser?.user) {
-        // Fallback: search any customer user
-        const { data: anyCustomer } = await supabaseAdmin
-          .from('profiles')
-          .select('id')
-          .eq('role', 'customer')
-          .limit(1)
-          .maybeSingle();
-
-        customerId = anyCustomer?.id || caller.id;
+        return NextResponse.json(
+          {
+            success: false,
+            error: userCreateErr?.message || 'Failed to create walk-in patient profile',
+          },
+          { status: 500 }
+        );
       } else {
         customerId = newUser.user.id;
         await supabaseAdmin.from('profiles').upsert({
@@ -130,13 +130,13 @@ export async function POST(req: NextRequest) {
     slotStartMs = Math.floor(slotStartMs / 60000) * 60000;
     let slotEndMs = slotStartMs + durationMinutes * 60 * 1000;
 
-    // Check for range exclusion conflict on this resource
+    // Check for range exclusion conflict on this resource in ascending slot order (Phase 3 Item 9)
     const { data: existingSlots } = await supabaseAdmin
       .from('bookings')
       .select('id, slot_start, slot_end')
       .eq('resource_id', resource_id)
-      .in('status', ['HELD', 'CONFIRMED', 'CHECKED_IN'])
-      .order('slot_end', { ascending: false });
+      .in('status', [...ACTIVE_SLOT_BOOKING_STATUSES])
+      .order('slot_start', { ascending: true });
 
     if (existingSlots && existingSlots.length > 0) {
       for (const ex of existingSlots) {
@@ -187,15 +187,24 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insErr || !newBooking) {
+      const isDoubleBookConflict =
+        insErr?.code === '23505' ||
+        insErr?.code === '23P01' ||
+        /no_overlapping_active_bookings|duplicate key/i.test(insErr?.message || '');
       console.error('Failed to create offline walk-in booking:', insErr);
       return NextResponse.json(
-        { success: false, error: insErr?.message || 'Failed to create booking' },
-        { status: 500 }
+        {
+          success: false,
+          error: isDoubleBookConflict
+            ? 'Slot is already booked by another patient'
+            : insErr?.message || 'Failed to create booking',
+        },
+        { status: isDoubleBookConflict ? 409 : 500 }
       );
     }
 
     // 5. Create reception PIN code record
-    const todayDateStr = slotStartIso.slice(0, 10);
+    const todayDateStr = toClinicDateString(slotStartIso);
     await supabaseAdmin
       .from('appointment_checkin_codes')
       .upsert({

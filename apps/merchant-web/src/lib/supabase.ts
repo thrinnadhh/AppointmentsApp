@@ -143,6 +143,8 @@ export interface MerchantBookingWithDetails {
   reminder_1h_sent_at?: string | null;
   is_present?: boolean;
   customer_arrived_at?: string | null;
+  checked_in_at?: string | null;
+  skipped_at?: string | null;
   queue_position?: number | null;
   estimated_wait_minutes?: number | null;
   customer_name?: string;
@@ -355,14 +357,22 @@ export async function fetchProviderResources(providerId: string) {
 
 export async function updateBookingStatus(
   bookingId: string,
-  status: Database['public']['Enums']['booking_status'],
+  status: Database['public']['Enums']['booking_status'] | 'IN_PROGRESS',
   paymentStatus?: Database['public']['Enums']['payment_status']
 ) {
+  const { data: authData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+  const token = authData?.session?.access_token;
+  const authHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
   if (status === 'CANCELLED') {
     try {
       const resp = await fetch('/api/bookings/cancel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
+        credentials: 'include',
         body: JSON.stringify({
           booking_id: bookingId,
           reason: 'Merchant status update',
@@ -391,16 +401,11 @@ export async function updateBookingStatus(
 
   if (status === 'COMPLETED') {
     try {
-      const { data: authData } = await supabase.auth.getSession();
-      const token = authData?.session?.access_token;
       const resp = await fetch('/api/bookings/complete', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: authHeaders,
         credentials: 'include',
-        body: JSON.stringify({ booking_id: bookingId }),
+        body: JSON.stringify({ booking_id: bookingId, ...(paymentStatus ? { payment_status: paymentStatus } : {}) }),
       });
       const json = await resp.json().catch(() => null);
       if (resp.ok && json?.success) {
@@ -423,25 +428,71 @@ export async function updateBookingStatus(
     return data;
   }
 
-  const updates: Partial<Database['public']['Tables']['bookings']['Update']> = {
-    status,
-    updated_at: new Date().toISOString(),
-  };
-  if (paymentStatus) {
-    updates.payment_status = paymentStatus;
+  if (status === 'CHECKED_IN') {
+    const resp = await fetch('/api/bookings/reach', {
+      method: 'POST',
+      headers: authHeaders,
+      credentials: 'include',
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok || json?.success === false) {
+      throw new Error(json?.error || 'Failed to check in booking');
+    }
+    return json;
   }
 
-  const { data, error } = await supabase
-    .from('bookings')
-    .update(updates)
-    .eq('id', bookingId)
-    .select();
-
-  if (error) {
-    console.error('Error updating booking:', error);
-    throw error;
+  if (status === 'IN_PROGRESS' || (status as string) === 'IN_CONSULTATION') {
+    const resp = await fetch('/api/bookings/start', {
+      method: 'POST',
+      headers: authHeaders,
+      credentials: 'include',
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok || json?.success === false) {
+      throw new Error(json?.error || 'Failed to start booking');
+    }
+    return json;
   }
-  return data;
+
+  if (status === 'NO_SHOW') {
+    const resp = await fetch('/api/bookings/no-show', {
+      method: 'POST',
+      headers: authHeaders,
+      credentials: 'include',
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok || json?.success === false) {
+      throw new Error(json?.error || 'Failed to record no-show');
+    }
+    return json;
+  }
+
+  throw new Error(`Unsupported direct booking status transition: ${status}`);
+}
+
+export function subscribeToBookings(
+  providerId: string | undefined | null,
+  callback: (payload: any) => void
+) {
+  const filter = providerId ? `provider_id=eq.${providerId}` : undefined;
+  return supabase
+    .channel(`bookings-channel-${providerId || 'all'}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'bookings',
+        ...(providerId ? { filter: `provider_id=eq.${providerId}` } : {}),
+      },
+      (payload) => {
+        callback(payload);
+      }
+    )
+    .subscribe();
 }
 
 export async function rescheduleBookingSlot(bookingId: string, newStartIso: string, newEndIso: string) {

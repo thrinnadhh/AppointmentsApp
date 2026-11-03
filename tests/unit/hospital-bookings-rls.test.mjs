@@ -186,7 +186,7 @@ describe('Subtask 3: Hospital Bookings RLS Lockdown', () => {
     };
   }
 
-  // 1. Hospital Admin Read & Update
+  // 1. Hospital Admin Read & Update (via supported RPC, direct table PATCH blocked)
   it('1. Hospital Admin can read and update all bookings in the hospital', async () => {
     const res = await fetch(`${url}/rest/v1/bookings?id=in.(${bookingDoc1.id},${bookingDoc2.id})`, {
       headers: userHeaders(tokens.adminApex)
@@ -194,13 +194,29 @@ describe('Subtask 3: Hospital Bookings RLS Lockdown', () => {
     const data = await res.json();
     assert.equal(data.length, 2, 'Admin must see bookings for both doc1 and doc2');
 
-    // Admin updates note/queue_position
-    const updateRes = await fetch(`${url}/rest/v1/bookings?id=eq.${bookingDoc1.id}`, {
+    // Direct client table PATCH is blocked by client_grants_lockdown
+    const directPatch = await fetch(`${url}/rest/v1/bookings?id=eq.${bookingDoc1.id}`, {
       method: 'PATCH',
       headers: userHeaders(tokens.adminApex),
       body: JSON.stringify({ estimated_wait_minutes: 10 })
     });
-    assert.equal(updateRes.status, 200, 'Admin must be permitted to update hospital bookings');
+    assert.ok(directPatch.status === 401 || directPatch.status === 403, 'Direct client table PATCH must be blocked');
+
+    // Admin updates booking via supported RPC reschedule_booking_slot
+    const newStart = new Date(new Date(bookingDoc1.slot_start).getTime() + 5 * 60 * 1000).toISOString();
+    const newEnd = new Date(new Date(bookingDoc1.slot_end).getTime() + 5 * 60 * 1000).toISOString();
+    const rpcRes = await fetch(`${url}/rest/v1/rpc/reschedule_booking_slot`, {
+      method: 'POST',
+      headers: userHeaders(tokens.adminApex),
+      body: JSON.stringify({
+        p_booking_id: bookingDoc1.id,
+        p_new_slot_start: newStart,
+        p_new_slot_end: newEnd
+      })
+    });
+    assert.equal(rpcRes.status, 200, 'Admin must be permitted to update hospital bookings via RPC');
+    const rpcBody = await rpcRes.json();
+    assert.equal(rpcBody.success, true, 'Admin reschedule RPC must succeed');
   });
 
   // 2. Front Desk Read & Update Isolation
@@ -219,22 +235,36 @@ describe('Subtask 3: Hospital Bookings RLS Lockdown', () => {
     const dataDoc2 = await resDoc2.json();
     assert.equal(dataDoc2.length, 0, 'Front Desk must NOT see unassigned doc2 booking');
 
-    // Update assigned doc1 booking
-    const updateAssigned = await fetch(`${url}/rest/v1/bookings?id=eq.${bookingDoc1.id}`, {
-      method: 'PATCH',
+    // Update assigned doc1 booking via supported RPC
+    const newStart1 = new Date(new Date(bookingDoc1.slot_start).getTime() + 10 * 60 * 1000).toISOString();
+    const newEnd1 = new Date(new Date(bookingDoc1.slot_end).getTime() + 10 * 60 * 1000).toISOString();
+    const updateAssigned = await fetch(`${url}/rest/v1/rpc/reschedule_booking_slot`, {
+      method: 'POST',
       headers: userHeaders(tokens.neuroDesk),
-      body: JSON.stringify({ estimated_wait_minutes: 15 })
+      body: JSON.stringify({
+        p_booking_id: bookingDoc1.id,
+        p_new_slot_start: newStart1,
+        p_new_slot_end: newEnd1
+      })
     });
-    assert.equal(updateAssigned.status, 200, 'Front Desk must be able to update assigned doctor booking');
+    assert.equal(updateAssigned.status, 200, 'Front Desk must be able to call RPC on assigned doctor booking');
+    const assignedBody = await updateAssigned.json();
+    assert.equal(assignedBody.success, true, 'Front Desk must be able to update assigned doctor booking via RPC');
 
-    // Attempt update unassigned doc2 booking
-    const updateUnassigned = await fetch(`${url}/rest/v1/bookings?id=eq.${bookingDoc2.id}`, {
-      method: 'PATCH',
+    // Attempt update unassigned doc2 booking via supported RPC
+    const newStart2 = new Date(new Date(bookingDoc2.slot_start).getTime() + 10 * 60 * 1000).toISOString();
+    const newEnd2 = new Date(new Date(bookingDoc2.slot_end).getTime() + 10 * 60 * 1000).toISOString();
+    const updateUnassigned = await fetch(`${url}/rest/v1/rpc/reschedule_booking_slot`, {
+      method: 'POST',
       headers: userHeaders(tokens.neuroDesk),
-      body: JSON.stringify({ estimated_wait_minutes: 20 })
+      body: JSON.stringify({
+        p_booking_id: bookingDoc2.id,
+        p_new_slot_start: newStart2,
+        p_new_slot_end: newEnd2
+      })
     });
-    const updatedRows = await updateUnassigned.json();
-    assert.equal(updatedRows.length, 0, 'Front Desk must NOT update unassigned doctor booking (0 rows modified)');
+    const unassignedBody = await updateUnassigned.json();
+    assert.equal(unassignedBody.success, false, 'Front Desk must NOT update unassigned doctor booking via RPC');
   });
 
   // 3. Consultant Read & Update Isolation
@@ -253,14 +283,35 @@ describe('Subtask 3: Hospital Bookings RLS Lockdown', () => {
     const dataOther = await resOther.json();
     assert.equal(dataOther.length, 0, 'Consultant must NOT see another doctor booking');
 
-    // Attempt update other doctor booking
-    const updateOther = await fetch(`${url}/rest/v1/bookings?id=eq.${bookingDoc2.id}`, {
-      method: 'PATCH',
+    // Update own doc1 booking via supported RPC
+    const ownStart = new Date(new Date(bookingDoc1.slot_start).getTime() + 15 * 60 * 1000).toISOString();
+    const ownEnd = new Date(new Date(bookingDoc1.slot_end).getTime() + 15 * 60 * 1000).toISOString();
+    const updateOwn = await fetch(`${url}/rest/v1/rpc/reschedule_booking_slot`, {
+      method: 'POST',
       headers: userHeaders(tokens.neuroDoc),
-      body: JSON.stringify({ estimated_wait_minutes: 25 })
+      body: JSON.stringify({
+        p_booking_id: bookingDoc1.id,
+        p_new_slot_start: ownStart,
+        p_new_slot_end: ownEnd
+      })
     });
-    const updatedRows = await updateOther.json();
-    assert.equal(updatedRows.length, 0, 'Consultant must NOT modify another doctor booking (0 rows modified)');
+    const ownBody = await updateOwn.json();
+    assert.equal(ownBody.success, true, 'Consultant must be able to update own booking via RPC');
+
+    // Attempt update other doctor booking via supported RPC
+    const otherStart = new Date(new Date(bookingDoc2.slot_start).getTime() + 15 * 60 * 1000).toISOString();
+    const otherEnd = new Date(new Date(bookingDoc2.slot_end).getTime() + 15 * 60 * 1000).toISOString();
+    const updateOther = await fetch(`${url}/rest/v1/rpc/reschedule_booking_slot`, {
+      method: 'POST',
+      headers: userHeaders(tokens.neuroDoc),
+      body: JSON.stringify({
+        p_booking_id: bookingDoc2.id,
+        p_new_slot_start: otherStart,
+        p_new_slot_end: otherEnd
+      })
+    });
+    const otherBody = await updateOther.json();
+    assert.equal(otherBody.success, false, 'Consultant must NOT modify another doctor booking via RPC');
   });
 
   // 4. Customer Access Unchanged
@@ -286,11 +337,19 @@ describe('Subtask 3: Hospital Bookings RLS Lockdown', () => {
     const data = await res.json();
     assert.equal(data.length, 1, 'Salon owner can read salon booking');
 
-    const updateRes = await fetch(`${url}/rest/v1/bookings?id=eq.${salonBooking.id}`, {
-      method: 'PATCH',
+    const salonStart = new Date(new Date(salonBooking.slot_start).getTime() + 10 * 60 * 1000).toISOString();
+    const salonEnd = new Date(new Date(salonBooking.slot_end).getTime() + 10 * 60 * 1000).toISOString();
+    const updateRes = await fetch(`${url}/rest/v1/rpc/reschedule_booking_slot`, {
+      method: 'POST',
       headers: userHeaders(tokens.salonOwner),
-      body: JSON.stringify({ estimated_wait_minutes: 5 })
+      body: JSON.stringify({
+        p_booking_id: salonBooking.id,
+        p_new_slot_start: salonStart,
+        p_new_slot_end: salonEnd
+      })
     });
-    assert.equal(updateRes.status, 200, 'Salon owner can update salon booking');
+    assert.equal(updateRes.status, 200, 'Salon owner can update salon booking via RPC');
+    const salonBody = await updateRes.json();
+    assert.equal(salonBody.success, true, 'Salon owner reschedule RPC must succeed');
   });
 });

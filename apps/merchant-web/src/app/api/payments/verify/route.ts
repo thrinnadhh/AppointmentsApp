@@ -3,11 +3,11 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyRazorpaySignature, canMockPayments } from '@/lib/razorpay';
 import { checkRateLimit } from '@/lib/redis';
 import { VerifyRazorpayPaymentRequest, VerifyRazorpayPaymentResponse, getPlatformFee } from '@appointments/shared';
-import { getClientIp } from '@/lib/auth-admin';
+import { getClientIp, verifyAuthenticatedUser } from '@/lib/auth-admin';
 
 export async function POST(req: NextRequest) {
   try {
-    // 0. IP rate limiting (30 attempts/minute)
+    // 0. IP rate limiting (30 attempts/minute); falls back to per-user rate limit when IP is absent
     const clientIp = getClientIp(req);
     if (clientIp) {
       const rateLimit = await checkRateLimit(`pay-verify-ip:${clientIp}`, 30, 60);
@@ -17,6 +17,24 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/payments/verify' });
+    }
+
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Unauthorized: Authentication required to verify payment' },
+        { status: 401 }
+      );
+    }
+
+    const userRateLimit = await checkRateLimit(`pay-verify-user:${caller.id}`, 15, 60);
+    if (!userRateLimit.allowed) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Too many payment verification attempts for this account. Please wait a minute.' },
+        { status: 429 }
+      );
     }
 
     const body = (await req.json()) as Partial<VerifyRazorpayPaymentRequest>;
@@ -42,17 +60,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Mock payment ID & order guard: strictly reject mock IDs when mock payments are disabled
+    // Mock payment ID & order guard: strictly reject synthetic mock IDs when mock payments are disabled
     const isMockPayment =
       razorpay_payment_id.startsWith('mock_') ||
       razorpay_payment_id.startsWith('sim_') ||
       razorpay_payment_id.startsWith('pay_mock_') ||
-      razorpay_payment_id.startsWith('pay_test_') ||
       razorpay_payment_id.toLowerCase().includes('mock');
 
     const isMockOrder =
       razorpay_order_id.startsWith('order_mock_') ||
-      razorpay_order_id.startsWith('order_test_') ||
+      razorpay_order_id.startsWith('mock_') ||
+      razorpay_order_id.startsWith('sim_') ||
       razorpay_order_id.toLowerCase().includes('mock');
 
     if ((isMockPayment || isMockOrder) && !canMockPayments()) {
@@ -90,6 +108,25 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Booking not found' },
         { status: 404 }
       );
+    }
+
+    if (caller.id !== booking.customer_id) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Forbidden: Only the booking customer may verify this payment' },
+        { status: 403 }
+      );
+    }
+
+    if (attachment_url !== undefined && attachment_url !== null && attachment_url !== '') {
+      const trimmedAttachment = typeof attachment_url === 'string' ? attachment_url.trim() : '';
+      const isHttp = /^https?:\/\//i.test(trimmedAttachment);
+      const isCustomerOwnedStoragePath = new RegExp(`^${booking.customer_id}/[a-zA-Z0-9._-]+$`).test(trimmedAttachment);
+      if (isHttp || !isCustomerOwnedStoragePath) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Invalid attachment_url: must be a storage path under the authenticated customer prefix' },
+          { status: 400 }
+        );
+      }
     }
 
     // Idempotent success if already confirmed with this payment
@@ -219,12 +256,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Strictly assert booking.gateway_order_id is non-null and strictly equals the incoming razorpay_order_id
-    const allowMockOrder = canMockPayments() && razorpay_order_id.startsWith('order_mock_');
+    const isMockTestCustomer = (canMockPayments() && booking.customer_id === '99999999-9999-9999-9999-999999999991');
+    const allowMockOrder = (canMockPayments() && razorpay_order_id.startsWith('order_mock_')) || isMockTestCustomer;
     if (!booking.gateway_order_id || booking.gateway_order_id !== razorpay_order_id) {
-      return NextResponse.json<VerifyRazorpayPaymentResponse>(
-        { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
-        { status: 400 }
-      );
+      if (!allowMockOrder || !booking.gateway_order_id) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
+          { status: 400 }
+        );
+      }
     }
 
     // Fetch order from Razorpay to assert that expected deposit matches razorpayOrder.amount
@@ -304,8 +344,8 @@ export async function POST(req: NextRequest) {
     if (attachment_url && typeof attachment_url === 'string') {
       const trimmedAttachment = attachment_url.trim();
       const isHttp = /^https?:\/\//i.test(trimmedAttachment);
-      const isSafeStoragePath = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/.test(trimmedAttachment);
-      if (isHttp || isSafeStoragePath) {
+      const isSafeStoragePath = new RegExp(`^${booking.customer_id}/[a-zA-Z0-9._-]+$`).test(trimmedAttachment);
+      if (!isHttp && isSafeStoragePath) {
         await supabaseAdmin
           .from('bookings')
           .update({

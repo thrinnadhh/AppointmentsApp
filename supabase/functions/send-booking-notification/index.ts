@@ -210,6 +210,7 @@ serve(async (req: Request) => {
                 body: `Your appointment status has updated: ${event_type}`,
                 data: { booking_id, event_type },
               }),
+              signal: AbortSignal.timeout(10000),
             });
 
             const pushBody = await pushRes.json().catch(() => ({}));

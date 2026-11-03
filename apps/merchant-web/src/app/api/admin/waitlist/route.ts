@@ -44,14 +44,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Ingestion Rate Limiting (10 waitlist requests per hour per IP)
-    const ip = getClientIp(request) || '127.0.0.1';
-    const rateLimit = await checkRateLimit(`waitlist:ip:${ip}`, 10, 3600);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many submissions. Please try again later.' },
-        { status: 429 }
-      );
+    // 1. Ingestion Rate Limiting (10 waitlist requests per hour per IP; falls back to per-phone limit if IP is missing)
+    const ip = getClientIp(request);
+    if (ip) {
+      const rateLimit = await checkRateLimit(`waitlist:ip:${ip}`, 10, 3600);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many submissions. Please try again later.' },
+          { status: 429 }
+        );
+      }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/admin/waitlist' });
     }
 
     const body = await request.json().catch(() => ({}));

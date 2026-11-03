@@ -7,7 +7,7 @@ import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. IP rate limiting (30 requests/minute)
+    // 1. IP rate limiting (30 requests/minute); falls back to per-booking/user rate limit when IP is absent
     const clientIp = getClientIp(req);
     if (clientIp) {
       const rateLimit = await checkRateLimit(`order-ip:${clientIp}`, 30, 60);
@@ -17,6 +17,8 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/payments/create-order' });
     }
 
     const body = (await req.json()) as Partial<CreateRazorpayOrderRequest>;
@@ -26,6 +28,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<CreateRazorpayOrderResponse>(
         { success: false, error: 'Missing required parameter: booking_id' },
         { status: 400 }
+      );
+    }
+
+    const bookingRateLimit = await checkRateLimit(`order-booking:${booking_id}`, 10, 60);
+    if (!bookingRateLimit.allowed) {
+      return NextResponse.json<CreateRazorpayOrderResponse>(
+        { success: false, error: 'Too many order attempts for this booking. Please wait a minute.' },
+        { status: 429 }
       );
     }
 

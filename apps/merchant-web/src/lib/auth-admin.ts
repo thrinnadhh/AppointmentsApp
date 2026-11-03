@@ -66,37 +66,65 @@ if (process.env.NODE_ENV === 'production' && !isBuildPhase && !process.env.ADMIN
 
 /**
  * Safely extracts client IP to prevent rate-limiter spoofing via forged X-Forwarded-For headers.
- * Prioritizes socket/platform IP, trusted proxy headers, and the rightmost trusted hop in X-Forwarded-For.
- * In direct-connect or untrusted environments, ignores client-controlled header spoofing.
+ *
+ * Note: Next.js 15 (`NextRequest`) does not expose `req.ip` on the standard Web Request object.
+ * Trusted header order by deployment host:
+ *   1. Vercel (`process.env.VERCEL === '1'` with `x-vercel-id` present):
+ *      - `x-vercel-forwarded-for` (rightmost hop overwritten by Vercel Edge)
+ *      - `x-real-ip` (single client IP injected by Vercel Edge)
+ *      - `x-forwarded-for` (rightmost hop appended by Vercel Edge)
+ *   2. Self-hosted reverse proxy (`process.env.TRUSTED_PROXY === 'true'`):
+ *      - `x-vercel-forwarded-for` (rightmost hop, if present)
+ *      - `x-real-ip`
+ *      - `x-forwarded-for` (rightmost hop appended by the trusted proxy)
+ *   3. Cloudflare proxy (`process.env.CLOUDFLARE_PROXY === 'true' && process.env.TRUSTED_PROXY === 'true'` with `cf-ray`):
+ *      - `cf-connecting-ip`
+ *
+ * In direct-connect or untrusted environments, returns `undefined` so callers log the missing-IP
+ * event and fall back strictly to per-phone / per-user rate limits (never a shared IP bucket).
  */
 export function getClientIp(req: Request | NextRequest): string | undefined {
-  const platformIp = (req as any).ip;
-  if (typeof platformIp === 'string' && platformIp.trim()) return platformIp.trim();
+  const isVercelOrTrustedProxy =
+    process.env.VERCEL === '1' || process.env.TRUSTED_PROXY === 'true';
+  const vercelId = req.headers.get('x-vercel-id');
+  const hasTrustedVercelEdge =
+    isVercelOrTrustedProxy && (Boolean(vercelId) || process.env.TRUSTED_PROXY === 'true');
 
-  // In direct-connect environments, ignore client-controlled header spoofing unless TRUSTED_PROXY is enabled.
+  // Cloudflare headers (cf-ray / cf-connecting-ip) are client-spoofable when deployed
+  // on Vercel without Cloudflare in front, so they never decide the client IP unless
+  // CLOUDFLARE_PROXY=true and TRUSTED_PROXY=true are both explicitly configured.
   const cfRay = req.headers.get('cf-ray');
   const cfConnectingIp = req.headers.get('cf-connecting-ip');
   if (cfConnectingIp && (cfRay || process.env.TRUSTED_PROXY === 'true')) {
-    if (process.env.TRUSTED_PROXY === 'true') return cfConnectingIp.trim();
+    if (process.env.CLOUDFLARE_PROXY === 'true' && process.env.TRUSTED_PROXY === 'true') {
+      return cfConnectingIp.trim();
+    }
   }
 
-  const vercelId = req.headers.get('x-vercel-id');
+  // 2. Vercel edge header: x-vercel-forwarded-for (overwritten by Vercel edge)
+  const vercelForwardedFor = req.headers.get('x-vercel-forwarded-for');
+  if (hasTrustedVercelEdge && vercelForwardedFor) {
+    const vParts = vercelForwardedFor.split(',').map((p) => p.trim()).filter(Boolean);
+    if (vParts.length > 0) return vParts[vParts.length - 1];
+  }
+
+  // 3. Vercel edge header: x-real-ip (overwritten by Vercel edge)
   const xRealIp = req.headers.get('x-real-ip');
   if (xRealIp && (vercelId || process.env.TRUSTED_PROXY === 'true')) {
-    if (process.env.TRUSTED_PROXY === 'true') return xRealIp.trim();
+    if (hasTrustedVercelEdge) return xRealIp.trim();
   }
 
+  // 4. Rightmost hop of x-forwarded-for (appended/overwritten by Vercel edge)
   const xff = req.headers.get('x-forwarded-for');
   if (xff && (cfRay || vercelId || process.env.TRUSTED_PROXY === 'true')) {
-    if (process.env.TRUSTED_PROXY === 'true') {
+    if (hasTrustedVercelEdge) {
       const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
       if (parts.length > 0) return parts[parts.length - 1];
     }
   }
 
   // No trustworthy client identity is available: return undefined so callers
-  // skip IP-scoped throttling instead of collapsing every client into one
-  // shared bucket (which let a single attacker lock out logins for everyone).
+  // can fail closed in production or skip IP-scoped throttling in local dev.
   return undefined;
 }
 

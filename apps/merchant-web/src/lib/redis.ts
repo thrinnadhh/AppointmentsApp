@@ -11,17 +11,25 @@ interface MemoryStoreEntry {
   expiresAt: number;
 }
 
-const memoryStore = new Map<string, MemoryStoreEntry>();
+const globalForRedis = globalThis as unknown as {
+  __appointmentsMemoryStore?: Map<string, MemoryStoreEntry>;
+};
+const memoryStore =
+  globalForRedis.__appointmentsMemoryStore ??
+  (globalForRedis.__appointmentsMemoryStore = new Map<string, MemoryStoreEntry>());
 
 // Clean expired memory entries periodically
-setInterval(() => {
+const memoryCleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of memoryStore.entries()) {
     if (entry.expiresAt <= now) {
       memoryStore.delete(key);
     }
   }
-}, 60000).unref();
+}, 60000);
+if (typeof (memoryCleanupInterval as unknown as { unref?: () => void })?.unref === 'function') {
+  (memoryCleanupInterval as unknown as { unref: () => void }).unref();
+}
 
 function getIsUpstashConfigured(): boolean {
   return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);

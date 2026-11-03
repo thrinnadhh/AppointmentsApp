@@ -16,11 +16,23 @@ const targetFiles = [
   'apps/merchant-web/src/app/terms/page.tsx',
   'apps/merchant-web/src/app/refund-policy/page.tsx',
   'apps/customer-mobile/src/screens/ConsentScreen.tsx',
-  'apps/customer-mobile/src/screens/AccountScreen.tsx'
+  'apps/customer-mobile/src/screens/AccountScreen.tsx',
+  'docs/incident-response.md'
 ];
 
 const tokenPattern = /\{\{([A-Z_]+)\}\}/g;
+const forbiddenHardcodedDefaults = [
+  'Trinadh Kumar',
+  'grievance@appointments4u.in',
+  '+91-877-2200000',
+  'Appointments4U Operations Center',
+  'Compliance Grievance Officer',
+  'dpo@appointments-tirupati.in',
+  '+91-877-2289001',
+  'AIR Bypass Road, Tirupati'
+];
 let foundTokens = 0;
+let foundHardcoded = 0;
 
 console.log('--- Checking Legal Text Placeholders ---');
 
@@ -38,6 +50,13 @@ targetFiles.forEach((relPath) => {
       console.warn(`       - Token: ${m[0]}`);
     });
   }
+
+  forbiddenHardcodedDefaults.forEach((literal) => {
+    if (content.includes(literal)) {
+      foundHardcoded += 1;
+      console.error(`[ERROR] File ${relPath} contains hardcoded Grievance Officer default literal: "${literal}"`);
+    }
+  });
 });
 
 const isProdOrRelease =
@@ -45,6 +64,57 @@ const isProdOrRelease =
   process.env.RELEASE_BUILD === 'true' ||
   process.argv.includes('--release') ||
   process.argv.includes('--strict');
+
+const requiredGrievanceEnvVars = [
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS',
+  'EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME',
+  'EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL',
+  'EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE',
+  'EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS',
+];
+
+const placeholderEnvPatterns = [
+  /placeholder/i,
+  /^(xxx+|change[_-]?me|your[_-].*|dummy.*|test[_-]secret|todo)$/i,
+  /replace[_-]?me/i,
+  /^<.*>$/,
+  /\{\{[A-Z_]+\}\}/,
+];
+
+let missingOrPlaceholderEnvCount = 0;
+requiredGrievanceEnvVars.forEach((envKey) => {
+  const raw = process.env[envKey];
+  const val = typeof raw === 'string' ? raw.trim() : '';
+  if (!val) {
+    missingOrPlaceholderEnvCount += 1;
+    console.error(`[ERROR] Missing required Grievance Officer environment variable: ${envKey}`);
+    return;
+  }
+  const matchesPlaceholder =
+    placeholderEnvPatterns.some((rx) => rx.test(val)) ||
+    forbiddenHardcodedDefaults.some((lit) => val.toLowerCase().includes(lit.toLowerCase()));
+  if (matchesPlaceholder) {
+    missingOrPlaceholderEnvCount += 1;
+    console.error(
+      `[ERROR] Grievance Officer environment variable ${envKey} contains a placeholder or fabricated default value: "${val}"`
+    );
+  }
+});
+
+if (foundHardcoded > 0) {
+  console.error(`\n[FATAL] Found ${foundHardcoded} hardcoded Grievance Officer default(s). Supply values via NEXT_PUBLIC_GRIEVANCE_OFFICER_* and EXPO_PUBLIC_GRIEVANCE_OFFICER_* environment variables.`);
+  process.exit(1);
+}
+
+if (missingOrPlaceholderEnvCount > 0) {
+  console.error(
+    `\n[FATAL] ${missingOrPlaceholderEnvCount} Grievance Officer environment variable(s) are unset or match placeholder/fabricated patterns.`
+  );
+  process.exit(1);
+}
 
 if (foundTokens > 0) {
   if (isProdOrRelease) {
@@ -55,6 +125,6 @@ if (foundTokens > 0) {
     console.log(`\n[NOTICE] Found ${foundTokens} placeholder token(s). In development/staging, these tokens act as visible reminders for legal review.\n`);
   }
 } else {
-  console.log('No unpopulated legal placeholder tokens found.');
+  console.log('No unpopulated legal placeholder tokens found. Legal placeholder check passed.');
 }
 

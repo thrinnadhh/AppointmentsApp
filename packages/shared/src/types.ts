@@ -13,7 +13,7 @@ export type BookingStatus =
   | 'IN_CONSULTATION'
   | 'ADMITTED';
 
-export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'FORFEITED';
+export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_IN_PROGRESS' | 'REFUND_FAILED' | 'FORFEITED';
 
 export type ResourceType = 'doctor' | 'table' | 'court' | 'stylist' | 'groomer' | 'vet';
 
@@ -134,6 +134,7 @@ export interface Booking {
   checked_in_at?: string | null;
   checked_in_by?: string | null;
   checked_in_method?: 'code' | 'manual' | null;
+  skipped_at?: string | null;
   queue_position?: number | null;
   estimated_wait_minutes?: number | null;
   department_id?: string | null;

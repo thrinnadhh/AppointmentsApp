@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { supabase, getApiBaseUrl } from '../services/api';
 
+declare const process: { env: Record<string, string | undefined> };
+
 interface DeletionStatus {
   pending: boolean;
   request: { id: string; requested_at: string; scheduled_for: string } | null;
@@ -226,7 +228,12 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.link}
-          onPress={() => Linking.openURL('mailto:grievance@appointments4u.in')}
+          onPress={() => {
+            const email = process.env.EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL?.trim();
+            if (email) {
+              Linking.openURL(`mailto:${email}`);
+            }
+          }}
         >
           <Text style={styles.linkText}>Grievance Officer →</Text>
         </TouchableOpacity>
@@ -322,7 +329,7 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
       </View>
 
       <Text style={styles.footer}>
-        Grievance Officer: grievance@appointments4u.in{'\n'}
+        Grievance Officer: {process.env.EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL?.trim()}{'\n'}
         Response within 48 hours · Resolution within 30 days
       </Text>
     </ScrollView>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useCallback, useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import {
   Clock,
@@ -21,18 +21,19 @@ import { RollingTenSlotQueue } from '@/components/RollingTenSlotQueue';
 import { MonthlyAttendanceCalendar } from '@/components/MonthlyAttendanceCalendar';
 import { QueueSlot, MonthlyAttendanceSummary } from '@/lib/queue-scheduler';
 import { supabase } from '@/lib/supabase';
+import { toClinicDateString } from '@/lib/queue-scheduler';
 
 interface TicketData {
   booking: {
     id: string;
     resource_id?: string;
     provider_id?: string;
-    reference_code: string;
+    reference_code: string | null;
     slot_start: string;
     slot_end: string;
     status: 'HELD' | 'CONFIRMED' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED';
-    payment_status: string;
-    deposit_amount: number;
+    payment_status: string | null;
+    deposit_amount: number | null;
     is_present: boolean;
     checked_in_at: string | null;
     checked_in_method: string | null;
@@ -42,20 +43,20 @@ interface TicketData {
     name: string;
     email: string;
     phone: string;
-  };
+  } | null;
   hospital: {
     name: string;
     address: string;
     phone: string;
-  };
+  } | null;
   doctor: {
     id?: string;
-    name: string;
-    department: string;
+    name?: string;
+    department?: string;
     duration_minutes: number;
-    price: number;
+    price?: number;
   };
-  checkin_code: string;
+  checkin_code: string | null;
 }
 
 export default function CustomerTicketPage({
@@ -77,7 +78,7 @@ export default function CustomerTicketPage({
   const [calendarMonth, setCalendarMonth] = useState<number>(new Date().getMonth() + 1);
   const [isLoadingQueue, setIsLoadingQueue] = useState(false);
 
-  const fetchQueueAndHistory = async (year = calendarYear, month = calendarMonth) => {
+  const fetchQueueAndHistory = useCallback(async (year = calendarYear, month = calendarMonth) => {
     setIsLoadingQueue(true);
     try {
       const res = await fetch(
@@ -96,9 +97,9 @@ export default function CustomerTicketPage({
     } finally {
       setIsLoadingQueue(false);
     }
-  };
+  }, [calendarMonth, calendarYear, id]);
 
-  const fetchTicket = async (showLoading = false) => {
+  const fetchTicket = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
       const res = await fetch(`/api/ticket/${id}`, { cache: 'no-store' });
@@ -114,10 +115,10 @@ export default function CustomerTicketPage({
     } finally {
       if (showLoading) setLoading(false);
     }
-  };
+  }, [id]);
 
   // Determine if patient is within next 3 positions or ETA is <= 30 minutes
-  const isNearPatientTurn = () => {
+  const isNearPatientTurn = useCallback(() => {
     // 1. Check position in current rolling queue
     const patientSlotIdx = queueSlots.findIndex(
       (s) => s.bookingId === id || s.isCurrentPatient
@@ -142,7 +143,7 @@ export default function CustomerTicketPage({
     }
 
     return false;
-  };
+  }, [data?.booking?.queue_position, data?.booking?.slot_start, id, queueSlots]);
 
   // 1. Initial fetch & direct row realtime subscription
   useEffect(() => {
@@ -189,14 +190,14 @@ export default function CustomerTicketPage({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id]);
+  }, [fetchQueueAndHistory, fetchTicket, id]);
 
   // 2. No-PII Realtime Broadcast channel per doctor and day (anonymous-safe)
   useEffect(() => {
     const doctorId = data?.doctor?.id || data?.booking?.resource_id;
     const dateStr = data?.booking?.slot_start
-      ? data.booking.slot_start.slice(0, 10)
-      : new Date().toISOString().slice(0, 10);
+      ? toClinicDateString(data.booking.slot_start)
+      : toClinicDateString(new Date());
 
     if (!doctorId) return;
 
@@ -215,7 +216,7 @@ export default function CustomerTicketPage({
     return () => {
       supabase.removeChannel(broadcastChannel);
     };
-  }, [data?.doctor?.id, data?.booking?.resource_id, data?.booking?.slot_start]);
+  }, [data?.doctor?.id, data?.booking?.resource_id, data?.booking?.slot_start, fetchQueueAndHistory, fetchTicket]);
 
   // 3. Adaptive Refresh: 6s when within next 3 positions or ETA <= 30m, 35s otherwise, paused when hidden
   useEffect(() => {
@@ -264,7 +265,7 @@ export default function CustomerTicketPage({
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
     };
-  }, [data, queueSlots, id]);
+  }, [data, fetchQueueAndHistory, fetchTicket, id, isNearPatientTurn, queueSlots]);
 
   const handleCopyCode = () => {
     if (!data?.checkin_code) return;
@@ -331,23 +332,27 @@ export default function CustomerTicketPage({
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-900/40 backdrop-blur-md rounded-full text-xs font-semibold text-emerald-200 uppercase tracking-wider mb-2 border border-emerald-500/30">
                 <Building2 className="w-3.5 h-3.5" />
-                {hospital.name}
+                {hospital?.name || 'Appointment Ticket'}
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                 OPD Patient Ticket
               </h1>
-              <p className="text-xs sm:text-sm text-emerald-100/90 mt-1">
-                {hospital.address}
-              </p>
+              {hospital?.address && (
+                <p className="text-xs sm:text-sm text-emerald-100/90 mt-1">
+                  {hospital.address}
+                </p>
+              )}
             </div>
 
             {/* Reference Badge */}
-            <div className="text-right">
-              <span className="text-[11px] uppercase tracking-wider text-emerald-200 block font-medium">Ref Code</span>
-              <span className="font-mono text-sm sm:text-base font-bold text-white bg-white/10 px-2.5 py-1 rounded-lg border border-white/20 inline-block mt-0.5">
-                {booking.reference_code}
-              </span>
-            </div>
+            {booking.reference_code && (
+              <div className="text-right">
+                <span className="text-[11px] uppercase tracking-wider text-emerald-200 block font-medium">Ref Code</span>
+                <span className="font-mono text-sm sm:text-base font-bold text-white bg-white/10 px-2.5 py-1 rounded-lg border border-white/20 inline-block mt-0.5">
+                  {booking.reference_code}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -409,28 +414,34 @@ export default function CustomerTicketPage({
         {/* Appointment Details Grid */}
         <div className="p-6 sm:p-8 space-y-6">
           {/* Patient & Doctor Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-100">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">
-                Patient Name
-              </span>
-              <p className="text-base font-bold text-gray-900">{customer.name}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{customer.phone}</p>
-            </div>
-
-            <div className="bg-emerald-50/40 rounded-2xl p-4 border border-emerald-100">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
-                  Assigned Doctor
+          {customer && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-100">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                  Patient Name
                 </span>
-                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-200/60 text-emerald-800">
-                  {doctor.department}
-                </span>
+                <p className="text-base font-bold text-gray-900">{customer.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{customer.phone}</p>
               </div>
-              <p className="text-base font-bold text-gray-900">{doctor.name}</p>
-              <p className="text-xs text-emerald-700 mt-0.5">Consultation Fee: ₹{doctor.price}</p>
+
+              <div className="bg-emerald-50/40 rounded-2xl p-4 border border-emerald-100">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
+                    Assigned Doctor
+                  </span>
+                  {doctor.department && (
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-200/60 text-emerald-800">
+                      {doctor.department}
+                    </span>
+                  )}
+                </div>
+                <p className="text-base font-bold text-gray-900">{doctor.name || 'Assigned Specialist'}</p>
+                {doctor.price != null && (
+                  <p className="text-xs text-emerald-700 mt-0.5">Consultation Fee: ₹{doctor.price}</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Time Slot Banner */}
           <div className="bg-gray-900 text-white rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -494,8 +505,8 @@ export default function CustomerTicketPage({
       {queueSlots.length > 0 && (
         <RollingTenSlotQueue
           slots={queueSlots}
-          doctorName={doctor.name}
-          department={doctor.department}
+          doctorName={doctor.name || 'Specialist'}
+          department={doctor.department || 'OPD'}
           slotDurationMinutes={doctor.duration_minutes}
           currentBookingId={booking.id}
           onRefresh={() => fetchQueueAndHistory()}
@@ -515,8 +526,8 @@ export default function CustomerTicketPage({
             fetchQueueAndHistory(y, m);
           }}
           isLoading={isLoadingQueue}
-          selectedDoctorName={doctor.name}
-          selectedDepartment={doctor.department}
+          selectedDoctorName={doctor.name || 'Specialist'}
+          selectedDepartment={doctor.department || 'OPD'}
         />
       )}
     </div>

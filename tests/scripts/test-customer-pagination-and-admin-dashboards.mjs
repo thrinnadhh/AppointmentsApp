@@ -1,20 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import pg from 'pg';
 import { createClient } from '../../apps/merchant-web/node_modules/@supabase/supabase-js/dist/index.mjs';
 
-const PG_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-const SUPABASE_URL = 'http://127.0.0.1:54321';
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+const envLocal = fs.existsSync('apps/merchant-web/.env.local')
+  ? fs.readFileSync('apps/merchant-web/.env.local', 'utf8')
+  : '';
+const envUrl = envLocal.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\n]+)"?/)?.[1];
+const envServiceKey = envLocal.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\n]+)"?/)?.[1];
+
+const PG_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || envUrl || 'http://127.0.0.1:54321';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || envServiceKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 
 const pool = new pg.Pool({ connectionString: PG_URL });
 const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-const TEST_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
-const TEST_PROVIDER_ID = '11111111-1111-1111-1111-111111111111';
-const TEST_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+let TEST_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
+let TEST_PROVIDER_ID = '11111111-1111-1111-1111-111111111111';
+let TEST_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
 test('Step 7: Customer Mobile Pagination & Admin Dashboard Decoupling Suite', async (t) => {
+  const custRow = await pool.query(`SELECT id FROM profiles WHERE role = 'customer' LIMIT 1`);
+  const resRow = await pool.query(`SELECT id, provider_id FROM resources WHERE is_active = true LIMIT 1`);
+  if (custRow.rows[0]) TEST_CUSTOMER_ID = custRow.rows[0].id;
+  if (resRow.rows[0]) {
+    TEST_RESOURCE_ID = resRow.rows[0].id;
+    TEST_PROVIDER_ID = resRow.rows[0].provider_id;
+  }
   t.after(async () => {
     // Clean up created test bookings
     await pool.query("DELETE FROM bookings WHERE reference_code LIKE 'PAGETEST-%'");

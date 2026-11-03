@@ -230,6 +230,7 @@ Deno.serve(async (req: Request) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(metaPayload),
+          signal: AbortSignal.timeout(10000),
         });
 
         if (metaRes.ok) {

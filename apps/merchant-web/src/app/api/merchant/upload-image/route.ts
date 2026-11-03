@@ -47,6 +47,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: callerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', caller.id)
+      .maybeSingle();
+
+    if (!callerProfile || (callerProfile.role !== 'merchant' && callerProfile.role !== 'admin')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Merchant or Administrator role required to upload venue images' },
+        { status: 403 }
+      );
+    }
+
     // 2. Rate limit: max 15 uploads per merchant per minute
     const rateLimit = await checkRateLimit(`upload:${caller.id}`, 15, 60);
     if (!rateLimit.allowed) {
@@ -90,8 +104,6 @@ export async function POST(request: NextRequest) {
     const randomId = crypto.randomBytes(6).toString('hex');
     const timestamp = Date.now();
     const storagePath = `${merchantId}/${timestamp}-${randomId}.${detectedFormat.ext}`;
-
-    const supabaseAdmin = getSupabaseAdmin();
 
     // 4. Upload with blind overwriting disabled (upsert: false)
     const { data, error: uploadError } = await supabaseAdmin.storage
