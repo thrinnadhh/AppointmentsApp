@@ -228,14 +228,14 @@ for (const [id, pos] of stateEvalA.positionByBookingId.entries()) {
 // 3. buildRollingTenSlotQueue at 09:40
 const rollingA = buildRollingTenSlotQueue(bookingsA, {
   resourceId: 'DOC_1',
-  currentDateStr: '2026-11-04',
+  dateString: '2026-11-04',
   now: t('09:40'),
+  slotDurationMinutes: 10,
 });
 
 console.log('\n--- 3. buildRollingTenSlotQueue Timeline Slots at 09:40 (IST) ---');
-rollingA.forEach((s, idx) => {
-  const patient = s.bookedPatient || s.latePatient;
-  console.log(`  Slot ${idx + 1}: ${s.time} | Type: ${s.slotType} | UpNext: ${s.isUpNext ? 'YES' : 'NO'} | Patient: ${patient?.id || '-'} | Label: ${s.statusLabel}`);
+rollingA.forEach((s) => {
+  console.log(`  Slot ${s.slotIndex}: ${s.formattedStartTime} | Type: ${s.type} | UpNext: ${s.isUpNext ? 'YES' : 'NO'} | Patient: ${s.booking?.patient_name || s.patientName || '-'} | Label: ${s.statusLabel}`);
 });
 
 // 4. Customer Queue API check
@@ -255,7 +255,7 @@ try {
     password: 'HospitalTest2026!',
   });
   if (data?.session?.access_token) {
-    const custRes = await fetch(`http://localhost:3000/api/customer/queue-and-history?customer_id=${data.user.id}&resource_id=${manifest.hospitalA.departments[0].id}`, {
+    const custRes = await fetch(`http://localhost:3000/api/customer/queue-and-history?customer_id=${data.user.id}&resource_id=${manifest.bookings[0].resource_id}`, {
       headers: {
         Authorization: `Bearer ${data.session.access_token}`,
         Origin: 'http://localhost:3000',
