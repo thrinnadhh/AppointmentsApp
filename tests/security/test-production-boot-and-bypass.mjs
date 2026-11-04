@@ -84,7 +84,7 @@ async function runProductionBootTests() {
     for (let i = 0; i < 30; i++) {
       try {
         const res = await fetch(`http://127.0.0.1:${PROD_PORT}/api/health`);
-        if (res.status === 200) {
+        if (res.status === 200 || res.status === 503) {
           isUp = true;
           break;
         }

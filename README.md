@@ -47,10 +47,14 @@ cp apps/merchant-web/.env.example apps/merchant-web/.env.local
 cp apps/customer-mobile/.env.example apps/customer-mobile/.env
 # Fill in your Supabase URL and anon key
 
-# 3. Apply database migrations
+# 3. Generate local PostgREST asymmetric signing key (ES256)
+# Required by supabase/config.toml (signing_keys_path = "./signing_keys.json")
+node scripts/generate-signing-keys.mjs
+
+# 4. Apply database migrations
 # Use the Supabase CLI or dashboard to run files in supabase/migrations/ in order
 
-# 4. Seed demo data (optional)
+# 5. Seed demo data (optional)
 # Run supabase/seed.sql against your database
 ```
 

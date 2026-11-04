@@ -114,6 +114,7 @@ export async function GET(
     const slotStartMs = new Date(booking.slot_start).getTime();
     const nowMs = Date.now();
     const isWindowOpen = nowMs >= slotStartMs - 60 * 60 * 1000;
+    const windowOpensAt = new Date(slotStartMs - 60 * 60 * 1000).toISOString();
     const isCheckedIn = booking.status === "CHECKED_IN" || booking.is_present;
 
     let displayCode: string | null = null;
@@ -151,6 +152,7 @@ export async function GET(
       },
       customer: {
         id: booking.customer_id,
+        name: profile?.full_name || "Patient",
         full_name: profile?.full_name || "Patient",
         email: profile?.email || null,
         phone: profile?.phone || null,
@@ -169,6 +171,7 @@ export async function GET(
         price: resource?.price || 500,
       },
       is_window_open: isWindowOpen,
+      window_opens_at: windowOpensAt,
       checkin_code: displayCode,
     });
   } catch (error) {

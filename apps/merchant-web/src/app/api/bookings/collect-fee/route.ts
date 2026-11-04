@@ -39,6 +39,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const { data: hospRole } = await (supabaseAdmin.rpc as any)('hospital_role', {
+      p_provider_id: booking.provider_id,
+      p_user_id: caller.id,
+    });
+
+    if (hospRole !== 'admin' && hospRole !== 'front_desk') {
+      return NextResponse.json(
+        { success: false, error: 'FORBIDDEN', message: 'Unauthorized: Only authorized hospital reception staff or administrators can collect fees' },
+        { status: 403 }
+      );
+    }
+
     const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, false);
     if (!isAuthorized) {
       return NextResponse.json(

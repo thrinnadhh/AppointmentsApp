@@ -128,8 +128,9 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
     // Existing rows: 1 confirmed (slot 2) + 1 expired hold on another slot (slot 1).
     // If expired hold was counted, count would be 2 and next hold on slot 3 would fail.
     // With fix: expired hold is ignored, active count is 1 < 2, so hold on slot 3 must succeed!
-    const slot3Start = `${todayStr}T11:00:00.000Z`;
-    const slot3End = `${todayStr}T11:15:00.000Z`;
+    // Spaced at 11:30 to satisfy the 1-hour anti-hoarding patient gap (Slot 2 was 10:00)
+    const slot3Start = `${todayStr}T11:30:00.000Z`;
+    const slot3End = `${todayStr}T11:45:00.000Z`;
 
     await pgPool.query("SELECT set_config('request.jwt.claim.role', 'service_role', false)");
     const rpcRes = await pgPool.query(
@@ -149,9 +150,9 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
 
   it('2. Verifies limit is strictly enforced when active bookings reach limit (1 confirmed + 1 active hold = 2)', async () => {
     // Now active count = 2 (slot 2 confirmed + slot 3 active hold).
-    // Next attempt on slot 4 (12:00 - 12:15) must fail due to reaching limit.
-    const slot4Start = `${todayStr}T12:00:00.000Z`;
-    const slot4End = `${todayStr}T12:15:00.000Z`;
+    // Next attempt on slot 4 (13:00 - 13:15) must fail due to reaching limit.
+    const slot4Start = `${todayStr}T13:00:00.000Z`;
+    const slot4End = `${todayStr}T13:15:00.000Z`;
 
     await pgPool.query("SELECT set_config('request.jwt.claim.role', 'service_role', false)");
     const rpcRes = await pgPool.query(

@@ -68,6 +68,10 @@ async function handleSecurityMonitor(req: NextRequest) {
 
       const logPayload = {
         level: 'error',
+        severity: 'CRITICAL',
+        category: 'SECURITY',
+        source: 'server',
+        environment: process.env.NODE_ENV === 'production' ? 'prod' : 'dev',
         component: 'security-monitor',
         platform: 'backend',
         message: `High velocity contact reveals detected: ${staffName} (${item.user_id}) performed ${reveals1h} reveals in last 1h (${reveals24h} in 24h).`,

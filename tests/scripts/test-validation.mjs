@@ -231,8 +231,7 @@ describe('14. Finding 14: Hold Rate Limit Key & Spoofable Header Protection', ()
 
   it('verifies hold route derives IP from platform-verified headers before client headers', () => {
     const code = fs.readFileSync(holdRoutePath, 'utf8');
-    assert.match(code, /req\.headers\.get\('x-real-ip'\)/, 'Must prioritize x-real-ip header');
-    assert.match(code, /req\.headers\.get\('cf-connecting-ip'\)/, 'Must check cf-connecting-ip');
+    assert.match(code, /getClientIp\s*\(\s*req\s*\)/, 'Must prioritize platform-verified headers via getClientIp');
   });
 
   it('verifies hold route validates UUID formats, interval order, and duration boundaries', () => {

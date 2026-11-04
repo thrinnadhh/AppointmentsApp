@@ -470,8 +470,7 @@ describe('Authentication, Toll-Fraud & Gateway Defense Remediation', () => {
       const holdRoutePath = path.join(rootDir, 'apps/merchant-web/src/app/api/bookings/hold/route.ts');
       const code = fs.readFileSync(holdRoutePath, 'utf8');
       assert.doesNotMatch(code, /x-forwarded-for.*split\(','\)\[0\]/, 'Must NOT use leftmost XFF split');
-      assert.match(code, /req\.headers\.get\('x-real-ip'\)/, 'Must check x-real-ip');
-      assert.match(code, /req\.headers\.get\('cf-connecting-ip'\)/, 'Must check cf-connecting-ip');
+      assert.match(code, /getClientIp\s*\(\s*req\s*\)/, 'Must use getClientIp helper');
     });
   });
 });

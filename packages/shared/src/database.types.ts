@@ -118,43 +118,82 @@ export type Database = {
       }
       app_logs: {
         Row: {
+          appointment_id: string | null
+          app_version: string | null
+          category: string | null
+          city_id: string | null
           component: string | null
           created_at: string
           device_info: Json | null
+          device_model: string | null
+          environment: string | null
+          error_code: string | null
+          fingerprint: string | null
           id: string
           level: string
           message: string
           metadata: Json | null
           platform: string
+          platform_os: string | null
+          role: string | null
           session_id: string | null
+          severity: string | null
+          source: string | null
           stack_trace: string | null
           user_id: string | null
+          vertical: string | null
         }
         Insert: {
+          appointment_id?: string | null
+          app_version?: string | null
+          category?: string | null
+          city_id?: string | null
           component?: string | null
           created_at?: string
           device_info?: Json | null
+          device_model?: string | null
+          environment?: string | null
+          error_code?: string | null
+          fingerprint?: string | null
           id?: string
           level: string
           message: string
           metadata?: Json | null
           platform: string
+          platform_os?: string | null
+          role?: string | null
           session_id?: string | null
+          severity?: string | null
+          source?: string | null
           stack_trace?: string | null
           user_id?: string | null
+          vertical?: string | null
         }
         Update: {
+          appointment_id?: string | null
+          app_version?: string | null
+          category?: string | null
+          city_id?: string | null
           component?: string | null
           created_at?: string
           device_info?: Json | null
+          device_model?: string | null
+          environment?: string | null
+          error_code?: string | null
+          fingerprint?: string | null
           id?: string
           level?: string
           message?: string
           metadata?: Json | null
           platform?: string
+          platform_os?: string | null
+          role?: string | null
           session_id?: string | null
+          severity?: string | null
+          source?: string | null
           stack_trace?: string | null
           user_id?: string | null
+          vertical?: string | null
         }
         Relationships: [
           {

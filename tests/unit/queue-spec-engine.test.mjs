@@ -428,7 +428,7 @@ describe('Hospital Vertical: Queue Specification & Invariant Verification Suite'
                   const q = engine.evaluateQueues(simIso);
                   const presentOnTime = q.waitingQueue.filter((p) => {
                     const pStartMs = new Date(p.slotStart).getTime();
-                    return currentSimMs >= pStartMs - 10 * 60 * 1000;
+                    return currentSimMs >= pStartMs;
                   });
                   assert.equal(
                     presentOnTime.length,

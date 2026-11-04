@@ -423,17 +423,21 @@ export function buildRollingTenSlotQueue(
       let statusLabel: string;
       let statusDescription: string;
 
+      const isUpNext = Boolean(consultantEval?.upNext?.id === bookedPatient.id && !isActualConsultation);
+
       if (isActualConsultation) {
         slotType = 'SERVING';
-
-        statusLabel = 'Now In Consultation';
+        statusLabel = 'In Consultation';
         statusDescription = pulledForward
           ? 'Arrived early — passes directly to doctor (preceding slot absent)'
           : 'With Doctor right now';
-
+      } else if (isServing) {
+        slotType = 'SERVING';
+        statusLabel = isUpNext ? 'Up Next' : 'Now In Consultation';
+        statusDescription = 'Arrived early — passes directly to doctor (preceding slot absent)';
       } else if (isPresent) {
         slotType = 'BOOKED_PRESENT';
-        statusLabel = 'Present & Ready';
+        statusLabel = isUpNext ? 'Up Next' : 'Present & Ready';
         statusDescription = 'Reception PIN verified. Next in line.';
       } else {
         slotType = 'BOOKED_AWAITING_PIN';
@@ -458,8 +462,8 @@ export function buildRollingTenSlotQueue(
         statusLabel,
         statusDescription,
         isGuaranteedUndisturbed: true,
-
         isFastTracked: pulledForward,
+        isUpNext,
       });
     } else {
       // Slot has NO on-time booking (Empty Gap)
@@ -505,6 +509,7 @@ export function buildRollingTenSlotQueue(
             : 'Fitted into available gap in Standby Queue order',
           isGuaranteedUndisturbed: false,
           isFastTracked: false,
+          isUpNext: Boolean(consultantEval?.upNext?.id === accommodatedLatePatient.id),
         });
       } else if (remainingLatePatients.length > 0 && nextOnTimeStartMs) {
         slots.push({

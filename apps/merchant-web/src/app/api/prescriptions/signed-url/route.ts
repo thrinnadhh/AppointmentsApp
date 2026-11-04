@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrivateDocumentSignedUrl } from '@/lib/storage';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { isCallerAuthorizedForBooking, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 
@@ -71,6 +72,32 @@ export async function POST(req: NextRequest) {
 
     if (!storagePath || typeof storagePath !== 'string') {
       return NextResponse.json({ error: 'storagePath is required' }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    if (bookingId) {
+      const { data: booking, error: bkgErr } = await supabaseAdmin
+        .from('bookings')
+        .select('id, customer_id, provider_id, resource_id')
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      if (bkgErr || !booking) {
+        return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+      }
+
+      const isAuthorized = await isCallerAuthorizedForBooking(user.id, booking, true);
+      if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden: Access denied to medical prescription' }, { status: 403 });
+      }
+    } else if (providerId) {
+      const isAuthorized = await isCallerAuthorizedForProvider(user.id, providerId);
+      if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden: Access denied to provider records' }, { status: 403 });
+      }
+    } else {
+      return NextResponse.json({ error: 'Either bookingId or providerId is required' }, { status: 400 });
     }
 
     const result = await getPrivateDocumentSignedUrl(

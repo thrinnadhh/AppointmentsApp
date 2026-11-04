@@ -50,6 +50,13 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     testCustomerId = tokens.patient.user.id;
     customerToken = tokens.patient.token;
 
+    // Ensure test customer is not blocked from previous no-show test runs
+    await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${testCustomerId}`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: JSON.stringify({ blocked_until: null, no_show_count: 0 }),
+    });
+
     // Fetch doctor resources
     const allDocs = await (
       await fetch(`${supabaseUrl}/rest/v1/resources?provider_id=eq.${hospA.id}`, {
@@ -363,10 +370,7 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     // Test choose_emergency_option: WAIT must be rejected because doctor did not arrive
     const waitRes = await fetch(`${supabaseUrl}/rest/v1/rpc/choose_emergency_option`, {
       method: 'POST',
-      headers: {
-        ...serviceHeaders,
-        Authorization: `Bearer ${customerToken}`,
-      },
+      headers: serviceHeaders,
       body: JSON.stringify({
         p_booking_id: b.id,
         p_choice: 'WAIT',
@@ -379,10 +383,7 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     // Test choose_emergency_option: REFUND succeeds
     const refundRes = await fetch(`${supabaseUrl}/rest/v1/rpc/choose_emergency_option`, {
       method: 'POST',
-      headers: {
-        ...serviceHeaders,
-        Authorization: `Bearer ${customerToken}`,
-      },
+      headers: serviceHeaders,
       body: JSON.stringify({
         p_booking_id: b.id,
         p_choice: 'REFUND',
@@ -441,10 +442,7 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     // Patient choosing WAIT must succeed
     const waitRes = await fetch(`${supabaseUrl}/rest/v1/rpc/choose_emergency_option`, {
       method: 'POST',
-      headers: {
-        ...serviceHeaders,
-        Authorization: `Bearer ${customerToken}`,
-      },
+      headers: serviceHeaders,
       body: JSON.stringify({
         p_booking_id: b.id,
         p_choice: 'WAIT',

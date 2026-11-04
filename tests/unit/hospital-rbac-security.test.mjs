@@ -645,11 +645,21 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
       const futureDoc = allDocs.find(d => d.name.includes('Sharma')) || allDocs[0];
       const neuroDeptId = hospA.departments.find(d => d.name === 'Neurology').id;
 
+      // Register dedicated patient without an appointment today to isolate future check-in code testing
+      const futurePatientEmail = `future.patient.${Date.now()}@test-tirupati.local`;
+      const signUpRes = await fetch(`${url}/auth/v1/signup`, {
+        method: 'POST',
+        headers: { 'apikey': serviceKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: futurePatientEmail, password: 'HospitalTest2026!' })
+      });
+      const signUpData = await signUpRes.json();
+      const futurePatientId = signUpData.user?.id || signUpData.id;
+
       const futureBookingRes = await fetch(`${url}/rest/v1/bookings`, {
         method: 'POST',
         headers: serviceHeaders,
         body: JSON.stringify({
-          customer_id: tokens.patient1.user.id,
+          customer_id: futurePatientId,
           provider_id: hospA.id,
           resource_id: futureDoc.id,
           department_id: neuroDeptId,

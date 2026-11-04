@@ -9,7 +9,7 @@
  * - Non-destructive upload policy (upsert: false) to prevent overwriting existing assets
  */
 
-import { supabase } from './supabase';
+import { supabase, getSupabaseAdmin } from './supabase';
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_BUCKET = process.env.R2_BUCKET_NAME || 'appointments-assets';
@@ -224,7 +224,8 @@ export async function getPrivateDocumentSignedUrl(
   const boundedTtl = Math.max(60, Math.min(expiresInSeconds, 3600));
 
   try {
-    const { data, error } = await supabase.storage
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.storage
       .from(bucket)
       .createSignedUrl(storagePath, boundedTtl);
 
@@ -243,7 +244,7 @@ export async function getPrivateDocumentSignedUrl(
         (await supabase.auth.getUser().then((res) => res.data.user?.id).catch(() => null)) ||
         null;
 
-      await (supabase.from('audit_logs') as any).insert({
+      await (admin.from('audit_logs') as any).insert({
         merchant_id: providerId,
         actor_id: actorId,
         action: 'READ_PRESCRIPTION_ATTACHMENT',

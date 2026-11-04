@@ -201,7 +201,6 @@ export async function seedHospitalTestData() {
         provider_id,
         name,
         department_id,
-        user_id: userId,
         type,
         user_id,
         deposit_amount: 100,

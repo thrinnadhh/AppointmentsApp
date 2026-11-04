@@ -21,9 +21,17 @@ const REQUIRED_GRIEVANCE_VARS = [
 ];
 
 module.exports = ({ config }) => {
+  const envProjectId = (process.env.EXPO_PUBLIC_EAS_PROJECT_ID || process.env.EAS_PROJECT_ID || '').trim();
+  if (process.env.EAS_BUILD === 'true' && !envProjectId) {
+    throw new Error(
+      'Missing or invalid EXPO_PUBLIC_EAS_PROJECT_ID (or EAS_PROJECT_ID). ' +
+        'Run `cd apps/customer-mobile && npx eas-cli init` once to create your EAS project, ' +
+        'then set EXPO_PUBLIC_EAS_PROJECT_ID=<your-eas-project-uuid> in your environment.'
+    );
+  }
+
   const rawProjectId = (
-    process.env.EXPO_PUBLIC_EAS_PROJECT_ID ||
-    process.env.EAS_PROJECT_ID ||
+    envProjectId ||
     config?.extra?.eas?.projectId ||
     ''
   ).trim();

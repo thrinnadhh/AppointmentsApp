@@ -49,17 +49,17 @@ describe('Security Audit: Database Grants & Function Overload Resolution', () =>
     assert.equal(rows.length, 0, `Must have zero ambiguous overloaded functions. Found: ${JSON.stringify(rows)}`);
   });
 
-  it('4. authenticated role has table-level SELECT and UPDATE grants on public.profiles (grant snapshot)', () => {
+  it('4. authenticated role has SELECT and UPDATE grants on public.profiles (column-level grant snapshot)', () => {
     const rows = runSql(`
-      SELECT privilege_type 
-      FROM information_schema.role_table_grants 
+      SELECT DISTINCT privilege_type 
+      FROM information_schema.role_column_grants 
       WHERE table_schema = 'public' 
         AND table_name = 'profiles' 
         AND grantee = 'authenticated';
     `);
     const privs = rows.map((r) => r.privilege_type);
-    assert.ok(privs.includes('SELECT'), 'authenticated role must have table-level SELECT on public.profiles');
-    assert.ok(privs.includes('UPDATE'), 'authenticated role must have table-level UPDATE on public.profiles');
+    assert.ok(privs.includes('SELECT'), 'authenticated role must have SELECT on public.profiles');
+    assert.ok(privs.includes('UPDATE'), 'authenticated role must have UPDATE on public.profiles');
   });
 
   it('5. public.profiles has RLS enabled with users_read_own_profile and users_update_own_profile policies', () => {

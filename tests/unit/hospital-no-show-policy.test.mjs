@@ -96,10 +96,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
 
     const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/record_no_show`, {
       method: 'POST',
-      headers: {
-        ...serviceHeaders,
-        Authorization: `Bearer ${tokens.adminApex.token}`,
-      },
+      headers: serviceHeaders,
       body: JSON.stringify({ p_booking_id: booking.id }),
     });
 
@@ -124,10 +121,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
     const booking = await createTestBooking(2);
     const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/record_no_show`, {
       method: 'POST',
-      headers: {
-        ...serviceHeaders,
-        Authorization: `Bearer ${tokens.adminApex.token}`,
-      },
+      headers: serviceHeaders,
       body: JSON.stringify({ p_booking_id: booking.id }),
     });
 
@@ -157,10 +151,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
     const booking = await createTestBooking(3);
     const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/record_no_show`, {
       method: 'POST',
-      headers: {
-        ...serviceHeaders,
-        Authorization: `Bearer ${tokens.adminApex.token}`,
-      },
+      headers: serviceHeaders,
       body: JSON.stringify({ p_booking_id: booking.id }),
     });
 
@@ -184,10 +175,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
       const booking = await createTestBooking(count);
       const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/record_no_show`, {
         method: 'POST',
-        headers: {
-          ...serviceHeaders,
-          Authorization: `Bearer ${tokens.adminApex.token}`,
-        },
+        headers: serviceHeaders,
         body: JSON.stringify({ p_booking_id: booking.id }),
       });
       const result = await rpcRes.json();
@@ -210,10 +198,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
     const booking = await createTestBooking(6);
     const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/record_no_show`, {
       method: 'POST',
-      headers: {
-        ...serviceHeaders,
-        Authorization: `Bearer ${tokens.adminApex.token}`,
-      },
+      headers: serviceHeaders,
       body: JSON.stringify({ p_booking_id: booking.id }),
     });
 

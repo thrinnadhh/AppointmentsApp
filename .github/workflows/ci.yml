@@ -154,6 +154,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate local PostgREST asymmetric signing key if absent
+        run: node scripts/generate-signing-keys.mjs
+
       - name: Start local Supabase and apply migrations
         run: |
           npx --yes supabase@2.20.5 start

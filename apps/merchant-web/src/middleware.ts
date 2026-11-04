@@ -66,12 +66,17 @@ export function isAllowedOrigin(origin: string | null): boolean {
       }
     }
 
-    // Production & preview whitelisted domains (Vercel & Cloudflare preview dynamic subdomains)
+    // Production & preview whitelisted domains (Vercel & Cloudflare preview dynamic subdomains restricted to team slug)
+    const teamSlug = process.env.VERCEL_TEAM_SLUG || 'appointments4u';
+    const isVercelPreview =
+      host.startsWith('appointments-merchant-') &&
+      (host.endsWith(`-${teamSlug}.vercel.app`) || host.endsWith(`_${teamSlug}.vercel.app`));
+
     if (
       host === 'appointments4u.in' ||
       host.endsWith('.appointments4u.in') ||
       host === 'appointments-merchant.vercel.app' ||
-      (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app')) ||
+      isVercelPreview ||
       host === 'appointments4u.pages.dev' ||
       host.endsWith('.appointments4u.pages.dev')
     ) {
@@ -113,9 +118,24 @@ export async function middleware(req: NextRequest) {
       : 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key, x-customer-id',
   };
 
+  let isPreviewOrigin = false;
+  if (reqOrigin) {
+    try {
+      const originHost = new URL(reqOrigin).hostname;
+      isPreviewOrigin =
+        (originHost.endsWith('.vercel.app') && originHost !== 'appointments-merchant.vercel.app') ||
+        originHost.endsWith('.pages.dev');
+    } catch {
+      isPreviewOrigin = false;
+    }
+  }
+
   if (originAllowed && reqOrigin) {
     corsHeaders['Access-Control-Allow-Origin'] = reqOrigin;
-    corsHeaders['Access-Control-Allow-Credentials'] = 'true';
+    // Do not send Access-Control-Allow-Credentials for preview origins. Preview origins use Bearer JWT headers, not cross-site ambient cookies.
+    if (!isPreviewOrigin) {
+      corsHeaders['Access-Control-Allow-Credentials'] = 'true';
+    }
   }
 
   // Handle CORS preflight OPTIONS requests immediately
@@ -223,9 +243,12 @@ export async function middleware(req: NextRequest) {
   }
 
   // 2. Public Page Routes Gate
+  const isDemoAllowed = !isProduction && !process.env.VERCEL && !process.env.CF_PAGES;
+  const isDemo = isDemoAllowed && req.nextUrl.searchParams.get('demo') === '1';
+
   if (
     PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) ||
-    ((['/', '/schedule', '/departments', '/audit-logs', '/consultation', '/team', '/settings'].includes(pathname)) && req.nextUrl.searchParams.get('demo') === '1') ||
+    ((['/', '/schedule', '/departments', '/audit-logs', '/consultation', '/team', '/settings'].includes(pathname)) && isDemo) ||
     isE2EBypass
   ) {
     return NextResponse.next();

@@ -723,12 +723,12 @@ describe('Phase 3: Hospital Queue Engine & Console/Customer Parity (R1-R7, Items
     callOrder.push(c.id);
     recordStep('09:30', 'P7 done; dispatch P8', c.id);
 
-    // 09:35: P1, P2, P5, P6 arrive, and P9 arrives (present for 10:20 slot)
-    engine.checkInPatient('P1', new Date('2026-10-28T09:35:01+05:30').toISOString());
-    engine.checkInPatient('P2', new Date('2026-10-28T09:35:02+05:30').toISOString());
-    engine.checkInPatient('P5', new Date('2026-10-28T09:35:03+05:30').toISOString());
-    engine.checkInPatient('P6', new Date('2026-10-28T09:35:04+05:30').toISOString());
-    engine.checkInPatient('P9', new Date('2026-10-28T09:35:05+05:30').toISOString());
+    // 09:35: P1, P2, P5, P6 arrive (before 09:35 snapshot), and P9 arrives (present for 10:20 slot)
+    engine.checkInPatient('P1', new Date('2026-10-28T09:34:55+05:30').toISOString());
+    engine.checkInPatient('P2', new Date('2026-10-28T09:34:56+05:30').toISOString());
+    engine.checkInPatient('P5', new Date('2026-10-28T09:34:57+05:30').toISOString());
+    engine.checkInPatient('P6', new Date('2026-10-28T09:34:58+05:30').toISOString());
+    engine.checkInPatient('P9', new Date('2026-10-28T09:34:59+05:30').toISOString());
     recordStep('09:35', 'P1,P2,P5,P6 arrive (late) + P9 arrives (on-time for 10:20)', null);
 
     // 09:40, 09:50, 10:00, 10:10: 40m gap before P9's 10:20 slot -> P1, P2, P5, P6 fit in order

@@ -665,7 +665,7 @@ export default function BookingPassModal({
                             <Text style={styles.lateQueueBadgeText}>STANDBY QUEUE ASSIGNED</Text>
                           </View>
                           <Text style={styles.lateQueueTokenNumber} testID="pass-late-token-number">
-                            Standby #{currentQueuePosition}
+                            Standby (Turn #{currentQueuePosition})
                           </Text>
                         </View>
                         <Text style={styles.lateQueueNoticeText}>
@@ -673,8 +673,8 @@ export default function BookingPassModal({
                         </Text>
                         <View style={styles.honestEstimateBox} testID="pass-honest-estimate-box">
                           <Text style={styles.honestEstimateTitle}>Honest Estimate &amp; Guarantee:</Text>
-                          <Text style={styles.honestEstimateText}>
-                            The doctor will see you in gaps between on-time patients (estimated wait: ~{currentWaitMinutes || 25} mins) or at the end of the session. You will never be dropped!
+                          <Text style={styles.honestEstimateText} testID="pass-late-wait-minutes">
+                            The doctor will see you in gaps between on-time patients (estimated wait: ~{currentWaitMinutes} mins) or at the end of the session. You will never be dropped!
                           </Text>
                         </View>
                       </View>

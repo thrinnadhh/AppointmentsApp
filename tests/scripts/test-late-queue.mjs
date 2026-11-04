@@ -193,7 +193,7 @@ describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
       engine.checkInPatient('P_LATE_1', '2026-10-11T10:10:00.000Z');
       engine.checkInPatient('P_LATE_2', '2026-10-11T10:05:00.000Z');
 
-      const queues = engine.evaluateQueues('2026-10-11T10:00:00.000Z');
+      const queues = engine.evaluateQueues('2026-10-11T10:15:00.000Z');
       assert.equal(queues.waitingQueue[0].id, 'P_ON');
       assert.equal(queues.standbyQueue[0].id, 'P_LATE_1', 'Earlier original booking time served first in Standby');
       assert.equal(queues.standbyQueue[1].id, 'P_LATE_2');

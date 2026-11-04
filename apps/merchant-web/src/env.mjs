@@ -187,7 +187,7 @@ const isLintPhase = process.env.npm_lifecycle_event === 'lint';
 // Auto-validate on startup unless explicitly opted out
 if (process.env.SKIP_ENV_VALIDATION !== 'true') {
   // Production Security Assertion: Never permit payment mocking in production environments
-  if (process.env.NODE_ENV === 'production' && !isBuildPhase && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
     throw new Error('FATAL SECURITY VIOLATION: ALLOW_MOCK_PAYMENTS cannot be set to "true" in production environments.');
   }
 

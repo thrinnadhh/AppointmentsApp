@@ -18,6 +18,10 @@ describe('Security Audit: Production Environment Assertions', () => {
     UPSTASH_REDIS_REST_TOKEN: 'actual_upstash_rest_token_prod_12345',
     NEXT_PUBLIC_APP_URL: 'https://appointments4u.in',
     ALLOW_MOCK_PAYMENTS: 'false',
+    NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME: 'A. Venkata Rao',
+    NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL: 'compliance@appointments4u.in',
+    NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE: '+918772254321',
+    NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS: '14-2-108 Leela Mahal Circle, Tirupati 517501',
   };
 
   it('1. REQUIRED_PRODUCTION_VARS includes UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN', () => {

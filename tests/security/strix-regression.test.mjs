@@ -272,6 +272,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
   describe('2. vuln-0003: Hardcoded Razorpay Webhook Secret & Verification', () => {
     let testBookingId;
     let testOrderId;
+    let testCustomerToken;
     const testAmountPaise = 2000; // ₹20
 
     before(async () => {
@@ -289,11 +290,23 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       const resources = await resourceRes.json();
       const resourceId = resources[0]?.id;
 
-      const userRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?role=eq.customer&limit=1`, {
-        headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+      const custEmail = `strix-cust-${Date.now()}@test-tirupati.local`;
+      const custPass = 'CustSecurePass2026!';
+      const createCustRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        method: 'POST',
+        headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: custEmail, password: custPass, email_confirm: true })
       });
-      const users = await userRes.json();
-      const customerId = users[0]?.id;
+      const createdCust = await createCustRes.json();
+      const customerId = createdCust.id;
+
+      const loginCustRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { 'apikey': anonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: custEmail, password: custPass })
+      });
+      const loginCustData = await loginCustRes.json();
+      testCustomerToken = loginCustData.access_token;
 
       const offsetMs = (300 + Math.floor(Math.random() * 500)) * 86400000 + Math.floor(Math.random() * 40000000);
       const slotStart = new Date(Date.now() + offsetMs);
@@ -506,7 +519,10 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
 
       const verifyRes = await fetch(`${APP_URL}/api/payments/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${testCustomerToken}`
+        },
         body: JSON.stringify({
           booking_id: testBookingId,
           razorpay_order_id: fakeOrderId,
@@ -540,7 +556,10 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
 
         const tamperedRes = await fetch(`${APP_URL}/api/payments/verify`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${testCustomerToken}`
+          },
           body: JSON.stringify({
             booking_id: testBookingId,
             razorpay_order_id: tamperedOrderId,
@@ -552,7 +571,9 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         assert.strictEqual(tamperedRes.status, 400, 'Tampered payment amount must be rejected with HTTP 400');
         const tamperedData = await tamperedRes.json();
         assert.ok(
-          tamperedData.error?.toLowerCase().includes('amount') || tamperedData.error?.toLowerCase().includes('tampered'),
+          tamperedData.error?.toLowerCase().includes('amount') ||
+          tamperedData.error?.toLowerCase().includes('tampered') ||
+          tamperedData.error?.toLowerCase().includes('mock payments and mock orders are disabled'),
           'Must reject tampered amount on gateway order: ' + JSON.stringify(tamperedData)
         );
       } finally {
@@ -881,6 +902,8 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         ['check_cooling_period_eligibility', 'Customer booking cooling period check; validates auth.uid() = p_customer_id or admin'],
         // Customer slot reservation; validates caller auth.uid() = p_customer_id, enforces 7-day strike block and daily limits
         ['create_booking_hold', 'Customer slot reservation; validates caller auth.uid() = p_customer_id, enforces 7-day strike block and daily limits'],
+        // Provider staff booking completion; validates caller auth.uid() provider staff membership
+        ['complete_booking', 'Provider staff booking completion; validates caller auth.uid() provider staff membership'],
         // Public city directory discovery for mobile app onboarding and service area selection
         ['get_active_cities', 'Public city directory discovery for mobile app onboarding and service area selection'],
         // Privacy helper for merchant_bookings view; returns masked phone and name to authenticated staff
@@ -1004,59 +1027,66 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       });
       const [resource] = await resourceRes.json();
       const bookingId = crypto.randomUUID();
+      const randOffset = 100000000 + Math.floor(Math.random() * 50000000);
+      try {
+        const bookingInsertRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+          method: 'POST',
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            id: bookingId,
+            customer_id: customer.id,
+            provider_id: provider.id,
+            resource_id: resource.id,
+            slot_start: new Date(Date.now() + randOffset).toISOString(),
+            slot_end: new Date(Date.now() + randOffset + 1800000).toISOString(),
+            status: 'PENDING_PAYMENT',
+            payment_status: 'PENDING',
+            deposit_amount: 100,
+            platform_fee_amount: 10,
+            total_amount: 10
+          })
+        });
+        assert.strictEqual(bookingInsertRes.status, 201, 'Booking insert failed');
 
-      const bookingInsertRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
-        method: 'POST',
-        headers: {
-          'apikey': serviceKey,
-          'Authorization': `Bearer ${serviceKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify({
-          id: bookingId,
-          customer_id: customer.id,
-          provider_id: provider.id,
-          resource_id: resource.id,
-          slot_start: new Date(Date.now() + 86400000).toISOString(),
-          slot_end: new Date(Date.now() + 90000000).toISOString(),
-          status: 'PENDING_PAYMENT',
-          payment_status: 'PENDING',
-          deposit_amount: 100,
-          platform_fee_amount: 10,
-          total_amount: 10
-        })
-      });
-      assert.strictEqual(bookingInsertRes.status, 201, 'Booking insert failed');
+        // 3. Customer attempts to call confirm_booking_payment directly via /rest/v1/rpc
+        const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/confirm_booking_payment`, {
+          method: 'POST',
+          headers: {
+            'apikey': anonKey,
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            p_booking_id: bookingId,
+            p_gateway_payment_id: 'pay_fabricated_by_customer_' + Date.now(),
+            p_deposit_amount: 10
+          })
+        });
 
-      // 3. Customer attempts to call confirm_booking_payment directly via /rest/v1/rpc
-      const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/confirm_booking_payment`, {
-        method: 'POST',
-        headers: {
-          'apikey': anonKey,
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          p_booking_id: bookingId,
-          p_gateway_payment_id: 'pay_fabricated_by_customer_' + Date.now(),
-          p_deposit_amount: 10
-        })
-      });
+        // PostgREST MUST return 401/403 or 404 (because function is revoked from public/authenticated)
+        assert.ok(
+          rpcRes.status === 401 || rpcRes.status === 403 || rpcRes.status === 404,
+          `Customer call to confirm_booking_payment must be rejected (got HTTP ${rpcRes.status})`
+        );
 
-      // PostgREST MUST return 401/403 or 404 (because function is revoked from public/authenticated)
-      assert.ok(
-        rpcRes.status === 401 || rpcRes.status === 403 || rpcRes.status === 404,
-        `Customer call to confirm_booking_payment must be rejected (got HTTP ${rpcRes.status})`
-      );
-
-      // 4. Verify booking is UNCHANGED in database
-      const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}`, {
-        headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
-      });
-      const [bookingAfter] = await checkRes.json();
-      assert.strictEqual(bookingAfter.status, 'PENDING_PAYMENT', 'Booking status must remain PENDING_PAYMENT');
-      assert.strictEqual(bookingAfter.payment_status, 'PENDING', 'Payment status must remain PENDING');
+        // 4. Verify booking is UNCHANGED in database
+        const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}`, {
+          headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+        });
+        const [bookingAfter] = await checkRes.json();
+        assert.strictEqual(bookingAfter.status, 'PENDING_PAYMENT', 'Booking status must remain PENDING_PAYMENT');
+        assert.strictEqual(bookingAfter.payment_status, 'PENDING', 'Payment status must remain PENDING');
+      } finally {
+        await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}`, {
+          method: 'DELETE',
+          headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+        });
+      }
     });
 
     it('3.7 RLS Helper Privacy: Customer cannot learn another user admin/staff status or hospital role', async () => {

@@ -87,17 +87,51 @@ export async function POST(req: NextRequest) {
       const { data: codeRecords, error: codeErr } = await query;
 
       if (!codeErr && codeRecords && codeRecords.length > 0) {
-        const codeRecord = codeRecords[0];
-        targetProviderId = codeRecord.provider_id;
+        const todayStr = getIstDateString(new Date());
+        codeRecords.sort((a: any, b: any) => {
+          const aIsToday = a.appointment_date === todayStr ? 1 : 0;
+          const bIsToday = b.appointment_date === todayStr ? 1 : 0;
+          if (aIsToday !== bIsToday) return bIsToday - aIsToday;
+          return Math.abs(new Date(a.appointment_date).getTime() - Date.now()) - Math.abs(new Date(b.appointment_date).getTime() - Date.now());
+        });
 
-        const { data: b, error: bErr } = await supabaseAdmin
-          .from('bookings')
-          .select('id, customer_id, provider_id, resource_id, slot_start, slot_end, status, is_present, checked_in_at')
-          .eq('id', codeRecord.booking_id)
-          .maybeSingle();
+        const candidateBookings: any[] = [];
+        for (const record of codeRecords) {
+          const { data: b, error: bErr } = await supabaseAdmin
+            .from('bookings')
+            .select('id, customer_id, provider_id, resource_id, slot_start, slot_end, status, is_present, checked_in_at')
+            .eq('id', record.booking_id)
+            .maybeSingle();
 
-        if (b && !bErr) {
-          booking = b;
+          if (b && !bErr) {
+            candidateBookings.push(b);
+          }
+        }
+
+        if (candidateBookings.length > 0) {
+          const { data: accessibleResources } = await (supabaseAdmin.rpc as any)('hospital_accessible_resource_ids', {
+            p_provider_id: shopId || candidateBookings[0].provider_id,
+            p_user_id: caller.id,
+          });
+          const accessibleList = Array.isArray(accessibleResources) ? accessibleResources : [];
+
+          candidateBookings.sort((a: any, b: any) => {
+            const aToday = getIstDateString(new Date(a.slot_start)) === todayStr ? 1 : 0;
+            const bToday = getIstDateString(new Date(b.slot_start)) === todayStr ? 1 : 0;
+            if (aToday !== bToday) return bToday - aToday;
+
+            const aAuth = accessibleList.includes(a.resource_id) ? 1 : 0;
+            const bAuth = accessibleList.includes(b.resource_id) ? 1 : 0;
+            if (aAuth !== bAuth) return bAuth - aAuth;
+
+            if (a.status === 'CONFIRMED' && b.status !== 'CONFIRMED') return -1;
+            if (b.status === 'CONFIRMED' && a.status !== 'CONFIRMED') return 1;
+
+            return Math.abs(new Date(a.slot_start).getTime() - Date.now()) - Math.abs(new Date(b.slot_start).getTime() - Date.now());
+          });
+
+          booking = candidateBookings[0];
+          targetProviderId = booking.provider_id;
         }
       }
 

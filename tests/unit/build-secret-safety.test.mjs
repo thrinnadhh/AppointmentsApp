@@ -26,7 +26,7 @@ describe('Layer 2: API & Build Secret Safety (DEF-RC-01)', () => {
     let stdout = '';
     try {
       stdout = execSync(
-        `npx tsx -e "${script.replace(/"/g, '\\"')}"`,
+        `node -e "${script.replace(/"/g, '\\"')}"`,
         { cwd: merchantWebDir, encoding: 'utf8' }
       );
     } catch (e) {
@@ -60,7 +60,7 @@ describe('Layer 2: API & Build Secret Safety (DEF-RC-01)', () => {
     `;
 
     const stdout = execSync(
-      `npx tsx -e "${script.replace(/"/g, '\\"')}"`,
+      `node -e "${script.replace(/"/g, '\\"')}"`,
       { cwd: merchantWebDir, encoding: 'utf8' }
     );
 
