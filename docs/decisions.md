@@ -297,3 +297,21 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
      - Gitleaks configuration in `.gitleaks.toml` anchors path ignore patterns (`(^|/)node_modules/`, etc.) and eliminates bare directory patterns.
      - `vuln-0002` marked as "not exploitable at runtime (build-time @expo/cli only); accepted risk".
 
+
+---
+
+### Decision 15: Production Readiness Roadmap (Groups 1–9) & Verification of Groups 1 & 2
+- **Date**: 2026-11-05
+- **Status**: DECIDED (Groups 1 & 2 Accepted & Committed; Groups 3–9 Documented in `docs/PRODUCTION_READINESS_ROADMAP.md`)
+- **Requirement & Architecture**:
+  1. **Master Instruction & Specification Centralization**:
+     - Centralized all 9 production readiness groups from user directives into `docs/PRODUCTION_READINESS_ROADMAP.md` as the definitive single source of truth alongside `docs/hospital/SPEC.md`.
+  2. **Group 1 Reconciliation & DB Clean-State Proof**:
+     - Merged `main` into `fix/production-readiness`, reconciling 134 migrations with 0 duplicate version prefixes.
+     - Restored 11 stored procedures (`cancel_booking`, `complete_booking`, `reschedule_booking_slot`, `record_no_show`, `mark_present_manually`, `verify_checkin_code`, `expire_stale_standby_queue`, `override_hospital_queue_position`, `collect_consultation_fee`, `create_booking_hold`, `cancel_doctor_emergency`).
+     - Hardened production build check against `ALLOW_MOCK_PAYMENTS=true` in `apps/merchant-web/src/env.mjs`.
+     - Restricted preview CORS origins to `[YOUR-TEAM-SLUG]` and disabled demo mode in production.
+  3. **Group 2 Concurrency & Test Verification**:
+     - Executed complete baseline dependency audit across all 46 test suites (245 unit tests, 324 script tests, 0 failures).
+     - Proved PostgreSQL database-level concurrency enforcement via `no_overlapping_active_bookings` (`btree_gist` / `tstzrange` exclusion constraint) and `idx_single_in_consultation_per_doctor` (partial unique index).
+     - Authored repeatable stress test script `scripts/stress-test-queue-invariants.mjs` verifying atomic single check-in under 5 simultaneous requests (1 winner, 4 stale rejections, 0 duplicates) and FIFO standby queue ordering respecting the 10-minute grace window.
