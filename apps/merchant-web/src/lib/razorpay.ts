@@ -32,6 +32,7 @@ export interface RefundParams {
   reason?: string;
   actorId?: string;
   idempotencyKey?: string;
+  speed?: 'normal' | 'optimum' | 'instant';
   stuckThresholdMs?: number;
 }
 
@@ -441,6 +442,24 @@ export async function fetchRazorpayRefundsForPayment(
 }
 
 /**
+ * Resolves or generates a compliant Razorpay refund idempotency key.
+ * Official Razorpay spec: Must be at least 10 chars, containing only [a-zA-Z0-9_-].
+ */
+export function resolveRefundIdempotencyKey(candidate?: string, fallbackSeed?: string): string {
+  if (candidate && typeof candidate === 'string') {
+    const trimmed = candidate.trim();
+    if (trimmed.length >= 10 && /^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+  return crypto
+    .createHash('sha256')
+    .update(fallbackSeed || `refund:${Date.now()}:${Math.random()}`)
+    .digest('hex')
+    .slice(0, 36);
+}
+
+/**
  * Initiates a refund for a payment via Razorpay.
  * Supports both direct paymentId refunds and booking-scoped refunds ({ supabaseAdmin, bookingId, refundAmountInr, reason, actorId }).
  * Includes recovery (reconciliation + retry) for rows stuck in REFUND_IN_PROGRESS longer than STUCK_REFUND_THRESHOLD_MS.
@@ -452,6 +471,7 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
     refundAmountInr,
     reason,
     actorId,
+    speed = 'optimum',
     stuckThresholdMs = STUCK_REFUND_THRESHOLD_MS,
   } = params;
   let paymentId = params.paymentId || '';
@@ -628,19 +648,17 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
         throw new Error(`No gateway_payment_id found for booking ${bookingId}`);
       }
 
-      const idempotencyKey =
-        params.idempotencyKey ||
-        crypto
-          .createHash('sha256')
-          .update(`refund:${bookingId}:${paymentId}:${amount ?? 'full'}`)
-          .digest('hex')
-          .slice(0, 36);
+      const idempotencyKey = resolveRefundIdempotencyKey(
+        params.idempotencyKey,
+        `refund:${bookingId}:${paymentId}:${amount ?? 'full'}`
+      );
 
       const refundRes = await initiateRazorpayRefund({
         paymentId,
         amount,
         notes,
         idempotencyKey,
+        speed,
       });
 
       const nowIso = new Date().toISOString();
@@ -720,13 +738,10 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
     const keyId = process.env.RAZORPAY_KEY_ID!;
     const keySecret = process.env.RAZORPAY_KEY_SECRET!;
     const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
-    const idempotencyKey =
-      params.idempotencyKey ||
-      crypto
-        .createHash('sha256')
-        .update(`refund:${paymentId}:${amount ?? 'full'}:${notes.booking_id || ''}`)
-        .digest('hex')
-        .slice(0, 36);
+    const idempotencyKey = resolveRefundIdempotencyKey(
+      params.idempotencyKey,
+      `refund:${paymentId}:${amount ?? 'full'}:${notes.booking_id || ''}`
+    );
 
     const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
       method: 'POST',
@@ -737,6 +752,7 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
       },
       body: JSON.stringify({
         ...(amount ? { amount } : {}),
+        ...(speed ? { speed } : {}),
         ...(Object.keys(notes).length > 0 ? { notes } : {}),
       }),
       signal: AbortSignal.timeout(10000),
@@ -753,6 +769,7 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
       amount: data.amount,
       status: data.status,
       is_mock: false,
+      success: true,
     };
   }
 

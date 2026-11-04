@@ -1,19 +1,12 @@
----
-type: user
-created: 2026-07-18
-updated: 2026-09-30
----
+# User Preferences & Agent Execution Rules
 
-# User Preferences
+## Multi-Agent Workflow (`ag-kit`)
+- **Supported Environment**: Google Antigravity and Gemini CLI using `ag-kit` specialist roles (`@orchestrator`, `[Agent-Infra]`, `[Agent-Backend]`, `[Agent-Security-Auditor]`, `[Agent-QA]`).
+- **Additional Installed Tooling**: Roo Code, GSD, and Ralph Code are available for autonomous execution, spec planning, and self-correcting feedback loops.
 
-## Installed AI Tooling & Framework Extensions
-The user has installed and enabled the following tools in their Antigravity development environment:
-1. **Roo Code (`rooveterinaryinc.roo-cline`)**:
-   - Advanced autonomous AI coding assistant with custom modes, deep file editing, and terminal integration.
-   - Use for autonomous multi-step code generation and task orchestration when requested or appropriate.
-2. **GSD (`axrydestudio.get-shit-done`)**:
-   - Get Shit Done context engineering and spec-driven development framework.
-   - Maintain and consult `.planning/` artifacts (`PROJECT.md`, `ROADMAP.md`, `STATE.md`, `CODEBASE.md`) to prevent context rot and enforce phased execution.
-3. **Ralph Code / Ralph Loop (`abhishekbhakat.ralph-loop-for-antigravity`)**:
-   - Ralph Wiggum iterative feedback loop for Antigravity.
-   - Use for self-correcting agent execution loops and test-driven verification until all criteria pass.
+## Strict Verification & Anti-Cheating Protocol
+1. **Raw Command Receipts**: Every sub-agent claim must be backed by raw terminal outputs, exit codes, and exact `file:line` references.
+2. **Zero Test Weakening**: Never delete, skip, or weaken assertions in existing test files to force a pass. Always verify with `git diff --stat HEAD tests/`.
+3. **Authentic Runtime Checks**: Database-dependent and Dev-Server-dependent tests must run against live local Supabase (`127.0.0.1:54321` / `54322`) and Next.js (`localhost:3000`) instances—never fake live integration tests with mocks.
+4. **Orchestrator Cross-Examination**: Every group execution must conclude with a Phase 3 Coordinator Cross-Examination verifying all invariants before committing.
+5. **Stop-Gate Discipline**: Execute strictly ONE numbered group from `docs/PRODUCTION_READINESS_ROADMAP.md` at a time, commit cleanly, and STOP to await user authorization.

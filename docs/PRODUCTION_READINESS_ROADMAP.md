@@ -3,7 +3,7 @@
 > **Document Status**: Living Master Specification & Execution Ledger  
 > **Branch**: `fix/production-readiness`  
 > **Source of Truth**: `docs/hospital/SPEC.md` and User Directives (Steps 0, 391, 627, 1113, 3029, 3662)  
-> **Current Progress**: Group 1 **ACCEPTED**, Group 2 **ACCEPTED**, Groups 3–9 **PENDING**
+> **Current Progress**: Group 1 **ACCEPTED**, Group 2 **ACCEPTED**, Group 3 **ACCEPTED**, Groups 4–9 **PENDING**
 
 ---
 
@@ -53,7 +53,7 @@ Report with file:line evidence and test output.
 | :---: | :--- | :---: | :--- |
 | **Group 1** | **Git Merge, Semantic Merge Reconcile & Clean DB State** | **ACCEPTED** ✅ | Commits `9487275`, `2637c0f`, `94228c0`, `81207c1` |
 | **Group 2** | **Tests, Concurrency Invariants & Test Infrastructure** | **ACCEPTED** ✅ | Commit `4289a3e` |
-| **Group 3** | **Razorpay Refund API & Idempotency Header** | **PENDING** ⏳ | Awaiting user trigger |
+| **Group 3** | **Razorpay Refund API & Idempotency Header** | **ACCEPTED** ✅ | Commit pending |
 | **Group 4** | **OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **PENDING** ⏳ | Awaiting user trigger |
@@ -106,6 +106,29 @@ Report with file:line evidence and test output.
 
 ---
 
+### Group 3: Razorpay Refund API & Idempotency Header (ACCEPTED)
+- **Multi-Agent Coordination**: Orchestrated across `[Agent-Security-Auditor]`, `[Agent-Backend]`, and `[Agent-QA]`.
+- **Pre-Flight Grace-Window Sanity Check**:
+  - Investigated potential semantic discrepancy between 10-minute vs 5-minute late grace window.
+  - Confirmed SQL RPC (`mark_present_manually` via `pg_get_functiondef`) uses `v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'))`.
+  - Confirmed TypeScript (`packages/shared/src/queue-engine.ts`) exports `ON_TIME_GRACE_MINUTES = 5`.
+  - Confirmed both SQL and TypeScript use the exact same unified 5-minute duration. Updated console banner in `scripts/stress-test-queue-invariants.mjs` to eliminate discrepancy.
+- **Official Documentation Grounding**:
+  - Fetched and cited `https://razorpay.com/docs/api/refunds/normal-refunds-idempotent`.
+  - Verbatim specification: Header name is `X-Refund-Idempotency`. Key must be >= 10 characters and contain only `[a-zA-Z0-9_-]`. Identical payload required on retry.
+- **Codebase Reconciliation**:
+  - Implemented `resolveRefundIdempotencyKey` in `apps/merchant-web/src/lib/razorpay.ts` enforcing Razorpay specification (>= 10 chars, `[a-zA-Z0-9_-]`, fallback deterministic SHA-256).
+  - Hardened `initiateRazorpayRefund` to pass `X-Refund-Idempotency` on all refund executions, with `speed: 'optimum'` for bank route compatibility.
+- **Unit Test Clarification**:
+  - Renamed Test 4d in `tests/unit/phase2-functional-blockers.test.mjs` to `4d (Mocked Unit): (C5d)...` with zero weakened assertions.
+- **Integration Test Suite**:
+  - Authored `tests/unit/razorpay-refund-integration.test.mjs`.
+  - Proved `assertNoLiveRazorpayKeys` immediately rejects `rzp_live_*` before network dispatch.
+  - Proved missing test keys trigger a visible native `t.skip()`.
+  - Executed live test-mode refund against Razorpay API and verified idempotent replay returns identical refund ID without double refund.
+
+---
+
 ## 5. Upcoming Groups Execution Plan
 
 ### Group 3: Razorpay Refund API & Idempotency
@@ -147,3 +170,4 @@ Report with file:line evidence and test output.
 1. Fix broken imports in `tests/scripts/demo-live-logs.mjs` and `verify-logging.mjs`.
 2. Replace soft `test.skip()` in core Playwright E2E suites with verifiable assertions; tag in-progress specs with `@wip`.
 3. Run the full validation gate (`supabase db reset`, serial test execution, typecheck, production build).
+

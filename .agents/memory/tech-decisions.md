@@ -1,19 +1,27 @@
----
-type: project
-created: 2026-07-18
-updated: 2026-07-18
----
+# Technical Decisions, Architecture & Domain Invariants
 
-# Technical Decisions
+## Multi-App Monorepo Stack
+- **Customer Mobile (`apps/customer-mobile`)**: React Native (Expo) for iOS/Android. Phone OTP auth, hyperlocal Tirupati discovery (Hospitals, Restaurants, Salons, Gaming/Turf, Pet Care), 5-minute atomic booking holds, Razorpay deposit checkout, booking pass with lifetime 4-digit check-in PIN.
+- **Merchant Web (`apps/merchant-web`)**: Next.js 15 App Router (port 3000). Hospital Admin, Front Desk queue desk, and Consultant screens.
+- **Shared Core (`packages/shared`)**: Queue math engine (`evaluateConsultantQueue`, `buildRollingTenSlotQueue`) and shared constants.
+- **Database (`supabase/`)**: PostgreSQL with strict RLS, `SECURITY DEFINER` RPCs, and `pg_cron`.
+- **Payments & Distributed State**: Razorpay (Orders API, HMAC-SHA256 webhooks, Refunds with `X-Refund-Idempotency` header) + Upstash Redis (fail-closed distributed locks and rate limiters).
 
-- Component metadata uses SemVer while the toolkit release keeps CalVer.
-- `manifest.json` and `manifest.lock.json` must remain synchronized with component frontmatter.
-- Database: Supabase (PostgreSQL with RLS, Supabase Auth with SMS OTP, Storage, and Edge Functions).
-- Customer Platform: Native Mobile Application built with React Native (Expo) for iOS and Android.
-- Merchant Platform: Web Application built with Next.js 15 App Router and Tailwind CSS.
-- Monorepo: Managed via pnpm workspaces (`apps/customer-mobile`, `apps/merchant-web`, `packages/shared`, `supabase/`).
-- Payment Gateway: Standardized on Razorpay (Orders API, HMAC-SHA256 signature verification, and UPI Intent checkout) for Indian domestic collections and deposit holds.
-- Cooling Period / Free Follow-up: Configurable `cooling_period_days` on providers (hospitals/clinics standard: 20 days). When rebooked within window from a prior confirmed appointment, fees are waived to ₹0 (`is_followup: true`), Razorpay gateway order is bypassed, and direct 1-click confirmation is recorded.
-- Security & Cancellation Architecture: Cancellation initiator (`CUSTOMER` vs `MERCHANT`) is derived strictly from verified authenticated JWT caller in both SQL RPC (`cancel_booking`) and Edge Functions. Customer callers cannot spoof `MERCHANT` cancellations to evade deposit forfeitures. Refund-eligible cancellations keep `payments.status` in `CAPTURED` until single-winner atomic claim in `/api/bookings/cancel` promotes to `REFUND_PENDING` and triggers Razorpay API. Testing bypass headers (`x-customer-id`) are strictly gated behind `ENABLE_E2E_BYPASS=true` and disabled by default in production.
+## Reconciled Core Stored Procedures (11 Canonical RPCs)
+1. `cancel_booking`: DPDP audit logs, 60-minute cooling-off fee calculation, emergency cancellation.
+2. `complete_booking`: Role guard (`is_admin OR auth.uid() IN (doctor_user_id, front_desk_assigned)`).
+3. `reschedule_booking_slot`: Enforces 1-hour minimum patient gap check.
+4. `record_no_show`: Enforces tiered no-show policy; restricted strictly to `service_role`.
+5. `mark_present_manually`: `FOR UPDATE` row lock, late grace window, `customer_arrived_at` tracking.
+6. `verify_checkin_code`: Daily PIN lookup, permanent lifetime PIN fallback, 5-attempt / 60s lockout rate limit.
+7. `expire_stale_standby_queue`: Auto-expires overdue standby candidates while protecting delayed on-time patients.
+8. `override_hospital_queue_position`: Restricted to hospital admins and assigned front desk staff.
+9. `collect_consultation_fee`: Split payment support (platform fee online, consultation fee at desk).
+10. `create_booking_hold`: GiST range exclusion overlap check + daily quota tracking in `Asia/Kolkata`.
+11. `cancel_doctor_emergency`: Mass-reschedule, 100% refund trigger, 0 merchant strikes.
 
-
+## Database & Security Hard Locks
+- **No Overlapping Active Bookings**: `no_overlapping_active_bookings` (`EXCLUDE USING gist (resource_id WITH =, tstzrange(slot_start, slot_end) WITH &&) WHERE status IN ('HELD', 'PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_CONSULTATION')`).
+- **Single Active Consultation**: `idx_single_in_consultation_per_doctor` (`CREATE UNIQUE INDEX ON public.bookings (resource_id) WHERE status = 'IN_CONSULTATION'`).
+- **Profile Column Lockdown**: `role`, `is_superadmin`, `permanent_checkin_pin`, and `blocked_until` are revoked from `anon` and `authenticated` update privileges.
+- **Production Environment Guards (`apps/merchant-web/src/env.mjs`)**: Strictly fails build/startup if `ALLOW_MOCK_PAYMENTS=true` or demo mode is enabled when `NODE_ENV === 'production'`. Razorpay secret validation must be evaluated lazily at runtime rather than breaking Next.js build-time module imports (`DEF-RC-01`).

@@ -145,7 +145,7 @@ assert.equal(parseInt(checkCount[0].cnt, 10), 1, 'Exactly 1 checked-in record in
 // ─────────────────────────────────────────────────────────────────────────────
 // PART 2: LATE QUEUE ORDERING UNDER LOAD & FIFO RESPECTING 10-MIN GRACE WINDOW
 // ─────────────────────────────────────────────────────────────────────────────
-console.log('\n--- PART 2: LATE QUEUE ORDERING (FIFO & 10-MIN GRACE WINDOW) ---');
+console.log('\n--- PART 2: LATE QUEUE ORDERING (FIFO & 5-MIN GRACE WINDOW) ---');
 
 const clinicDate = '2026-11-04';
 // Create an on-time patient and multiple late patients arriving in specific sequence:

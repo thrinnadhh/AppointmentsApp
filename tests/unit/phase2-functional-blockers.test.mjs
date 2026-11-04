@@ -557,7 +557,7 @@ describe('Phase 2: Functional Blockers', () => {
       }
     });
 
-    it('4b. Atomic DB claim before gateway call prevents concurrent duplicate refunds and sends X-Razorpay-Idempotency header', async () => {
+    it('4b. Atomic DB claim before gateway call prevents concurrent duplicate refunds and sends X-Refund-Idempotency header', async () => {
       const client = await pool.connect();
       let bookingId;
       const paymentId = `pay_atomic_${Date.now()}`;
@@ -726,7 +726,7 @@ describe('Phase 2: Functional Blockers', () => {
       }
     });
 
-    it('4d. (C5d) Hard-fails if RAZORPAY_KEY_ID starts with rzp_live_ and exercises fresh test-mode payment refund', async (t) => {
+    it('4d (Mocked Unit): (C5d) Hard-fails if RAZORPAY_KEY_ID starts with rzp_live_ and exercises fresh test-mode payment refund', async (t) => {
       const keyId = process.env.RAZORPAY_KEY_ID || '';
       const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
 
