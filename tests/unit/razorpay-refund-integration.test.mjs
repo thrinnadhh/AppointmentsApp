@@ -99,12 +99,13 @@ describe('Group 3: Razorpay Refund API & Idempotency Integration Suite', () => {
   });
 
   it('3. Real Test-Mode Razorpay Refund & Idempotent Replay Verification (X-Refund-Idempotency)', async (t) => {
-    // 1. Live Key Safety Guard: Hard fail if live credentials present
+    // 1. Live Key Safety Guard: Hard fail immediately if live credentials are configured
     assertNoLiveRazorpayKeys();
 
     const keyId = process.env.RAZORPAY_KEY_ID || '';
     const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
 
+    // Permitted skip ONLY when keys are absent
     if (!keyId || !keySecret || !keyId.startsWith('rzp_test_')) {
       t.skip('Reason: RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET (rzp_test_*) not present in environment');
       return;
@@ -113,96 +114,73 @@ describe('Group 3: Razorpay Refund API & Idempotency Integration Suite', () => {
     const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
 
     // 2. Retrieve real captured test payments from Razorpay test API
-    let targetPayment = null;
-    try {
-      const listRes = await fetch('https://api.razorpay.com/v1/payments?status=captured&count=20', {
-        headers: {
-          Authorization: authHeader,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(10000),
-      });
+    const listRes = await fetch('https://api.razorpay.com/v1/payments?status=captured&count=50', {
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    assert.equal(listRes.ok, true, `Razorpay list payments API must return 200 OK (got ${listRes.status})`);
 
-      if (!listRes.ok) {
-        t.skip(`Reason: Unable to reach Razorpay test API (HTTP ${listRes.status})`);
-        return;
-      }
+    const listData = await listRes.json();
+    const items = listData.items || [];
+    assert.ok(items.length > 0, 'Razorpay test account must have captured test payments');
 
-      const listData = await listRes.json();
-      const items = listData.items || [];
-      // Find a captured payment with remaining refundable amount >= 100 paise (₹1)
-      targetPayment = items.find(
-        (p) => p && p.captured && p.amount - (p.amount_refunded || 0) >= 100
-      );
-    } catch (err) {
-      t.skip(`Reason: Network error querying Razorpay test API: ${err.message}`);
-      return;
-    }
-
-    if (!targetPayment) {
-      t.skip('Reason: No test payment with >= 100 paise refundable balance found in Razorpay test account');
-      return;
-    }
-
-    // 3. Formulate an idempotency key conforming to official Razorpay specifications
+    // 3. Generate a brand-new, fresh idempotency key for this test run
     // Spec: >= 10 chars, [a-zA-Z0-9_-]
-    const customIdempotencyKey = `grp3-test-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
+    const customIdempotencyKey = `grp3-fresh-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
     const verifiedIdempKey = resolveRefundIdempotencyKey(customIdempotencyKey);
     assert.equal(verifiedIdempKey, customIdempotencyKey, 'Key must pass official spec validator unmodified');
 
     const refundAmountPaise = 100; // ₹1.00
 
-    let res1, res2;
-    let usedPaymentId = targetPayment.id;
-    let usedIdempotencyKey = customIdempotencyKey;
+    // 4. Iterate over candidate payments to find one that accepts a fresh refund
+    let successfulPaymentId = null;
+    let res1 = null;
+    let res2 = null;
 
-    try {
-      res1 = await initiateRazorpayRefund({
-        paymentId: targetPayment.id,
+    for (const candidate of items) {
+      if (!candidate.captured || (candidate.amount - (candidate.amount_refunded || 0)) < refundAmountPaise) {
+        continue;
+      }
+
+      const refundPayload = {
+        paymentId: candidate.id,
         amount: refundAmountPaise,
-        notes: {
-          reason: 'Group 3 Automated Idempotency Verification',
-          suite: 'tests/unit/razorpay-refund-integration.test.mjs',
-        },
         idempotencyKey: customIdempotencyKey,
         speed: 'optimum',
-      });
-    } catch (err) {
-      if (err.message && err.message.includes('more than 6 months old')) {
-        // Fallback: When all test payments are > 6 months old and bank rejects fresh refunds,
-        // execute idempotent replay against registered test key on captured test payment
-        usedPaymentId = 'pay_SbqEyR99JWpTF8';
-        usedIdempotencyKey = 'test-idemp-curl-1234567890';
-        res1 = await initiateRazorpayRefund({
-          paymentId: usedPaymentId,
-          amount: refundAmountPaise,
-          idempotencyKey: usedIdempotencyKey,
-          speed: 'optimum',
-        });
-      } else {
+      };
+
+      try {
+        // Call 1: Execute initial fresh refund
+        res1 = await initiateRazorpayRefund(refundPayload);
+        successfulPaymentId = candidate.id;
+
+        // Call 2: Replay identical refund request with the EXACT SAME freshly generated key and payload
+        res2 = await initiateRazorpayRefund(refundPayload);
+        break;
+      } catch (err) {
+        if (err.message && err.message.includes('more than 6 months old')) {
+          // If this specific historical payment hit the bank 6-month limit, continue to the next candidate
+          continue;
+        }
         throw err;
       }
     }
 
-    const refundPayload = {
-      paymentId: usedPaymentId,
-      amount: refundAmountPaise,
-      idempotencyKey: usedIdempotencyKey,
-      speed: 'optimum',
-    };
+    assert.ok(
+      successfulPaymentId,
+      'Must successfully execute fresh refund on an eligible Razorpay test payment'
+    );
 
-    if (!res1) {
-      res1 = await initiateRazorpayRefund(refundPayload);
-    }
-
+    // Assertions on Call 1
     assert.equal(res1.success, true, 'First refund attempt must succeed');
     assert.ok(res1.id.startsWith('rfnd_'), `Expected rfnd_* ID, got ${res1.id}`);
     assert.equal(res1.amount, refundAmountPaise, 'Refund amount must match requested 100 paise');
     assert.equal(res1.is_mock, false, 'Must be real Razorpay gateway response');
 
-    // 5. Call 2: Replay identical refund request with the EXACT SAME idempotency key & payload
-    res2 = await initiateRazorpayRefund(refundPayload);
-
+    // Assertions on Call 2 (Idempotent Replay)
     assert.equal(res2.success, true, 'Idempotent replay call must succeed');
     assert.equal(
       res2.id,
@@ -216,9 +194,9 @@ describe('Group 3: Razorpay Refund API & Idempotency Integration Suite', () => {
     );
     assert.equal(res2.is_mock, false, 'Replay must be real Razorpay gateway response');
 
-    // 6. Verify against Razorpay's list refunds endpoint that exactly one refund exists for this ID
+    // Verify against Razorpay's list refunds endpoint that exactly ONE refund exists for this refund ID
     const refundsListRes = await fetch(
-      `https://api.razorpay.com/v1/payments/${encodeURIComponent(usedPaymentId)}/refunds`,
+      `https://api.razorpay.com/v1/payments/${encodeURIComponent(successfulPaymentId)}/refunds`,
       {
         headers: {
           Authorization: authHeader,

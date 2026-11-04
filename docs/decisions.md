@@ -315,3 +315,28 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
      - Executed complete baseline dependency audit across all 46 test suites (245 unit tests, 324 script tests, 0 failures).
      - Proved PostgreSQL database-level concurrency enforcement via `no_overlapping_active_bookings` (`btree_gist` / `tstzrange` exclusion constraint) and `idx_single_in_consultation_per_doctor` (partial unique index).
      - Authored repeatable stress test script `scripts/stress-test-queue-invariants.mjs` verifying atomic single check-in under 5 simultaneous requests (1 winner, 4 stale rejections, 0 duplicates) and FIFO standby queue ordering respecting the 10-minute grace window.
+
+
+---
+
+### Decision 16: Production Readiness Groups 3 & 4 (Razorpay Refund Idempotency Remediation & OTP Circuit Breaker)
+- **Date**: 2026-11-05
+- **Status**: DECIDED (Groups 3 & 4 Accepted & Committed)
+- **Requirement & Architecture**:
+  1. **Group 3 Razorpay Refund Idempotency Remediation**:
+     - Hardened `tests/unit/razorpay-refund-integration.test.mjs` to eliminate all hardcoded fallback IDs (`pay_SbqEyR99JWpTF8`) and pre-existing idempotency keys.
+     - Dynamically generates fresh, cryptographically unique idempotency keys (`grp3-fresh-${Date.now()}-${randomHex}`) conforming to official Razorpay specifications (`[a-zA-Z0-9_-]`, >= 10 chars).
+     - Mandated strictly identical payloads (`paymentId`, `amount`, `notes`, `idempotencyKey`, `speed`) across Call 1 and Call 2 to eliminate gateway payload mismatch rejections.
+     - Enforced that `t.skip()` is strictly restricted to absent test credentials (`!keyId || !keySecret || !keyId.startsWith('rzp_test_')`).
+  2. **Group 4 Multi-Tier OTP Circuit Breaker Architecture**:
+     - Replaced the rigid global daily cap of 500 requests with an elastic multi-tier defense in `apps/merchant-web/src/app/api/auth/otp/send/route.ts`:
+       - **Tier 1 (Per-IP Sliding Window)**: 5 requests per 10 minutes (`otp-ip:${ip}`).
+       - **Tier 2 (Per-Phone Sliding Window)**: 3 requests per 5 minutes per E.164 number (`otp:${e164}`).
+       - **Tier 3 (Per-Phone-Prefix Sliding Window)**: 15 requests per 10 minutes (`otp-prefix:${prefix}:${bucketScope}`) using `extractPhonePrefix` (e.g. `+919848`) to neutralize sequential SMS toll fraud / pumping attacks.
+       - **Tier 4 (Global Per-Minute Cap)**: 30 requests per 60 seconds (`otp-global:minute:${bucketScope}`).
+       - **Tier 5 (Global Daily Rate & CAPTCHA Circuit Breaker)**: High safety ceiling (`OTP_GLOBAL_DAILY_CEILING = 2000`). Once daily volume passes `OTP_GLOBAL_CAPTCHA_THRESHOLD` (default 200), challenges callers with `CAPTCHA_REQUIRED` (HTTP 403, `X-RateLimit-Scope: captcha-required`). Verified challenge tokens allow legitimate human patients to authenticate uninterrupted.
+       - **Security Incident Logging**: Integrated `logSecurityAlert` emitting structured `[SECURITY_ALERT]` JSON logs for SIEM and SOC observability.
+  3. **Verification**:
+     - Authored repeatable simulation script `scripts/simulate-otp-attack-before-after.mjs` proving Before (100% DoS on Patient #501) vs After (Attacker throttled at request 5, sequential pumping blocked at request 15, Patient #501 authenticated with 200 OK, 99.0% cost reduction).
+     - Authored dedicated unit/integration suite `tests/unit/otp-circuit-breaker.test.mjs` (7/7 tests passing).
+     - Verified zero regressions in `tests/unit/phase2-functional-blockers.test.mjs` Test 6a, `tests/unit/phase1-security-blockers.test.mjs`, and `tests/scripts/test-security.mjs`.

@@ -3,7 +3,7 @@
 > **Document Status**: Living Master Specification & Execution Ledger  
 > **Branch**: `fix/production-readiness`  
 > **Source of Truth**: `docs/hospital/SPEC.md` and User Directives (Steps 0, 391, 627, 1113, 3029, 3662)  
-> **Current Progress**: Group 1 **ACCEPTED**, Group 2 **ACCEPTED**, Group 3 **ACCEPTED**, Groups 4–9 **PENDING**
+> **Current Progress**: Group 1 **ACCEPTED**, Group 2 **ACCEPTED**, Group 3 **ACCEPTED**, Group 4 **ACCEPTED**, Groups 5–9 **PENDING**
 
 ---
 
@@ -53,8 +53,8 @@ Report with file:line evidence and test output.
 | :---: | :--- | :---: | :--- |
 | **Group 1** | **Git Merge, Semantic Merge Reconcile & Clean DB State** | **ACCEPTED** ✅ | Commits `9487275`, `2637c0f`, `94228c0`, `81207c1` |
 | **Group 2** | **Tests, Concurrency Invariants & Test Infrastructure** | **ACCEPTED** ✅ | Commit `4289a3e` |
-| **Group 3** | **Razorpay Refund API & Idempotency Header** | **ACCEPTED** ✅ | Commit `0c5e2c0` |
-| **Group 4** | **OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA** | **PENDING** ⏳ | Awaiting user trigger |
+| **Group 3** | **Razorpay Refund API & Idempotency Header** | **ACCEPTED** ✅ | Commit `0c5e2c0` & Dynamic Fresh Replay Fix |
+| **Group 4** | **OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA** | **ACCEPTED** ✅ | Verified Multi-Tier Engine (`/api/auth/otp/send`) |
 | **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 7** | **Production Safety, Test Route Lock & Guest UX** | **PENDING** ⏳ | Awaiting user trigger |
@@ -121,11 +121,39 @@ Report with file:line evidence and test output.
   - Hardened `initiateRazorpayRefund` to pass `X-Refund-Idempotency` on all refund executions, with `speed: 'optimum'` for bank route compatibility.
 - **Unit Test Clarification**:
   - Renamed Test 4d in `tests/unit/phase2-functional-blockers.test.mjs` to `4d (Mocked Unit): (C5d)...` with zero weakened assertions.
-- **Integration Test Suite**:
+- **Integration Test Suite & Remediation**:
   - Authored `tests/unit/razorpay-refund-integration.test.mjs`.
   - Proved `assertNoLiveRazorpayKeys` immediately rejects `rzp_live_*` before network dispatch.
-  - Proved missing test keys trigger a visible native `t.skip()`.
-  - Executed live test-mode refund against Razorpay API and verified idempotent replay returns identical refund ID without double refund.
+  - Proved missing test keys trigger a visible native `t.skip()` strictly restricted to absent credentials.
+  - Eliminated hardcoded fallback IDs (`pay_SbqEyR99JWpTF8`) and hardcoded idempotency keys (`test-idemp-curl-1234567890`). Dynamically generates fresh unique keys (`grp3-fresh-${Date.now()}-${randomHex}`) and passes strictly identical payloads across Call 1 and Call 2.
+  - Executed live test-mode refund against Razorpay API and verified idempotent replay returns identical refund ID (`res1.id === res2.id`) without double refund.
+
+---
+
+### Group 4: OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA (ACCEPTED)
+- **Multi-Agent Coordination**: Orchestrated across `[Agent-Security-Auditor]`, `[Agent-Backend]`, and `[Agent-QA]`.
+- **Vulnerability Audit**:
+  - Discovered that legacy `apps/merchant-web/src/app/api/auth/otp/send/route.ts` used a rigid global hard cap of 500 requests/day.
+  - Proved that an attacker firing 500 requests across rotating numbers completely exhausted the global bucket, resulting in 100% Denial of Service (HTTP 429) for legitimate patient #501 on a clean IP/number.
+  - Identified lack of per-phone-prefix sliding-window rate limiting (allowing sequential SMS pumping) and absence of a CAPTCHA challenge hook.
+- **Circuit Breaker Architecture (`apps/merchant-web/src/lib/otp-circuit-breaker.ts` & `apps/merchant-web/src/lib/captcha.ts`)**:
+  - **Tier 1 (Per-IP)**: 5 requests per 10 minutes sliding window (`otp-ip:${ip}`).
+  - **Tier 2 (Per-Phone)**: 3 requests per 5 minutes per E.164 number (`otp:${e164}`).
+  - **Tier 3 (Per-Phone-Prefix)**: 15 requests per 10 minutes per prefix (`otp-prefix:${phonePrefix}:${bucketScope}`) extracting country code + 4 subscriber digits (e.g., `+919848`).
+  - **Tier 4 (Global Per-Minute)**: 30 requests per 60 seconds (`otp-global:minute:${bucketScope}`).
+  - **Tier 5 (Global Daily Rate & CAPTCHA Circuit Breaker)**:
+    - High global ceiling (`OTP_GLOBAL_DAILY_CEILING = 2000`).
+    - When daily volume passes `OTP_GLOBAL_CAPTCHA_THRESHOLD` (default 200), requires verified CAPTCHA challenge token (`x-captcha-token` / `body.captchaToken`).
+    - Returns HTTP 403 `CAPTCHA_REQUIRED` (`{ error: 'CAPTCHA_REQUIRED', requiresCaptcha: true }`) with `X-RateLimit-Scope: captcha-required` when token is missing/invalid.
+    - Verified tokens (Cloudflare Turnstile, reCAPTCHA, and test tokens) allow legitimate callers to authenticate uninterrupted during elevated traffic surges.
+  - **SIEM Security Alerts**: Structured logging with `[SECURITY_ALERT]` emitting JSON payloads for incident monitoring and alerting.
+- **Attack Simulation (`scripts/simulate-otp-attack-before-after.mjs`)**:
+  - Executed live 500-OTP flood simulation comparing Before vs After states.
+  - **Before**: 500 attacker requests consumed 100% of the 500 daily cap (₹125 SMS waste); Patient #501 hard-blocked with HTTP 429 DoS.
+  - **After**: Attacker throttled at Request #5 by Tier 1 (IP limit) with HTTP 429 (`per-ip`); 495 requests blocked at the edge; 99% cost reduction (₹1.25 waste); sequential pumping throttled at Request #15 by Tier 3 (`per-prefix`); Patient #501 allowed with HTTP 200 OK (zero DoS); elevated volume challenge hook successfully verified with CAPTCHA token.
+- **Test Suite**:
+  - Dedicated suite `tests/unit/otp-circuit-breaker.test.mjs` verifying all 5 tiers, prefix extraction, and CAPTCHA validation. All 7 tests passing.
+  - Existing `tests/unit/phase2-functional-blockers.test.mjs` (Test 6a) and `tests/scripts/test-security.mjs` verified passing with 0 regressions.
 
 ---
 
