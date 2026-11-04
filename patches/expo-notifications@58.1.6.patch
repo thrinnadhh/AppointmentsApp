@@ -1,0 +1,55 @@
+diff --git a/build/TopicSubscriptionModule.android.js b/build/TopicSubscriptionModule.android.js
+index 4ad9affeea4282013924ca0f8c5f81809b57bc02..050accf4c6ee97618d723820579d3e3645cbd58d 100644
+--- a/build/TopicSubscriptionModule.android.js
++++ b/build/TopicSubscriptionModule.android.js
+@@ -1,4 +1,3 @@
+-import { requireNativeModule } from 'expo';
+-export default requireNativeModule('ExpoTopicSubscriptionModule');
+-
+-//# sourceMappingURL=TopicSubscriptionModule.android.js.map
++import { requireOptionalNativeModule } from 'expo';
++const topicSubscriptionModule = requireOptionalNativeModule('ExpoTopicSubscriptionModule') ?? {};
++export default topicSubscriptionModule;
+diff --git a/build/topicSubscription.js b/build/topicSubscription.js
+index 0f1ac5cd38c8ac7b0236244a19606856ddf11a38..1814a5b046bdee7161c33a96432209bd037b4250 100644
+--- a/build/topicSubscription.js
++++ b/build/topicSubscription.js
+@@ -7,10 +7,10 @@ import { warnOfExpoGoPushUsage } from './warnOfExpoGoPushUsage';
+  * @return a Promise which resolves to `null` once the device is subscribed to the topic.
+  * @platform android
+  */ export async function subscribeToTopicAsync(topic) {
++    warnOfExpoGoPushUsage();
+     if (!TopicSubscriptionModule.subscribeToTopicAsync) {
+         throw new UnavailabilityError('ExpoNotifications', 'subscribeToTopicAsync');
+     }
+-    warnOfExpoGoPushUsage();
+     return TopicSubscriptionModule.subscribeToTopicAsync(topic);
+ }
+ /**
+@@ -19,10 +19,10 @@ import { warnOfExpoGoPushUsage } from './warnOfExpoGoPushUsage';
+  * @return a Promise which resolves to `null` once the device is unsubscribed from the topic.
+  * @platform android
+  */ export async function unsubscribeFromTopicAsync(topic) {
++    warnOfExpoGoPushUsage();
+     if (!TopicSubscriptionModule.unsubscribeFromTopicAsync) {
+         throw new UnavailabilityError('ExpoNotifications', 'unsubscribeFromTopicAsync');
+     }
+-    warnOfExpoGoPushUsage();
+     return TopicSubscriptionModule.unsubscribeFromTopicAsync(topic);
+ }
+ 
+diff --git a/src/TopicSubscriptionModule.android.ts b/src/TopicSubscriptionModule.android.ts
+index da3fae49de183b86740777016456f29b1ee0ac70..0a97d6c0434fc4a4b59e932110f07901796dcdd6 100644
+--- a/src/TopicSubscriptionModule.android.ts
++++ b/src/TopicSubscriptionModule.android.ts
+@@ -1,5 +1,7 @@
+-import { requireNativeModule } from 'expo';
+-
++import { requireOptionalNativeModule } from 'expo';
+ import type { TopicSubscriptionModule } from './TopicSubscriptionModule.types';
+ 
+-export default requireNativeModule<TopicSubscriptionModule>('ExpoTopicSubscriptionModule');
++const topicSubscriptionModule: TopicSubscriptionModule =
++  requireOptionalNativeModule<TopicSubscriptionModule>('ExpoTopicSubscriptionModule') ?? {};
++
++export default topicSubscriptionModule;

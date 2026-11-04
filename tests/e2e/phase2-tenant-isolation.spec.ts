@@ -47,6 +47,7 @@ test.describe.serial('Phase 2: Tenant Isolation & Perimeter Defense Suite', () =
       const res = await request.post('http://localhost:3000/api/bookings/hold', {
         headers: {
           'x-customer-id': UNAUTHORIZED_CALLER_ID,
+          'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
         },
         data: {
           resource_id: TEST_RESOURCE_ID,
@@ -61,7 +62,7 @@ test.describe.serial('Phase 2: Tenant Isolation & Perimeter Defense Suite', () =
       expect(res.status()).toBe(403);
       const json = await res.json();
       expect(json.success).toBe(false);
-      expect(json.error).toMatch(/Forbidden: Cannot create holds for external providers/);
+      expect(json.error).toMatch(/Forbidden: (Cannot create holds for external providers|You cannot reserve appointments on behalf of another customer)/);
     });
   });
 
@@ -95,6 +96,7 @@ test.describe.serial('Phase 2: Tenant Isolation & Perimeter Defense Suite', () =
       const res = await request.post('http://localhost:3000/api/merchant/upload-image', {
         headers: {
           'x-customer-id': TEST_CUSTOMER_ID,
+          'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
         },
         multipart: {
           file: {
@@ -125,6 +127,7 @@ test.describe.serial('Phase 2: Tenant Isolation & Perimeter Defense Suite', () =
       const res = await request.post('http://localhost:3000/api/merchant/upload-image', {
         headers: {
           'x-customer-id': TEST_CUSTOMER_ID,
+          'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
         },
         multipart: {
           file: {

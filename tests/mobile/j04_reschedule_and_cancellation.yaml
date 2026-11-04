@@ -1,0 +1,18 @@
+appId: host.exp.exponent
+---
+# Journey J-04: Reschedule Policy and 60-Minute Cancellation Forfeit Gate
+# Verified against SPEC.md (Deposit transfer without charge; late cancellation forfeit alert)
+- launchApp
+- tapOn: "My Appointments"
+- tapOn: "Reschedule Booking"
+- assertVisible: "RESCHEDULE SLOT"
+- assertVisible: "Select New Date"
+- assertVisible: "Select Time Slot"
+- assertVisible: "Your deposit of ₹75 will automatically transfer to the new slot without any extra charge."
+- tapOn: "✕"
+- tapOn: "Cancel Booking"
+- assertVisible: "Late Cancellation Warning"
+- assertVisible: "You are cancelling inside the 60-minute window. Under the policy, your deposit will be forfeited to the business."
+- assertVisible: "KEEP BOOKING"
+- assertVisible: "FORFEIT & CANCEL"
+- tapOn: "KEEP BOOKING"

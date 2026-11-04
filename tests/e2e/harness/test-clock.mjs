@@ -24,15 +24,23 @@ export async function closeClockPool() {
 }
 
 function getDbConfig() {
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
-  const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/);
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+  let serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  try {
+    const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
+    const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\r\n]+)"?/);
+    const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\r\n]+)"?/);
+    if (urlMatch) url = urlMatch[1];
+    if (keyMatch) serviceKey = keyMatch[1];
+  } catch (_) {}
+
   return {
-    url: urlMatch[1],
-    serviceKey: keyMatch[1],
+    url,
+    serviceKey,
     headers: {
-      'apikey': keyMatch[1],
-      'Authorization': `Bearer ${keyMatch[1]}`,
+      'apikey': serviceKey,
+      'Authorization': `Bearer ${serviceKey}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     }

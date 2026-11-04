@@ -28,6 +28,7 @@ import CheckoutModal from './src/screens/CheckoutModal';
 import BookingPassModal from './src/screens/BookingPassModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import DoctorEmergencyModal from './src/components/DoctorEmergencyModal';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import {
   fetchCustomerBookingsFromSupabase,
@@ -44,6 +45,10 @@ import {
   signOutCustomer,
   supabase,
 } from './src/services/api';
+import {
+  registerForPushNotificationsAsync,
+  setupNotificationListeners,
+} from './src/services/notifications';
 
 type ScreenType = 'HOME' | 'PROVIDER_DETAIL' | 'MY_BOOKINGS';
 
@@ -63,9 +68,9 @@ export default function App() {
   const [checkoutVisible, setCheckoutVisible] = useState<boolean>(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState<boolean>(false);
   const [patientBookingDetails, setPatientBookingDetails] = useState<CustomerBookingDetails>({
-    fullName: 'Trinadh Patient',
-    phone: '+919999999991',
-    email: 'trinadh.patient@gmail.com',
+    fullName: '',
+    phone: '',
+    email: '',
   });
   const [assignedTokenNumber, setAssignedTokenNumber] = useState<number | undefined>(undefined);
   const [passModalVisible, setPassModalVisible] = useState<boolean>(false);
@@ -83,10 +88,10 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [isEmailVerified, setIsEmailVerified] = useState<boolean>(false);
-  const [authPhone, setAuthPhone] = useState<string>('+919999999991');
+  const [authPhone, setAuthPhone] = useState<string>('');
   const [authOtp, setAuthOtp] = useState<string>('');
   const [otpSent, setOtpSent] = useState<boolean>(false);
-  const [authEmail, setAuthEmail] = useState<string>('trinadh.patient@appointments4u.in');
+  const [authEmail, setAuthEmail] = useState<string>('');
   const [authEmailOtp, setAuthEmailOtp] = useState<string>('');
   const [emailOtpSent, setEmailOtpSent] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState<boolean>(false);
@@ -100,10 +105,10 @@ export default function App() {
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
-    name: 'Trinadh Test Patient',
-    phone: '+91 98765 43210',
-    email: 'trinadh.patient@appointments4u.in',
-    city: 'Tirupati, AP',
+    name: '',
+    phone: '',
+    email: '',
+    city: '',
   });
 
   // Check existing Supabase session on app startup
@@ -133,6 +138,22 @@ export default function App() {
       }
     }
     checkSession();
+  }, []);
+
+  // Deep-linking listener for push notifications: opens ticket / booking pass on notification tap
+  useEffect(() => {
+    const unsubscribe = setupNotificationListeners(async (bookingId) => {
+      try {
+        const booking = await fetchSingleCustomerBookingFromSupabase(bookingId);
+        if (booking) {
+          setSelectedBookingForPass(booking);
+          setPassModalVisible(true);
+        }
+      } catch (err) {
+        console.warn('Failed to load booking from push notification tap:', err);
+      }
+    });
+    return unsubscribe;
   }, []);
 
   // Stored customer bookings (seeded from Supabase)
@@ -380,10 +401,10 @@ export default function App() {
       setOtpSent(false);
       setAuthOtp('');
       setCustomerProfile({
-        name: 'Ravi Teja',
-        phone: '+91 98765 43210',
-        email: 'ravi.teja@customer.tirupati.in',
-        city: 'Tirupati, AP',
+        name: '',
+        phone: '',
+        email: '',
+        city: '',
       });
       setConfirmationToast('Signed out. Switched to Guest mode.');
       setTimeout(() => setConfirmationToast(null), 4000);
@@ -562,6 +583,9 @@ export default function App() {
     setSelectedBookingForPass(newBooking);
     setPassModalVisible(true);
 
+    // Prompt for push notification permission at this sensible moment (right after booking confirmation)
+    registerForPushNotificationsAsync(activeCustomerId).catch(() => null);
+
     loadBookings();
 
     setTimeout(() => {
@@ -637,21 +661,42 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, [handleGoBack]);
 
+  const upcomingBooking = customerBookings.find(
+    (b) =>
+      (b.status === 'CONFIRMED' || b.status === 'CHECKED_IN' || b.status === 'HELD') &&
+      new Date(b.slot_end).getTime() > Date.now() - 30 * 60 * 1000
+  );
+
+  const upcomingCount = customerBookings.filter(
+    (b) => b.status === 'CONFIRMED' || b.status === 'CHECKED_IN' || b.status === 'HELD'
+  ).length;
+
+  const emergencyBooking = customerBookings.find(
+    (b) => b.emergency_cancelled === true && !b.emergency_patient_choice
+  );
+
   return (
     <ErrorBoundary>
       <View style={styles.container}>
         <StatusBar style="dark" />
 
       {/* Screen Router */}
-      {currentScreen === 'HOME' && (
-        <HomeScreen
-          selectedCategory={activeCategoryId}
-          onSelectCategory={handleSelectCategory}
-          onSelectProvider={handleSelectProvider}
-          onOpenMyBookings={handleOpenMyBookings}
-          onOpenProfile={() => setProfileVisible(true)}
-        />
-      )}
+      <View style={{ flex: 1 }}>
+        {currentScreen === 'HOME' && (
+          <HomeScreen
+            selectedCategory={activeCategoryId}
+            onSelectCategory={handleSelectCategory}
+            onSelectProvider={handleSelectProvider}
+            onOpenMyBookings={handleOpenMyBookings}
+            onOpenProfile={() => setProfileVisible(true)}
+            upcomingBooking={upcomingBooking}
+            onOpenPassModal={(booking) => {
+              setSelectedBookingForPass(booking);
+              setPassModalVisible(true);
+            }}
+            onMarkReached={handleMarkReached}
+          />
+        )}
 
       {currentScreen === 'PROVIDER_DETAIL' && (
         <ProviderDetailScreen
@@ -662,18 +707,66 @@ export default function App() {
         />
       )}
 
-      {currentScreen === 'MY_BOOKINGS' && (
-        <MyBookingsScreen
-          onBack={handleGoBack}
-          bookings={customerBookings}
-          onCancelBooking={handleCancelBooking}
-          onRescheduleBooking={handleRescheduleBooking}
-          onMarkReached={handleMarkReached}
-          onLoadMore={handleLoadMoreBookings}
-          hasMore={hasMoreBookings}
-          isLoadingMore={isLoadingMoreBookings}
-        />
-      )}
+        {currentScreen === 'MY_BOOKINGS' && (
+          <MyBookingsScreen
+            onBack={handleGoBack}
+            bookings={customerBookings}
+            customerId={activeCustomerId}
+            onCancelBooking={handleCancelBooking}
+            onRescheduleBooking={handleRescheduleBooking}
+            onMarkReached={handleMarkReached}
+            onLoadMore={handleLoadMoreBookings}
+            hasMore={hasMoreBookings}
+            isLoadingMore={isLoadingMoreBookings}
+          />
+        )}
+      </View>
+
+      {/* Persistent Bottom Navigation Bar */}
+      <View style={styles.bottomTabBar} testID="customer-bottom-tab-bar">
+        <TouchableOpacity
+          style={[styles.bottomTabItem, currentScreen === 'HOME' && styles.bottomTabItemActive]}
+          onPress={() => {
+            setHistory([{ screen: 'HOME', categoryId: null }]);
+          }}
+          testID="tab-nav-explore"
+          accessibilityLabel="Explore Home"
+        >
+          <Text style={styles.bottomTabIcon}>🏠</Text>
+          <Text style={[styles.bottomTabLabel, currentScreen === 'HOME' && styles.bottomTabLabelActive]}>
+            Explore
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.bottomTabItem, currentScreen === 'MY_BOOKINGS' && styles.bottomTabItemActive]}
+          onPress={handleOpenMyBookings}
+          testID="tab-nav-my-appointments"
+          accessibilityLabel="My Appointments"
+        >
+          <View style={{ position: 'relative' }}>
+            <Text style={styles.bottomTabIcon}>📅</Text>
+            {upcomingCount > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{upcomingCount}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.bottomTabLabel, currentScreen === 'MY_BOOKINGS' && styles.bottomTabLabelActive]}>
+            My Appointments
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.bottomTabItem}
+          onPress={() => setProfileVisible(true)}
+          testID="tab-nav-account"
+          accessibilityLabel="My Profile"
+        >
+          <Text style={styles.bottomTabIcon}>👤</Text>
+          <Text style={styles.bottomTabLabel}>Account</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* 1. Pre-Booking Patient Details & Google Sign-In Modal */}
       <CustomerDetailsModal
@@ -724,6 +817,34 @@ export default function App() {
         assignedTokenNumber={assignedTokenNumber}
         onClose={() => setPassModalVisible(false)}
         onMarkReached={handleMarkReached}
+      />
+
+      {/* 4. Doctor Emergency Notice & Choice Modal */}
+      <DoctorEmergencyModal
+        visible={Boolean(emergencyBooking)}
+        booking={emergencyBooking || null}
+        onChoiceResolved={(choice, bookingId) => {
+          setCustomerBookings((prev) =>
+            prev.map((b) =>
+              b.id === bookingId
+                ? {
+                    ...b,
+                    emergency_patient_choice: choice,
+                    status: choice === 'WAIT' ? 'CONFIRMED' : 'CANCELLED',
+                    payment_status: choice === 'REFUND' ? 'REFUNDED' : b.payment_status,
+                  }
+                : b
+            )
+          );
+          loadBookings();
+        }}
+        onRequestReschedule={(b) => {
+          setHistory((prev) => [
+            ...prev,
+            { screen: 'PROVIDER_DETAIL', providerId: b.provider_id },
+          ]);
+        }}
+        onClose={() => {}}
       />
 
 
@@ -922,7 +1043,7 @@ export default function App() {
                           style={styles.authTextInput}
                           value={authEmail}
                           onChangeText={setAuthEmail}
-                          placeholder="trinadh.patient@appointments4u.in"
+                          placeholder="patient@example.com"
                           placeholderTextColor="#94a3b8"
                           keyboardType="email-address"
                           autoCapitalize="none"
@@ -1073,6 +1194,61 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  bottomTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  bottomTabItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  bottomTabItemActive: {
+    backgroundColor: '#ecfdf5',
+  },
+  bottomTabIcon: {
+    fontSize: 20,
+    marginBottom: 2,
+  },
+  bottomTabLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  bottomTabLabelActive: {
+    color: '#047857',
+    fontWeight: '800',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#047857',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
   },
   screenContainer: {
     flex: 1,

@@ -23,10 +23,14 @@ import {
   ON_TIME_GRACE_MS,
   toClinicAnchorDate,
   toClinicDateString,
+  computeQueueETAs,
+  computePatientETA,
+  shouldSendEtaNotification,
   type ArrivalTag,
   type ConsultantQueueEvaluation,
   type HospitalQueueBooking,
   type EvaluatedQueuesState,
+  type PatientETA,
 } from '@appointments/shared/queue-engine';
 
 export {
@@ -37,10 +41,14 @@ export {
   ON_TIME_GRACE_MS,
   toClinicAnchorDate,
   toClinicDateString,
+  computeQueueETAs,
+  computePatientETA,
+  shouldSendEtaNotification,
   type ArrivalTag,
   type ConsultantQueueEvaluation,
   type HospitalQueueBooking,
   type EvaluatedQueuesState,
+  type PatientETA,
 };
 
 export type QueueSlotType = 
@@ -69,6 +77,7 @@ export interface QueueSlot {
   statusDescription: string;
   isGuaranteedUndisturbed: boolean;
   isFastTracked: boolean;
+  isUpNext?: boolean;
 }
 
 export interface DayAttendance {
@@ -137,6 +146,7 @@ export interface ScheduledBookingInput {
   wasSkipped?: boolean;
   arrival_tag?: ArrivalTag;
   original_booking_time?: string;
+
   [key: string]: any;
 }
 
@@ -172,6 +182,7 @@ function getBookingDurationMinutes(
 }
 
 export interface BuildRollingQueueParams {
+
   bookings: ScheduledBookingInput[];
   slotDurationMinutes?: number;
   currentBookingId?: string | null;
@@ -212,6 +223,8 @@ export function buildRollingTenSlotQueue(
         : new Date());
 
   const durationMs = slotDurationMinutes * 60 * 1000;
+  const anchorTimeIso = anchorStartTime.toISOString();
+
 
   // Normalize and filter out cancelled / no-show / completed / other-consultant bookings
   const activeBookings = (bookings || [])
@@ -242,15 +255,19 @@ export function buildRollingTenSlotQueue(
         (b.checked_in_at ? new Date(b.checked_in_at).getTime() : 0);
       if (arrDiff !== 0) return arrDiff;
       return String(a.id).localeCompare(String(b.id));
+
     });
+
 
   // Populate canonical evaluateConsultantQueue (per resourceId) to determine standby membership & upNext
   const consultantEval = evaluateConsultantQueue(activeBookings, {
     now: anchorStartTime,
     resourceId,
+
     defaultDurationMinutes: slotDurationMinutes,
   });
   const engineStandbyIds = new Set(consultantEval.standbyQueue.map((s) => s.id));
+
 
   // Separate normal on-time bookings from present late/standby queue bookings (Decision D3 & D7)
   const lateQueuePatients = activeBookings
@@ -286,6 +303,7 @@ export function buildRollingTenSlotQueue(
       if (arrDiff !== 0) return arrDiff;
       return String(a.id).localeCompare(String(b.id));
     });
+
 
   const lateQueueIdSet = new Set(lateQueuePatients.map((l) => l.id));
   const onTimeBookings = activeBookings.filter((b) => !lateQueueIdSet.has(b.id));
@@ -398,19 +416,23 @@ export function buildRollingTenSlotQueue(
     if (bookedPatient) {
       consumedOnTimeIds.add(bookedPatient.id);
       const isPresent = Boolean(bookedPatient.is_present || bookedPatient.status === 'CHECKED_IN');
-      const isServing = slotIndex === 1 && isPresent;
+      const isActualConsultation = bookedPatient.status === 'IN_CONSULTATION' || Boolean(currentBookingId && bookedPatient.id === currentBookingId);
+      const isServing = isActualConsultation || (slotIndex === 1 && isPresent);
       const isCurrent = Boolean(currentBookingId && bookedPatient.id === currentBookingId);
+      const isUpNext = Boolean(upNextCandidate && bookedPatient.id === upNextCandidate.id);
 
       let slotType: QueueSlotType;
       let statusLabel: string;
       let statusDescription: string;
 
-      if (isServing) {
+      if (isActualConsultation) {
         slotType = 'SERVING';
+
         statusLabel = 'Now In Consultation';
         statusDescription = pulledForward
           ? 'Arrived early — passes directly to doctor (preceding slot absent)'
           : 'With Doctor right now';
+
       } else if (isPresent) {
         slotType = 'BOOKED_PRESENT';
         statusLabel = 'Present & Ready';
@@ -421,6 +443,8 @@ export function buildRollingTenSlotQueue(
         statusDescription = 'Arriving shortly. Token reserved.';
       }
 
+      const patientEta = etas.get(bookedPatient.id);
+
       slots.push({
         slotIndex,
         slotStart: slotStartIso,
@@ -428,7 +452,7 @@ export function buildRollingTenSlotQueue(
         formattedStartTime,
         formattedEndTime,
         type: slotType,
-        tokenNumber: bookedPatient.queue_position || tokenCounter++,
+        tokenNumber: patientEta?.queuePosition || bookedPatient.queue_position || tokenCounter++,
         referenceCode: bookedPatient.reference_code || `P${tokenCounter}`,
         bookingId: bookedPatient.id,
         booking: bookedPatient,
@@ -438,6 +462,7 @@ export function buildRollingTenSlotQueue(
         statusLabel,
         statusDescription,
         isGuaranteedUndisturbed: true,
+
         isFastTracked: pulledForward,
       });
     } else {
@@ -452,6 +477,7 @@ export function buildRollingTenSlotQueue(
           return !nextOnTimeStartMs || currentSlotStartMs + candDurationMs <= nextOnTimeStartMs;
         });
 
+
         if (fittingIndex !== -1) {
           const [picked] = remainingLatePatients.splice(fittingIndex, 1);
           accommodatedLatePatient = picked || null;
@@ -460,6 +486,8 @@ export function buildRollingTenSlotQueue(
 
       if (accommodatedLatePatient) {
         const isCurrent = Boolean(currentBookingId && accommodatedLatePatient.id === currentBookingId);
+        const isUpNext = Boolean(upNextCandidate && accommodatedLatePatient.id === upNextCandidate.id);
+        const patientEta = etas.get(accommodatedLatePatient.id);
 
         slots.push({
           slotIndex,
@@ -468,19 +496,22 @@ export function buildRollingTenSlotQueue(
           formattedStartTime,
           formattedEndTime,
           type: 'LATE_ACCOMMODATED',
-          tokenNumber: accommodatedLatePatient.queue_position || tokenCounter++,
+          tokenNumber: patientEta?.queuePosition || accommodatedLatePatient.queue_position || tokenCounter++,
           referenceCode: accommodatedLatePatient.reference_code || `LATE-${tokenCounter}`,
           bookingId: accommodatedLatePatient.id,
+
           booking: accommodatedLatePatient,
           patientName: accommodatedLatePatient.customer_name || 'Late Patient (Accommodated)',
+
           isPresent: true,
           isCurrentPatient: isCurrent,
-          statusLabel: 'Late Accommodated in Gap',
+          statusLabel: isUpNext ? 'Up Next' : 'Late Accommodated in Gap',
           statusDescription: nextOnTimePatient
             ? `Placed in gap; ${nextOnTimePatient.reference_code || 'next patient'} time undisturbed`
-            : 'Fitted into available gap',
+            : 'Fitted into available gap in Standby Queue order',
           isGuaranteedUndisturbed: false,
           isFastTracked: false,
+          isUpNext,
         });
       } else if (remainingLatePatients.length > 0 && nextOnTimeStartMs) {
         slots.push({
@@ -493,8 +524,10 @@ export function buildRollingTenSlotQueue(
           tokenNumber: null,
           referenceCode: null,
           bookingId: null,
+
           booking: null,
           patientName: 'Late Queue (Waiting for Free Window)',
+
           isPresent: false,
           isCurrentPatient: false,
           statusLabel: 'Late Member Waiting',
@@ -503,6 +536,8 @@ export function buildRollingTenSlotQueue(
           isFastTracked: false,
         });
       } else {
+
+
         slots.push({
           slotIndex,
           slotStart: slotStartIso,

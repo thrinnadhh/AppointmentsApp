@@ -178,7 +178,7 @@ export default function ConsentScreen({ onConsentsGranted }: Props) {
             time via <Text style={styles.bold}>Settings → Account → Delete Account</Text>.
           </Text>
           <Text style={styles.legalText}>
-            Grievance Officer: {grievanceOfficerName} ({grievanceOfficerEmail}, {grievanceOfficerPhone}) · Address: {grievanceOfficerAddress} · Response within 48 hours.
+Grievance Officer: {grievanceOfficerName} ({grievanceOfficerEmail}, {grievanceOfficerPhone}) · Address: {grievanceOfficerAddress} · Response within 48 hours.
           </Text>
         </View>
       </ScrollView>

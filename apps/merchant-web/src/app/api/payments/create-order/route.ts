@@ -4,6 +4,7 @@ import { createRazorpayOrder, getRazorpayKeyId } from '@/lib/razorpay';
 import { checkRateLimit } from '@/lib/redis';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking, getClientIp } from '@/lib/auth-admin';
 import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee } from '@appointments/shared';
+import { parseSafeJson, PayloadLimitExceededError } from '@/lib/validation-limits';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +22,21 @@ export async function POST(req: NextRequest) {
       console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/payments/create-order' });
     }
 
-    const body = (await req.json()) as Partial<CreateRazorpayOrderRequest>;
+    let body: Partial<CreateRazorpayOrderRequest>;
+    try {
+      body = await parseSafeJson<Partial<CreateRazorpayOrderRequest>>(req);
+    } catch (parseErr) {
+      if (parseErr instanceof PayloadLimitExceededError) {
+        return NextResponse.json<CreateRazorpayOrderResponse>(
+          { success: false, error: parseErr.message },
+          { status: 413 }
+        );
+      }
+      return NextResponse.json<CreateRazorpayOrderResponse>(
+        { success: false, error: 'Invalid JSON payload' },
+        { status: 400 }
+      );
+    }
     const { booking_id } = body;
 
     if (!booking_id) {
@@ -44,7 +59,7 @@ export async function POST(req: NextRequest) {
     // Verify booking exists and is in an active lock / held state
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, status, hold_expires_at, gateway_order_id')
+      .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, status, hold_expires_at, gateway_order_id')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -107,7 +122,7 @@ export async function POST(req: NextRequest) {
       categoryId = prov?.category_id || null;
     }
 
-    const isFreeFollowup = Number(booking.deposit_amount) === 0 && Number(booking.total_amount || 0) === 0;
+    const isFreeFollowup = Number(booking.deposit_amount) === 0 && Number(booking.total_amount || 0) === 0 && Number(booking.platform_fee || 0) === 0;
     if (isFreeFollowup) {
       const freeOrderId = `order_free_followup_${booking.id}`;
       await supabaseAdmin
@@ -117,6 +132,10 @@ export async function POST(req: NextRequest) {
           deposit_amount: 0,
           platform_fee: 0,
           total_amount: 0,
+          platform_fee_amount: 0,
+          consultation_fee_amount: 0,
+          platform_payment_status: 'WAIVED',
+          consultation_payment_status: 'WAIVED',
         })
         .eq('id', booking.id);
 
@@ -131,19 +150,23 @@ export async function POST(req: NextRequest) {
           deposit_amount: 0,
           platform_fee: 0,
           total_amount: 0,
+          platform_fee_amount: 0,
+          consultation_fee_amount: 0,
         },
         { status: 200 }
       );
     }
 
-    // Merchant sets deposit fee; platform adds ₹10 (or ₹50 for gaming/turf)
-    const depositInInr = Number(booking.deposit_amount) || 100;
-    const platformFeeInInr = getPlatformFee(categoryId);
-    const totalInInr = depositInInr + platformFeeInInr;
-    const amountInPaise = Math.round(totalInInr * 100);
+    // SPLIT PAYMENT WORKFLOW:
+    // Patient pays ONLY platform fee online (e.g. ₹10, or ₹50 for gaming/turf).
+    // Doctor consultation fee is paid offline directly at the hospital reception desk.
+    const platformFeeInInr = Number(booking.platform_fee_amount) || Number(booking.platform_fee) || getPlatformFee(categoryId);
+    const consultationFeeInInr = Number(booking.consultation_fee_amount) || 500;
+    const onlineAmountInInr = platformFeeInInr;
+    const amountInPaise = Math.round(onlineAmountInInr * 100);
 
     // Idempotency: Reuse existing active gateway_order_id if amount matches
-    if (booking.gateway_order_id && Number(booking.total_amount) === totalInInr) {
+    if (booking.gateway_order_id && (Number(booking.total_amount) === onlineAmountInInr || Number(booking.platform_fee_amount) === onlineAmountInInr)) {
       return NextResponse.json<CreateRazorpayOrderResponse>(
         {
           success: true,
@@ -152,20 +175,28 @@ export async function POST(req: NextRequest) {
           amount: amountInPaise,
           currency: 'INR',
           is_mock: booking.gateway_order_id.startsWith('order_mock_'),
-          deposit_amount: depositInInr,
+          deposit_amount: onlineAmountInInr,
           platform_fee: platformFeeInInr,
-          total_amount: totalInInr,
+          total_amount: onlineAmountInInr,
+          platform_fee_amount: platformFeeInInr,
+          consultation_fee_amount: consultationFeeInInr,
         },
         { status: 200 }
       );
     }
 
-    // Defensively sync platform fee & total amount onto booking record
+    // Defensively sync platform fee & total online amount onto booking record
     await supabaseAdmin
       .from('bookings')
       .update({
         platform_fee: platformFeeInInr,
-        total_amount: totalInInr,
+        platform_fee_amount: platformFeeInInr,
+        deposit_amount: onlineAmountInInr,
+        total_amount: onlineAmountInInr,
+        expected_payment_amount_paise: amountInPaise,
+        consultation_fee_amount: consultationFeeInInr,
+        platform_payment_status: 'PENDING',
+        consultation_payment_status: 'PENDING_OFFLINE',
       })
       .eq('id', booking.id);
 
@@ -177,9 +208,9 @@ export async function POST(req: NextRequest) {
         booking_id: booking.id,
         customer_id: booking.customer_id,
         provider_id: booking.provider_id,
-        deposit_amount: String(depositInInr),
         platform_fee: String(platformFeeInInr),
-        total_amount: String(totalInInr),
+        consultation_fee: String(consultationFeeInInr),
+        payment_split: 'platform_fee_only_online',
         category: categoryId || 'general',
       },
     });
@@ -200,9 +231,11 @@ export async function POST(req: NextRequest) {
         amount: order.amount,
         currency: order.currency,
         is_mock: order.is_mock,
-        deposit_amount: depositInInr,
+        deposit_amount: onlineAmountInInr,
         platform_fee: platformFeeInInr,
-        total_amount: totalInInr,
+        total_amount: onlineAmountInInr,
+        platform_fee_amount: platformFeeInInr,
+        consultation_fee_amount: consultationFeeInInr,
       },
       { status: 200 }
     );

@@ -89,7 +89,7 @@ export function isAllowedOrigin(origin: string | null): boolean {
   return false;
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // If an OAuth code arrives on any route (e.g. /?code=...), route to /auth/callback to exchange for session
@@ -142,9 +142,7 @@ export function middleware(req: NextRequest) {
     adminBypassToken!.length >= 24 &&
     !COMMITTED_DEFAULT_E2E_SECRETS.includes(adminBypassToken!) &&
     (req.headers.get('x-merchant-bypass-key') === adminBypassToken ||
-      req.headers.get('x-admin-bypass-key') === adminBypassToken ||
-      req.headers.get('x-admin-bypass-key') === COMMITTED_DEFAULT_E2E_SECRETS[0] ||
-      req.headers.get('x-merchant-bypass-key') === COMMITTED_DEFAULT_E2E_SECRETS[0]);
+      req.headers.get('x-admin-bypass-key') === adminBypassToken);
 
   // Check for Supabase session cookies
   const cookies = req.cookies;
@@ -181,10 +179,31 @@ export function middleware(req: NextRequest) {
     bearerToken.split('.').length === 3
   );
 
-  const isAuthenticated = hasAuthCookie || hasBearerToken;
+  const cronSecret = process.env.CRON_SECRET;
+  let isCronAuth = false;
+  if (pathname.startsWith('/api/cron/') && cronSecret && bearerToken && bearerToken.length === cronSecret.length) {
+    let diff = 0;
+    for (let i = 0; i < bearerToken.length; i++) {
+      diff |= bearerToken.charCodeAt(i) ^ cronSecret.charCodeAt(i);
+    }
+    isCronAuth = diff === 0;
+  }
+
+  const isAuthenticated = hasAuthCookie || hasBearerToken || isCronAuth;
 
   // 1. API Route Access Control: Enforce authentication for all sensitive / non-whitelisted routes
   if (pathname.startsWith('/api/')) {
+    // Interim mitigation for GHSA-mrhx-c7xc-m3w5 (Zod / JSON parser memory exhaustion):
+    // Reject payloads exceeding 2MB before body parsing
+    const MAX_API_BODY_BYTES = 2 * 1024 * 1024; // 2MB
+    const contentLength = req.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_API_BODY_BYTES) {
+      return NextResponse.json(
+        { error: 'Payload Too Large: Request body exceeds maximum allowed size of 2MB' },
+        { status: 413, headers: corsHeaders }
+      );
+    }
+
     const isPublicApi =
       PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route)) ||
       (pathname === '/api/admin/waitlist' && req.method === 'POST');
@@ -206,7 +225,7 @@ export function middleware(req: NextRequest) {
   // 2. Public Page Routes Gate
   if (
     PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) ||
-    ((pathname === '/' || pathname === '/schedule') && req.nextUrl.searchParams.get('demo') === '1') ||
+    ((['/', '/schedule', '/departments', '/audit-logs', '/consultation', '/team', '/settings'].includes(pathname)) && req.nextUrl.searchParams.get('demo') === '1') ||
     isE2EBypass
   ) {
     return NextResponse.next();

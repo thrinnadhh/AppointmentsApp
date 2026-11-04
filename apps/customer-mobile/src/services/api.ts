@@ -411,6 +411,9 @@ export async function fetchCustomerBookingsFromSupabase(
         id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
         status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
         checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
+        queue_position, estimated_wait_minutes, emergency_cancelled, emergency_doctor_arrived,
+        emergency_patient_choice, booking_for_someone_else, patient_name, patient_phone,
+        patient_relationship, total_charged,
         created_at, updated_at,
         providers ( name ),
         resources ( name )
@@ -475,7 +478,9 @@ export async function fetchSingleCustomerBookingFromSupabase(
         id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
         status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
         checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
-        queue_position, estimated_wait_minutes,
+        queue_position, estimated_wait_minutes, emergency_cancelled, emergency_doctor_arrived,
+        emergency_patient_choice, booking_for_someone_else, patient_name, patient_phone,
+        patient_relationship, total_charged,
         created_at, updated_at,
         providers ( name ),
         resources ( name )
@@ -565,6 +570,10 @@ export interface CreateHoldSupabaseResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
   error?: string;
@@ -574,7 +583,11 @@ export async function createHoldOnSupabase(
   customerId: string,
   resourceId: string,
   slotStart: string,
-  slotEnd: string
+  slotEnd: string,
+  bookingForSomeoneElse?: boolean,
+  patientName?: string,
+  patientPhone?: string,
+  patientRelationship?: string
 ): Promise<CreateHoldSupabaseResult> {
   // Route all resource hold operations strictly through backend API routes.
   // Direct client-side unmetered RPC access is disallowed to enforce Redis concurrency locks, rate limits, and business logic.
@@ -594,6 +607,10 @@ export async function createHoldOnSupabase(
         resource_id: resourceId,
         slot_start: slotStart,
         slot_end: slotEnd,
+        booking_for_someone_else: Boolean(bookingForSomeoneElse),
+        patient_name: patientName || null,
+        patient_phone: patientPhone || null,
+        patient_relationship: patientRelationship || null,
       }),
     });
 
@@ -607,6 +624,10 @@ export async function createHoldOnSupabase(
         deposit_amount: json.deposit_amount,
         platform_fee: json.platform_fee,
         total_amount: json.total_amount,
+        platform_fee_amount: json.platform_fee_amount ?? json.platform_fee,
+        consultation_fee_amount: json.consultation_fee_amount,
+        platform_payment_status: json.platform_payment_status,
+        consultation_payment_status: json.consultation_payment_status,
         is_followup: json.is_followup,
         followup_original_booking_id: json.followup_original_booking_id,
       };
@@ -623,6 +644,53 @@ export async function createHoldOnSupabase(
     return {
       success: false,
       error: `Unable to reserve slot: ${msg}`,
+    };
+  }
+}
+
+export async function chooseEmergencyOption(
+  bookingId: string,
+  choice: 'WAIT' | 'RESCHEDULE' | 'REFUND',
+  rescheduleSlotStart?: string,
+  rescheduleSlotEnd?: string
+): Promise<{ success: boolean; choice?: string; refund_amount?: number; message?: string; error?: string }> {
+  try {
+    const session = (await supabase.auth.getSession()).data?.session;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
+    const resp = await fetch(`${API_BASE_URL}/api/bookings/emergency-choice`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        booking_id: bookingId,
+        choice,
+        reschedule_slot_start: rescheduleSlotStart || null,
+        reschedule_slot_end: rescheduleSlotEnd || null,
+      }),
+    });
+
+    const json = await resp.json().catch(() => ({}));
+    if (resp.ok && json.success) {
+      return {
+        success: true,
+        choice: json.choice,
+        refund_amount: json.refund_amount,
+        message: json.message,
+      };
+    }
+
+    return {
+      success: false,
+      error: json.error || `Emergency option selection failed (${resp.status})`,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error';
+    return {
+      success: false,
+      error: msg,
     };
   }
 }
@@ -703,6 +771,8 @@ export interface CreateRazorpayOrderResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
   error?: string;
 }
 
@@ -738,6 +808,8 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
       deposit_amount: json.deposit_amount,
       platform_fee: json.platform_fee,
       total_amount: json.total_amount,
+      platform_fee_amount: json.platform_fee_amount,
+      consultation_fee_amount: json.consultation_fee_amount,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Network error initiating payment';
@@ -754,6 +826,8 @@ export interface VerifyPaymentResult {
   queue_position?: number;
   status?: string;
   payment_status?: string;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   error?: string;
 }
 
@@ -793,6 +867,8 @@ export async function verifyRazorpayPayment(params: {
       queue_position: json.queue_position,
       status: json.status,
       payment_status: json.payment_status,
+      platform_payment_status: json.platform_payment_status,
+      consultation_payment_status: json.consultation_payment_status,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Network error verifying payment';
@@ -1281,7 +1357,7 @@ export async function sendEmailOtp(email: string): Promise<{ success: boolean; e
     const { error } = await supabase.auth.signInWithOtp({ email: trimmed });
     if (error) {
       console.warn('Supabase email signInWithOtp error:', error.message);
-      if (isDev && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient'))) {
+if (isDev && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('patient'))) {
         return { success: true };
       }
       return { success: false, error: error.message };
@@ -1302,7 +1378,7 @@ export async function verifyEmailOtp(
 ): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
   try {
     const trimmed = email.trim();
-    if (isDev && token.trim() === '123456' && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient'))) {
+if (isDev && token.trim() === '123456' && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('patient'))) {
       return { success: true };
     }
     const { data, error } = await supabase.auth.verifyOtp({
@@ -1427,8 +1503,8 @@ export async function signInWithGoogle(): Promise<{ success: boolean; url?: stri
  * without requiring third-party OAuth configuration in the Supabase Dashboard.
  */
 export async function signInWithGoogleDev(
-  email: string = 'trinadh.patient@gmail.com',
-  name: string = 'Trinadh Google User'
+  email: string = 'patient@gmail.com',
+  name: string = 'Google Patient'
 ): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
   try {
     const testPhone = '+919999999991';
@@ -1556,26 +1632,40 @@ export async function joinCityWaitlist(
 /**
  * Fetch customer no-show strikes count and flagged status from public.profiles
  */
+export interface CustomerStrikesResult {
+  strikes: number;
+  isFlagged: boolean;
+  isBlocked: boolean;
+  blockedUntil: string | null;
+}
+
 export async function fetchCustomerStrikes(
   customerId: string
-): Promise<{ strikes: number; isFlagged: boolean }> {
+): Promise<CustomerStrikesResult> {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('no_show_count, is_flagged')
+      .select('no_show_count, is_flagged, blocked_until')
       .eq('id', customerId)
       .maybeSingle();
 
     if (error || !data) {
-      return { strikes: 0, isFlagged: false };
+      return { strikes: 0, isFlagged: false, isBlocked: false, blockedUntil: null };
     }
+
+    const blockedUntilStr = data.blocked_until ? String(data.blocked_until) : null;
+    const isBlocked = Boolean(
+      blockedUntilStr && new Date(blockedUntilStr).getTime() > Date.now()
+    );
 
     return {
       strikes: Number(data.no_show_count) || 0,
       isFlagged: Boolean(data.is_flagged),
+      isBlocked,
+      blockedUntil: blockedUntilStr,
     };
   } catch {
-    return { strikes: 0, isFlagged: false };
+    return { strikes: 0, isFlagged: false, isBlocked: false, blockedUntil: null };
   }
 }
 
@@ -1632,5 +1722,25 @@ export async function fetchBookingCheckinCode(bookingId: string): Promise<string
     console.warn('Network error fetching checkin code:', err);
     return null;
   }
+}
+
+/**
+ * Fetch permanent lifetime 4-digit check-in PIN for customer
+ */
+export async function fetchCustomerLifetimePin(customerId: string): Promise<string | null> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from('customer_checkin_pins')
+      .select('pin')
+      .eq('customer_id', customerId)
+      .maybeSingle();
+
+    if (!error && data?.pin) {
+      return data.pin;
+    }
+  } catch (err) {
+    console.warn('Network error fetching customer lifetime pin:', err);
+  }
+  return null;
 }
 

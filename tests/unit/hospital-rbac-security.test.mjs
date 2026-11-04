@@ -117,7 +117,13 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
   describe('A2 & A3: Invite & Acceptance Lifecycle', () => {
     it('creates invite with 7-day expiry and transitions to active upon acceptance with role', async () => {
       const neuroDeptId = hospA.departments.find(d => d.name === 'Neurology').id;
-      const testEmail = 'temporary.nurse@test-tirupati.local';
+      const testEmail = `temporary.nurse.${Date.now()}@test-tirupati.local`;
+
+      // Ensure clean state before invite
+      await fetch(`${url}/rest/v1/department_members?department_id=eq.${neuroDeptId}&email=like.temporary.nurse*`, {
+        method: 'DELETE',
+        headers: serviceHeaders
+      });
 
       // Ensure auth user exists for temp nurse
       const createRes = await fetch(`${url}/auth/v1/admin/users`, {
@@ -130,56 +136,62 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
         })
       });
       const tempUser = await createRes.json();
+      let invite;
 
-      // Invite staff member (A2) with Front Desk role (BUG-HOSP-02)
-      const invRes = await fetch(`${url}/rest/v1/department_members`, {
-        method: 'POST',
-        headers: serviceHeaders,
-        body: JSON.stringify({
-          department_id: neuroDeptId,
-          merchant_id: hospA.id,
-          email: testEmail,
-          user_id: null,
-          role: 'front_desk',
-          status: 'invited',
-          invited_by: tokens.adminApex.user.id
-        })
-      });
-      const invData = await invRes.json();
-      assert.ok(Array.isArray(invData) && invData[0]?.id, 'Invite record created');
-      const invite = invData[0];
-      assert.equal(invite.status, 'invited');
-      assert.equal(invite.role, 'front_desk', 'BUG-HOSP-02: role is stored as front_desk');
-      assert.ok(invite.invite_expires_at, '7-day expiry set');
+      try {
+        // Invite staff member (A2) with Front Desk role (BUG-HOSP-02)
+        const invRes = await fetch(`${url}/rest/v1/department_members`, {
+          method: 'POST',
+          headers: serviceHeaders,
+          body: JSON.stringify({
+            department_id: neuroDeptId,
+            merchant_id: hospA.id,
+            email: testEmail,
+            user_id: null,
+            role: 'front_desk',
+            status: 'invited',
+            invited_by: tokens.adminApex.user.id
+          })
+        });
+        const invData = await invRes.json();
+        assert.ok(Array.isArray(invData) && invData[0]?.id, 'Invite record created');
+        invite = invData[0];
+        assert.equal(invite.status, 'invited');
+        assert.equal(invite.role, 'front_desk', 'BUG-HOSP-02: role is stored as front_desk');
+        assert.ok(invite.invite_expires_at, '7-day expiry set');
 
-      // Check expiry is ~7 days in future
-      const diffDays = (new Date(invite.invite_expires_at) - new Date()) / (1000 * 60 * 60 * 24);
-      assert.ok(diffDays >= 6.8 && diffDays <= 7.2, 'Expiry is approximately 7 days');
+        // Check expiry is ~7 days in future
+        const diffDays = (new Date(invite.invite_expires_at) - new Date()) / (1000 * 60 * 60 * 24);
+        assert.ok(diffDays >= 6.8 && diffDays <= 7.2, 'Expiry is approximately 7 days');
 
-      // Accept invite (A3)
-      const acceptRes = await fetch(`${url}/rest/v1/department_members?id=eq.${invite.id}`, {
-        method: 'PATCH',
-        headers: serviceHeaders,
-        body: JSON.stringify({
-          status: 'active',
-          user_id: tempUser.id,
-          accepted_at: new Date().toISOString()
-        })
-      });
-      const acceptData = await acceptRes.json();
-      assert.equal(acceptData[0].status, 'active');
-      assert.equal(acceptData[0].user_id, tempUser.id);
-      assert.ok(acceptData[0].accepted_at);
-
-      // Cleanup
-      await fetch(`${url}/rest/v1/department_members?id=eq.${invite.id}`, {
-        method: 'DELETE',
-        headers: serviceHeaders
-      });
-      await fetch(`${url}/auth/v1/admin/users/${tempUser.id}`, {
-        method: 'DELETE',
-        headers: serviceHeaders
-      });
+        // Accept invite (A3)
+        const acceptRes = await fetch(`${url}/rest/v1/department_members?id=eq.${invite.id}`, {
+          method: 'PATCH',
+          headers: serviceHeaders,
+          body: JSON.stringify({
+            status: 'active',
+            user_id: tempUser.id,
+            accepted_at: new Date().toISOString()
+          })
+        });
+        const acceptData = await acceptRes.json();
+        assert.equal(acceptData[0].status, 'active');
+        assert.equal(acceptData[0].user_id, tempUser.id);
+        assert.ok(acceptData[0].accepted_at);
+      } finally {
+        if (invite?.id) {
+          await fetch(`${url}/rest/v1/department_members?id=eq.${invite.id}`, {
+            method: 'DELETE',
+            headers: serviceHeaders
+          });
+        }
+        if (tempUser?.id) {
+          await fetch(`${url}/auth/v1/admin/users/${tempUser.id}`, {
+            method: 'DELETE',
+            headers: serviceHeaders
+          });
+        }
+      }
     });
   });
 
@@ -189,6 +201,12 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
   describe('A4: Max 3 Members Per Department Rule', () => {
     it('strictly rejects adding a 4th member when department already has 3 members', async () => {
       const neuroDeptId = hospA.departments.find(d => d.name === 'Neurology').id;
+
+      // Clean any prior stray member records for Neurology before testing limits
+      await fetch(`${url}/rest/v1/department_members?department_id=eq.${neuroDeptId}&email=in.(third.member@test-tirupati.local,fourth.member@test-tirupati.local)`, {
+        method: 'DELETE',
+        headers: serviceHeaders
+      });
 
       // Currently Neurology has 2 active members (neuro.doc and neuro.desk)
       // Add 3rd member (should succeed)
@@ -207,32 +225,34 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
       assert.ok(Array.isArray(data3rd) && data3rd[0]?.id, '3rd member allowed');
       const thirdId = data3rd[0].id;
 
-      // Try to add 4th member (MUST BE REJECTED BY TRIGGER)
-      const res4th = await fetch(`${url}/rest/v1/department_members`, {
-        method: 'POST',
-        headers: serviceHeaders,
-        body: JSON.stringify({
-          department_id: neuroDeptId,
-          merchant_id: hospA.id,
-          email: 'fourth.member@test-tirupati.local',
-          status: 'invited',
-          invited_by: tokens.adminApex.user.id
-        })
-      });
-      const data4th = await res4th.json();
-      
-      // Verify database trigger prevented the 4th member
-      assert.ok(!Array.isArray(data4th), '4th member must not be inserted');
-      assert.ok(
-        data4th.message?.includes('already has 3 members') || data4th.code === 'P0001',
-        `Rejection error returned: ${data4th.message}`
-      );
-
-      // Cleanup 3rd member
-      await fetch(`${url}/rest/v1/department_members?id=eq.${thirdId}`, {
-        method: 'DELETE',
-        headers: serviceHeaders
-      });
+      try {
+        // Try to add 4th member (MUST BE REJECTED BY TRIGGER)
+        const res4th = await fetch(`${url}/rest/v1/department_members`, {
+          method: 'POST',
+          headers: serviceHeaders,
+          body: JSON.stringify({
+            department_id: neuroDeptId,
+            merchant_id: hospA.id,
+            email: 'fourth.member@test-tirupati.local',
+            status: 'invited',
+            invited_by: tokens.adminApex.user.id
+          })
+        });
+        const data4th = await res4th.json();
+        
+        // Verify database trigger prevented the 4th member
+        assert.ok(!Array.isArray(data4th), '4th member must not be inserted');
+        assert.ok(
+          data4th.message?.includes('already has 3 members') || data4th.code === 'P0001',
+          `Rejection error returned: ${data4th.message}`
+        );
+      } finally {
+        // Cleanup 3rd member
+        await fetch(`${url}/rest/v1/department_members?id=eq.${thirdId}`, {
+          method: 'DELETE',
+          headers: serviceHeaders
+        });
+      }
     });
   });
 

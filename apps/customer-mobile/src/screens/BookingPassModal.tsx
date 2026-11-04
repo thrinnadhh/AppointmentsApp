@@ -15,7 +15,12 @@ import { fetchBookingCheckinCode, getApiBaseUrl, supabase } from '../services/ap
 
 interface BookingPassModalProps {
   visible: boolean;
-  booking: (Booking & { provider_name?: string; resource_name?: string }) | null;
+  booking: (Booking & {
+    provider_name?: string;
+    resource_name?: string;
+    is_doctor_ahead?: boolean;
+    early_invite_active?: boolean;
+  }) | null;
   patientDetails?: {
     fullName?: string;
     phone?: string;
@@ -54,6 +59,23 @@ export default function BookingPassModal({
   const [liveQueuePosition, setLiveQueuePosition] = useState<number | null>(booking?.queue_position || null);
   const [liveWaitMinutes, setLiveWaitMinutes] = useState<number | null>(booking?.estimated_wait_minutes || null);
   const [liveQueueItems, setLiveQueueItems] = useState<HospitalQueueTokenItem[]>([]);
+  const [showComeNowInvite, setShowComeNowInvite] = useState<boolean>(false);
+  const [comeNowAccepted, setComeNowAccepted] = useState<boolean>(false);
+  const [isNotificationDenied, setIsNotificationDenied] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof window.Notification !== "undefined") {
+      if (Notification.permission === "denied") {
+        setIsNotificationDenied(true);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (booking?.is_doctor_ahead || booking?.early_invite_active) {
+      setShowComeNowInvite(true);
+    }
+  }, [booking?.is_doctor_ahead, booking?.early_invite_active]);
 
   useEffect(() => {
     if (booking) {
@@ -206,6 +228,10 @@ export default function BookingPassModal({
   const currentWaitMinutes = liveWaitMinutes ?? booking.estimated_wait_minutes;
   const isLateQueue = Boolean(currentQueuePosition);
 
+  const arrivalWindowStart = new Date(slotMs - 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const arrivalWindowEnd = new Date(slotMs + 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const arrivalWindowString = `${arrivalWindowStart} – ${arrivalWindowEnd}`;
+
   // Derive user token number (e.g. from assignedTokenNumber, booking.queue_position, or default 1)
   const myTokenNumber = assignedTokenNumber ?? booking.queue_position ?? 1;
   const slotEndDate = new Date(booking.slot_end || slotDate.getTime() + 15 * 60 * 1000);
@@ -296,7 +322,7 @@ export default function BookingPassModal({
                 </View>
               </View>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {booking.provider_name || 'Trinadh Multi-Speciality Hospital'}
+                {booking.provider_name || 'Hospital OPD'}
               </Text>
             </View>
             <TouchableOpacity
@@ -392,10 +418,10 @@ export default function BookingPassModal({
                   <View style={styles.opdHighlightTop}>
                     <View>
                       <Text style={styles.opdDoctorTitle}>
-                        {booking.resource_name || 'Dr. K. Trinadh (Chief Physician)'}
+                        {booking.resource_name || 'Doctor Consultation'}
                       </Text>
                       <Text style={styles.opdHospitalSub}>
-                        {booking.provider_name || 'Trinadh Multi-Speciality Hospital'} • OPD Room 101
+                        {booking.provider_name || 'Hospital'} • OPD Room
                       </Text>
                     </View>
                     <View style={styles.myTokenBadge}>
@@ -530,7 +556,7 @@ export default function BookingPassModal({
                           </View>
                         </View>
                         <Text style={styles.checkedInNotice}>
-                          Please have a seat in the waiting lobby. Dr. Trinadh will call Token #{myTokenNumber} shortly.
+                          Please have a seat in the waiting lobby. The doctor will call Token #{myTokenNumber} shortly.
                         </Text>
                       </View>
                     ) : (liveStatus === 'CONFIRMED' && isWindowOpen) ? (
@@ -594,61 +620,132 @@ export default function BookingPassModal({
 
                     <View style={styles.depositInfoBox}>
                       <View style={styles.depositRow}>
-                        <Text style={styles.depositTitle}>Deposit Paid via UPI / Card</Text>
-                        <Text style={styles.depositAmount}>₹{booking.deposit_amount}</Text>
+                        <Text style={styles.depositTitle}>Platform Fee (Paid Online)</Text>
+                        <Text style={styles.depositAmount}>₹{booking.platform_fee_amount ?? booking.platform_fee ?? 10}</Text>
+                      </View>
+                      <View style={[styles.depositRow, { marginTop: 6 }]}>
+                        <Text style={styles.depositTitle}>Doctor Consultation (Pay at Desk)</Text>
+                        <Text style={[styles.depositAmount, { color: booking.consultation_payment_status === 'COLLECTED_AT_DESK' ? '#047857' : '#b45309' }]}>
+                          ₹{booking.consultation_fee_amount ?? 500} {booking.consultation_payment_status === 'COLLECTED_AT_DESK' ? '✓ Paid' : '(Pending)'}
+                        </Text>
                       </View>
                       <Text style={styles.depositSubtext}>
-                        This deposit guarantees your slot and will be adjusted in your consultation bill.
+                        Online booking fee reserves your slot. Doctor's consultation fee is paid directly at the hospital reception.
                       </Text>
                     </View>
 
-                    {/* Expected Arrival & Zero-Wait Schedule */}
+                    {/* Expected Arrival & Arrival Window (±10 Mins) */}
                     <View style={styles.expectedTimeBox} testID="pass-expected-time">
                       <View style={styles.expectedTimeHeader}>
                         <Text style={styles.expectedTimeIcon}>⏱️</Text>
-                        <Text style={styles.expectedTimeTitle}>Expected Time & Zero-Wait Advice</Text>
+                        <Text style={styles.expectedTimeTitle}>Arrival Window: Booked Time ± 10 Minutes</Text>
+                      </View>
+                      <View style={styles.arrivalWindowBadgeRow}>
+                        <Text style={styles.arrivalWindowBadgeTime}>
+                          Arrival Window: <Text style={{ fontWeight: '800', color: '#047857' }}>{arrivalWindowString}</Text>
+                        </Text>
+                        <View style={styles.arrivalCeilingPill}>
+                          <Text style={styles.arrivalCeilingPillText}>±10m Window</Text>
+                        </View>
                       </View>
                       <Text style={styles.expectedTimeText}>
-                        Scheduled Slot: <Text style={{ fontWeight: '700', color: '#0f172a' }}>{timeString}</Text> | Expected Arrival: <Text style={{ fontWeight: '700', color: '#0284c7' }}>10 mins prior</Text> | Est. Consultation Wait: <Text style={{ fontWeight: '700', color: '#059669' }}>0–5 mins</Text> (Zero-Wait OPD Token #{myTokenNumber})
+                        Scheduled Slot: <Text style={{ fontWeight: '700', color: '#0f172a' }}>{timeString}</Text> | Est. Consultation Wait: <Text style={{ fontWeight: '700', color: '#059669' }}>0–5 mins</Text> (OPD Token #{myTokenNumber})
+                      </Text>
+                      <Text style={styles.expectedTimeSubtext}>
+                        💡 Booked time ({timeString}) is a ceiling: starting earlier is always allowed when you are present and the doctor is free.
                       </Text>
                     </View>
 
-                    {/* Late Arrival Queue Token or Grace Reminder */}
+                    {/* Late Arrival Standby Queue with Honest Estimate */}
                     {currentQueuePosition ? (
                       <View style={styles.lateQueueActiveBox} testID="pass-late-queue-token">
                         <View style={styles.lateQueueActiveHeader}>
                           <View style={styles.lateQueueBadgePill}>
                             <Text style={styles.lateQueueBadgeIcon}>⏰</Text>
-                            <Text style={styles.lateQueueBadgeText}>LATE TURN ASSIGNED</Text>
+                            <Text style={styles.lateQueueBadgeText}>STANDBY QUEUE ASSIGNED</Text>
                           </View>
                           <Text style={styles.lateQueueTokenNumber} testID="pass-late-token-number">
-                            Turn #{currentQueuePosition}
+                            Standby #{currentQueuePosition}
                           </Text>
                         </View>
                         <Text style={styles.lateQueueNoticeText}>
-                          You are checked in to the late queue and will be served in the next fitting gap without delaying on-time patients.
+                          You checked in after your scheduled arrival window and have been placed in the Standby Queue in original booking order.
                         </Text>
-                        {currentWaitMinutes ? (
-                          <View style={styles.lateWaitRow}>
-                            <Text style={styles.lateWaitLabel}>Estimated Wait:</Text>
-                            <Text style={styles.lateWaitVal} testID="pass-late-wait-minutes">
-                              ~{currentWaitMinutes} mins
-                            </Text>
-                          </View>
-                        ) : null}
+                        <View style={styles.honestEstimateBox} testID="pass-honest-estimate-box">
+                          <Text style={styles.honestEstimateTitle}>Honest Estimate &amp; Guarantee:</Text>
+                          <Text style={styles.honestEstimateText}>
+                            The doctor will see you in gaps between on-time patients (estimated wait: ~{currentWaitMinutes || 25} mins) or at the end of the session. You will never be dropped!
+                          </Text>
+                        </View>
                       </View>
                     ) : (
                       (liveStatus === 'CONFIRMED' || isCheckedIn) && (
                         <View style={styles.lateArrivalPassNote} testID="pass-late-arrival-note">
                           <View style={styles.lateArrivalPassHeader}>
                             <Text style={styles.lateArrivalPassIcon}>⏱️</Text>
-                            <Text style={styles.lateArrivalPassTitle}>Late Arrival Policy (Gap Accommodation)</Text>
+                            <Text style={styles.lateArrivalPassTitle}>Late Arrival Rule (Standby Queue)</Text>
                           </View>
                           <Text style={styles.lateArrivalPassText}>
-                            Arriving late? Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"I've Reached"</Text> below when you arrive. Late arrivals join the consultant's standby queue and are served in the next fitting gap without delaying scheduled on-time patients.
+                            Arriving late? Don&apos;t worry! Tap <Text style={{ fontWeight: "700", color: "#059669" }}>&quot;I&apos;ve Reached&quot;</Text> below when you arrive. You will be placed in the <Text style={{ fontWeight: "700", color: "#0f172a" }}>Standby Queue in original booking order</Text> and called between on-time patients when a slot fits. Nobody is dropped!
                           </Text>
                         </View>
                       )
+                    )}
+
+                    {/* Optional "Come Now?" Early Arrival Invite */}
+                    {showComeNowInvite && !isCheckedIn && (
+                      <View style={styles.comeNowCard} testID="pass-come-now-invite">
+                        <View style={styles.comeNowHeader}>
+                          <Text style={styles.comeNowIcon}>⚡</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.comeNowTitle}>Doctor Running Ahead of Schedule</Text>
+                            <Text style={styles.comeNowSubtitle}>
+                              Dr. {booking.resource_name || 'the Consultant'} is available early! Can you arrive now?
+                            </Text>
+                          </View>
+                        </View>
+                        {comeNowAccepted ? (
+                          <View style={styles.comeNowAcceptedBox}>
+                            <Text style={styles.comeNowAcceptedText}>✓ Notified clinic you are on your way early!</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.comeNowActionRow}>
+                            <TouchableOpacity
+                              style={styles.comeNowPrimaryBtn}
+                              onPress={() => {
+                                setComeNowAccepted(true);
+                                handleSayReached();
+                              }}
+                              testID="come-now-accept-btn"
+                            >
+                              <Text style={styles.comeNowPrimaryText}>I&apos;m On My Way</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.comeNowDismissBtn}
+                              onPress={() => setShowComeNowInvite(false)}
+                              testID="come-now-decline-btn"
+                            >
+                              <Text style={styles.comeNowDismissText}>Stick to Booked Time</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        <Text style={styles.comeNowFineprint}>
+                          Optional: Declining or ignoring changes nothing. Your booked slot at {timeString} remains 100% reserved.
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Notification Denied Fallback Banner */}
+                    {isNotificationDenied && (
+                      <View style={styles.notificationDeniedBanner} testID="push-denied-fallback-banner">
+                        <Text style={styles.notificationDeniedIcon}>🔔</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.notificationDeniedTitle}>Push Notifications Disabled</Text>
+                          <Text style={styles.notificationDeniedText}>
+                            Updates, live ETAs, and your reception PIN will be delivered via WhatsApp and SMS.
+                          </Text>
+                        </View>
+                      </View>
                     )}
                   </View>
                 </View>
@@ -697,10 +794,10 @@ export default function BookingPassModal({
                 <View style={styles.queueBoardBanner}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.queueBoardHospitalName}>
-                      {booking.provider_name || 'Trinadh Multi-Speciality Hospital'}
+                      {booking.provider_name || 'Hospital'}
                     </Text>
                     <Text style={styles.queueBoardDoctorSub}>
-                      {booking.resource_name || 'Dr. K. Trinadh (Chief Physician & Cardiologist)'}
+                      {booking.resource_name || 'Doctor OPD'}
                     </Text>
                     <Text style={styles.queueBoardSessionText}>
                       Today's Morning OPD Session • Room 101
@@ -1650,6 +1747,153 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#0c4a6e',
     lineHeight: 15,
+  },
+  arrivalWindowBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  arrivalWindowBadgeTime: {
+    fontSize: 12,
+    color: '#0369a1',
+    fontWeight: '600',
+  },
+  arrivalCeilingPill: {
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  arrivalCeilingPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0369a1',
+  },
+  expectedTimeSubtext: {
+    fontSize: 10,
+    color: '#0284c7',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  honestEstimateBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#f59e0b',
+  },
+  honestEstimateTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#b45309',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  honestEstimateText: {
+    fontSize: 11,
+    color: '#1e293b',
+    lineHeight: 15,
+  },
+  comeNowCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#86efac',
+    marginTop: 10,
+  },
+  comeNowHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+  },
+  comeNowIcon: {
+    fontSize: 18,
+  },
+  comeNowTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#166534',
+  },
+  comeNowSubtitle: {
+    fontSize: 11,
+    color: '#15803d',
+    marginTop: 1,
+    lineHeight: 15,
+  },
+  comeNowActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  comeNowPrimaryBtn: {
+    flex: 1,
+    backgroundColor: '#047857',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  comeNowPrimaryText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  comeNowDismissBtn: {
+    flex: 1,
+    backgroundColor: '#e2e8f0',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  comeNowDismissText: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  comeNowAcceptedBox: {
+    backgroundColor: '#dcfce7',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 6,
+  },
+  comeNowAcceptedText: {
+    color: '#15803d',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  comeNowFineprint: {
+    fontSize: 10,
+    color: '#4b5563',
+    fontStyle: 'italic',
+  },
+  notificationDeniedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    marginTop: 10,
+  },
+  notificationDeniedIcon: {
+    fontSize: 16,
+  },
+  notificationDeniedTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  notificationDeniedText: {
+    fontSize: 10,
+    color: '#64748b',
+    lineHeight: 14,
   },
   lateQueueActiveBox: {
     backgroundColor: '#fffbeb',

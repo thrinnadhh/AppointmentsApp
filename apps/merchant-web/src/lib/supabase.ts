@@ -81,12 +81,19 @@ export function registerLocalCheckFn(fn: () => boolean) {
 // NEXT_PUBLIC_ prefix, or it would be bundled into client-side JS.
 // Built lazily on first use so importing this module never throws for code
 // that only needs the plain `supabase` client above.
+
 let _supabaseAdmin: (typeof supabase) | null = null;
 let _localSupabaseAdmin: (typeof supabase) | null = null;
 
 export function getLocalSupabaseAdmin(): typeof supabase {
+  if (typeof window !== 'undefined') {
+    throw new Error('FATAL: getLocalSupabaseAdmin is server-only and cannot be invoked in the browser bundle.');
+  }
   if (!_localSupabaseAdmin) {
-    const localKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+    const localKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!localKey) {
+      throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY — required for server-only administrative operations');
+    }
     _localSupabaseAdmin = createClient<Database>('http://127.0.0.1:54321', localKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     }) as unknown as typeof supabase;
@@ -95,6 +102,9 @@ export function getLocalSupabaseAdmin(): typeof supabase {
 }
 
 export function getSupabaseAdmin(callerOrReq?: any): typeof supabase {
+  if (typeof window !== 'undefined') {
+    throw new Error('FATAL: getSupabaseAdmin is server-only and cannot be invoked in the browser bundle.');
+  }
   if (process.env.NODE_ENV !== 'production') {
     if (
       callerOrReq?.isLocalTestCaller ||
@@ -158,7 +168,7 @@ export interface MerchantBookingWithDetails {
 export async function manageLateQueueBooking(
   bookingId: string, 
   action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE', 
-  bufferOffset = 2
+  bufferOffset?: number
 ): Promise<{
   success: boolean;
   queue_position?: number;
@@ -281,7 +291,10 @@ export async function fetchMerchantBookingById(
   };
 }
 
-export async function revealCustomerContact(bookingId: string): Promise<{
+export async function revealCustomerContact(
+  bookingId: string,
+  reason: string = 'Operational check-in'
+): Promise<{
   success: boolean;
   phone?: string;
   full_name?: string;
@@ -289,6 +302,7 @@ export async function revealCustomerContact(bookingId: string): Promise<{
 }> {
   const { data, error } = await (supabase.rpc as any)('reveal_customer_contact', {
     p_booking_id: bookingId,
+    p_reason: reason,
   });
   if (error) {
     return { success: false, error: error.message };
@@ -564,17 +578,19 @@ export async function adminCreateStaffUser(params: {
   role?: 'admin' | 'merchant' | 'customer';
   phone?: string;
 }) {
-  const { data, error } = await supabase.rpc('admin_create_user', {
-    p_email: params.email,
-    p_password: params.password,
-    p_full_name: params.fullName,
-    p_role: params.role || 'merchant',
-    p_phone: params.phone || undefined,
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const res = await fetch('/api/admin/users', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(params),
   });
-
-  if (error) {
-    console.error('Error creating user:', error);
-    throw error;
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create user');
   }
   return data;
 }
@@ -590,34 +606,19 @@ export async function adminCreateVenue(params: {
   email?: string;
   ownerId?: string;
 }) {
-  const CATEGORY_MAP: Record<string, string> = {
-    clinic: 'clinics',
-    clinics: 'clinics',
-    salon: 'salons',
-    salons: 'salons',
-    gaming: 'gaming',
-    restaurant: 'restaurants',
-    restaurants: 'restaurants',
-    pet: 'pets',
-    pets: 'pets',
-  };
-  const dbCategoryId = CATEGORY_MAP[params.categoryId.toLowerCase()] || params.categoryId;
-
-  const { data, error } = await supabase.rpc('admin_create_venue', {
-    p_name: params.name,
-    p_category_id: dbCategoryId,
-    p_address: params.address,
-    p_phone: params.phone,
-    p_opening_time: params.openingTime || '09:00:00',
-    p_closing_time: params.closingTime || '21:00:00',
-    p_description: params.description || undefined,
-    p_email: params.email || undefined,
-    p_owner_id: params.ownerId || undefined,
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const res = await fetch('/api/admin/venues', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(params),
   });
-
-  if (error) {
-    console.error('Error creating venue:', error);
-    throw error;
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create venue');
   }
   return data;
 }
@@ -632,20 +633,19 @@ export async function adminCreateDoctorResource(params: {
   durationMinutes?: number;
   capacity?: number;
 }) {
-  const { data, error } = await supabase.rpc('admin_create_resource', {
-    p_provider_id: params.providerId,
-    p_name: params.name,
-    p_type: params.type,
-    p_department: params.department,
-    p_duration_minutes: (params.durationMinutes !== undefined && params.durationMinutes !== null && !isNaN(Number(params.durationMinutes)))
-      ? Math.round(Number(params.durationMinutes))
-      : 30,
-    p_capacity: params.capacity || 1,
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const res = await fetch('/api/admin/resources', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(params),
   });
-
-  if (error) {
-    console.error('Error creating doctor/resource:', error);
-    throw error;
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create doctor/resource');
   }
   return data;
 }

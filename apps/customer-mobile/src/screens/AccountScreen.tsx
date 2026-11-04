@@ -10,7 +10,7 @@ import {
   Alert, ActivityIndicator, ScrollView, Linking, Switch,
   Platform, StatusBar,
 } from 'react-native';
-import { supabase, getApiBaseUrl } from '../services/api';
+import { supabase, getApiBaseUrl, fetchCustomerStrikes } from '../services/api';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -33,6 +33,7 @@ export interface AccountScreenProps {
 export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
   const [user, setUser]                 = useState<{ id: string; phone?: string; email?: string } | null>(null);
   const [deletion, setDeletion]         = useState<DeletionStatus | null>(null);
+  const [strikeInfo, setStrikeInfo]     = useState<{ strikes: number; isBlocked: boolean; blockedUntil: string | null } | null>(null);
   const [loadingDelete, setLoadingDelete] = useState(false);
   const [loading, setLoading]           = useState(true);
   const [consents, setConsents]         = useState<ConsentState>({ location_detection: false, marketing_notifications: false, whatsapp_notifications: false, loaded: false });
@@ -43,8 +44,13 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user ? { id: user.id, phone: user.phone, email: user.email } : null);
 
-      // Load optional consent settings from DB (DPDPA §6 right to withdraw)
       if (user) {
+        try {
+          const strikesRes = await fetchCustomerStrikes(user.id);
+          setStrikeInfo(strikesRes);
+        } catch { /* non-fatal */ }
+
+        // Load optional consent settings from DB (DPDPA §6 right to withdraw)
         try {
           const { data: rows } = await supabase
             .from('user_consents')
@@ -186,6 +192,29 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
     }
   };
 
+  const [exportingData, setExportingData] = useState(false);
+
+  const handleExportData = async () => {
+    if (!user) {
+      Alert.alert('Authentication Required', 'Please sign in to export your personal data archive.');
+      return;
+    }
+    setExportingData(true);
+    try {
+      const base = getApiBaseUrl();
+      const exportUrl = `${base}/api/account/export`;
+      await Linking.openURL(exportUrl);
+      Alert.alert(
+        'Data Export',
+        'Your personal data archive (profile, appointments, consents) is being downloaded in JSON format.'
+      );
+    } catch (err: any) {
+      Alert.alert('Export Error', err?.message || 'Could not trigger data export');
+    } finally {
+      setExportingData(false);
+    }
+  };
+
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color="#047857" /></View>;
   }
@@ -203,6 +232,34 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
       )}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
         {!onClose && <Text style={styles.heading}>Account</Text>}
+
+      {/* Account Standing & No-Show Policy */}
+      {strikeInfo?.isBlocked ? (
+        <View style={[styles.section, styles.blockedSection]} testID="account-blocked-banner">
+          <Text style={[styles.sectionTitle, { color: '#991b1b' }]}>🚫 Account Blocked (7 Days)</Text>
+          <Text style={styles.blockedText}>
+            Your account is temporarily blocked for 7 days due to excessive missed appointments (exceeded 5 no-shows).
+            {strikeInfo.blockedUntil
+              ? ` Cooldown expires on ${new Date(strikeInfo.blockedUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.`
+              : ''}
+            {'\n\n'}You cannot book new appointments during this 7-day cooldown period. After the cooldown expires, your no-show strikes will reset to zero.
+          </Text>
+        </View>
+      ) : strikeInfo && strikeInfo.strikes > 0 ? (
+        <View style={[styles.section, styles.strikeSection]} testID="account-strikes-banner">
+          <Text style={[styles.sectionTitle, { color: '#92400e' }]}>⚠️ Attendance Standing</Text>
+          <Text style={styles.strikeText}>
+            {strikeInfo.strikes === 1 && '1 missed appointment recorded. Two times there will be no issue or penalty (100% deposit refunded).'}
+            {strikeInfo.strikes === 2 && "2 missed appointments recorded. Two times there was no issue, but for your third time booking: if you don't show up this time, there will be a penalty of ₹60. In ₹60, ₹50 will be given to the hospital and ₹10 to the Appointments app (the rest of your deposit will be refunded)."}
+            {strikeInfo.strikes >= 3 && `${strikeInfo.strikes} missed appointments recorded. If you don't show up, a penalty of ₹60 will be deducted (₹50 to the hospital and ₹10 to the Appointments app). Exceeding 5 no-shows will block your account for 7 days.`}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.section} testID="account-good-standing-card">
+          <Text style={styles.sectionTitle}>Attendance Standing</Text>
+          <Text style={styles.detail}>✨ Good Standing (0 Missed Appointments)</Text>
+        </View>
+      )}
 
       {/* Profile */}
       <View style={styles.section}>
@@ -236,6 +293,20 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
           }}
         >
           <Text style={styles.linkText}>Grievance Officer →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.link}
+          onPress={handleExportData}
+          disabled={exportingData}
+          testID="btn-export-data-archive"
+        >
+          {exportingData ? (
+            <ActivityIndicator size="small" color="#047857" />
+          ) : (
+            <Text style={[styles.linkText, { color: '#047857', fontWeight: '600' }]}>
+              📥 Export Personal Data Archive (JSON) →
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -400,4 +471,8 @@ const styles = StyleSheet.create({
   consentLabelGroup:    { flex: 1, marginRight: 12 },
   consentLabel:         { fontSize: 14, fontWeight: '600', color: '#1e293b' },
   consentSub:           { fontSize: 12, color: '#64748b', marginTop: 2 },
+  blockedSection:       { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1.5 },
+  blockedText:          { fontSize: 13, color: '#b91c1c', lineHeight: 18 },
+  strikeSection:        { backgroundColor: '#fffbeb', borderColor: '#fde68a', borderWidth: 1.5 },
+  strikeText:           { fontSize: 13, color: '#b45309', lineHeight: 18 },
 });

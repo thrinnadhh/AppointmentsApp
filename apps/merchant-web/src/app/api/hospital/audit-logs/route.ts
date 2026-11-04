@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getAccessContext, logHospitalAuditEvent, hasModuleAccess } from '@/lib/hospital-access';
+import { getAccessContext, logHospitalAuditEvent, hasModuleAccess, isHospitalAdmin } from '@/lib/hospital-access';
 
 /**
  * GET /api/hospital/audit-logs
- * Owner-only audit log inspection for hospital activity (team changes, patient views).
+ * Hospital Admin audit log inspection for hospital activity (team changes, patient views).
  */
 export async function GET(req: NextRequest) {
   try {
@@ -17,9 +17,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (ctx.role !== 'owner' && ctx.role !== 'superadmin') {
+    if (!isHospitalAdmin(ctx)) {
       return NextResponse.json(
-        { error: 'Forbidden. Owner access required to view audit logs.' },
+        { error: 'Forbidden. Hospital Admin access required to view audit logs.' },
         { status: 403 }
       );
     }
@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({
+      success: true,
       logs: enrichedLogs,
       total: count || enrichedLogs.length,
     });

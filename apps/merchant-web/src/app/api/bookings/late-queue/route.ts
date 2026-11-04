@@ -6,7 +6,12 @@ import {
   isCallerAuthorizedForProvider,
 } from '@/lib/auth-admin';
 import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
-import { evaluateConsultantQueue, toClinicDateString } from '@appointments/shared/queue-engine';
+import {
+  calculateArrivalTag,
+  computePatientETA,
+  evaluateConsultantQueue,
+  toClinicDateString,
+} from '@appointments/shared/queue-engine';
 
 export async function POST(req: NextRequest) {
   try {
@@ -164,7 +169,7 @@ export async function POST(req: NextRequest) {
 
       const arrivedAt = booking.customer_arrived_at || new Date().toISOString();
 
-      // 1. Atomically assign arrival sequence position in Postgres (Phase 3 Item 7)
+      // 1. Atomically assign arrival sequence position in Postgres
       const { data: atomicRows } = await (supabaseAdmin.rpc as any)(
         'atomic_assign_checkin_arrival',
         {
@@ -178,7 +183,7 @@ export async function POST(req: NextRequest) {
           ? atomicRow.queue_position
           : booking.queue_position || 1;
 
-      // 2. Evaluate position and wait estimate from the canonical per-consultant queue engine (Phase 3 Item 1 & 7)
+      // 2. Evaluate position and wait estimate from the canonical per-consultant queue engine
       const slotDate = toClinicDateString(booking.slot_start);
       const { data: todayBookings } = await supabaseAdmin
         .from('bookings')
@@ -232,13 +237,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
       }
 
-      // Log notification
-      try {
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('phone, full_name')
-          .eq('id', booking.customer_id)
-          .maybeSingle();
+      // Log notification only when ETA leaves patient window
+      const shouldNotify = patientEta ? patientEta.hasLeftWindow : true;
 
         if (profile?.phone) {
           await (supabaseAdmin.from('notification_logs') as any).upsert(
@@ -255,8 +255,6 @@ export async function POST(req: NextRequest) {
             { onConflict: 'booking_id,event_type,channel', ignoreDuplicates: true }
           );
         }
-      } catch (notifyErr) {
-        console.warn('[LateQueueRoute] Error writing notification log:', notifyErr);
       }
 
       return NextResponse.json({
@@ -267,7 +265,6 @@ export async function POST(req: NextRequest) {
         customer_arrived_at: arrivedAt,
         queue_position: newQueuePosition,
         estimated_wait_minutes: waitMinutes,
-        buffer_offset: offset,
         queue_notice: queueNotice,
       });
     }

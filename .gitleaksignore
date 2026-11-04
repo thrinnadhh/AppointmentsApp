@@ -1,0 +1,80 @@
+# .gitleaksignore
+# Documented benign test fixtures, synthetic test tokens, and agent framework metadata.
+# No production credentials or live secrets are ignored here.
+
+# stripe-access-token in .agents/scripts/tests/test_toolkit.py:65 (local test fixture / synthetic token)
+.agents/scripts/tests/test_toolkit.py:stripe-access-token:65
+# generic-api-key in .agents/manifest.lock.json:69 (local test fixture / synthetic token)
+.agents/manifest.lock.json:generic-api-key:69
+# generic-api-key in .agents/manifest.lock.json:75 (local test fixture / synthetic token)
+.agents/manifest.lock.json:generic-api-key:75
+# generic-api-key in .agents/.ag-kit/manifest.json:73 (local test fixture / synthetic token)
+.agents/.ag-kit/manifest.json:generic-api-key:73
+# generic-api-key in .agents/.ag-kit/manifest.json:74 (local test fixture / synthetic token)
+.agents/.ag-kit/manifest.json:generic-api-key:74
+# generic-api-key in .agents/.ag-kit/manifest.json:80 (local test fixture / synthetic token)
+.agents/.ag-kit/manifest.json:generic-api-key:80
+# jwt in tests/e2e/harness/test-clock.mjs:32 (local test fixture / synthetic token)
+tests/e2e/harness/test-clock.mjs:jwt:32
+# jwt in tests/e2e/stories/story-helpers.mjs:16 (local test fixture / synthetic token)
+tests/e2e/stories/story-helpers.mjs:jwt:16
+# jwt in tests/e2e/stories/story-helpers.mjs:17 (local test fixture / synthetic token)
+tests/e2e/stories/story-helpers.mjs:jwt:17
+# jwt in tests/k6/load-test-config.json:3 (local test fixture / synthetic token)
+tests/k6/load-test-config.json:jwt:3
+# jwt in tests/k6/load-test-config.json:5 (local test fixture / synthetic token)
+tests/k6/load-test-config.json:jwt:5
+# jwt in tests/k6/load-test-config.json:7 (local test fixture / synthetic token)
+tests/k6/load-test-config.json:jwt:7
+# jwt in tests/k6/load-test-config.json:9 (local test fixture / synthetic token)
+tests/k6/load-test-config.json:jwt:9
+# jwt in tests/k6/load-test-config.json:13 (local test fixture / synthetic token)
+tests/k6/load-test-config.json:jwt:13
+# jwt in tests/e2e/harness/tenant-factory.mjs:75 (local test fixture / synthetic token)
+tests/e2e/harness/tenant-factory.mjs:jwt:75
+# jwt in tests/e2e/harness/tenant-factory.mjs:76 (local test fixture / synthetic token)
+tests/e2e/harness/tenant-factory.mjs:jwt:76
+# jwt in tests/e2e/workstreams/sa7-admin-governance.test.mjs:27 (local test fixture / synthetic token)
+tests/e2e/workstreams/sa7-admin-governance.test.mjs:jwt:27
+# jwt in tests/scripts/generate-load-test-tokens.mjs:101 (local test fixture / synthetic token)
+tests/scripts/generate-load-test-tokens.mjs:jwt:101
+# jwt in tests/e2e/workstreams/sa4-consultation-flow.test.mjs:53 (local test fixture / synthetic token)
+tests/e2e/workstreams/sa4-consultation-flow.test.mjs:jwt:53
+# jwt in tests/scripts/test-admin-logs.mjs:12 (local test fixture / synthetic token)
+tests/scripts/test-admin-logs.mjs:jwt:12
+# jwt in tests/e2e/workstreams/sa6-consultant-isolation.test.mjs:26 (local test fixture / synthetic token)
+tests/e2e/workstreams/sa6-consultant-isolation.test.mjs:jwt:26
+# jwt in tests/scripts/test-e2e-logging-and-alerts.mjs:4 (local test fixture / synthetic token)
+tests/scripts/test-e2e-logging-and-alerts.mjs:jwt:4
+# jwt in tests/scripts/test-logging-baseline.mjs:4 (local test fixture / synthetic token)
+tests/scripts/test-logging-baseline.mjs:jwt:4
+# jwt in tests/scripts/test-expired-holds-limit.mjs:28 (local test fixture / synthetic token)
+tests/scripts/test-expired-holds-limit.mjs:jwt:28
+# jwt in tests/scripts/test-profiles-security.mjs:5 (local test fixture / synthetic token)
+tests/scripts/test-profiles-security.mjs:jwt:5
+# jwt in tests/scripts/seed-mission-e2e.mjs:31 (local test fixture / synthetic token)
+tests/scripts/seed-mission-e2e.mjs:jwt:31
+# jwt in tests/unit/hospital-split-payment.test.mjs:9 (local test fixture / synthetic token)
+tests/unit/hospital-split-payment.test.mjs:jwt:9
+# jwt in tests/e2e/stories/seed.mjs:17 (local test fixture / synthetic token)
+tests/e2e/stories/seed.mjs:jwt:17
+# jwt in tests/e2e/stories/seed.mjs:18 (local test fixture / synthetic token)
+tests/e2e/stories/seed.mjs:jwt:18
+# jwt in tests/scripts/test-customer-pagination-and-admin-dashboards.mjs:8 (local test fixture / synthetic token)
+tests/scripts/test-customer-pagination-and-admin-dashboards.mjs:jwt:8
+# jwt in tests/scripts/test-realtime-fanout.mjs:14 (local test fixture / synthetic token)
+tests/scripts/test-realtime-fanout.mjs:jwt:14
+# jwt in tests/scripts/test-waitlist-security.mjs:5 (local test fixture / synthetic token)
+tests/scripts/test-waitlist-security.mjs:jwt:5
+# jwt in tests/scripts/test-ticket-freshness.mjs:29 (local test fixture / synthetic token)
+tests/scripts/test-ticket-freshness.mjs:jwt:29
+# jwt in tests/scripts/test-ticket-freshness.mjs:30 (local test fixture / synthetic token)
+tests/scripts/test-ticket-freshness.mjs:jwt:30
+# jwt in tests/e2e/workstreams/sa2-checkin-arrival.test.mjs:52 (local test fixture / synthetic token)
+tests/e2e/workstreams/sa2-checkin-arrival.test.mjs:jwt:52
+# stripe-access-token in tests/scripts/verify-logging.mjs:18 (local test fixture / synthetic token)
+tests/scripts/verify-logging.mjs:stripe-access-token:18
+# jwt in tests/scripts/run-mission-full-verification.mjs:27 (local test fixture / synthetic token)
+tests/scripts/run-mission-full-verification.mjs:jwt:27
+# generic-api-key in .agents/manifest.lock.json:68 (sha256 hash in lockfile)
+.agents/manifest.lock.json:generic-api-key:68

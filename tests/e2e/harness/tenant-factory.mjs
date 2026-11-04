@@ -67,37 +67,27 @@ export async function dbDeleteProvider(id) {
 }
 
 function getDbConfig() {
-  const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-  const isLocalDb = dbUrl.includes('127.0.0.1') || dbUrl.includes('localhost');
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+  let serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  let anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (isLocalDb && !process.env.USE_REMOTE_TEST_AUTH) {
-    const localUrl = 'http://127.0.0.1:54321';
-    const localServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
-    const localAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-    return {
-      url: localUrl,
-      anonKey: localAnonKey,
-      serviceKey: localServiceKey,
-      serviceHeaders: {
-        'apikey': localServiceKey,
-        'Authorization': `Bearer ${localServiceKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      }
-    };
-  }
+  try {
+    const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
+    const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\r\n]+)"?/);
+    const anonKeyMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="?([^"\r\n]+)"?/);
+    const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\r\n]+)"?/);
+    if (urlMatch) url = urlMatch[1];
+    if (anonKeyMatch) anonKey = anonKeyMatch[1];
+    if (keyMatch) serviceKey = keyMatch[1];
+  } catch (_) {}
 
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
-  const anonKeyMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="([^"]+)"/);
-  const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/)[1];
   return {
-    url: urlMatch[1],
-    anonKey: anonKeyMatch ? anonKeyMatch[1] : '',
-    serviceKey: keyMatch,
+    url,
+    anonKey: anonKey || '',
+    serviceKey,
     serviceHeaders: {
-      'apikey': keyMatch,
-      'Authorization': `Bearer ${keyMatch}`,
+      'apikey': serviceKey,
+      'Authorization': `Bearer ${serviceKey}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     }

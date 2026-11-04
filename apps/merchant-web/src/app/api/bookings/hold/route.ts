@@ -4,6 +4,7 @@ import { acquireSlotLock, releaseSlotLock, checkRateLimit } from '@/lib/redis';
 import { verifyAuthenticatedUser, getClientIp, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 import { captureException } from '@/lib/sentry';
 import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
+import { parseSafeJson, PayloadLimitExceededError } from '@/lib/validation-limits';
 
 interface RpcHoldResult {
   success: boolean;
@@ -12,6 +13,10 @@ interface RpcHoldResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   hold_expires_at?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
@@ -23,25 +28,38 @@ export async function POST(req: NextRequest) {
   let lockToken = '';
   try {
     // IP Rate Limit: prioritize platform-verified IP or rightmost trusted proxy before client headers
-    // Leverages getClientIp with fallback to req.headers.get('x-real-ip') and req.headers.get('cf-connecting-ip')
     const clientIp = getClientIp(req);
-    const isTestEnv = process.env.NODE_ENV !== 'production';
+    const isTestEnv = process.env.NODE_ENV !== "production";
     if (clientIp) {
       const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, isTestEnv ? 500 : 30, 60);
       if (!ipRateLimit.allowed) {
         return NextResponse.json<CreateHoldResponse>(
           {
             success: false,
-            error: 'Too many reservation attempts from this network. Please wait a minute.',
+            error: "Too many reservation attempts from this network. Please wait a minute.",
           },
           { status: 429 }
         );
       }
     } else {
-      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/bookings/hold' });
+      console.warn("[RateLimit] missing_trusted_client_ip", { route: "/api/bookings/hold" });
     }
 
-    const body = (await req.json()) as Partial<CreateHoldRequest>;
+    let body: Partial<CreateHoldRequest>;
+    try {
+      body = await parseSafeJson<Partial<CreateHoldRequest>>(req);
+    } catch (parseErr) {
+      if (parseErr instanceof PayloadLimitExceededError) {
+        return NextResponse.json<CreateHoldResponse>(
+          { success: false, error: parseErr.message },
+          { status: 413 }
+        );
+      }
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: "Invalid JSON payload" },
+        { status: 400 }
+      );
+    }
     const { resource_id, slot_start, slot_end, customer_id } = body;
 
     if (!resource_id || !slot_start || !slot_end || !customer_id) {
@@ -271,6 +289,10 @@ export async function POST(req: NextRequest) {
       p_slot_start: slot_start,
       p_slot_end: slot_end,
       p_customer_id: customer_id,
+      p_booking_for_someone_else: Boolean(body.booking_for_someone_else),
+      p_patient_name: body.patient_name || null,
+      p_patient_phone: body.patient_phone || null,
+      p_patient_relationship: body.patient_relationship || null,
     });
 
     if (error) {
@@ -349,6 +371,10 @@ export async function POST(req: NextRequest) {
         deposit_amount: result.deposit_amount,
         platform_fee: result.platform_fee,
         total_amount: result.total_amount,
+        platform_fee_amount: result.platform_fee_amount ?? result.platform_fee,
+        consultation_fee_amount: result.consultation_fee_amount,
+        platform_payment_status: (result.platform_payment_status as any) || 'PENDING',
+        consultation_payment_status: (result.consultation_payment_status as any) || 'PENDING_OFFLINE',
         hold_expires_at: result.hold_expires_at,
         is_followup: result.is_followup,
         followup_original_booking_id: result.followup_original_booking_id,

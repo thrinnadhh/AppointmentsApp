@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 import {
+  calculateArrivalTag,
+  computePatientETA,
   evaluateConsultantQueue,
   ON_TIME_GRACE_MS,
   toClinicDateString,
@@ -82,7 +84,6 @@ export async function POST(req: NextRequest) {
     const arrivedAt = booking.customer_arrived_at || new Date().toISOString();
     const slotStartTime = new Date(booking.slot_start).getTime();
     const arrivalTime = new Date(arrivedAt).getTime();
-    // Unified grace window: arrived more than ON_TIME_GRACE_MS (5 minutes) after scheduled slot start or was skipped (R7)
     const isLateArrival = Boolean(booking.skipped_at) || arrivalTime > slotStartTime + ON_TIME_GRACE_MS;
 
     if (booking.is_present && booking.customer_arrived_at && booking.queue_position && booking.queue_position > 0) {
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 1. Atomically assign arrival sequence position in Postgres (Phase 3 Item 7)
+    // 1. Atomically assign arrival sequence position in Postgres
     const { data: atomicRows } = await (supabaseAdmin.rpc as any)('atomic_assign_checkin_arrival', {
       p_booking_id: booking_id,
       p_arrived_at: arrivedAt,
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
         ? atomicRow.queue_position
         : booking.queue_position || 1;
 
-    // 2. Evaluate position and wait estimate from the canonical per-consultant queue engine (Phase 3 Item 1 & 7)
+    // 2. Evaluate position and wait estimate from the canonical per-consultant queue engine
     const slotDate = toClinicDateString(booking.slot_start);
     const { data: todayBookings } = await supabaseAdmin
       .from('bookings')
@@ -139,8 +140,6 @@ export async function POST(req: NextRequest) {
 
     if (isLateArrival) {
       queueNotice = `You arrived after your scheduled slot (${new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). You are in the late queue and will be served in the next fitting gap without delaying on-time patients (Estimated wait: ~${waitMinutes} mins, Queue Position: #${queuePosition}).`;
-
-      // Dispatch / record notification to customer
       try {
         const { data: profile } = await supabaseAdmin
           .from('profiles')
@@ -164,7 +163,7 @@ export async function POST(req: NextRequest) {
           );
         }
       } catch (notifyErr) {
-        console.warn('[ReachRoute] Error writing late queue notification log:', notifyErr);
+        console.warn('[ReachRoute] Error writing notification log:', notifyErr);
       }
     }
 

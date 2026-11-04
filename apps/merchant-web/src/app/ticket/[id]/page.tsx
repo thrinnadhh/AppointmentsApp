@@ -15,7 +15,8 @@ import {
   Calendar,
   AlertCircle,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  Lock
 } from 'lucide-react';
 import { RollingTenSlotQueue } from '@/components/RollingTenSlotQueue';
 import { MonthlyAttendanceCalendar } from '@/components/MonthlyAttendanceCalendar';
@@ -56,7 +57,10 @@ interface TicketData {
     duration_minutes: number;
     price?: number;
   };
+  is_window_open?: boolean;
+  window_opens_at?: string;
   checkin_code: string | null;
+  is_doctor_ahead?: boolean;
 }
 
 export default function CustomerTicketPage({
@@ -70,6 +74,32 @@ export default function CustomerTicketPage({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [justReconnected, setJustReconnected] = useState<boolean>(false);
+
+  // Phone verification state for unauthenticated web pass visitors (SMS/WhatsApp links)
+  const [requiresVerification, setRequiresVerification] = useState(false);
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => {
+      setIsOnline(true);
+      setJustReconnected(true);
+      setTimeout(() => setJustReconnected(false), 4000);
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Live 10-Slot Queue & Monthly Attendance State
   const [queueSlots, setQueueSlots] = useState<QueueSlot[]>([]);
@@ -99,23 +129,66 @@ export default function CustomerTicketPage({
     }
   }, [calendarMonth, calendarYear, id]);
 
-  const fetchTicket = useCallback(async (showLoading = false) => {
+  const fetchTicket = useCallback(async (showLoading = false, digitsOverride?: string) => {
     if (showLoading) setLoading(true);
     try {
-      const res = await fetch(`/api/ticket/${id}`, { cache: 'no-store' });
+      const storedDigits = typeof window !== 'undefined' ? sessionStorage.getItem(`ticket_phone_${id}`) : null;
+      const digits = digitsOverride !== undefined ? digitsOverride : (phoneDigits || storedDigits || '');
+      const url = digits ? `/api/ticket/${id}?phone_last4=${encodeURIComponent(digits)}` : `/api/ticket/${id}`;
+      const res = await fetch(url, { cache: 'no-store' });
+
+      if (res.status === 401 || res.status === 403) {
+        const json = await res.json().catch(() => ({}));
+        if (json.requires_verification) {
+          setRequiresVerification(true);
+          if (digits) {
+            setVerifyError('Incorrect digits. Please check the last 4 digits of your registered phone number.');
+          }
+          setData(null);
+          return;
+        }
+        throw new Error(`Ticket not found (${res.status})`);
+      }
+
       if (!res.ok) {
         throw new Error(`Ticket not found (${res.status})`);
       }
+
       const json = await res.json();
+      if (digits) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`ticket_phone_${id}`, digits);
+        }
+        setPhoneDigits(digits);
+      }
       setData(json);
+      setRequiresVerification(false);
+      setVerifyError(null);
       setLastUpdated(new Date());
       setError(null);
+      fetchQueueAndHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load ticket');
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, [id]);
+  }, [id, phoneDigits]);
+
+  const handleVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanDigits = phoneDigits.trim();
+    if (!/^\d{4}$/.test(cleanDigits)) {
+      setVerifyError('Please enter exactly 4 numbers (digits only).');
+      return;
+    }
+    setIsVerifying(true);
+    setVerifyError(null);
+    try {
+      await fetchTicket(false, cleanDigits);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   // Determine if patient is within next 3 positions or ETA is <= 30 minutes
   const isNearPatientTurn = useCallback(() => {
@@ -284,6 +357,81 @@ export default function CustomerTicketPage({
     );
   }
 
+  if (requiresVerification) {
+    return (
+      <div data-testid="ticket-verification-gate" className="max-w-md mx-auto my-12 p-8 bg-white rounded-xl border border-gray-200 shadow-sm text-center">
+        <div className="w-14 h-14 bg-emerald-50 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-200">
+          <ShieldCheck className="w-7 h-7 text-emerald-700" />
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-semibold uppercase tracking-wider mb-2 border border-emerald-200">
+          <Lock className="w-3.5 h-3.5" />
+          Patient Access Verification
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Confirm Your Phone Number</h2>
+        <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+          To protect patient medical privacy, please enter the <strong className="text-gray-900 font-semibold">last 4 digits</strong> of the phone number used when booking this appointment.
+        </p>
+
+        <form onSubmit={handleVerifySubmit} className="mt-6 space-y-4 text-left">
+          <div>
+            <label htmlFor="phone_digits" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+              Last 4 Digits of Phone Number
+            </label>
+            <div className="relative">
+              <input
+                id="phone_digits"
+                data-testid="phone-verification-input"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                autoFocus
+                placeholder="••••"
+                value={phoneDigits}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setPhoneDigits(val);
+                  if (verifyError) setVerifyError(null);
+                }}
+                className="w-full text-center font-mono text-2xl font-bold tracking-[0.5em] px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 text-gray-900 transition"
+              />
+            </div>
+          </div>
+
+          {verifyError && (
+            <div data-testid="verification-error" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{verifyError}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            data-testid="phone-verification-submit"
+            disabled={isVerifying || phoneDigits.length !== 4}
+            className="w-full py-3 px-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-sm shadow-sm transition flex items-center justify-center gap-2"
+          >
+            {isVerifying ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Verifying...</span>
+              </>
+            ) : (
+              <>
+                <span>Unlock Appointment Pass</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <p className="text-xs text-gray-400 mt-5">
+          💡 Tip: Check the SMS or WhatsApp confirmation message received on your phone.
+        </p>
+      </div>
+    );
+  }
+
   if (error || !data) {
     return (
       <div className="max-w-md mx-auto my-12 p-8 bg-white rounded-2xl border border-red-200 shadow-sm text-center">
@@ -309,12 +457,27 @@ export default function CustomerTicketPage({
   const timeFormatted = `${slotStart.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })} – ${slotEnd.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
   const dateFormatted = slotStart.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
+  const arrivalStart = new Date(slotStart.getTime() - 10 * 60 * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const arrivalEnd = new Date(slotStart.getTime() + 10 * 60 * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const arrivalWindowFormatted = `${arrivalStart} – ${arrivalEnd}`;
+
   // Status mapping
   const isCheckedIn = booking.status === 'CHECKED_IN' || booking.is_present;
   const isCompleted = booking.status === 'COMPLETED';
 
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 space-y-6">
+      {/* Network / Reconnection Banner */}
+      {!isOnline ? (
+        <div data-testid="ticket-network-status-banner" className="bg-red-50 border border-red-200 text-red-800 text-xs px-4 py-2.5 rounded-2xl flex items-center gap-2">
+          <span>⚠️</span> Offline mode — showing cached ticket data. Reconnect to refresh live queue.
+        </div>
+      ) : justReconnected ? (
+        <div data-testid="ticket-network-status-banner" className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-2.5 rounded-2xl flex items-center gap-2 animate-fade-in">
+          <span>🟢</span> Reconnected — live queue status updated!
+        </div>
+      ) : null}
+
       {/* Top Breadcrumb & Live Refresh indicator */}
       <div className="flex items-center justify-between mb-4 text-xs text-gray-500">
         <span className="flex items-center gap-1.5 font-medium text-emerald-800">
@@ -362,32 +525,63 @@ export default function CustomerTicketPage({
             Reception Check-in PIN
           </span>
 
-          <h2 className="text-sm font-medium text-gray-600 mb-3">
-            Please tell this 4-digit PIN at the reception desk upon arrival:
-          </h2>
+          {isCheckedIn ? (
+            <div>
+              <h2 className="text-sm font-medium text-gray-600 mb-3">
+                Your presence has been verified by the reception desk.
+              </h2>
+              <div className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-100/80 text-emerald-800 border border-emerald-300 font-semibold shadow-sm">
+                <UserCheck className="w-5 h-5 text-emerald-600" />
+                <span>Verified Present in Waiting Lounge</span>
+              </div>
+            </div>
+          ) : (!data.is_window_open || !checkin_code) ? (
+            /* Locked 60m Countdown Gate */
+            <div data-testid="checkin-pin-locked-box" className="max-w-md mx-auto bg-amber-50/80 border border-amber-200/80 rounded-2xl p-5 mb-2 text-center">
+              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-2 text-lg">
+                🔒
+              </div>
+              <h3 className="text-sm font-bold text-amber-900 mb-1">Check-in PIN Unlocks 60m Before Slot</h3>
+              <p className="text-xs text-amber-800/90 leading-relaxed">
+                Your 4-digit reception PIN will unlock at{' '}
+                <span className="font-semibold text-amber-950">
+                  {data.window_opens_at
+                    ? new Date(data.window_opens_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                    : '60 minutes before your slot'}
+                </span>
+                . Show or tell it at the counter upon arrival.
+              </p>
+            </div>
+          ) : (
+            /* Open 4-digit PIN */
+            <>
+              <h2 className="text-sm font-medium text-gray-600 mb-3">
+                Please tell this 4-digit PIN at the reception desk upon arrival:
+              </h2>
 
-          {/* Big PIN Box */}
-          <div className="relative inline-flex items-center justify-center gap-3 bg-white border-2 border-emerald-600 px-8 py-4 rounded-2xl shadow-lg shadow-emerald-600/10 mb-4">
-            <span
-              data-testid="customer-checkin-pin"
-              className="font-mono text-4xl sm:text-5xl font-black tracking-[0.25em] text-emerald-800 select-all"
-            >
-              {checkin_code}
-            </span>
+              <div className="relative inline-flex items-center justify-center gap-3 bg-white border-2 border-emerald-600 px-8 py-4 rounded-2xl shadow-lg shadow-emerald-600/10 mb-4">
+                <span
+                  data-testid="customer-checkin-pin"
+                  className="font-mono text-4xl sm:text-5xl font-black tracking-[0.25em] text-emerald-800 select-all"
+                >
+                  {checkin_code}
+                </span>
 
-            <button
-              onClick={handleCopyCode}
-              title="Copy PIN"
-              className="ml-2 p-2.5 hover:bg-emerald-50 active:scale-95 text-emerald-700 rounded-xl transition border border-emerald-200"
-            >
-              {copied ? <Check className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
-            </button>
-          </div>
+                <button
+                  onClick={handleCopyCode}
+                  title="Copy PIN"
+                  className="ml-2 p-2.5 hover:bg-emerald-50 active:scale-95 text-emerald-700 rounded-xl transition border border-emerald-200"
+                >
+                  {copied ? <Check className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
+                </button>
+              </div>
 
-          {copied && (
-            <p className="text-xs text-emerald-600 font-semibold mb-2">
-              ✓ PIN copied to clipboard!
-            </p>
+              {copied && (
+                <p className="text-xs text-emerald-600 font-semibold mb-2">
+                  ✓ PIN copied to clipboard!
+                </p>
+              )}
+            </>
           )}
 
           {/* Status Badge */}
@@ -460,6 +654,53 @@ export default function CustomerTicketPage({
               <p className="text-sm font-semibold text-emerald-300">{dateFormatted}</p>
             </div>
           </div>
+
+          {/* Arrival Window (±10 Mins) Card */}
+          <div data-testid="ticket-arrival-window" className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-300">
+                <Clock className="w-5 h-5 text-emerald-700" />
+              </div>
+              <div>
+                <span className="text-xs text-emerald-800 font-semibold uppercase tracking-wider block">OPD Arrival Window (±10 Mins)</span>
+                <p className="text-base font-extrabold text-emerald-950 font-mono">{arrivalWindowFormatted}</p>
+              </div>
+            </div>
+            <div className="text-xs text-emerald-800/90 max-w-sm">
+              💡 Booked time is a ceiling: starting earlier is always allowed when you are present and the doctor is free.
+            </div>
+          </div>
+
+          {/* Standby Queue Honest Estimate Banner */}
+          {booking.queue_position && isCheckedIn && (
+            <div data-testid="ticket-standby-banner" className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 flex items-start gap-3">
+              <span className="text-xl">⏰</span>
+              <div>
+                <h4 className="font-bold text-amber-950">Standby Queue Assigned (Turn #{booking.queue_position})</h4>
+                <p className="mt-1 text-amber-800 leading-relaxed">
+                  You arrived after your scheduled window. You are placed in the Standby Queue in original booking order. The doctor will see you in gaps between on-time patients or at the end of the session. You will never be dropped!
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Optional Come Now Invite */}
+          {data.is_doctor_ahead && !isCheckedIn && (
+            <div data-testid="ticket-come-now-invite" className="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-4 text-xs text-emerald-950 flex items-start justify-between gap-3 shadow-md">
+              <div className="flex items-start gap-2.5">
+                <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-emerald-900 text-sm">Doctor Running Ahead of Schedule ⚡</h4>
+                  <p className="text-emerald-800 mt-0.5">
+                    Dr. {doctor.name} is ready early! If you are nearby, you are welcome to come in now.
+                  </p>
+                  <p className="text-[11px] text-emerald-700 mt-1 italic">
+                    Optional: Declining changes nothing; your slot at {timeFormatted} remains 100% reserved.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* How to test instructions card */}
           <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-4 text-xs text-blue-900 space-y-1.5">

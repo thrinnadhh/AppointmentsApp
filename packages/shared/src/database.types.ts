@@ -259,6 +259,7 @@ export type Database = {
       bookings: {
         Row: {
           attachment_url: string | null
+          booking_for_someone_else: boolean
           checked_in_at: string | null
           checked_in_by: string | null
           checked_in_method: string | null
@@ -268,6 +269,9 @@ export type Database = {
           department_id: string | null
           deposit_amount: number
           disclaimer_version: string | null
+          emergency_cancelled: boolean
+          emergency_doctor_arrived: boolean
+          emergency_patient_choice: string | null
           estimated_wait_minutes: number | null
           followup_original_booking_id: string | null
           gateway_order_id: string | null
@@ -279,8 +283,18 @@ export type Database = {
           invoice_number: string | null
           is_followup: boolean
           is_present: boolean
+          expected_payment_amount_paise: number | null
+          patient_name: string | null
+          patient_phone: string | null
+          patient_relationship: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           platform_fee: number | null
+          platform_fee_amount: number | null
+          consultation_fee_amount: number | null
+          platform_payment_status: string | null
+          consultation_payment_status: string | null
+          consultation_collected_at: string | null
+          consultation_collected_by: string | null
           platform_fee_gst: number
           provider_id: string
           queue_position: number | null
@@ -299,6 +313,7 @@ export type Database = {
         }
         Insert: {
           attachment_url?: string | null
+          booking_for_someone_else?: boolean
           checked_in_at?: string | null
           checked_in_by?: string | null
           checked_in_method?: string | null
@@ -308,6 +323,9 @@ export type Database = {
           department_id?: string | null
           deposit_amount: number
           disclaimer_version?: string | null
+          emergency_cancelled?: boolean
+          emergency_doctor_arrived?: boolean
+          emergency_patient_choice?: string | null
           estimated_wait_minutes?: number | null
           followup_original_booking_id?: string | null
           gateway_order_id?: string | null
@@ -319,8 +337,18 @@ export type Database = {
           invoice_number?: string | null
           is_followup?: boolean
           is_present?: boolean
+          expected_payment_amount_paise?: number | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          patient_relationship?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
+          platform_fee_amount?: number | null
+          consultation_fee_amount?: number | null
+          platform_payment_status?: string | null
+          consultation_payment_status?: string | null
+          consultation_collected_at?: string | null
+          consultation_collected_by?: string | null
           platform_fee_gst?: number
           provider_id: string
           queue_position?: number | null
@@ -339,6 +367,7 @@ export type Database = {
         }
         Update: {
           attachment_url?: string | null
+          booking_for_someone_else?: boolean
           checked_in_at?: string | null
           checked_in_by?: string | null
           checked_in_method?: string | null
@@ -348,6 +377,9 @@ export type Database = {
           department_id?: string | null
           deposit_amount?: number
           disclaimer_version?: string | null
+          emergency_cancelled?: boolean
+          emergency_doctor_arrived?: boolean
+          emergency_patient_choice?: string | null
           estimated_wait_minutes?: number | null
           followup_original_booking_id?: string | null
           gateway_order_id?: string | null
@@ -359,8 +391,18 @@ export type Database = {
           invoice_number?: string | null
           is_followup?: boolean
           is_present?: boolean
+          expected_payment_amount_paise?: number | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          patient_relationship?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
+          platform_fee_amount?: number | null
+          consultation_fee_amount?: number | null
+          platform_payment_status?: string | null
+          consultation_payment_status?: string | null
+          consultation_collected_at?: string | null
+          consultation_collected_by?: string | null
           platform_fee_gst?: number
           provider_id?: string
           queue_position?: number | null
@@ -924,6 +966,7 @@ export type Database = {
       profiles: {
         Row: {
           assigned_city_id: string | null
+          blocked_until: string | null
           created_at: string
           default_provider_id: string | null
           email: string | null
@@ -932,12 +975,14 @@ export type Database = {
           id: string
           is_flagged: boolean
           no_show_count: number
+          permanent_checkin_pin: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
         }
         Insert: {
           assigned_city_id?: string | null
+          blocked_until?: string | null
           created_at?: string
           default_provider_id?: string | null
           email?: string | null
@@ -946,12 +991,14 @@ export type Database = {
           id: string
           is_flagged?: boolean
           no_show_count?: number
+          permanent_checkin_pin?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
         Update: {
           assigned_city_id?: string | null
+          blocked_until?: string | null
           created_at?: string
           default_provider_id?: string | null
           email?: string | null
@@ -960,6 +1007,7 @@ export type Database = {
           id?: string
           is_flagged?: boolean
           no_show_count?: number
+          permanent_checkin_pin?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -977,6 +1025,41 @@ export type Database = {
             columns: ["default_provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_tokens: {
+        Row: {
+          created_at: string
+          device_type: string
+          id: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_type?: string
+          id?: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_type?: string
+          id?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1478,6 +1561,13 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: Json
       }
+      collect_consultation_fee: {
+        Args: {
+          p_booking_id: string
+          p_collected_by?: string | null
+        }
+        Returns: Json
+      }
       confirm_booking_payment: {
         Args: {
           p_booking_id: string
@@ -1701,6 +1791,10 @@ export type Database = {
       }
       record_no_show: { Args: { p_booking_id: string }; Returns: Json }
       release_expired_holds: { Args: never; Returns: Json }
+      remove_stale_push_token: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       request_account_deletion: { Args: { p_reason?: string }; Returns: Json }
       reschedule_booking_slot: {
         Args: {

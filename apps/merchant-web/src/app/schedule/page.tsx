@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Clock, 
@@ -10,14 +10,35 @@ import {
   ArrowRight, 
   Building2, 
   CalendarDays,
-  AlertCircle
+  AlertCircle,
+  Stethoscope,
+  Calendar,
+  Trash2,
+  Plus,
+  ShieldCheck,
+  UserCheck
 } from 'lucide-react';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { Resource } from '@appointments/shared';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+interface DoctorLeave {
+  id: string;
+  doctorId: string;
+  doctorName: string;
+  date: string;
+  reason: string;
+  createdAt: string;
+}
+
 export default function ScheduleManagementPage() {
-  const { activeProvider } = useMerchantTenant();
+  const { activeProvider, isHospitalAdmin, isSuperAdmin, verticalConfig } = useMerchantTenant();
+
+  const resources: Resource[] = useMemo(() => {
+    return (activeProvider?.resources as Resource[]) || [];
+  }, [activeProvider?.resources]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
 
   // Weekly hours state
   const [schedule, setSchedule] = useState([
@@ -31,6 +52,28 @@ export default function ScheduleManagementPage() {
   ]);
   const [saved, setSaved] = useState(false);
 
+  // Leave & Absence management state
+  const [leaves, setLeaves] = useState<DoctorLeave[]>([
+    {
+      id: 'leave-1',
+      doctorId: resources[0]?.id || 'doc-1',
+      doctorName: resources[0]?.name || 'Dr. Ramesh Kumar',
+      date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+      reason: 'Medical Conference Attendance',
+      createdAt: new Date().toISOString(),
+    }
+  ]);
+  const [leaveDate, setLeaveDate] = useState('');
+  const [leaveReason, setLeaveReason] = useState('Planned Leave');
+  const [leaveDoctorId, setLeaveDoctorId] = useState('');
+  const [leaveSuccess, setLeaveSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (resources.length > 0 && !leaveDoctorId) {
+      setLeaveDoctorId(resources[0].id);
+    }
+  }, [resources, leaveDoctorId]);
+
   const toggleDay = (dayIndex: number) => {
     setSchedule(prev => prev.map(s => s.day === dayIndex ? { ...s, enabled: !s.enabled } : s));
   };
@@ -43,6 +86,37 @@ export default function ScheduleManagementPage() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
+
+  const handleAddLeave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leaveDate) return;
+
+    const matchedDoc = resources.find((r) => r.id === leaveDoctorId);
+    const docName = matchedDoc ? matchedDoc.name : 'Consultant Doctor';
+
+    const newLeave: DoctorLeave = {
+      id: `leave-${Date.now()}`,
+      doctorId: leaveDoctorId || 'all',
+      doctorName: docName,
+      date: leaveDate,
+      reason: leaveReason.trim() || 'Planned Leave',
+      createdAt: new Date().toISOString(),
+    };
+
+    setLeaves((prev) => [newLeave, ...prev]);
+    setLeaveDate('');
+    setLeaveSuccess(`Leave marked for ${docName} on ${leaveDate}. Consultation bookings for this date will be unavailable.`);
+    setTimeout(() => setLeaveSuccess(null), 4000);
+  };
+
+  const handleRemoveLeave = (leaveId: string) => {
+    setLeaves((prev) => prev.filter((l) => l.id !== leaveId));
+  };
+
+  const filteredLeaves = useMemo(() => {
+    if (!selectedDoctorId) return leaves;
+    return leaves.filter((l) => l.doctorId === selectedDoctorId);
+  }, [leaves, selectedDoctorId]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
@@ -60,7 +134,7 @@ export default function ScheduleManagementPage() {
             <span>Operating Schedule &amp; Shift Hours</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Configure weekly outpatient consultation hours, daily shifts, and weekend closures for patient bookings.
+            Configure weekly outpatient consultation hours, daily shifts, and doctor leave calendars for patient bookings.
           </p>
         </div>
 
@@ -82,6 +156,28 @@ export default function ScheduleManagementPage() {
         </button>
       </div>
 
+      {/* Doctor Filter Bar */}
+      {resources.length > 0 && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2">
+            <Stethoscope className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-bold text-slate-800">Configure Schedule For:</span>
+          </div>
+          <select
+            value={selectedDoctorId}
+            onChange={(e) => setSelectedDoctorId(e.target.value)}
+            className="text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+          >
+            <option value="">General Hospital Operating Schedule (All Doctors)</option>
+            {resources.map((r) => (
+              <option key={r.id} value={r.id}>
+                Dr. {r.name} ({r.department || 'Consultant'})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Info notice about doctor slot generation */}
       <div className="rounded-xl bg-emerald-50/70 border border-emerald-200 p-4 flex items-start gap-3 text-xs text-emerald-950">
         <Clock className="w-4 h-4 text-emerald-700 flex-shrink-0 mt-0.5" />
@@ -96,7 +192,7 @@ export default function ScheduleManagementPage() {
         </div>
       </div>
 
-      {/* Weekly Operating Hours Form */}
+      {/* SECTION 1: Weekly Operating Hours Form */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
         <div className="p-4 sm:p-5 bg-slate-50/60 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -164,6 +260,133 @@ export default function ScheduleManagementPage() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* SECTION 2: Doctor Leave & Holiday Marking */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-lg font-bold text-slate-900">
+                Doctor Leave &amp; Planned Absence Calendar
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Mark specific calendar days where a doctor is unavailable for consultations. Appointment booking for those days will be blocked.
+            </p>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto">
+            {filteredLeaves.length} Marked Absences
+          </span>
+        </div>
+
+        {leaveSuccess && (
+          <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 flex items-center gap-2.5 text-xs text-emerald-800">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>{leaveSuccess}</span>
+          </div>
+        )}
+
+        {/* Mark Leave Form */}
+        <form onSubmit={handleAddLeave} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+            + Mark New Absence
+          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label htmlFor="leave-doctor" className="block text-xs font-semibold text-slate-700 mb-1">
+                Doctor / Consultant *
+              </label>
+              <select
+                id="leave-doctor"
+                value={leaveDoctorId}
+                onChange={(e) => setLeaveDoctorId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 bg-white"
+              >
+                {resources.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    Dr. {r.name} ({r.department || 'General'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="leave-date" className="block text-xs font-semibold text-slate-700 mb-1">
+                Absence Date *
+              </label>
+              <input
+                id="leave-date"
+                type="date"
+                required
+                value={leaveDate}
+                onChange={(e) => setLeaveDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 bg-white font-mono"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="leave-reason" className="block text-xs font-semibold text-slate-700 mb-1">
+                Reason (Optional)
+              </label>
+              <input
+                id="leave-reason"
+                type="text"
+                value={leaveReason}
+                onChange={(e) => setLeaveReason(e.target.value)}
+                placeholder="e.g. Vacation, Conference"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 bg-white"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Record Doctor Absence</span>
+            </button>
+          </div>
+        </form>
+
+        {/* Existing Leaves List */}
+        <div className="space-y-2">
+          {filteredLeaves.length === 0 ? (
+            <p className="text-xs text-slate-400 py-3 text-center italic">
+              No planned absences recorded for this selection.
+            </p>
+          ) : (
+            filteredLeaves.map((l) => (
+              <div
+                key={l.id}
+                className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs shadow-2xs hover:border-slate-300 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900">
+                      {l.doctorName} — <span className="font-mono text-emerald-700">{l.date}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-500">{l.reason}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleRemoveLeave(l.id)}
+                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                  title="Remove Leave"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Quick Navigation Footer */}

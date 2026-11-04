@@ -21,20 +21,7 @@ import fs from 'fs';
 import { createTenant, cleanupTenant } from '../harness/tenant-factory.mjs';
 import { SubAgentReportWriter } from '../harness/report-writer.mjs';
 
-function getDbConfig() {
-  const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-  const url = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/)[1];
-  const serviceKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/)[1];
-  return {
-    url,
-    serviceHeaders: {
-      'apikey': serviceKey,
-      'Authorization': `Bearer ${serviceKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    }
-  };
-}
+import { getDbConfig } from '../harness/client-helpers.mjs';
 
 describe('Workstream SA3: Cancel, Reschedule, Money', () => {
   let tenant;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { evaluateConsultantQueue, ON_TIME_GRACE_MS } from '@/lib/queue-scheduler';
 import { 
@@ -30,7 +30,8 @@ import {
   UserCheck,
   UserPlus,
   Ticket,
-  Stethoscope
+  Stethoscope,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   supabase, 
@@ -50,6 +51,11 @@ import {
 } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 import { CustomerContactBadge } from '@/components/CustomerContactBadge';
+import FrontDeskHeader, { AssignedDoctor } from '@/components/frontdesk/FrontDeskHeader';
+import FastPassCheckinPanel, { CheckinSuccessData } from '@/components/frontdesk/FastPassCheckinPanel';
+import ManualCheckinModal, { UpcomingCandidateBooking } from '@/components/frontdesk/ManualCheckinModal';
+import FrontDeskQueueTabs, { FrontDeskQueueBooking } from '@/components/frontdesk/FrontDeskQueueTabs';
+import WaitingLoungeDisplayModal, { DisplayQueueItem } from '@/components/frontdesk/WaitingLoungeDisplayModal';
 
 const DEMO_PROVIDER: Provider & { resources?: Resource[] } = {
   id: 'b66cb1fc-0248-4c13-97d3-73b0519b59f9',
@@ -306,6 +312,7 @@ export default function MerchantOverviewPage() {
     activeProvider: tenantProvider, 
     verticalConfig, 
     isSuperAdmin, 
+    isHospitalAdmin,
     isLocked, 
     memberships, 
     switchActiveProvider,
@@ -313,6 +320,8 @@ export default function MerchantOverviewPage() {
     isLoading: isTenantLoading,
     isAuthenticated,
   } = useMerchantTenant();
+
+  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
 
   const venueLabel = verticalConfig?.venueLabel || 'Shop';
 
@@ -332,10 +341,10 @@ export default function MerchantOverviewPage() {
   }, [isTenantLoading, isAuthenticated, tenantProvider, isSuperAdmin]);
 
   const [providers, setProviders] = useState<(Provider & { resources?: Resource[] })[]>(
-    tenantProvider ? [tenantProvider] : []
+    tenantProvider ? [tenantProvider] : isDemo ? [DEMO_PROVIDER] : []
   );
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    tenantProvider?.id || ''
+    tenantProvider?.id || (isDemo ? DEMO_PROVIDER.id : '')
   );
   const [bookings, setBookings] = useState<MerchantBookingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -360,6 +369,42 @@ export default function MerchantOverviewPage() {
   } | null>(null);
   const [checkinErrorMessage, setCheckinErrorMessage] = useState<string | null>(null);
   const checkinInputRef = useRef<HTMLInputElement>(null);
+
+  // Front Desk Hospital Workspace State (Phase 5c)
+  const [hospitalContext, setHospitalContext] = useState<{
+    role?: string;
+    accessibleResourceIds?: string[];
+    departments?: any[];
+    members?: any[];
+    assignments?: any[];
+  } | null>(null);
+  const [userEmail, setUserEmail] = useState('');
+  const [isDisplayModalOpen, setIsDisplayModalOpen] = useState(false);
+  const [isManualCheckinModalOpen, setIsManualCheckinModalOpen] = useState(false);
+  const [isProcessingFrontDeskAction, setIsProcessingFrontDeskAction] = useState(false);
+
+  useEffect(() => {
+    async function loadUserAndHospitalContext() {
+      if (!selectedProviderId) return;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        setUserEmail(sessionData.session?.user?.email || '');
+        if (!token) return;
+
+        const res = await fetch(`/api/hospital/context?provider_id=${selectedProviderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setHospitalContext(data);
+        }
+      } catch (err) {
+        console.error('Failed to load hospital context:', err);
+      }
+    }
+    loadUserAndHospitalContext();
+  }, [selectedProviderId]);
 
 
   useEffect(() => {
@@ -386,8 +431,10 @@ export default function MerchantOverviewPage() {
     loadVersion.current += 1;
   }, [tenantProviderId]);
 
-  const activeProvider = providers.find((p) => p.id === selectedProviderId) || tenantProvider || providers[0] || null;
-  const activeResources: Resource[] = (activeProvider?.resources as Resource[]) || [];
+  const activeProvider = providers.find((p) => p.id === selectedProviderId) || tenantProvider || providers[0] || (isDemo ? DEMO_PROVIDER : null);
+  const activeResources: Resource[] = useMemo(() => {
+    return (activeProvider?.resources as Resource[]) || [];
+  }, [activeProvider?.resources]);
 
   // Operational control state with optimistic overrides
   const [overrideIsActive, setOverrideIsActive] = useState<boolean | null>(null);
@@ -419,9 +466,481 @@ export default function MerchantOverviewPage() {
   const [isSubmittingOffline, setIsSubmittingOffline] = useState(false);
 
   // Live Patient Queue Attendance Matrix filter state
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<string>('');
   const [merchantSelectedDoctorId, setMerchantSelectedDoctorId] = useState<string>('');
   const [matrixFilter, setMatrixFilter] = useState<'ALL' | 'PRESENT' | 'WAITING' | 'ABSENT' | 'LATE'>('ALL');
   const [selectedMatrixBookingId, setSelectedMatrixBookingId] = useState<string | null>(null);
+  const [urlDoctorId, setUrlDoctorId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('doctor_id') || params.get('resource_id') || null;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const docParam = params.get('doctor_id') || params.get('resource_id');
+      if (docParam) {
+        setUrlDoctorId(docParam);
+        setMerchantSelectedDoctorId(docParam);
+      }
+    }
+  }, []);
+
+  const availableDepartments = useMemo(() => {
+    const depts = new Set<string>();
+    activeResources.forEach((r) => {
+      if (r.department) depts.add(r.department);
+    });
+    return Array.from(depts).sort();
+  }, [activeResources]);
+
+  const departmentFilteredResources = useMemo(() => {
+    if (!selectedDepartmentFilter) return activeResources;
+    return activeResources.filter((r) => (r.department || 'General') === selectedDepartmentFilter);
+  }, [activeResources, selectedDepartmentFilter]);
+
+  const isHospitalVenue = Boolean(
+    activeProvider?.category_id === 'hospital' || 
+    verticalConfig?.venueLabel === 'Hospital'
+  );
+
+  const isFrontDesk = useMemo(() => {
+    if (hospitalContext?.role === 'front_desk') return true;
+    if (typeof window !== 'undefined') {
+      const roleParam = new URLSearchParams(window.location.search).get('role');
+      if (roleParam === 'front_desk') return true;
+    }
+    return false;
+  }, [hospitalContext?.role]);
+
+  const frontDeskAssignedDoctors: AssignedDoctor[] = useMemo(() => {
+    if (!isHospitalVenue) return [];
+    const resources = (activeProvider?.resources as Resource[]) || [];
+    
+    // Explicit test/demo parameter check: ?assigned=none
+    const isExplicitlyUnassigned = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('assigned') === 'none';
+    if (isExplicitlyUnassigned) {
+      return [];
+    }
+
+    if (isFrontDesk) {
+      if (hospitalContext?.accessibleResourceIds && hospitalContext.accessibleResourceIds.length > 0) {
+        return resources
+          .filter((r) => hospitalContext.accessibleResourceIds?.includes(r.id))
+          .map((r) => ({
+            id: r.id,
+            name: r.name,
+            department: r.department,
+            room: 'Room 204',
+            is_active: r.is_active,
+          }));
+      }
+      if (isDemo) {
+        return resources.map((r) => ({
+          id: r.id,
+          name: r.name,
+          department: r.department,
+          room: 'Room 204',
+          is_active: r.is_active,
+        }));
+      }
+      return [];
+    }
+    return resources.map((r) => ({
+      id: r.id,
+      name: r.name,
+      department: r.department,
+      room: 'Room 204',
+      is_active: r.is_active,
+    }));
+  }, [isHospitalVenue, activeProvider?.resources, hospitalContext, isFrontDesk]);
+
+  const hasNoAssignedDoctors = Boolean(
+    isHospitalVenue &&
+    isFrontDesk &&
+    frontDeskAssignedDoctors.length === 0
+  );
+
+  const isUnassignedDoctorUrlProbe = Boolean(
+    isHospitalVenue &&
+    isFrontDesk &&
+    urlDoctorId &&
+    !frontDeskAssignedDoctors.some((d) => d.id === urlDoctorId)
+  );
+
+  const hospitalTodayBookings = useMemo(() => {
+    return bookings.filter((b) => {
+      const isToday = b.slot_start?.startsWith(today);
+      if (!isToday) return false;
+      if (!merchantSelectedDoctorId) {
+        if (hospitalContext?.role === 'front_desk' && hospitalContext.accessibleResourceIds?.length) {
+          return hospitalContext.accessibleResourceIds.includes(b.resource_id);
+        }
+        return true;
+      }
+      return b.resource_id === merchantSelectedDoctorId;
+    });
+  }, [bookings, today, merchantSelectedDoctorId, hospitalContext]);
+
+  const hospitalWaitingBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => (b.status === 'CHECKED_IN' || b.is_present) && !b.queue_position && b.status !== 'IN_CONSULTATION' && b.status !== 'COMPLETED')
+      .map((b) => {
+        let arrival_tag: 'On Time' | 'Early' | 'Late' = 'On Time';
+        const checkinTime = (b as any).checked_in_at || b.customer_arrived_at;
+        if (checkinTime) {
+          const diffMs = new Date(checkinTime).getTime() - new Date(b.slot_start).getTime();
+          if (diffMs > 10 * 60 * 1000) arrival_tag = 'Late';
+          else if (diffMs < -10 * 60 * 1000) arrival_tag = 'Early';
+        }
+        return {
+          id: b.id,
+          reference_code: b.reference_code || '',
+          patient_name: b.customer_name,
+          customer: { full_name: b.customer_name, phone: b.customer_phone },
+          slot_start: b.slot_start,
+          slot_end: b.slot_end,
+          status: b.status,
+          arrival_tag,
+          checked_in_at: checkinTime || undefined,
+          doctor_name: b.resource_name,
+          deposit_amount: b.deposit_amount,
+          platform_fee_amount: (b as any).platform_fee_amount ?? (b as any).platform_fee ?? 10,
+          consultation_fee_amount: (b as any).consultation_fee_amount ?? 500,
+          platform_payment_status: (b as any).platform_payment_status ?? 'CAPTURED',
+          consultation_payment_status: (b as any).consultation_payment_status ?? 'PENDING_OFFLINE',
+          consultation_collected_at: (b as any).consultation_collected_at ?? undefined,
+        };
+      })
+      .sort((a, b) => {
+        if (a.arrival_tag === 'On Time' && b.arrival_tag !== 'On Time') return -1;
+        if (b.arrival_tag === 'On Time' && a.arrival_tag !== 'On Time') return 1;
+        return new Date(a.slot_start).getTime() - new Date(b.slot_start).getTime();
+      });
+  }, [hospitalTodayBookings]);
+
+  const hospitalStandbyBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => (b.status === 'CHECKED_IN' || b.is_present) && (Boolean(b.queue_position) || (b as any).arrival_tag === 'Late') && b.status !== 'IN_CONSULTATION' && b.status !== 'COMPLETED')
+      .map((b) => {
+        const checkinTime = (b as any).checked_in_at || b.customer_arrived_at;
+        return {
+          id: b.id,
+          reference_code: b.reference_code || '',
+          patient_name: b.customer_name,
+          customer: { full_name: b.customer_name, phone: b.customer_phone },
+          slot_start: b.slot_start,
+          slot_end: b.slot_end,
+          status: b.status,
+          arrival_tag: 'Late' as const,
+          checked_in_at: checkinTime || undefined,
+          doctor_name: b.resource_name,
+          deposit_amount: b.deposit_amount,
+          platform_fee_amount: (b as any).platform_fee_amount ?? (b as any).platform_fee ?? 10,
+          consultation_fee_amount: (b as any).consultation_fee_amount ?? 500,
+          platform_payment_status: (b as any).platform_payment_status ?? 'CAPTURED',
+          consultation_payment_status: (b as any).consultation_payment_status ?? 'PENDING_OFFLINE',
+          consultation_collected_at: (b as any).consultation_collected_at ?? undefined,
+        };
+      })
+      .sort((a, b) => new Date(a.slot_start).getTime() - new Date(b.slot_start).getTime());
+  }, [hospitalTodayBookings]);
+
+  const hospitalInConsultationBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => b.status === 'IN_CONSULTATION')
+      .map((b) => ({
+        id: b.id,
+        reference_code: b.reference_code || '',
+        patient_name: b.customer_name,
+        customer: { full_name: b.customer_name, phone: b.customer_phone },
+        slot_start: b.slot_start,
+        slot_end: b.slot_end,
+        status: b.status,
+        arrival_tag: 'On Time' as const,
+        doctor_name: b.resource_name,
+        deposit_amount: b.deposit_amount,
+        platform_fee_amount: (b as any).platform_fee_amount ?? (b as any).platform_fee ?? 10,
+        consultation_fee_amount: (b as any).consultation_fee_amount ?? 500,
+        platform_payment_status: (b as any).platform_payment_status ?? 'CAPTURED',
+        consultation_payment_status: (b as any).consultation_payment_status ?? 'COLLECTED_AT_DESK',
+        consultation_collected_at: (b as any).consultation_collected_at ?? undefined,
+      }));
+  }, [hospitalTodayBookings]);
+
+  const upNextBookingId = useMemo(() => {
+    if (hospitalWaitingBookings.length > 0) return hospitalWaitingBookings[0].id;
+    if (hospitalStandbyBookings.length > 0) return hospitalStandbyBookings[0].id;
+    return null;
+  }, [hospitalWaitingBookings, hospitalStandbyBookings]);
+
+  const hospitalExpectedBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => b.status === 'CONFIRMED' && !b.is_present)
+      .map((b) => ({
+        id: b.id,
+        reference_code: b.reference_code || '',
+        patient_name: b.customer_name,
+        customer: { full_name: b.customer_name, phone: b.customer_phone },
+        slot_start: b.slot_start,
+        slot_end: b.slot_end,
+        status: b.status,
+        arrival_tag: 'Expected' as const,
+        doctor_name: b.resource_name,
+        deposit_amount: b.deposit_amount,
+        platform_fee_amount: (b as any).platform_fee_amount ?? (b as any).platform_fee ?? 10,
+        consultation_fee_amount: (b as any).consultation_fee_amount ?? 500,
+        platform_payment_status: (b as any).platform_payment_status ?? 'CAPTURED',
+        consultation_payment_status: (b as any).consultation_payment_status ?? 'PENDING_OFFLINE',
+        consultation_collected_at: (b as any).consultation_collected_at ?? undefined,
+      }));
+  }, [hospitalTodayBookings]);
+
+  const hospitalCompletedBookings: FrontDeskQueueBooking[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => b.status === 'COMPLETED')
+      .map((b) => ({
+        id: b.id,
+        reference_code: b.reference_code || '',
+        patient_name: b.customer_name,
+        customer: { full_name: b.customer_name, phone: b.customer_phone },
+        slot_start: b.slot_start,
+        slot_end: b.slot_end,
+        status: b.status,
+        doctor_name: b.resource_name,
+        deposit_amount: b.deposit_amount,
+      }));
+  }, [hospitalTodayBookings]);
+
+  const frontDeskStats = useMemo(() => ({
+    checkedIn: hospitalWaitingBookings.length,
+    standby: hospitalStandbyBookings.length,
+    expected: hospitalExpectedBookings.length,
+    completed: hospitalCompletedBookings.length,
+  }), [hospitalWaitingBookings.length, hospitalStandbyBookings.length, hospitalExpectedBookings.length, hospitalCompletedBookings.length]);
+
+  const candidateManualBookings: UpcomingCandidateBooking[] = useMemo(() => {
+    return hospitalExpectedBookings.map((b) => ({
+      id: b.id,
+      reference_code: b.reference_code || '',
+      patient_name: b.patient_name,
+      phone: b.customer?.phone,
+      slot_start: b.slot_start,
+      slot_end: b.slot_end,
+      status: b.status,
+      doctor_name: b.doctor_name,
+    }));
+  }, [hospitalExpectedBookings]);
+
+  const displayQueueItems: DisplayQueueItem[] = useMemo(() => {
+    return hospitalTodayBookings
+      .filter((b) => b.status === 'IN_CONSULTATION' || b.status === 'CHECKED_IN')
+      .map((b, idx) => {
+        const pName = b.customer_name || 'Patient';
+        const parts = pName.trim().split(' ');
+        const masked = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+        return {
+          id: b.id,
+          tokenNumber: idx + 1,
+          referenceCode: b.reference_code || '',
+          maskedName: masked,
+          doctorName: b.resource_name || 'Doctor',
+          departmentName: (b as any).department || 'Consultation',
+          roomNumber: 'Room 204',
+          status: b.status === 'IN_CONSULTATION' ? ('IN_CONSULTATION' as const) : idx === 0 ? ('UP_NEXT' as const) : Boolean(b.queue_position) ? ('STANDBY' as const) : ('WAITING' as const),
+          slotTime: new Date(b.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          estimatedWaitMinutes: (idx + 1) * 15,
+        };
+      });
+  }, [hospitalTodayBookings]);
+
+  const handleFrontDeskVerifyCode = async (code: string) => {
+    const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+    if (isDemo) {
+      if (code === '1234') {
+        return {
+          success: true,
+          data: {
+            booking_id: 'demo-booking-1',
+            patient_name: 'Jane Doe',
+            service_doctor: 'Dr. Sarah Jenkins',
+            slot_time: '10:00 AM',
+            is_late: false,
+            arrival_tag: 'On Time' as const,
+            checked_in_at: new Date().toISOString(),
+            queue_name: 'Waiting Queue',
+          },
+        };
+      }
+      return {
+        success: false,
+        error: 'INVALID_CODE',
+        message: 'Invalid check-in code',
+      };
+    }
+
+    const res = await verifyCheckinCodeRpc(selectedProviderId, code);
+    if (res.success) {
+      let arrival_tag: 'On Time' | 'Early' | 'Late' = 'On Time';
+      if (res.is_late) arrival_tag = 'Late';
+      void loadData();
+      return {
+        success: true,
+        data: {
+          booking_id: res.booking_id,
+          patient_name: res.patient_name,
+          service_doctor: res.service_doctor,
+          slot_time: res.slot_time,
+          is_late: res.is_late,
+          arrival_tag,
+          checked_in_at: res.checked_in_at,
+        },
+      };
+    }
+    return {
+      success: false,
+      error: res.error,
+      message: res.message || 'Invalid check-in code',
+    };
+  };
+
+  const handleFrontDeskStartConsultation = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/bookings/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to start consultation');
+      }
+      setRecentNotification('Patient called into consultation');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskEndConsultation = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/bookings/end', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to end consultation');
+      }
+      setRecentNotification('Consultation marked completed');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskAdmitPatient = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/bookings/admit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to admit patient');
+      }
+      setRecentNotification('Patient admitted to waiting area');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskManualCheckin = async (bookingId: string, reason: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const res = await markPresentManuallyRpc(bookingId);
+      if (!res.success) {
+        throw new Error(res.message || 'Failed to mark present');
+      }
+      setRecentNotification('Patient marked present manually');
+      void loadData();
+      return true;
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Manual check-in failed');
+      return false;
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskMarkNoShow = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      await recordMerchantNoShow(bookingId);
+      setRecentNotification('Patient marked as No Show with deposit settled');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Mark No Show failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
+
+  const handleFrontDeskCollectFee = async (bookingId: string) => {
+    setIsProcessingFrontDeskAction(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch('/api/bookings/collect-fee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to collect consultation fee');
+      }
+      setRecentNotification('✓ Consultation fee marked as collected at hospital reception');
+      void loadData();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Fee collection failed');
+    } finally {
+      setIsProcessingFrontDeskAction(false);
+    }
+  };
 
   useEffect(() => {
     if (activeProvider) {
@@ -752,8 +1271,8 @@ export default function MerchantOverviewPage() {
 
   const loadData = useCallback(async () => {
     const version = ++loadVersion.current;
-    if (isTenantLoading) return;
     const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+    if (isTenantLoading && !isDemoMode) return;
     if (!isAuthenticated && !isDemoMode) {
       setLoading(false);
       return;
@@ -1009,7 +1528,7 @@ export default function MerchantOverviewPage() {
     }
   };
 
-  const handleLateQueueAction = async (bookingId: string, action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE', bufferOffset = 2) => {
+  const handleLateQueueAction = async (bookingId: string, action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE') => {
     if (pendingBookingId) return;
     setPendingBookingId(bookingId);
     try {
@@ -1029,16 +1548,16 @@ export default function MerchantOverviewPage() {
         );
         setRecentNotification(
           action === 'CHECKIN_LATE'
-            ? `✓ Late check-in assigned: Accommodated after ${bufferOffset} member appointments (Estimated wait: ~${bufferOffset * 15}m)`
+            ? '✓ Late check-in assigned: Placed in Standby Queue in booking order'
             : '⏳ Patient moved to Standby Queue.'
         );
         return;
       }
 
-      const res = await manageLateQueueBooking(bookingId, action, bufferOffset);
+      const res = await manageLateQueueBooking(bookingId, action);
       if (res.success) {
         if (action === 'CHECKIN_LATE') {
-          setRecentNotification(`✓ Late check-in assigned: Accommodated after ${bufferOffset} member appointments (Token #${res.queue_position}, ~${res.estimated_wait_minutes}m wait)`);
+          setRecentNotification(`✓ Late check-in assigned: Placed in Standby Queue in booking order (Token #${res.queue_position}, ~${res.estimated_wait_minutes}m wait)`);
         } else {
           setRecentNotification('⏳ Patient moved to Standby Queue until physical arrival.');
         }
@@ -1230,9 +1749,7 @@ export default function MerchantOverviewPage() {
     }
   };
 
-  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
-
-  if (isTenantLoading || (loading && !activeProvider && !isSuperAdmin && !isDemo)) {
+  if ((isTenantLoading && !isDemo) || (loading && !activeProvider && !isSuperAdmin && !isDemo)) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
         <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
@@ -1613,11 +2130,105 @@ export default function MerchantOverviewPage() {
         </div>
       )}
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmed</span>
+      {isHospitalVenue ? (
+        isUnassignedDoctorUrlProbe ? (
+          <div data-testid="frontdesk-unassigned-doctor-forbidden" className="bg-white rounded-2xl border border-rose-200 p-8 text-center max-w-xl mx-auto my-12 shadow-sm space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-8 h-8 text-rose-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">403 Forbidden: Consultant Data Unreachable</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              You do not have authorization to access or view appointments for consultant ID <span className="font-mono font-bold text-rose-700">{urlDoctorId}</span>. Front Desk personnel can only access assigned consultant queues.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('doctor_id');
+                url.searchParams.delete('resource_id');
+                window.history.replaceState({}, '', url.toString());
+                setUrlDoctorId(null);
+                setMerchantSelectedDoctorId('');
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
+            >
+              Return to Your Assigned Consultants
+            </button>
+          </div>
+        ) : hasNoAssignedDoctors ? (
+          <div data-testid="frontdesk-no-assignments-forbidden" className="bg-white rounded-2xl border border-rose-200 p-8 text-center max-w-xl mx-auto my-12 shadow-sm space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-8 h-8 text-rose-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">Reception Access Restricted: No Assigned Doctors</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              You are signed in as Front Desk staff, but you have not been assigned to any consultant desks yet. Per hospital governance policy, you can only view and manage appointments for your assigned consultants.
+            </p>
+            <p className="text-xs text-slate-400">
+              Please contact your Hospital Administrator to assign consultant queues to your account in the Team Management screen.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <FrontDeskHeader
+              userEmail={userEmail}
+              role={hospitalContext?.role || (isHospitalAdmin ? 'admin' : 'front_desk')}
+              hospitalName={activeProvider?.name}
+              assignedDoctors={frontDeskAssignedDoctors}
+              selectedDoctorId={merchantSelectedDoctorId}
+              onSelectDoctor={setMerchantSelectedDoctorId}
+              stats={frontDeskStats}
+              onOpenDisplayModal={() => setIsDisplayModalOpen(true)}
+            />
+
+            <FastPassCheckinPanel
+              onVerifyCode={handleFrontDeskVerifyCode}
+              onOpenManualCheckin={() => {
+                setIsManualCheckinModalOpen(true);
+              }}
+              selectedDoctorName={frontDeskAssignedDoctors.find((d) => d.id === merchantSelectedDoctorId)?.name}
+            />
+
+            <FrontDeskQueueTabs
+              waitingBookings={hospitalWaitingBookings}
+              standbyBookings={hospitalStandbyBookings}
+              expectedBookings={hospitalExpectedBookings}
+              completedBookings={hospitalCompletedBookings}
+              inConsultationBookings={hospitalInConsultationBookings}
+              upNextBookingId={upNextBookingId}
+              onAdmitPatient={handleFrontDeskAdmitPatient}
+              onStartConsultation={handleFrontDeskStartConsultation}
+              onEndConsultation={handleFrontDeskEndConsultation}
+              onManualMarkPresent={() => {
+                setIsManualCheckinModalOpen(true);
+              }}
+              onMarkNoShow={handleFrontDeskMarkNoShow}
+              onCollectConsultationFee={handleFrontDeskCollectFee}
+              isProcessingAction={isProcessingFrontDeskAction}
+            />
+
+            <ManualCheckinModal
+              isOpen={isManualCheckinModalOpen}
+              onClose={() => setIsManualCheckinModalOpen(false)}
+              candidateBookings={candidateManualBookings}
+              onConfirmManualCheckin={handleFrontDeskManualCheckin}
+            />
+
+            <WaitingLoungeDisplayModal
+              isOpen={isDisplayModalOpen}
+              onClose={() => setIsDisplayModalOpen(false)}
+              hospitalName={activeProvider?.name}
+              queueItems={displayQueueItems}
+            />
+          </div>
+        )
+      ) : (
+        <>
+          {/* KPI Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmed</span>
             <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             </div>
@@ -1865,33 +2476,65 @@ export default function MerchantOverviewPage() {
             </div>
 
 
-            {/* Attendance Matrix Subheader & Resource Filter */}
+            {/* Attendance Matrix Subheader & Resource / Department Filter */}
             <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
                   <Users className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Live Queue &amp; Service Matrix ({todaysBookings.length} Tokens)</span>
                 </span>
+                {isHospitalAdmin && (
+                  <Link
+                    href="/departments"
+                    className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition"
+                  >
+                    <span>Manage Departments</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                )}
               </div>
 
-              {/* Resource filter dropdown */}
-              {activeResources.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-500">Filter by {verticalConfig.resourceLabelSingular}:</span>
-                  <select
-                    value={merchantSelectedDoctorId}
-                    onChange={(e) => setMerchantSelectedDoctorId(e.target.value)}
-                    className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                  >
-                    <option value="">All {verticalConfig.resourceLabelSingular}s ({activeResources.length})</option>
-                    {activeResources.map((doc) => (
-                      <option key={doc.id} value={doc.id}>
-                        {doc.name} ({doc.department || 'Active'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Resource & Department filter dropdowns */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {availableDepartments.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500">Department:</span>
+                    <select
+                      value={selectedDepartmentFilter}
+                      onChange={(e) => {
+                        setSelectedDepartmentFilter(e.target.value);
+                        setMerchantSelectedDoctorId('');
+                      }}
+                      className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    >
+                      <option value="">All Departments ({availableDepartments.length})</option>
+                      {availableDepartments.map((dept: string) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {activeResources.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500">{verticalConfig.resourceLabelSingular}:</span>
+                    <select
+                      value={merchantSelectedDoctorId}
+                      onChange={(e) => setMerchantSelectedDoctorId(e.target.value)}
+                      className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    >
+                      <option value="">All {verticalConfig.resourceLabelSingular}s ({departmentFilteredResources.length})</option>
+                      {departmentFilteredResources.map((doc: Resource) => (
+                        <option key={doc.id} value={doc.id}>
+                          {doc.name} ({doc.department || 'Active'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1989,14 +2632,16 @@ export default function MerchantOverviewPage() {
 
           {/* Live Patient Queue Attendance Matrix (Style 3) */}
           {(() => {
-            const targetConsultantId =
-              merchantSelectedDoctorId ||
-              todaysBookings.find((b) => b.status !== 'CANCELLED')?.resource_id ||
-              null;
-            const baseBookings = (targetConsultantId
-              ? todaysBookings.filter((b) => b.resource_id === targetConsultantId)
-              : todaysBookings
-            ).filter((b) => b.status !== 'CANCELLED');
+            const baseBookings = todaysBookings.filter((b) => {
+              if (b.status === 'CANCELLED') return false;
+              if (merchantSelectedDoctorId && b.resource_id !== merchantSelectedDoctorId) return false;
+              if (selectedDepartmentFilter) {
+                const res = activeResources.find((r) => r.id === b.resource_id);
+                if ((res?.department || 'General') !== selectedDepartmentFilter) return false;
+              }
+              return true;
+            });
+            const targetConsultantId = merchantSelectedDoctorId || baseBookings[0]?.resource_id || null;
 
             const consultantQueueEval = evaluateConsultantQueue(baseBookings, {
               now: new Date(),
@@ -2218,7 +2863,7 @@ export default function MerchantOverviewPage() {
                             ) : isLate ? (
                               <button
                                 type="button"
-                                onClick={() => handleLateQueueAction(booking.id, 'CHECKIN_LATE', 2)}
+                                onClick={() => handleLateQueueAction(booking.id, 'CHECKIN_LATE')}
                                 disabled={pendingBookingId === booking.id}
                                 className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer"
                               >
@@ -2429,6 +3074,8 @@ export default function MerchantOverviewPage() {
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* ========================================================================= */}
       {/* OPERATIONAL SETTINGS MODAL (Auto-Accept & Daily Limit)                     */}

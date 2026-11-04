@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { RazorpayWebhookPayload } from '@appointments/shared';
+import { assertSafePayloadStructure, PayloadLimitExceededError } from '@/lib/validation-limits';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +18,11 @@ export async function POST(req: NextRequest) {
 
     try {
       body = JSON.parse(rawBody);
-    } catch {
+      assertSafePayloadStructure(body);
+    } catch (parseErr) {
+      if (parseErr instanceof PayloadLimitExceededError) {
+        return NextResponse.json({ error: parseErr.message }, { status: 413 });
+      }
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
@@ -38,14 +43,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing x-razorpay-signature header' }, { status: 401 });
     }
 
+    if (!/^[a-f0-9]{64}$/i.test(signature)) {
+      return NextResponse.json({ error: 'Malformed x-razorpay-signature header' }, { status: 400 });
+    }
+
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)
       .update(rawBody)
       .digest('hex');
 
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expectedBuf = Buffer.from(expectedSignature, 'utf8');
+
     const isMatch =
-      signature.length === expectedSignature.length &&
-      crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+      sigBuf.length === expectedBuf.length &&
+      crypto.timingSafeEqual(sigBuf, expectedBuf);
 
     if (!isMatch) {
       return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 });
@@ -67,6 +79,22 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
+    // Check payment ledger for already-processed event ID (idempotency)
+    if (paymentId) {
+      const { data: existingPayment } = await supabaseAdmin
+        .from('payments')
+        .select('id, booking_id, status')
+        .eq('gateway_payment_id', paymentId)
+        .maybeSingle();
+
+      if (existingPayment && existingPayment.status === 'CAPTURED') {
+        return NextResponse.json(
+          { success: true, booking_id: existingPayment.booking_id, idempotent: true, status: 'CONFIRMED' },
+          { status: 200 }
+        );
+      }
+    }
+
     // Handle payment.captured or order.paid
     if (event === 'payment.captured' || event === 'order.paid') {
       // 4. Find booking by gateway_order_id first, fallback to notes.booking_id
@@ -74,7 +102,7 @@ export async function POST(req: NextRequest) {
       if (orderId) {
         const { data: bByOrder } = await supabaseAdmin
           .from('bookings')
-          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, gateway_payment_id, gateway_order_id, hold_expires_at')
+          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, expected_payment_amount_paise, gateway_payment_id, gateway_order_id, hold_expires_at')
           .eq('gateway_order_id', orderId)
           .maybeSingle();
         booking = bByOrder;
@@ -83,7 +111,7 @@ export async function POST(req: NextRequest) {
       if (!booking && bookingIdFromNotes) {
         const { data: bById } = await supabaseAdmin
           .from('bookings')
-          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, gateway_payment_id, gateway_order_id, hold_expires_at')
+          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, expected_payment_amount_paise, gateway_payment_id, gateway_order_id, hold_expires_at')
           .eq('id', bookingIdFromNotes)
           .maybeSingle();
         booking = bById;
@@ -98,26 +126,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Invalid currency: expected INR, received ${paymentCurrency}` }, { status: 400 });
       }
 
-      const expectedOrderAmountPaise = Math.round(Number(booking.total_amount ?? booking.deposit_amount ?? 100) * 100);
-      if (rawAmount !== expectedOrderAmountPaise) {
+      // Strict 1-to-1 payment amount verification: compare strictly to single stored expected amount
+      const expectedAmountPaise = (booking as any).expected_payment_amount_paise != null
+        ? Number((booking as any).expected_payment_amount_paise)
+        : Math.round(Number(booking.total_amount ?? booking.deposit_amount ?? 10) * 100);
+
+      if (rawAmount !== expectedAmountPaise) {
         return NextResponse.json(
-          { error: `Payment amount mismatch: expected ${expectedOrderAmountPaise} paise, received ${rawAmount}` },
+          { error: `Payment amount mismatch: expected ${expectedAmountPaise} paise, received ${rawAmount}` },
           { status: 400 }
         );
       }
 
-      // 6. Idempotency Check: if booking is already confirmed with this payment
-      if (booking.status === 'CONFIRMED' && booking.gateway_payment_id === paymentId) {
+      // 6. Idempotency Check: if booking is already confirmed or captured
+      if (booking.status === 'CONFIRMED' || booking.payment_status === 'CAPTURED') {
         return NextResponse.json(
-          { success: true, booking_id: booking.id, idempotent: true, status: 'CONFIRMED' },
-          { status: 200 }
-        );
-      }
-
-      // If already confirmed with any payment, return idempotent success
-      if (booking.status === 'CONFIRMED') {
-        return NextResponse.json(
-          { success: true, booking_id: booking.id, idempotent: true, status: 'CONFIRMED' },
+          { success: true, booking_id: booking.id, idempotent: true, status: booking.status },
           { status: 200 }
         );
       }

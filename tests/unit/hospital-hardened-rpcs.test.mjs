@@ -105,16 +105,19 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
       })
     });
 
-    // Helper to create test booking
-    const now = new Date();
-    async function createTestBooking(refCode, docId, deptId, patientId, slotOffsetMinutes = 30) {
+    // Helper to create test booking safely on current Asia/Kolkata calendar date
+    const istNow = new Date();
+    const istHour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false }).format(istNow), 10);
+    const baseOffset = istHour >= 23 ? -25 : (istHour < 1 ? 5 : 0);
+
+    async function createTestBooking(refCode, docId, deptId, patientId, slotOffsetMinutes = 0) {
       await fetch(`${url}/rest/v1/bookings?reference_code=eq.${refCode}`, {
         method: 'DELETE',
         headers: serviceHeaders
       });
 
-      const slotStart = new Date(now.getTime() + slotOffsetMinutes * 60 * 1000).toISOString();
-      const slotEnd = new Date(now.getTime() + (slotOffsetMinutes + 15) * 60 * 1000).toISOString();
+      const slotStart = new Date(istNow.getTime() + (baseOffset + slotOffsetMinutes) * 60 * 1000).toISOString();
+      const slotEnd = new Date(istNow.getTime() + (baseOffset + slotOffsetMinutes + 15) * 60 * 1000).toISOString();
 
       const bRes = await fetch(`${url}/rest/v1/bookings`, {
         method: 'POST',
@@ -145,15 +148,15 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
       return { booking, code: codeRows[0]?.code };
     }
 
-    const t1 = await createTestBooking('ST4-DOC1', doc1.id, deptNeuro.id, tokens.patient1.user.id, 20);
+    const t1 = await createTestBooking('ST4-DOC1', doc1.id, deptNeuro.id, tokens.patient1.user.id, 0);
     bookingDoc1 = t1.booking;
     codeDoc1 = t1.code;
 
-    const t2 = await createTestBooking('ST4-DOC2', doc2.id, deptNeuro.id, tokens.patient2.user.id, 25);
+    const t2 = await createTestBooking('ST4-DOC2', doc2.id, deptNeuro.id, tokens.patient2.user.id, 5);
     bookingDoc2 = t2.booking;
     codeDoc2 = t2.code;
 
-    const t3 = await createTestBooking('ST4-DERMA', docDerma.id, deptDerma.id, tokens.patient3.user.id, 30);
+    const t3 = await createTestBooking('ST4-DERMA', docDerma.id, deptDerma.id, tokens.patient3.user.id, 10);
     bookingDerma = t3.booking;
     codeDerma = t3.code;
   });
