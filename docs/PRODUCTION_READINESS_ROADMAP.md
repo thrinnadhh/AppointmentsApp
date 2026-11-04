@@ -53,7 +53,7 @@ Report with file:line evidence and test output.
 | :---: | :--- | :---: | :--- |
 | **Group 1** | **Git Merge, Semantic Merge Reconcile & Clean DB State** | **ACCEPTED** ✅ | Commits `9487275`, `2637c0f`, `94228c0`, `81207c1` |
 | **Group 2** | **Tests, Concurrency Invariants & Test Infrastructure** | **ACCEPTED** ✅ | Commit `4289a3e` |
-| **Group 3** | **Razorpay Refund API & Idempotency Header** | **ACCEPTED** ✅ | Commit pending |
+| **Group 3** | **Razorpay Refund API & Idempotency Header** | **ACCEPTED** ✅ | Commit `0c5e2c0` |
 | **Group 4** | **OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **PENDING** ⏳ | Awaiting user trigger |
