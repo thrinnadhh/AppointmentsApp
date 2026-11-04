@@ -163,11 +163,12 @@ export async function POST(req: NextRequest) {
 
     // Enforce per-consultant access for hospital front-desk/consultant staff
     if (!isAdmin) {
-      const accessCtx = await getAccessContext(req, targetProviderId);
+      const effectiveProviderId = booking.provider_id || targetProviderId || '';
+      const accessCtx = await getAccessContext(req, effectiveProviderId);
       const resourceAuth = await authorizeHospitalResourceOrMerchant(
         req,
         caller.id,
-        targetProviderId,
+        effectiveProviderId,
         booking.resource_id
       );
       if (!canAccessDoctor(accessCtx, booking.resource_id) && !resourceAuth.authorized) {

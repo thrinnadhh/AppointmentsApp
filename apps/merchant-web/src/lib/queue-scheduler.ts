@@ -419,8 +419,6 @@ export function buildRollingTenSlotQueue(
       const isActualConsultation = bookedPatient.status === 'IN_CONSULTATION' || Boolean(currentBookingId && bookedPatient.id === currentBookingId);
       const isServing = isActualConsultation || (slotIndex === 1 && isPresent);
       const isCurrent = Boolean(currentBookingId && bookedPatient.id === currentBookingId);
-      const isUpNext = Boolean(upNextCandidate && bookedPatient.id === upNextCandidate.id);
-
       let slotType: QueueSlotType;
       let statusLabel: string;
       let statusDescription: string;
@@ -443,8 +441,6 @@ export function buildRollingTenSlotQueue(
         statusDescription = 'Arriving shortly. Token reserved.';
       }
 
-      const patientEta = etas.get(bookedPatient.id);
-
       slots.push({
         slotIndex,
         slotStart: slotStartIso,
@@ -452,7 +448,7 @@ export function buildRollingTenSlotQueue(
         formattedStartTime,
         formattedEndTime,
         type: slotType,
-        tokenNumber: patientEta?.queuePosition || bookedPatient.queue_position || tokenCounter++,
+        tokenNumber: bookedPatient.queue_position || tokenCounter++,
         referenceCode: bookedPatient.reference_code || `P${tokenCounter}`,
         bookingId: bookedPatient.id,
         booking: bookedPatient,
@@ -486,8 +482,6 @@ export function buildRollingTenSlotQueue(
 
       if (accommodatedLatePatient) {
         const isCurrent = Boolean(currentBookingId && accommodatedLatePatient.id === currentBookingId);
-        const isUpNext = Boolean(upNextCandidate && accommodatedLatePatient.id === upNextCandidate.id);
-        const patientEta = etas.get(accommodatedLatePatient.id);
 
         slots.push({
           slotIndex,
@@ -496,7 +490,7 @@ export function buildRollingTenSlotQueue(
           formattedStartTime,
           formattedEndTime,
           type: 'LATE_ACCOMMODATED',
-          tokenNumber: patientEta?.queuePosition || accommodatedLatePatient.queue_position || tokenCounter++,
+          tokenNumber: accommodatedLatePatient.queue_position || tokenCounter++,
           referenceCode: accommodatedLatePatient.reference_code || `LATE-${tokenCounter}`,
           bookingId: accommodatedLatePatient.id,
 
@@ -505,13 +499,12 @@ export function buildRollingTenSlotQueue(
 
           isPresent: true,
           isCurrentPatient: isCurrent,
-          statusLabel: isUpNext ? 'Up Next' : 'Late Accommodated in Gap',
+          statusLabel: 'Late Accommodated in Gap',
           statusDescription: nextOnTimePatient
             ? `Placed in gap; ${nextOnTimePatient.reference_code || 'next patient'} time undisturbed`
             : 'Fitted into available gap in Standby Queue order',
           isGuaranteedUndisturbed: false,
           isFastTracked: false,
-          isUpNext,
         });
       } else if (remainingLatePatients.length > 0 && nextOnTimeStartMs) {
         slots.push({

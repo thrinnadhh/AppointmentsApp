@@ -237,8 +237,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
       }
 
-      // Log notification only when ETA leaves patient window
-      const shouldNotify = patientEta ? patientEta.hasLeftWindow : true;
+      // Log notification
+      try {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('phone, full_name')
+          .eq('id', booking.customer_id)
+          .maybeSingle();
 
         if (profile?.phone) {
           await (supabaseAdmin.from('notification_logs') as any).upsert(
@@ -255,6 +260,8 @@ export async function POST(req: NextRequest) {
             { onConflict: 'booking_id,event_type,channel', ignoreDuplicates: true }
           );
         }
+      } catch (notifyErr) {
+        console.warn('[LateQueueRoute] Error writing notification log:', notifyErr);
       }
 
       return NextResponse.json({

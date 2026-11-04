@@ -888,8 +888,6 @@ export default function BookingsManagementPage() {
                           Arrived Late (Standby Queue)
                         </button>
                       )}
-                        </button>
-                      )}
 
                       {!booking.is_present && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
                         <button

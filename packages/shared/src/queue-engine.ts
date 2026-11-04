@@ -215,6 +215,7 @@ function attachBookingsHelpers(arr: HospitalQueueBooking[]): HospitalQueueBookin
     },
   });
   return arr;
+}
 
 
 export function computeQueueETAs(params: {
@@ -447,8 +448,6 @@ export function computePatientETA(params: {
 }): PatientETA | null {
   const etas = computeQueueETAs(params);
   return etas.get(params.bookingId) || null;
-}
-
 }
 
 export class HospitalDepartmentQueueEngine {
@@ -851,25 +850,6 @@ export class HospitalDepartmentQueueEngine {
         : null;
 
     const clonedWaiting = waitingQueue.map(cloneBooking);
-
-    // Determine upNext using candidate selection
-    let nextCandidate: HospitalQueueBooking | null = null;
-    const upcomingBooked = this.bookings.filter((b) => {
-      if (b.isCompleted || b === this.currentConsultation) return false;
-      const tag = b.arrivalTag || calculateArrivalTag(b.slotStart, b.arrivedAt);
-      return tag !== 'Late';
-    });
-
-    if (currentServing) {
-      const durMs = (currentServing.durationMinutes || 15) * 60 * 1000;
-      const startMs = currentServing.consultationStart
-        ? new Date(currentServing.consultationStart).getTime()
-        : currMs;
-      const finishIso = new Date(Math.max(currMs, startMs + durMs)).toISOString();
-      nextCandidate = this.selectNextCandidate(finishIso, waitingQueue, standbyQueue, upcomingBooked);
-    } else {
-      nextCandidate = this.selectNextCandidate(currentTime, waitingQueue, standbyQueue, upcomingBooked);
-    }
 
     return {
       departmentName: this.departmentName,
