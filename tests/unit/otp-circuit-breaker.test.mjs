@@ -1,5 +1,24 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it } from 'node:test';
+
+// 1. Load apps/merchant-web/.env.local if not already populated
+const envLocalPath = path.resolve(process.cwd(), 'apps/merchant-web/.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const lines = fs.readFileSync(envLocalPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx > 0) {
+      const k = trimmed.slice(0, eqIdx).trim();
+      const v = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+      if (!process.env[k]) process.env[k] = v;
+    }
+  }
+}
+
 import {
   OTP_LIMITS,
   extractPhonePrefix,
@@ -46,6 +65,27 @@ describe('Group 4: OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA Suite', 
       const invalidTestRes = await verifyCaptchaToken('test-invalid-token-bad');
       assert.equal(invalidTestRes.success, false);
       assert.equal(invalidTestRes.reason, 'INVALID_TEST_TOKEN');
+    });
+
+    it('1c. verifyCaptchaToken strictly rejects synthetic test tokens in production environment', async () => {
+      const origEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'production';
+
+        const prodTestTokenRes = await verifyCaptchaToken('test-valid-token-alpha');
+        assert.equal(prodTestTokenRes.success, false, 'Must reject test-valid-* in production');
+        assert.equal(prodTestTokenRes.reason, 'TEST_TOKENS_FORBIDDEN_IN_PRODUCTION');
+
+        const prodMockTokenRes = await verifyCaptchaToken('valid-captcha-token');
+        assert.equal(prodMockTokenRes.success, false, 'Must reject valid-captcha-token in production');
+        assert.equal(prodMockTokenRes.reason, 'TEST_TOKENS_FORBIDDEN_IN_PRODUCTION');
+
+        const prodBypassRes = await verifyCaptchaToken(bypassKey);
+        assert.equal(prodBypassRes.success, false, 'Must reject SUPERADMIN_E2E_TOKEN in production');
+        assert.equal(prodBypassRes.reason, 'TEST_TOKENS_FORBIDDEN_IN_PRODUCTION');
+      } finally {
+        process.env.NODE_ENV = origEnv;
+      }
     });
   });
 

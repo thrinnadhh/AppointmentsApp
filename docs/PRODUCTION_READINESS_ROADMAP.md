@@ -54,8 +54,8 @@ Report with file:line evidence and test output.
 | **Group 1** | **Git Merge, Semantic Merge Reconcile & Clean DB State** | **ACCEPTED** ✅ | Commits `9487275`, `2637c0f`, `94228c0`, `81207c1` |
 | **Group 2** | **Tests, Concurrency Invariants & Test Infrastructure** | **ACCEPTED** ✅ | Commit `4289a3e` |
 | **Group 3** | **Razorpay Refund API & Idempotency Header** | **ACCEPTED** ✅ | Commit `0c5e2c0` & Dynamic Fresh Replay Fix |
-| **Group 4** | **OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA** | **ACCEPTED** ✅ | Verified Multi-Tier Engine (`/api/auth/otp/send`) |
-| **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **PENDING** ⏳ | Awaiting user trigger |
+| **Group 4** | **OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA** | **ACCEPTED** ✅ | Commit `1443657` & Verified Multi-Tier Engine |
+| **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **ACCEPTED** ✅ | Migration `20261105000001_deduplicate_cron_jobs.sql` |
 | **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 7** | **Production Safety, Test Route Lock & Guest UX** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 8** | **Cross-Tenant & Cross-Hospital Authorization Suite** | **PENDING** ⏳ | Awaiting user trigger |
@@ -152,8 +152,32 @@ Report with file:line evidence and test output.
   - **Before**: 500 attacker requests consumed 100% of the 500 daily cap (₹125 SMS waste); Patient #501 hard-blocked with HTTP 429 DoS.
   - **After**: Attacker throttled at Request #5 by Tier 1 (IP limit) with HTTP 429 (`per-ip`); 495 requests blocked at the edge; 99% cost reduction (₹1.25 waste); sequential pumping throttled at Request #15 by Tier 3 (`per-prefix`); Patient #501 allowed with HTTP 200 OK (zero DoS); elevated volume challenge hook successfully verified with CAPTCHA token.
 - **Test Suite**:
-  - Dedicated suite `tests/unit/otp-circuit-breaker.test.mjs` verifying all 5 tiers, prefix extraction, and CAPTCHA validation. All 7 tests passing.
+  - Dedicated suite `tests/unit/otp-circuit-breaker.test.mjs` verifying all 5 tiers, prefix extraction, and CAPTCHA validation (8/8 tests passing, including production rejection of synthetic test tokens).
   - Existing `tests/unit/phase2-functional-blockers.test.mjs` (Test 6a) and `tests/scripts/test-security.mjs` verified passing with 0 regressions.
+
+---
+
+### Group 5: Cron Job Deduplication & Security Monitor Evaluation (ACCEPTED)
+- **Multi-Agent Coordination**: Orchestrated across `[Agent-Backend]` and `[Agent-Database]`.
+- **Pre-Flight Security Check (`apps/merchant-web/src/lib/captcha.ts`)**:
+  - Audited `verifyCaptchaToken` and discovered lines 36–66 previously accepted synthetic test tokens without strict production gating.
+  - Hardened `apps/merchant-web/src/lib/captcha.ts`: gated all synthetic/test tokens behind `const isNonProduction = process.env.NODE_ENV !== 'production'`. When `NODE_ENV === 'production'`, test tokens are unconditionally rejected with `{ success: false, reason: 'TEST_TOKENS_FORBIDDEN_IN_PRODUCTION' }` and emit a structured `[SECURITY_ALERT]` log. Added test 1c in `tests/unit/otp-circuit-breaker.test.mjs`.
+- **Live Database & Migration Audit**:
+  - Queried live PostgreSQL `cron.job` state and identified historical duplicate schedules created across migrations:
+    - **Pair A**: `release-expired-booking-holds` (`* * * * *`, `SELECT public.release_expired_holds();`) vs `release-expired-holds-sql` (`* * * * *`, `SELECT public.release_expired_holds();`).
+    - **Pair B**: `process-expired-account-deletions` (`0 3 * * *`, `SELECT public.process_expired_account_deletions();`) vs `dpdp-account-deletions-sql` (`0 2 * * *`, `SELECT public.process_expired_account_deletions();`).
+- **Forward Migration (`supabase/migrations/20261105000001_deduplicate_cron_jobs.sql`)**:
+  - **Pair A Decision**: Kept canonical `release-expired-booking-holds` (* * * * *) and safely unscheduled duplicate `release-expired-holds-sql`. This preserves the exact contract required by `tests/scripts/test-expired-holds-limit.mjs` and eliminates double lock contention.
+  - **Pair B Decision**: Kept canonical `dpdp-account-deletions-sql` (0 2 * * * / 07:30 AM IST) and safely unscheduled duplicate `process-expired-account-deletions`. 02:00 UTC executes 30-day statutory DPDP data erasure and anonymization prior to morning clinic opening hours, preventing audit trail duplication and transaction contention during active patient hours.
+  - Zero duplicate migration prefixes verified (`ls supabase/migrations | cut -d_ -f1 | sort | uniq -d` returned empty). Rollback migration `supabase/migrations_rollback/20261105000001_rollback.sql` authored and verified.
+- **Security Monitor Architectural Recommendation**:
+  - Evaluated `/api/cron/security-monitor` and concluded it **MUST exist** as an authenticated Next.js Edge/API endpoint:
+    - **Regulatory Basis**: Fulfills Section 8(6) of India's Digital Personal Data Protection (DPDP) Act 2023 for security safeguards and breach prevention, querying `public.contact_reveal_anomalies` to detect high-velocity patient contact harvesting (>10 reveals/24h or >15/1h).
+    - **External Alerting**: Emits `CRITICAL` entries to `public.app_logs` and dispatches outbound alerts via `fetch(SECURITY_ALERT_WEBHOOK_URL)`. Outbound webhook requests cannot be reliably executed inside PostgreSQL `pg_cron` without complex extensions and credentials exposure.
+    - **Triggering Model**: Designed to be invoked externally via Vercel Cron or uptime scheduler with `CRON_SECRET` Bearer token (constant-time verification in `middleware.ts` and route handler `verifyCronAuth`). Intentionally NOT registered as an in-database `pg_cron` SQL job.
+- **Test Suite**:
+  - Authored `tests/unit/cron-deduplication.test.mjs` (10/10 tests PASS): asserts exactly 1 active job per pair, duplicate jobs completely unscheduled, clean stored procedure execution, and security-monitor 401/200 authentication enforcement.
+  - Verified `tests/security/test-security-monitor.mjs` (4/4 PASS), `tests/unit/otp-circuit-breaker.test.mjs` (8/8 PASS), and `tests/scripts/test-expired-holds-limit.mjs` (4/4 PASS).
 
 ---
 

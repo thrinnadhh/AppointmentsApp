@@ -34,16 +34,9 @@ export async function verifyCaptchaToken(
   const cleanToken = token.trim();
 
   // ── 1. Deterministic Test / E2E Bypass ────────────────────────────────────
-  // Authorized bypass for automated CI/E2E testing and local test scripts
-  if (
-    cleanToken.startsWith('test-valid-') ||
-    cleanToken.startsWith('mock-valid-') ||
-    cleanToken === 'valid-captcha-token' ||
-    cleanToken === 'test-token-passed' ||
-    (process.env.SUPERADMIN_E2E_TOKEN && cleanToken === process.env.SUPERADMIN_E2E_TOKEN)
-  ) {
-    return { success: true };
-  }
+  // Strictly restricted to NON-PRODUCTION environments for automated CI/E2E and local test scripts.
+  // In production (NODE_ENV === 'production'), synthetic test tokens are UNCONDITIONALLY REJECTED.
+  const isNonProduction = process.env.NODE_ENV !== 'production';
 
   if (
     cleanToken.startsWith('test-invalid-') ||
@@ -52,6 +45,23 @@ export async function verifyCaptchaToken(
     cleanToken === 'invalid-token'
   ) {
     return { success: false, reason: 'INVALID_TEST_TOKEN' };
+  }
+
+  if (
+    cleanToken.startsWith('test-valid-') ||
+    cleanToken.startsWith('mock-valid-') ||
+    cleanToken === 'valid-captcha-token' ||
+    cleanToken === 'test-token-passed' ||
+    (process.env.SUPERADMIN_E2E_TOKEN && cleanToken === process.env.SUPERADMIN_E2E_TOKEN)
+  ) {
+    if (!isNonProduction) {
+      console.error('[SECURITY_ALERT] Attempted test CAPTCHA token usage in production environment', {
+        remoteip,
+        tokenPrefix: cleanToken.slice(0, 10),
+      });
+      return { success: false, reason: 'TEST_TOKENS_FORBIDDEN_IN_PRODUCTION' };
+    }
+    return { success: true };
   }
 
   // ── 2. Cloudflare Turnstile ──────────────────────────────────────────────
@@ -135,3 +145,4 @@ export async function verifyCaptchaToken(
   console.error('[CAPTCHA] No CAPTCHA secret configured in production — verification failing closed');
   return { success: false, reason: 'CAPTCHA_NOT_CONFIGURED_IN_PROD' };
 }
+
