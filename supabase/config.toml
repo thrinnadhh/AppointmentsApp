@@ -437,3 +437,14 @@ entrypoint = "./functions/whatsapp-sender/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/whatsapp-auth-hook/index.ts"
+
+[functions.process-notification-queue]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/process-notification-queue/index.ts"
+
+[functions.process-refund-queue]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/process-refund-queue/index.ts"
+
