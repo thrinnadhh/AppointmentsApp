@@ -270,12 +270,12 @@ Report with file:line evidence and test output.
 2. Update customer slot picker UI: replace "Unauthorized... retry" message for guest users with an intuitive sign-in prompt.
 
 ### Group 8: Comprehensive Tenant & Cross-Hospital Authorization Suite
-- **Status**: SUBMITTED FOR HUMAN REVIEW (Full Serial Gate Passed: 39 suites / 347 tests, 0 typecheck errors, 52/52 Next.js static pages built)
-1. **Adversarial Matrix Suite**: Built `tests/unit/cross-tenant-authorization-matrix.test.mjs` executing 20 distinct API scenarios across 2 customers (A & B) and 2 hospitals (Hosp 1 & 2: Admin, Front Desk, Consultant, Department, Resource). Proven 200/201 on authorized caller and 401/403/404 or masked PII on cross-tenant/cross-role callers with zero 400 Bad Requests masquerading as passes.
+- **Status**: SUBMITTED FOR HUMAN REVIEW (Full Serial Gate Passed: 39 suites / 365 tests, 0 typecheck errors, 52/52 Next.js static pages built + 72 dynamic API routes)
+1. **Adversarial Matrix Suite**: Built `tests/unit/cross-tenant-authorization-matrix.test.mjs` executing 38 distinct test scenarios covering 100% of discovered API routes (all 66 routes under `apps/merchant-web/src/app/api`) across 2 customers (A & B) and 2 hospitals (Hosp 1 & 2: Admin, Front Desk, Consultant, Department, Resource). Proven 200/201 on authorized caller and 401/403/404 or masked PII on cross-tenant/cross-role callers with zero 400 Bad Requests masquerading as passes. Includes programmatic completeness assertion verifying 0 uncovered routes on disk.
 2. **Demo Customer ID Purge**: Purged all occurrences of `'99999999-9999-9999-9999-999999999991'` across `apps/customer-mobile/` (0 matches in `.ts`/`.tsx`).
 3. **Mock Payments Production Guard**: Validated fail-fast boot guard in `apps/merchant-web/src/env.mjs` and `payments/verify` preventing boot when `ALLOW_MOCK_PAYMENTS=true` in production (exit code 1).
-4. **CORS & Demo Isolation**: Verified strict team preview origin matching (`tests/security/test-cors-and-demo-mode.test.mjs`, 4/4 PASS), rejecting malicious Vercel subdomains without credentials.
-5. **TypeScript & Build Integrity**: Removed `typescript: { ignoreBuildErrors: true }` from `apps/merchant-web/next.config.mjs`. Ran `tsc --noEmit` (0 errors) and production build (52/52 pages).
+4. **CORS & Demo Isolation**: Verified strict team preview origin matching (`tests/security/test-cors-and-demo-mode.test.mjs`, 5/5 PASS), rejecting malicious Vercel subdomains (`appointments-merchant-evil-<team-slug>.vercel.app`) without credentials.
+5. **TypeScript & Build Integrity**: Removed `typescript: { ignoreBuildErrors: true }` from `apps/merchant-web/next.config.mjs`. Added `pnpm -r exec tsc --noEmit` to `.github/workflows/ci.yml`. Ran `tsc --noEmit` (0 errors) and production build (52/52 pages).
 6. **Rate-Limit Backend & Redis**: Proved fail-closed architecture in production (`tests/unit/rate-limit-backend.test.mjs`, 6/6 PASS).
 7. **RPC Security Audit**: Verified `complete_booking` and `override_hospital_queue_position` stored procedures enforce `SECURITY DEFINER`, search paths, and caller authorization checks.
 8. **Roles Tracking**: Resolved `supabase/roles.sql` tracking in git; verified clean `supabase db reset`.

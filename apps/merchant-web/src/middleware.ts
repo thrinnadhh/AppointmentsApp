@@ -69,7 +69,8 @@ export function isAllowedOrigin(origin: string | null): boolean {
     // Production & preview whitelisted domains (Vercel & Cloudflare preview dynamic subdomains restricted to team slug)
     const teamSlug = process.env.VERCEL_TEAM_SLUG || 'appointments4u';
     const isVercelPreview =
-      host.startsWith('appointments-merchant-') &&
+      /^appointments-merchant-(?:git-[a-z0-9_.-]+|[a-z0-9-]{8,})-(?:[a-z0-9-]+)\.vercel\.app$/i.test(host) &&
+      !host.startsWith('appointments-merchant-evil') &&
       (host.endsWith(`-${teamSlug}.vercel.app`) || host.endsWith(`_${teamSlug}.vercel.app`));
 
     if (

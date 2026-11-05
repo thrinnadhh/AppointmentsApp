@@ -1,4 +1,4 @@
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
 
@@ -118,6 +118,13 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
 
       // Cancel any existing bookings for this patient at hospA so permanent PIN resolves uniquely to this test booking
       await fetch(`${url}/rest/v1/bookings?customer_id=eq.${patientId}&provider_id=eq.${hospA.id}&reference_code=neq.${refCode}`, {
+        method: 'PATCH',
+        headers: serviceHeaders,
+        body: JSON.stringify({ status: 'CANCELLED' })
+      });
+
+      // Cancel any active bookings for this doctor that could conflict on time
+      await fetch(`${url}/rest/v1/bookings?resource_id=eq.${docId}&status=in.(CONFIRMED,CHECKED_IN,PENDING)&reference_code=neq.${refCode}`, {
         method: 'PATCH',
         headers: serviceHeaders,
         body: JSON.stringify({ status: 'CANCELLED' })
@@ -341,5 +348,14 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
 
     const alreadyCount = (data1.error === 'ALREADY_CHECKED_IN' ? 1 : 0) + (data2.error === 'ALREADY_CHECKED_IN' ? 1 : 0);
     assert.equal(alreadyCount, 1, 'Losing concurrent caller must receive ALREADY_CHECKED_IN');
+  });
+
+  after(async () => {
+    for (const ref of ['ST4-DOC1', 'ST4-DOC2', 'ST4-DERMA']) {
+      await fetch(`${url}/rest/v1/bookings?reference_code=eq.${ref}`, {
+        method: 'DELETE',
+        headers: serviceHeaders
+      });
+    }
   });
 });

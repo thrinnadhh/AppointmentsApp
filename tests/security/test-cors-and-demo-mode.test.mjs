@@ -24,6 +24,26 @@ describe('CORS and Demo Mode Security Suite', () => {
     );
   });
 
+  it('strictly rejects malicious team preview spoofing (appointments-merchant-evil-<our-team-slug>.vercel.app)', async () => {
+    const evilTeamOrigin = 'https://appointments-merchant-evil-appointments4u.vercel.app';
+    const res = await fetch(`${APP_URL}/api/health`, {
+      headers: { Origin: evilTeamOrigin },
+    });
+    const allowOrigin = res.headers.get('access-control-allow-origin');
+    const allowCredentials = res.headers.get('access-control-allow-credentials');
+
+    assert.equal(
+      allowOrigin,
+      null,
+      `Malicious team preview spoof ${evilTeamOrigin} must NOT receive Access-Control-Allow-Origin`
+    );
+    assert.equal(
+      allowCredentials,
+      null,
+      `Malicious team preview spoof ${evilTeamOrigin} must NOT receive Access-Control-Allow-Credentials`
+    );
+  });
+
   it('allows verified team preview origin but suppresses Access-Control-Allow-Credentials', async () => {
     const teamPreviewOrigin = 'https://appointments-merchant-preview-123-appointments4u.vercel.app';
     const res = await fetch(`${APP_URL}/api/health`, {

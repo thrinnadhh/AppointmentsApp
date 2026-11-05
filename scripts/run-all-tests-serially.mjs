@@ -54,3 +54,4 @@ if (failures.length > 0) {
   }
   process.exit(1);
 }
+

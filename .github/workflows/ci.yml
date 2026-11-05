@@ -133,7 +133,7 @@ jobs:
         run: pnpm lint
 
       - name: Typecheck (all workspaces)
-        run: pnpm typecheck
+        run: pnpm -r exec tsc --noEmit
 
       - name: Check for unpopulated DPDP legal placeholders
         run: pnpm run check:legal

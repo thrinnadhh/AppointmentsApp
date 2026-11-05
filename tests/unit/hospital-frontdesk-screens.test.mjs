@@ -1,4 +1,4 @@
-import { describe, it, before } from 'node:test';
+import { describe, it, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
@@ -120,6 +120,13 @@ describe('Phase 5c: Hospital Front Desk Reception Screens & Security Suite', () 
   });
 
   describe('2. 4-Digit Check-In Code Verification', () => {
+    beforeEach(async () => {
+      await fetch(`${supabaseUrl}/rest/v1/staff_checkin_rate_limits?user_id=eq.${tokens.neuroDesk.user.id}`, {
+        method: 'DELETE',
+        headers: serviceHeaders,
+      });
+    });
+
     it('verifies valid 4-digit code, marks status CHECKED_IN, and returns arrival details', async () => {
       // Find or reset a confirmed booking for neuroDocResource
       let targetBooking = hospABookings.find((b) => b.resource_id === neuroDocResource.id && b.status === 'CONFIRMED');
@@ -214,25 +221,25 @@ describe('Phase 5c: Hospital Front Desk Reception Screens & Security Suite', () 
         checkedInBooking = { ...anyB, status: 'CHECKED_IN', is_present: true, resource_id: neuroDocResource.id };
       }
 
-      let codeRecord = await (
-        await fetch(`${supabaseUrl}/rest/v1/appointment_checkin_codes?booking_id=eq.${checkedInBooking.id}`, {
-          headers: serviceHeaders,
-        })
-      ).json();
-
-      if (!codeRecord || codeRecord.length === 0) {
+      const todayKolkata = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      const patchRes = await fetch(`${supabaseUrl}/rest/v1/appointment_checkin_codes?booking_id=eq.${checkedInBooking.id}`, {
+        method: 'PATCH',
+        headers: serviceHeaders,
+        body: JSON.stringify({ code: '9875', appointment_date: todayKolkata }),
+      });
+      const patched = await patchRes.json();
+      if (!patched || patched.length === 0) {
         await fetch(`${supabaseUrl}/rest/v1/appointment_checkin_codes`, {
           method: 'POST',
-          headers: { ...serviceHeaders, Prefer: 'resolution=merge-duplicates' },
+          headers: serviceHeaders,
           body: JSON.stringify({
             booking_id: checkedInBooking.id,
             provider_id: hospA.id,
             customer_id: checkedInBooking.customer_id,
             code: '9875',
-            appointment_date: new Date().toISOString().split('T')[0],
+            appointment_date: todayKolkata,
           }),
         });
-        codeRecord = [{ code: '9875' }];
       }
 
       const res = await fetch(`${appBaseUrl}/api/bookings/checkin`, {
@@ -243,7 +250,7 @@ describe('Phase 5c: Hospital Front Desk Reception Screens & Security Suite', () 
         },
         body: JSON.stringify({
           shopId: hospA.id,
-          code: codeRecord[0].code,
+          code: '9875',
         }),
       });
 
@@ -254,6 +261,13 @@ describe('Phase 5c: Hospital Front Desk Reception Screens & Security Suite', () 
   });
 
   describe('3. Uniform Error Security (SPEC line 16)', () => {
+    beforeEach(async () => {
+      await fetch(`${supabaseUrl}/rest/v1/staff_checkin_rate_limits?user_id=eq.${tokens.neuroDesk.user.id}`, {
+        method: 'DELETE',
+        headers: serviceHeaders,
+      });
+    });
+
     it('returns uniform error for invalid non-existent code', async () => {
       const res = await fetch(`${appBaseUrl}/api/bookings/checkin`, {
         method: 'POST',
