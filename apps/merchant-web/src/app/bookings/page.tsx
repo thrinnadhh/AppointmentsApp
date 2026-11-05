@@ -850,6 +850,21 @@ export default function BookingsManagementPage() {
                           ⏰ 1h Sent
                         </span>
                       )}
+                      {booking.payment_status === 'REFUND_PENDING' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                          ⏳ Refund Pending
+                        </span>
+                      )}
+                      {booking.payment_status === 'REFUNDED' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
+                          ✓ Refund Processed
+                        </span>
+                      )}
+                      {booking.payment_status === 'REFUND_FAILED' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                          ⚠️ Refund Failed
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

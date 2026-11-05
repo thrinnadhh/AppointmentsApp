@@ -249,10 +249,10 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     });
     bookingB = (await bkgResB.json())[0];
 
-    // Dedicated booking for Booking Life Cycle Test 11 (scheduled for today in IST)
+    // Dedicated booking for Booking Life Cycle Test 11 (scheduled for today in IST, well before midnight)
     const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-    const tStartCycle = `${todayStr}T14:30:00.000Z`;
-    const tEndCycle = `${todayStr}T14:45:00.000Z`;
+    const tStartCycle = `${todayStr}T18:00:00.000Z`;
+    const tEndCycle = `${todayStr}T18:15:00.000Z`;
     const bkgCycleRes = await fetch(`${supabaseUrl}/rest/v1/bookings`, {
       method: 'POST',
       headers: serviceHeaders,
@@ -2466,4 +2466,203 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       'PASS'
     );
   });
+
+  it('39. Supabase Power Features: pgmq lockdown, push token isolation, edge secrets, idempotency, and DLQ', async () => {
+    // 39.1 anon and authenticated roles cannot select/insert/delete in pgmq or call its functions
+    // (A) Test via REST API
+    const anonPgmqRes = await fetch(`${supabaseUrl}/rest/v1/q_notifications`, {
+      headers: { apikey: anonKey },
+    });
+    assert.ok(
+      anonPgmqRes.status === 401 || anonPgmqRes.status === 403 || anonPgmqRes.status === 404,
+      `Anon must be blocked from pgmq tables, received ${anonPgmqRes.status}`
+    );
+
+    const authPgmqRes = await fetch(`${supabaseUrl}/rest/v1/q_notifications`, {
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${custA.token}`,
+      },
+    });
+    assert.ok(
+      authPgmqRes.status === 401 || authPgmqRes.status === 403 || authPgmqRes.status === 404,
+      `Authenticated customer must be blocked from pgmq tables, received ${authPgmqRes.status}`
+    );
+
+    // (B) Test direct SQL permissions as anon and authenticated
+    const pg = await import('pg');
+    const { Pool } = pg.default || pg;
+    const dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+    });
+    const pgClient = await dbPool.connect();
+
+    try {
+      // Test anon SQL permissions
+      let anonSelectBlocked = false;
+      try {
+        await pgClient.query('SET ROLE anon; SELECT * FROM pgmq.q_notifications;');
+      } catch (err) {
+        anonSelectBlocked = err.message.includes('permission denied');
+      } finally {
+        await pgClient.query('RESET ROLE;');
+      }
+      assert.ok(anonSelectBlocked, 'Anon role must be blocked from selecting pgmq.q_notifications');
+
+      // Test authenticated SQL permissions
+      let authSelectBlocked = false;
+      try {
+        await pgClient.query('SET ROLE authenticated; SELECT * FROM pgmq.q_notifications;');
+      } catch (err) {
+        authSelectBlocked = err.message.includes('permission denied');
+      } finally {
+        await pgClient.query('RESET ROLE;');
+      }
+      assert.ok(authSelectBlocked, 'Authenticated role must be blocked from selecting pgmq.q_notifications');
+
+      let authFnBlocked = false;
+      try {
+        await pgClient.query("SET ROLE authenticated; SELECT pgmq.send('notifications', '{}'::jsonb);");
+      } catch (err) {
+        authFnBlocked = err.message.includes('permission denied');
+      } finally {
+        await pgClient.query('RESET ROLE;');
+      }
+      assert.ok(authFnBlocked, 'Authenticated role must be blocked from calling pgmq.send');
+
+      // 39.2 A user cannot read another tenant's or user's push tokens
+      const tokenCustA = `ExponentPushToken[matrix_test_${Date.now()}_a]`;
+      // Customer A inserts token
+      const insRes = await fetch(`${supabaseUrl}/rest/v1/push_tokens`, {
+        method: 'POST',
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${custA.token}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({ token: tokenCustA, device_type: 'android' }),
+      });
+      assert.equal(insRes.status, 201, 'Customer A can insert own push token');
+
+      // Customer B queries push_tokens for tokenCustA -> 0 rows
+      const readResB = await fetch(`${supabaseUrl}/rest/v1/push_tokens?token=eq.${tokenCustA}`, {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${custB.token}`,
+        },
+      });
+      assert.equal(readResB.status, 200);
+      const rowsB = await readResB.json();
+      assert.equal(rowsB.length, 0, 'Customer B cannot read Customer A push token');
+
+      // Hospital Admin A queries push_tokens for tokenCustA -> 0 rows
+      const readResAdmin = await fetch(`${supabaseUrl}/rest/v1/push_tokens?token=eq.${tokenCustA}`, {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${adminA.token}`,
+        },
+      });
+      assert.equal(readResAdmin.status, 200);
+      const rowsAdmin = await readResAdmin.json();
+      assert.equal(rowsAdmin.length, 0, 'Hospital Admin cannot read Customer push token');
+
+      // 39.3 The edge functions return 401 without the internal secret
+      const fnUrlNotify = `${supabaseUrl}/functions/v1/process-notification-queue`;
+      const fnUrlRefund = `${supabaseUrl}/functions/v1/process-refund-queue`;
+
+      const unauthNotify = await fetch(fnUrlNotify, { method: 'POST' });
+      assert.equal(unauthNotify.status, 401, 'process-notification-queue returns 401 without internal secret');
+
+      const wrongNotify = await fetch(fnUrlNotify, {
+        method: 'POST',
+        headers: { 'x-internal-secret': 'wrong_secret' },
+      });
+      assert.equal(wrongNotify.status, 401, 'process-notification-queue returns 401 with wrong secret');
+
+      const unauthRefund = await fetch(fnUrlRefund, { method: 'POST' });
+      assert.equal(unauthRefund.status, 401, 'process-refund-queue returns 401 without internal secret');
+
+      const wrongRefund = await fetch(fnUrlRefund, {
+        method: 'POST',
+        headers: { 'x-internal-secret': 'wrong_secret' },
+      });
+      assert.equal(wrongRefund.status, 401, 'process-refund-queue returns 401 with wrong secret');
+
+      // 39.4 Re-running all migrations produces no errors and no duplicate cron jobs, queues, triggers or secrets
+      const migrationFiles = [
+        'supabase/migrations/20261105100001_enable_power_extensions.sql',
+        'supabase/migrations/20261105100002_vault_secret_placeholders.sql',
+        'supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql',
+        'supabase/migrations/20261105100004_pg_net_booking_triggers.sql',
+        'supabase/migrations/20261105100005_cron_lifecycle_jobs.sql',
+      ];
+      for (const file of migrationFiles) {
+        const sql = fs.readFileSync(file, 'utf8');
+        await pgClient.query(sql);
+      }
+
+      // Assert no duplicates in cron jobs, queues, vault secrets, triggers
+      const cronRes = await pgClient.query('SELECT count(*)::int as cnt FROM cron.job');
+      assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
+
+      const queuesRes = await pgClient.query('SELECT count(*)::int as cnt FROM pgmq.list_queues()');
+      assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
+
+      const vaultRes = await pgClient.query('SELECT count(*)::int as cnt FROM vault.secrets');
+      assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
+
+      const trigRes = await pgClient.query(
+        "SELECT count(*)::int as cnt FROM pg_trigger WHERE tgname = 'trg_booking_pgnet_webhook'"
+      );
+      assert.equal(trigRes.rows[0].cnt, 1, 'Expected exactly 1 trg_booking_pgnet_webhook trigger');
+
+      // 39.5 A failing notification or refund ends up in its DLQ after N attempts
+      // Test refunds DLQ routing with read_ct >= 5
+      const testRefundPayload = {
+        appointment_id: crypto.randomUUID(),
+        tenant_id: hospA.id,
+        user_id: custA.user.id,
+        type: 'REFUND_REQUESTED',
+        amount: 250,
+        reason: 'DLQ test failure simulation',
+      };
+      const sendRes = await pgClient.query("SELECT pgmq.send('refunds', $1::jsonb) as msg_id", [JSON.stringify(testRefundPayload)]);
+      const testMsgId = sendRes.rows[0].msg_id;
+
+      // Simulate 5 reads by setting read_ct = 5 and vt = NOW()
+      await pgClient.query("UPDATE pgmq.q_refunds SET read_ct = 5, vt = NOW() WHERE msg_id = $1", [testMsgId]);
+
+      // Read with DLQ helper
+      await pgClient.query("SELECT * FROM public.read_queue_with_dlq('refunds', 'refunds_dlq', 30, 10, 5)");
+
+      // Verify message has moved to refunds_dlq
+      const dlqRes = await pgClient.query("SELECT * FROM pgmq.q_refunds_dlq WHERE message->>'appointment_id' = $1", [testRefundPayload.appointment_id]);
+      assert.equal(dlqRes.rows.length, 1, 'Failing refund message must end up in refunds_dlq after 5 reads');
+      assert.equal(Number(dlqRes.rows[0].message?._original_msg_id), Number(testMsgId));
+      assert.equal(dlqRes.rows[0].message?._dlq_reason, 'max_read_count_exceeded');
+
+      // Cleanup test token
+      await fetch(`${supabaseUrl}/rest/v1/push_tokens?token=eq.${tokenCustA}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${custA.token}`,
+        },
+      });
+    } finally {
+      pgClient.release();
+      await dbPool.end();
+    }
+
+    recordResult(
+      'pgmq / vault / pg_net / pg_cron',
+      'ALL',
+      'Power features & security lockdown verified',
+      'Cross-tenant / unauthorized caller blocked',
+      'supabase/migrations/20261105100001_enable_power_extensions.sql',
+      'PASS'
+    );
+  });
+
 });

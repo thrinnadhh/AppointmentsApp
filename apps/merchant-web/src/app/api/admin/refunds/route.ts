@@ -138,19 +138,45 @@ export async function POST(request: NextRequest) {
     const results = [];
     for (const b of bookings || []) {
       const refundAmountInr = Number(b.refund_amount ?? b.deposit_amount ?? b.total_amount ?? 0);
-      const res = await initiateRazorpayRefund({
-        supabaseAdmin,
-        bookingId: b.id,
-        refundAmountInr,
-        reason: 'Admin Manual Refund Reconciliation',
-        actorId: authResult.user.id,
+
+      // Asynchronous Queue Pattern:
+      // Record refund_requested state and enqueue into pgmq 'refunds' queue.
+      // The background queue worker (process-refund-queue) processes the refund with Razorpay idempotently.
+      const { data: queueRes, error: queueErr } = await (supabaseAdmin.rpc as any)('enqueue_refund_request', {
+        p_booking_id: b.id,
+        p_actor_id: authResult.user.id,
+        p_reason: 'Admin Manual Refund Reconciliation (Queued)',
       });
-      results.push(res);
+
+      if (queueErr) {
+        // Fallback: if queue RPC encounters error, attempt direct fallback
+        try {
+          const res = await initiateRazorpayRefund({
+            supabaseAdmin,
+            bookingId: b.id,
+            refundAmountInr,
+            reason: 'Admin Manual Refund Reconciliation (Direct Fallback)',
+            actorId: authResult.user.id,
+          });
+          results.push(res);
+        } catch (fbErr: any) {
+          results.push({ booking_id: b.id, success: false, error: queueErr.message || fbErr.message });
+        }
+      } else {
+        results.push({
+          booking_id: b.id,
+          success: true,
+          status: 'REFUND_PENDING',
+          refund_amount: refundAmountInr,
+          queue_result: queueRes,
+        });
+      }
     }
 
     return NextResponse.json({
       success: true,
       processed: results.length,
+      status: 'REFUND_PENDING',
       results,
     });
   } catch (err: unknown) {
