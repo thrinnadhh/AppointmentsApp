@@ -72,6 +72,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { department_id, email, role } = body;
 
+    const requestedMerchantId = body.merchant_id || body.provider_id || body.providerId || null;
+    if (requestedMerchantId && requestedMerchantId !== ctx.merchantId) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You cannot modify members of another hospital' },
+        { status: 403 }
+      );
+    }
+
     if (!department_id || !email) {
       return NextResponse.json({ success: false, error: 'Missing department_id or email' }, { status: 400 });
     }

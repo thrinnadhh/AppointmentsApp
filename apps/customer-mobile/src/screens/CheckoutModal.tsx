@@ -75,7 +75,7 @@ export default function CheckoutModal({
   resource,
   slot,
   categoryId,
-  customerId = '99999999-9999-9999-9999-999999999991',
+  customerId = '',
   providerId,
   coolingPeriodDays,
   patientDetails,
@@ -272,8 +272,11 @@ export default function CheckoutModal({
         return;
       }
 
-      if (!isAuthenticated) {
+      if (!isAuthenticated || !customerId) {
         setPayError('Authentication required to create booking hold. Please sign in with your mobile number.');
+        if (onRequireAuth) {
+          onRequireAuth();
+        }
         setIsProcessing(false);
         return;
       }

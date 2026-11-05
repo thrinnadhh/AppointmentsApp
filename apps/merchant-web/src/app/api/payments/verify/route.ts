@@ -273,8 +273,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Strictly assert booking.gateway_order_id is non-null and strictly equals the incoming razorpay_order_id
-    const isMockTestCustomer = (canMockPayments() && booking.customer_id === '99999999-9999-9999-9999-999999999991');
-    const allowMockOrder = (canMockPayments() && razorpay_order_id.startsWith('order_mock_')) || isMockTestCustomer;
+    const allowMockOrder = canMockPayments() && razorpay_order_id.startsWith('order_mock_');
     if (!booking.gateway_order_id || booking.gateway_order_id !== razorpay_order_id) {
       if (!allowMockOrder || !booking.gateway_order_id) {
         return NextResponse.json<VerifyRazorpayPaymentResponse>(

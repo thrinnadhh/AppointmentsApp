@@ -4,9 +4,6 @@ import './src/env.mjs';
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@appointments/shared'],
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     remotePatterns: [
       {

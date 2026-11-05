@@ -368,3 +368,32 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
   4. **Verification**:
      - Authored `tests/unit/cron-deduplication.test.mjs` verifying: exactly 1 active job for expired holds, exactly 1 active job for DPDP deletions, duplicate jobs completely unscheduled, clean stored procedure execution, and security-monitor 401/200 authentication enforcement (10/10 PASS).
      - Verified `tests/security/test-security-monitor.mjs` (4/4 PASS), `tests/unit/otp-circuit-breaker.test.mjs` (8/8 PASS), and `tests/scripts/test-expired-holds-limit.mjs` (4/4 PASS).
+
+
+---
+
+### Decision 18: Production Readiness Group 8 (Adversarial Cross-Tenant Authorization Matrix, Identity Hardening & Build Integrity)
+- **Date**: 2026-11-05
+- **Status**: SUBMITTED FOR HUMAN REVIEW
+- **Requirement & Architecture**:
+  1. **Exhaustive Automated Authorization Matrix (`tests/unit/cross-tenant-authorization-matrix.test.mjs`)**:
+     - Built an adversarial test fixture establishing 2 distinct customers (Customer A, Customer B) and 2 distinct hospitals (Hospital 1, Hospital 2), each with an Admin, Front Desk receptionist, Consultant (Doctor), Department, Resource, and active bookings.
+     - Exercised 20 distinct API endpoints with valid payloads, proving HTTP 200/201 for the authorized persona, and HTTP 401/403/404 or masked PII for cross-tenant / cross-hospital / wrong-role personas.
+     - Strictly asserted `res.status !== 400` across all cross-tenant test cases to ensure that schema validation never masquerades as an authorization rejection.
+     - Hardened endpoints discovered during matrix exploration:
+       - `GET /api/hospital/context`: Added authenticated caller check (`verifyAuthenticatedUser`) and cross-hospital isolation check returning 403 Forbidden when caller role for the provider is `'none'`.
+       - `POST /api/hospital/departments`: Added cross-hospital boundary check rejecting requests where `requestedMerchantId !== ctx.merchantId` with 403 Forbidden.
+       - `POST /api/hospital/members`: Added cross-hospital boundary check rejecting unauthorized department member invites with 403 Forbidden.
+       - Cleaned up test bookings in an `after()` lifecycle hook to prevent database pollution in serial test runs.
+  2. **Purge Demo Customer UUID Fallbacks**:
+     - Removed all default fallbacks to demo customer UUID `'99999999-9999-9999-9999-999999999991'` across `apps/customer-mobile/` (`App.tsx`, `CheckoutModal.tsx`, `MyBookingsScreen.tsx`, `ProviderDetailScreen.tsx`, `services/api.ts`). Verified 0 matches in `.ts`/`.tsx` files.
+  3. **Mock Payments Production Boot Lock**:
+     - Verified `apps/merchant-web/src/env.mjs` and `payments/verify` route fail fast with exit code 1 when booted with `ALLOW_MOCK_PAYMENTS=true` in `NODE_ENV=production`.
+  4. **CORS & Demo Mode Security**:
+     - Verified Vercel preview origin regex strictly matching the verified team slug (`appointments-*-appointments-projects.vercel.app`), stripping `Access-Control-Allow-Credentials` on preview origins, and completely disabling demo mode in production builds.
+  5. **TypeScript & Build Integrity**:
+     - Removed `typescript: { ignoreBuildErrors: true }` from `apps/merchant-web/next.config.mjs`. Verified `tsc --noEmit` and `next build` succeed cleanly with 0 type errors across all 52 static and dynamic routes.
+  6. **Fail-Closed Rate Limiting & Concurrency**:
+     - Proved `apps/merchant-web/src/lib/redis.ts` fails closed in production for both slot locks (`acquired: false`) and rate limiting (`allowed: false`) when Upstash credentials are missing or network connection fails (`tests/unit/rate-limit-backend.test.mjs`, 6/6 PASS).
+  7. **Full Serial Gate Verification**:
+     - Ran full clean serial gate: `npx supabase db reset`, `node scripts/seed-hospital-test-data.mjs`, serial run of all 39 test suites (347/347 tests passed), `pnpm -r exec tsc --noEmit` (0 errors), and `pnpm --filter @appointments/merchant-web build` (52/52 pages built).

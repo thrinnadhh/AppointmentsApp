@@ -62,6 +62,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, is_preset, allowed_modules, is_active } = body;
 
+    const requestedMerchantId = body.merchant_id || body.providerId || body.provider_id || null;
+    if (requestedMerchantId && requestedMerchantId !== ctx.merchantId) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You cannot modify departments of another hospital' },
+        { status: 403 }
+      );
+    }
+
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ success: false, error: 'Department name is required' }, { status: 400 });
     }

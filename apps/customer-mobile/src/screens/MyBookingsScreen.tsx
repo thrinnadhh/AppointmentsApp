@@ -30,7 +30,7 @@ interface MyBookingsScreenProps {
 export default function MyBookingsScreen({
   onBack,
   bookings,
-  customerId = '99999999-9999-9999-9999-999999999991',
+  customerId = '',
   onCancelBooking,
   onRescheduleBooking,
   onMarkReached,
@@ -74,6 +74,11 @@ export default function MyBookingsScreen({
   };
 
   useEffect(() => {
+    if (!customerId) {
+      setCustomerStrikes(0);
+      setLifetimePin(null);
+      return;
+    }
     fetchCustomerStrikes(customerId).then((res) => {
       setCustomerStrikes(res.strikes);
     });

@@ -283,6 +283,19 @@ describe('Phase 5c: Hospital Front Desk Reception Screens & Security Suite', () 
       ).json();
 
       if (hospBCode && hospBCode.length > 0) {
+        const testBCode = '9871';
+        await fetch(`${supabaseUrl}/rest/v1/appointment_checkin_codes`, {
+          method: 'POST',
+          headers: { ...serviceHeaders, Prefer: 'resolution=merge-duplicates' },
+          body: JSON.stringify({
+            booking_id: hospBCode[0].booking_id,
+            provider_id: hospB.id,
+            customer_id: hospBCode[0].customer_id,
+            code: testBCode,
+            appointment_date: new Date().toISOString().slice(0, 10),
+          }),
+        });
+
         const res = await fetch(`${appBaseUrl}/api/bookings/checkin`, {
           method: 'POST',
           headers: {
@@ -291,7 +304,7 @@ describe('Phase 5c: Hospital Front Desk Reception Screens & Security Suite', () 
           },
           body: JSON.stringify({
             shopId: hospA.id,
-            code: hospBCode[0].code,
+            code: testBCode,
           }),
         });
 

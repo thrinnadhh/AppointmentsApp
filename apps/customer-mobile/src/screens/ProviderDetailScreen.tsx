@@ -38,7 +38,7 @@ interface ProviderDetailScreenProps {
 
 export default function ProviderDetailScreen({
   providerId,
-  customerId = '99999999-9999-9999-9999-999999999991',
+  customerId = '',
   isGuest = false,
   onBack,
   onOpenSignIn,

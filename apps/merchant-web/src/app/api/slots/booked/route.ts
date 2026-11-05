@@ -68,7 +68,14 @@ export async function GET(req: NextRequest) {
 
       const isOwner = provider?.owner_id === caller.id;
 
-      if (!isVenueStaff && !isOwner) {
+      // Check hospital role for hospital/clinic vertical staff
+      const { data: hospRole } = await (supabaseAdmin.rpc as any)('hospital_role', {
+        p_provider_id: resource.provider_id,
+        p_user_id: caller.id,
+      });
+      const isHospitalStaff = Boolean(hospRole && ['admin', 'front_desk', 'consultant'].includes(hospRole));
+
+      if (!isVenueStaff && !isOwner && !isHospitalStaff) {
         return NextResponse.json(
           { error: 'Forbidden: Caller is not authorized for this provider/venue' },
           { status: 403 }

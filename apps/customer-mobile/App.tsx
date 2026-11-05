@@ -58,8 +58,6 @@ export interface NavigationEntry {
   categoryId?: string | null;
 }
 
-const DEMO_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
-
 export default function App() {
   // Navigation History Stack ensures returning from booking goes to exactly where the user left off
   const [history, setHistory] = useState<NavigationEntry[]>([
@@ -84,7 +82,7 @@ export default function App() {
   const [activeProviderId, setActiveProviderId] = useState<string | undefined>(undefined);
 
   // Authentication & Active Customer State
-  const [activeCustomerId, setActiveCustomerId] = useState<string>(DEMO_CUSTOMER_ID);
+  const [activeCustomerId, setActiveCustomerId] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [isEmailVerified, setIsEmailVerified] = useState<boolean>(false);
@@ -167,6 +165,11 @@ export default function App() {
   const [isLoadingMoreBookings, setIsLoadingMoreBookings] = useState(false);
 
   const loadBookings = useCallback(async () => {
+    if (!activeCustomerId) {
+      setCustomerBookings([]);
+      setHasMoreBookings(false);
+      return;
+    }
     try {
       const data = await fetchCustomerBookingsFromSupabase(activeCustomerId, 20, 0);
       if (data && data.length > 0) {
@@ -177,6 +180,7 @@ export default function App() {
         });
         setHasMoreBookings(data.length === 20);
       } else {
+        setCustomerBookings([]);
         setHasMoreBookings(false);
       }
     } catch (e) {
@@ -185,7 +189,7 @@ export default function App() {
   }, [activeCustomerId]);
 
   const handleLoadMoreBookings = useCallback(async () => {
-    if (isLoadingMoreBookings) return;
+    if (isLoadingMoreBookings || !activeCustomerId) return;
     setIsLoadingMoreBookings(true);
     try {
       const offset = customerBookings.length;
@@ -214,6 +218,11 @@ export default function App() {
   }, [currentScreen, loadBookings]);
 
   useEffect(() => {
+    if (!activeCustomerId) {
+      setCustomerBookings([]);
+      return;
+    }
+
     loadBookings();
 
     const channel = supabase
@@ -396,8 +405,9 @@ export default function App() {
     setAuthLoading(true);
     try {
       await signOutCustomer();
-      setActiveCustomerId(DEMO_CUSTOMER_ID);
+      setActiveCustomerId('');
       setIsAuthenticated(false);
+      setCustomerBookings([]);
       setOtpSent(false);
       setAuthOtp('');
       setCustomerProfile({
@@ -584,7 +594,9 @@ export default function App() {
     setPassModalVisible(true);
 
     // Prompt for push notification permission at this sensible moment (right after booking confirmation)
-    registerForPushNotificationsAsync(activeCustomerId).catch(() => null);
+    if (activeCustomerId) {
+      registerForPushNotificationsAsync(activeCustomerId).catch(() => null);
+    }
 
     loadBookings();
 

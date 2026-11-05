@@ -399,10 +399,11 @@ interface CustomerBookingRow extends Booking {
 }
 
 export async function fetchCustomerBookingsFromSupabase(
-  customerId: string = '99999999-9999-9999-9999-999999999991',
+  customerId: string,
   limit: number = 20,
   offset: number = 0
 ) {
+  if (!customerId) return [];
   try {
     // Fast direct query to Supabase (50ms response, paginated with explicit columns)
     const { data, error } = await supabase
@@ -597,7 +598,10 @@ export async function createHoldOnSupabase(
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id;
+    if (!resolvedCustomerId) {
+      return { success: false, error: 'Authentication required to create a booking hold' };
+    }
     headers['x-customer-id'] = resolvedCustomerId;
     const resp = await fetch(`${API_BASE_URL}/api/bookings/hold`, {
       method: 'POST',
@@ -732,8 +736,10 @@ export async function confirmBookingPaymentOnSupabase(
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
-      const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-      headers['x-customer-id'] = customerId;
+      const customerId = (await supabase.auth.getUser()).data?.user?.id;
+      if (customerId) {
+        headers['x-customer-id'] = customerId;
+      }
 
       const resp = await fetch(`${API_BASE_URL}/api/bookings/confirm`, {
         method: 'POST',
@@ -784,7 +790,10 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id;
+    if (!resolvedCustomerId) {
+      return { success: false, error: 'Authentication required to initiate payment' };
+    }
     headers['x-customer-id'] = resolvedCustomerId;
 
     const resp = await fetch(`${baseUrl}/api/payments/create-order`, {
@@ -846,8 +855,10 @@ export async function verifyRazorpayPayment(params: {
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const resolvedCustomerId = params.customerId || (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-    headers['x-customer-id'] = resolvedCustomerId;
+    const resolvedCustomerId = params.customerId || (await supabase.auth.getUser()).data?.user?.id;
+    if (resolvedCustomerId) {
+      headers['x-customer-id'] = resolvedCustomerId;
+    }
 
     const resp = await fetch(`${baseUrl}/api/payments/verify`, {
       method: 'POST',
@@ -889,8 +900,10 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
-        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-        headers['x-customer-id'] = customerId;
+        const customerId = (await supabase.auth.getUser()).data?.user?.id;
+        if (customerId) {
+          headers['x-customer-id'] = customerId;
+        }
 
         const resp = await fetch(`${API_BASE_URL}/api/bookings/cancel`, {
           method: 'POST',
@@ -1077,8 +1090,10 @@ export async function rescheduleBookingOnSupabase(
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
-        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-        headers['x-customer-id'] = customerId;
+        const customerId = (await supabase.auth.getUser()).data?.user?.id;
+        if (customerId) {
+          headers['x-customer-id'] = customerId;
+        }
 
         const resp = await fetch(`${API_BASE_URL}/api/bookings/reschedule`, {
           method: 'POST',
@@ -1123,8 +1138,10 @@ export async function markBookingReached(bookingId: string): Promise<{ success: 
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
-        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-        headers['x-customer-id'] = customerId;
+        const customerId = (await supabase.auth.getUser()).data?.user?.id;
+        if (customerId) {
+          headers['x-customer-id'] = customerId;
+        }
 
         const resp = await fetch(`${API_BASE_URL}/api/bookings/reach`, {
           method: 'POST',
@@ -1683,8 +1700,10 @@ export async function reassignBookingResourceApi(
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-    headers['x-customer-id'] = customerId;
+    const customerId = (await supabase.auth.getUser()).data?.user?.id;
+    if (customerId) {
+      headers['x-customer-id'] = customerId;
+    }
 
     const resp = await fetch(`${API_BASE_URL}/api/bookings/reassign`, {
       method: 'POST',

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 
 export interface EmergencyChoiceRequest {
   booking_id: string;
@@ -39,12 +39,19 @@ export async function POST(req: NextRequest) {
     }
 
     const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<EmergencyChoiceResponse>(
+        { success: false, error: 'Unauthorized: Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
 
     let targetBooking: any = null;
     const { data: booking, error: bErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, emergency_cancelled, deposit_amount, platform_fee, total_charged')
+      .select('id, customer_id, provider_id, resource_id, emergency_cancelled, deposit_amount, platform_fee, total_charged')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -56,12 +63,16 @@ export async function POST(req: NextRequest) {
     }
     targetBooking = booking;
 
-    // Verify booking ownership if caller is authenticated
-    if (caller && booking.customer_id !== caller.id) {
-      return NextResponse.json<EmergencyChoiceResponse>(
-        { success: false, error: 'Unauthorized to modify this appointment' },
-        { status: 403 }
-      );
+    // Verify booking ownership: customer who owns booking or authorized staff/admin
+    const isOwner = caller.id === booking.customer_id;
+    if (!isOwner) {
+      const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
+      if (!isAuthorized) {
+        return NextResponse.json<EmergencyChoiceResponse>(
+          { success: false, error: 'Unauthorized to modify this appointment' },
+          { status: 403 }
+        );
+      }
     }
 
     // Call choose_emergency_option RPC

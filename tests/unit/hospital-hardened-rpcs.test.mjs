@@ -116,6 +116,13 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
         headers: serviceHeaders
       });
 
+      // Cancel any existing bookings for this patient at hospA so permanent PIN resolves uniquely to this test booking
+      await fetch(`${url}/rest/v1/bookings?customer_id=eq.${patientId}&provider_id=eq.${hospA.id}&reference_code=neq.${refCode}`, {
+        method: 'PATCH',
+        headers: serviceHeaders,
+        body: JSON.stringify({ status: 'CANCELLED' })
+      });
+
       const slotStart = new Date(istNow.getTime() + (baseOffset + slotOffsetMinutes) * 60 * 1000).toISOString();
       const slotEnd = new Date(istNow.getTime() + (baseOffset + slotOffsetMinutes + 15) * 60 * 1000).toISOString();
 
