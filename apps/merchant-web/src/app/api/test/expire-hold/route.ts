@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import crypto from 'crypto';
+import { isTestRouteDisabled, testRouteProductionResponse } from '@/lib/test-route-guard';
 
 export async function POST(req: NextRequest) {
   try {
     // Strictly block this test helper in production
-    if (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
-      return NextResponse.json({ error: 'Not available in production' }, { status: 404 });
+    if (isTestRouteDisabled()) {
+      return testRouteProductionResponse();
     }
 
     // Require CRON_SECRET or admin secret (rejecting committed default secrets)
@@ -80,4 +81,32 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+export async function GET() {
+  if (isTestRouteDisabled()) {
+    return testRouteProductionResponse();
+  }
+  return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405 });
+}
+
+export async function PUT() {
+  if (isTestRouteDisabled()) {
+    return testRouteProductionResponse();
+  }
+  return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405 });
+}
+
+export async function DELETE() {
+  if (isTestRouteDisabled()) {
+    return testRouteProductionResponse();
+  }
+  return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405 });
+}
+
+export async function PATCH() {
+  if (isTestRouteDisabled()) {
+    return testRouteProductionResponse();
+  }
+  return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405 });
 }

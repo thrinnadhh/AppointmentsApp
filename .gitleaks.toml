@@ -35,6 +35,7 @@ regexes = [
   # Local Supabase development demo keys (documented open keys with iss: supabase-demo)
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vI''',
   '''eyJhbGciOiJFUzI1NiIsImtpZCI6ImY4NjVkNGZlLWMxZDItNGY2Zi1iZDVmLWMxOGM1MzVhYjI2MiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vI''',
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.e30\.placeholder''',
   # Attacker 'none' algorithm JWTs used in security exploit test cases
   '''eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0''',
   # Test placeholders and mock fixtures

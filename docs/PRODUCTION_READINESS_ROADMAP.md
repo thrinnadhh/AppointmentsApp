@@ -57,7 +57,7 @@ Report with file:line evidence and test output.
 | **Group 4** | **OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA** | **ACCEPTED** ✅ | Commit `1443657` & Verified Multi-Tier Engine |
 | **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **ACCEPTED** ✅ | Migration `20261105000001_deduplicate_cron_jobs.sql` |
 | **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **ACCEPTED** ✅ | Automated Gitleaks CI, `.gitleaks.toml`, Hygiene Suite & Roles Review |
-| **Group 7** | **Production Safety, Test Route Lock & Guest UX** | **PENDING** ⏳ | Awaiting user trigger |
+| **Group 7** | **Production Safety, Test Route Lock & Guest UX** | **ACCEPTED** ✅ | `/api/test/*` Prod Lock, Middleware Gate, Guest Slot Sign-In Prompt |
 | **Group 8** | **Cross-Tenant & Cross-Hospital Authorization Suite** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 9** | **Test Harness Hygiene, Logging Scripts & E2E Cleanup** | **PENDING** ⏳ | Awaiting user trigger |
 
@@ -210,6 +210,30 @@ Report with file:line evidence and test output.
 - **Automated Hygiene Test Suite (`tests/unit/git-secrets-and-ci-hygiene.test.mjs`)**:
   - Programmatically verifies: (1) 0 non-example `.env*` files in `git ls-files`; (2) `.gitignore` ignores `.env*` with `!.env.example` exception and includes `supabase/roles.sql`; (3) `.github/workflows/ci.yml` contains active Gitleaks scan; (4) `gitleaks detect --no-git` reports 0 leaks and programmatic AST/regex scan finds 0 forbidden live credentials in tracked files.
   - Verified with `node --test tests/unit/build-secret-safety.test.mjs tests/scripts/test-credentials-security.mjs tests/unit/git-secrets-and-ci-hygiene.test.mjs` (11/11 tests PASS).
+
+---
+
+### Group 7: Production Safety, Test Route Lock & Guest UX (ACCEPTED)
+- **Multi-Agent Coordination**: Orchestrated across `[Agent-Security-Auditor]`, `[Agent-Backend]`, `[Agent-Frontend]`, and `[Agent-QA]`.
+- **`supabase/roles.sql` Resolution (Phase 0)**:
+  - Verified no workflows or test scripts depend on `supabase/roles.sql` being tracked in git (`grep -rn "roles.sql"`).
+  - Executed `git rm --cached supabase/roles.sql` to untrack it from git while preserving the local development file on disk, fully respecting `.gitignore:79`.
+- **`/api/test/*` Defense-in-Depth Production Guard**:
+  - **Middleware Gate (`apps/merchant-web/src/middleware.ts`)**: Evaluated at the top of Next.js Edge middleware before any authentication or bypass headers. Blocks any `/api/test/*` request with HTTP 404 when `NODE_ENV === 'production'`, `VERCEL_ENV === 'production'`, or `APP_ENV === 'production'`. Even if an attacker passes `x-e2e-bypass`, `x-admin-bypass-key`, or valid auth tokens, it is unconditionally rejected at the edge.
+  - **Route-Level Guard (`apps/merchant-web/src/lib/test-route-guard.ts` & `apps/merchant-web/src/app/api/test/expire-hold/route.ts`)**: Created shared `isTestRouteDisabled()` and `testRouteProductionResponse()` returning HTTP 404. Added route-level handlers across all methods (`POST`, `GET`, `PUT`, `DELETE`, `PATCH`), guaranteeing that isolated route execution without middleware also fails fast with HTTP 404.
+- **Guest Slot Picker Sign-In Prompt UX (`apps/customer-mobile/src/screens/ProviderDetailScreen.tsx` & `App.tsx`)**:
+  - Discovered that unauthenticated/guest users viewing doctor availability previously received HTTP 401 from `/api/slots/availability`, displaying a jarring `⚠️ Unable to Load Live Availability: Unauthorized: Valid authentication required. Please retry.` banner with a failing retry button.
+  - Replaced the banner for guest/auth failures with a user-friendly Sign-In Card (`testID="customer-slots-signin-prompt"`):
+    - Title: *"Sign In to View Available Slots"*
+    - Subtitle: *"Please sign in to check live appointment availability and reserve your slot."*
+    - Direct CTA Button (`testID="customer-slots-signin-button"`): *"Sign In to Book Slot →"*, wired via `onOpenSignIn` in `App.tsx` to open the customer profile & OTP verification sheet (`setProfileVisible(true)`).
+  - Preserved standard `testID="customer-slots-error"` and `testID="customer-slots-retry-button"` for genuine non-auth network or 500 server errors, maintaining 100% test compatibility with `tests/unit/phase2-functional-blockers.test.mjs` Test 1d.
+- **Test Suite (`tests/unit/production-safety-and-guest-ux.test.mjs`)**:
+  - Authored dedicated suite with 3 comprehensive tests:
+    - Test 1: Dynamically discovers every `/api/test/*` route and verifies all exported methods (`POST`, `GET`, `PUT`, `DELETE`, `PATCH`) return HTTP 404 in production mode.
+    - Test 2: Verifies Next.js `middleware.ts` returns HTTP 404 for `/api/test/*` in production mode even with attacker bypass headers.
+    - Test 3: Verifies `ProviderDetailScreen.tsx` and `App.tsx` replace the unauthorized retry message with the sign-in prompt and CTA for guest users while preserving network error retry states.
+  - Verified with `node --test tests/unit/production-safety-and-guest-ux.test.mjs tests/unit/phase2-functional-blockers.test.mjs tests/unit/hospital-customer-screens.test.mjs` (32/32 tests PASS).
 
 ---
 

@@ -24,7 +24,9 @@ import {
 interface ProviderDetailScreenProps {
   providerId: string;
   customerId?: string;
+  isGuest?: boolean;
   onBack: () => void;
+  onOpenSignIn?: () => void;
   onProceedToHold: (
     resource: Resource,
     slot: Slot,
@@ -37,7 +39,9 @@ interface ProviderDetailScreenProps {
 export default function ProviderDetailScreen({
   providerId,
   customerId = '99999999-9999-9999-9999-999999999991',
+  isGuest = false,
   onBack,
+  onOpenSignIn,
   onProceedToHold,
 }: ProviderDetailScreenProps) {
   const initialCached = getCachedProviderById(providerId);
@@ -161,6 +165,14 @@ export default function ProviderDetailScreen({
     : [];
 
   const isToday = selectedDateIndex === 0;
+  const isAuthError = Boolean(
+    isGuest ||
+    (slotsError &&
+      (slotsError.toLowerCase().includes('unauthorized') ||
+        slotsError.toLowerCase().includes('authentication') ||
+        slotsError.toLowerCase().includes('auth') ||
+        slotsError.includes('401')))
+  );
   // For today, only display slots that haven't passed yet, so user immediately sees upcoming bookable slots!
   const availableSlots = isToday
     ? rawSlots.filter((slot) => {
@@ -394,6 +406,24 @@ export default function ProviderDetailScreen({
               <Text style={{ fontSize: 12, color: '#64748b', marginTop: 8, fontWeight: '500' }}>
                 Checking live slot availability...
               </Text>
+            </View>
+          ) : (slotsError || isGuest) && isAuthError ? (
+            <View style={styles.signInPromptBanner} testID="customer-slots-signin-prompt">
+              <Text style={styles.signInPromptTitle}>Sign In to View Available Slots</Text>
+              <Text style={styles.signInPromptSub}>
+                Please sign in to check live appointment availability and reserve your slot.
+              </Text>
+              <TouchableOpacity
+                style={styles.signInPromptBtn}
+                testID="customer-slots-signin-button"
+                onPress={() => {
+                  if (onOpenSignIn) {
+                    onOpenSignIn();
+                  }
+                }}
+              >
+                <Text style={styles.signInPromptBtnText}>Sign In to Book Slot →</Text>
+              </TouchableOpacity>
             </View>
           ) : slotsError ? (
             <View style={styles.closedDayBanner} testID="customer-slots-error">
@@ -977,6 +1007,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   viewTomorrowBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  signInPromptBanner: {
+    padding: 20,
+    borderRadius: 14,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    marginVertical: 8,
+    alignItems: 'center',
+  },
+  signInPromptTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  signInPromptSub: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 19,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  signInPromptBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signInPromptBtnText: {
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '700',

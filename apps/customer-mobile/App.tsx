@@ -702,8 +702,10 @@ export default function App() {
         <ProviderDetailScreen
           providerId={selectedProviderId}
           customerId={activeCustomerId}
+          isGuest={!isAuthenticated}
           onBack={handleGoBack}
           onProceedToHold={handleProceedToHold}
+          onOpenSignIn={() => setProfileVisible(true)}
         />
       )}
 
