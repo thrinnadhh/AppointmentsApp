@@ -101,6 +101,13 @@ jobs:
           extra_args: --only-verified
         continue-on-error: false
 
+      - name: Gitleaks secret scan (PR & Push)
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+        continue-on-error: false
+
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 2 — Lint, Typecheck
 # ─────────────────────────────────────────────────────────────────────────────

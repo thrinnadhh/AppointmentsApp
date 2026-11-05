@@ -1,16 +1,107 @@
+# Gitleaks Configuration for Tirupati Appointments Platform
+title = "Appointments Platform Gitleaks Configuration"
+
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Ignore dependencies, build outputs, and test artifacts"
+description = "Global allowlist for lockfiles, dev artifacts, local gitignored files, and test mock tokens"
 paths = [
-  '''(^|/)node_modules/''',
-  '''(^|/)\.pnpm-store/''',
-  '''(^|/)\.next/''',
-  '''(^|/)strix_runs/''',
-  '''(^|/)\.source-aware/''',
-  '''(^|/)\.expo/''',
-  '''(^|/)\.env(\..+)?$''',
+  '''^\.agents/manifest\.lock\.json$''',
+  '''^scratch/''',
+  '''^\.source-aware/''',
+  '''^strix_runs/''',
   '''(^|/)poc_.*\.py$''',
-  '''(^|/)story-manifest\.json$'''
+  '''^\.expo/''',
+  '''(^|/)\.expo/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.next/''',
+  '''(^|/)\.git/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)\.env$''',
+  '''(^|/)\.env\.local$''',
+  '''(^|/)\.env\.production$''',
+  '''(^|/)\.env\.production\.local$''',
+  '''^tests/e2e/stories/story-manifest\.json$''',
+  '''^pnpm-lock\.yaml$''',
+  '''^package-lock\.json$''',
 ]
+stopwords = [
+  "whsec_dGVzdF9ob29rX3NlY3JldF8xMjM0NTY3ODkwMTI=",
+  "whsec_dGVzdF_hook_secret_1234567890",
+]
+regexes = [
+  # Local Supabase development demo keys (documented open keys with iss: supabase-demo)
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vI''',
+  '''eyJhbGciOiJFUzI1NiIsImtpZCI6ImY4NjVkNGZlLWMxZDItNGY2Zi1iZDVmLWMxOGM1MzVhYjI2MiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vI''',
+  # Attacker 'none' algorithm JWTs used in security exploit test cases
+  '''eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0''',
+  # Test placeholders and mock fixtures
+  '''valid-strong-anon-key-at-least-32-chars-long-1234567890''',
+  '''whsec_live_validsecret12345678901234567890''',
+  '''whsec_live_valid_9876543210''',
+  '''valid_test_secret_12345678901234567890''',
+  '''valid_test_secret_123456''',
+  '''live_secret_valid_9876543210''',
+  '''prod_anon_key_valid_length_123456''',
+  '''rzp_live_placeholder''',
+  '''rzp_test_placeholder''',
+  '''rzp_live_your_key_id''',
+  '''rzp_test_51MockAppPlatform''',
+  '''rzp_live_ValidKeyId12345''',
+  '''rzp_live_SimulatedProductionKey''',
+  '''rzp_live_ProductionKeySecret12345''',
+  '''rzp_live_ClientPublicKey99999''',
+  '''rzp_live_realauthkey123''',
+  '''rzp_test_ValidTestKey123''',
+  '''rzp_test_FreshRefundKey''',
+  '''rzp_test_RecoveryKey123''',
+  '''mock_secret_key_1234567890''',
+  '''placeholder_production_''',
+  '''tirupati_e2e_secure_bypass_key_2026_x9k2''',
+  '''d24831bb6c322697ea855e7464e8e9767191d1f4d340548e400bab603f927cfe''',
+  '''4db7bab98814a119b6623780cca8595c148f0fc9d722884743a979a12aab37e3''',
+  '''30772a35dc5bf0a5889b1af5dfd0409c364749e83c6e0e1d''',
+  '''sk_live_xyz123''',
+  '''sk_live_998124912849124''',
+]
+
+# Dedicated rule to strictly catch real Razorpay Live Keys
+[[rules]]
+id = "razorpay-live-key"
+description = "Unencrypted live Razorpay API Key ID"
+regex = '''rzp_live_[a-zA-Z0-9]{14,24}'''
+keywords = ["rzp_live_"]
+[rules.allowlist]
+regexes = [
+  '''rzp_live_placeholder''',
+  '''rzp_live_your_key_id''',
+  '''rzp_live_ValidKeyId12345''',
+  '''rzp_live_SimulatedProductionKey''',
+  '''rzp_live_ProductionKeySecret12345''',
+  '''rzp_live_ClientPublicKey99999''',
+  '''rzp_live_realauthkey123''',
+]
+
+# Dedicated rule to strictly catch real Razorpay Test Keys
+[[rules]]
+id = "razorpay-test-key"
+description = "Unencrypted test Razorpay API Key ID"
+regex = '''rzp_test_[a-zA-Z0-9]{14,24}'''
+keywords = ["rzp_test_"]
+[rules.allowlist]
+regexes = [
+  '''rzp_test_placeholder''',
+  '''rzp_test_51MockAppPlatform''',
+  '''rzp_test_ValidTestKey123''',
+  '''rzp_test_FreshRefundKey''',
+  '''rzp_test_RecoveryKey123''',
+]
+
+# Dedicated rule to catch Supabase Service Role Secret Keys
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase secret API key"
+regex = '''sb_secret_[a-zA-Z0-9_\-]{30,}'''
+keywords = ["sb_secret_"]

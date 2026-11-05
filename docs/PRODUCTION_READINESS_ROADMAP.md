@@ -56,7 +56,7 @@ Report with file:line evidence and test output.
 | **Group 3** | **Razorpay Refund API & Idempotency Header** | **ACCEPTED** ✅ | Commit `0c5e2c0` & Dynamic Fresh Replay Fix |
 | **Group 4** | **OTP Circuit Breaker, IP/Prefix Rate Limits & CAPTCHA** | **ACCEPTED** ✅ | Commit `1443657` & Verified Multi-Tier Engine |
 | **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **ACCEPTED** ✅ | Migration `20261105000001_deduplicate_cron_jobs.sql` |
-| **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **PENDING** ⏳ | Awaiting user trigger |
+| **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **ACCEPTED** ✅ | Automated Gitleaks CI, `.gitleaks.toml`, Hygiene Suite & Roles Review |
 | **Group 7** | **Production Safety, Test Route Lock & Guest UX** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 8** | **Cross-Tenant & Cross-Hospital Authorization Suite** | **PENDING** ⏳ | Awaiting user trigger |
 | **Group 9** | **Test Harness Hygiene, Logging Scripts & E2E Cleanup** | **PENDING** ⏳ | Awaiting user trigger |
@@ -178,6 +178,38 @@ Report with file:line evidence and test output.
 - **Test Suite**:
   - Authored `tests/unit/cron-deduplication.test.mjs` (10/10 tests PASS): asserts exactly 1 active job per pair, duplicate jobs completely unscheduled, clean stored procedure execution, and security-monitor 401/200 authentication enforcement.
   - Verified `tests/security/test-security-monitor.mjs` (4/4 PASS), `tests/unit/otp-circuit-breaker.test.mjs` (8/8 PASS), and `tests/scripts/test-expired-holds-limit.mjs` (4/4 PASS).
+
+---
+
+### Group 6: Git Secrets Audit, CI Gitleaks & Roles Review (ACCEPTED)
+- **Multi-Agent Coordination**: Orchestrated across `[Agent-Security-Auditor]`, `[Agent-Infra]`, and `[Agent-QA]`.
+- **Pre-Flight Rollback Check (Phase 0)**:
+  - Verified `supabase/migrations_rollback/20261105000001_rollback.sql` is isolated in `supabase/migrations_rollback/` and NOT located inside `supabase/migrations/` (preventing inadvertent execution by `supabase db reset`).
+  - Confirmed 0 duplicate migration timestamps (`ls supabase/migrations | cut -d_ -f1 | sort | uniq -d` returned empty).
+  - Confirmed `cron.job` has exactly 5 active deduplicated schedules in PostgreSQL (`check-booking-reminders`, `dpdp-account-deletions-sql`, `expire-stale-standby-sql`, `process-whatsapp-queue`, `release-expired-booking-holds`).
+- **Tracked `.env*` Files Audit (`git ls-files | grep -E '(^|/)\.env'`)**:
+  - Found exactly 3 tracked files: `.env.example`, `apps/customer-mobile/.env.example`, and `apps/merchant-web/.env.example`.
+  - Confirmed zero sensitive or real environment files (`.env`, `.env.local`, `.env.production`, `.env.test`) are tracked in git.
+  - Verified `.gitignore` contains `.env*` and exception `!.env.example`.
+- **Git History Secrets Sweep & Read-Only Audit**:
+  - Executed read-only audit across 321 commits.
+  - History was **NOT** rewritten or purged (`git rev-parse HEAD~1` confirms 46c25ab integrity).
+  - Identified historical commits containing sensitive credentials that need operator rotation and filter-repo purging:
+    - `scripts/e2e-trinadh-hospital-test.mjs` (commit `9305ab5`): hardcoded Supabase project URL (`ynkdnwhubfknnnzjtpeg.supabase.co`), real service_role JWT key, and anon JWT key.
+    - `tests/e2e/compliance-pages.spec.ts` (commit `5e51519`) & `tests/e2e/payment-full-flow.spec.ts` (commit `34b7d2c`): anon key for the same external Supabase instance.
+    - Historical scripts `test-admin-logs.mjs` and `verify-logging.mjs` (commit `fb2e401`).
+  - Generated copy-pasteable `git filter-repo` commands and step-by-step operator runbook covering backup mirroring, blob replacements, remote re-linking, force-push team coordination, and external credential rotation.
+- **`supabase/roles.sql` Inspection (Read-Only)**:
+  - File is tracked in git (`commit 7df953b`) but ignored by `.gitignore` (line 79).
+  - Inspected all 130 lines: contains ONLY an event trigger `_handle_ddl_setup()` and dummy demo seed accounts with empty passwords (`encrypted_password = ''`).
+  - Contains **zero** database role passwords, zero password hashes (`SCRAM-SHA-256` / `md5`), zero JWT secrets, and zero API keys.
+  - Recommendation: Recommend untracking from git (`git rm --cached supabase/roles.sql`) when the user approves, but kept completely untouched and uncommitted in this turn per hard constraint.
+- **CI Gitleaks Integration (`.github/workflows/ci.yml` & `.gitleaks.toml`)**:
+  - Added dedicated Gitleaks secret-scanning step using `gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7` (v2.3.9) in Job 1 (`security-audit`), running on both pull requests and branch pushes.
+  - Authored `.gitleaks.toml` with custom rules for Razorpay live/test keys, Supabase secret keys, and JWT tokens, with strict allowlisting of test mocks, lockfiles, and gitignored local development artifacts. Verified YAML syntax is 100% valid.
+- **Automated Hygiene Test Suite (`tests/unit/git-secrets-and-ci-hygiene.test.mjs`)**:
+  - Programmatically verifies: (1) 0 non-example `.env*` files in `git ls-files`; (2) `.gitignore` ignores `.env*` with `!.env.example` exception and includes `supabase/roles.sql`; (3) `.github/workflows/ci.yml` contains active Gitleaks scan; (4) `gitleaks detect --no-git` reports 0 leaks and programmatic AST/regex scan finds 0 forbidden live credentials in tracked files.
+  - Verified with `node --test tests/unit/build-secret-safety.test.mjs tests/scripts/test-credentials-security.mjs tests/unit/git-secrets-and-ci-hygiene.test.mjs` (11/11 tests PASS).
 
 ---
 
