@@ -21,7 +21,15 @@ for (const file of files) {
   const cmd = isTsx ? 'npx' : 'node';
   const args = isTsx ? ['tsx', '--test', file] : ['--test', file];
 
-  const res = spawnSync(cmd, args, { encoding: 'utf8', stdio: 'pipe' });
+  const res = spawnSync(cmd, args, {
+    encoding: 'utf8',
+    stdio: 'pipe',
+    env: {
+      ...process.env,
+      DO_NOT_TRACK: '1',
+      SUPABASE_TELEMETRY_DISABLED: '1',
+    },
+  });
   
   // Extract counts
   const passMatch = res.stdout.match(/ℹ pass (\d+)/);

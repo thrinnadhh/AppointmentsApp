@@ -6,7 +6,14 @@ describe('Layer 1: Database Advisor & Stored Procedure Integrity (DEF-RC-04)', (
   function runSql(query) {
     const raw = execSync(
       `supabase db query --output json "${query.replace(/"/g, '\\"')}"`,
-      { encoding: 'utf8' }
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          DO_NOT_TRACK: '1',
+          SUPABASE_TELEMETRY_DISABLED: '1',
+        },
+      }
     );
     const parsed = JSON.parse(raw);
     return parsed.rows || [];
@@ -81,7 +88,14 @@ describe('Layer 1: Database Advisor & Stored Procedure Integrity (DEF-RC-04)', (
   });
 
   it('5. supabase db lint must report zero errors in the public schema', () => {
-    const raw = execSync('supabase db lint', { encoding: 'utf8' });
+    const raw = execSync('supabase db lint', {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        DO_NOT_TRACK: '1',
+        SUPABASE_TELEMETRY_DISABLED: '1',
+      },
+    });
     let publicErrors = [];
     try {
       // Find JSON array in the output
