@@ -4,6 +4,8 @@ import {
   acquireSlotLock,
   checkRateLimit,
   assertRedisConfiguredInProduction,
+  buildRateLimitRedisKey,
+  hashRateLimitKey,
 } from '../../apps/merchant-web/src/lib/redis';
 
 describe('Rate-Limit Backend & Concurrency Security Audit', () => {
@@ -79,6 +81,59 @@ describe('Rate-Limit Backend & Concurrency Security Audit', () => {
     const rl = await checkRateLimit('dev-test-user-1', 5, 60);
     assert.equal(rl.allowed, true);
     assert.equal(rl.remaining, 4);
+  });
+
+  it('7. buildRateLimitRedisKey and hashRateLimitKey pseudonymize PII and prevent plaintext phone/IP in Redis keys', () => {
+    const rawPhone = '+919848011101';
+    const rawIp = '122.161.48.9';
+
+    const phoneKey = buildRateLimitRedisKey(`otp-verify:${rawPhone}`);
+    assert.equal(phoneKey.includes(rawPhone), false, 'Redis key must not contain plaintext phone number');
+    assert.match(phoneKey, /^ratelimit:otp-verify:[0-9a-f]{16}$/);
+
+    const ipKey = buildRateLimitRedisKey(`otp-ip:${rawIp}`);
+    assert.equal(ipKey.includes(rawIp), false, 'Redis key must not contain plaintext IP');
+    assert.match(ipKey, /^ratelimit:otp-ip:[0-9a-f]{16}$/);
+
+    const waitlistKey = buildRateLimitRedisKey(`waitlist:phone:${rawPhone}`);
+    assert.equal(waitlistKey.includes(rawPhone), false, 'Waitlist Redis key must not contain plaintext phone');
+    assert.match(waitlistKey, /^ratelimit:waitlist:phone:[0-9a-f]{16}$/);
+
+    const globalKey = buildRateLimitRedisKey('otp-global-minute');
+    assert.equal(globalKey, 'ratelimit:otp-global-minute', 'Global counter without PII should retain readable category');
+  });
+
+  it('8. checkRateLimit sends hashed key to Upstash REST API', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.UPSTASH_REDIS_REST_URL = 'https://fake-upstash.mock.io';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'mock-secret-token';
+
+    const phone = '+919999988888';
+    let interceptedCommands = [];
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => {
+      const parsedBody = JSON.parse(opts.body);
+      interceptedCommands.push(parsedBody);
+      return {
+        ok: true,
+        json: async () => ({ result: 1 }),
+      };
+    };
+
+    try {
+      const res = await checkRateLimit(`otp-verify:${phone}`, 5, 600);
+      assert.equal(res.allowed, true);
+      assert.ok(interceptedCommands.length >= 1, 'Must invoke Upstash command');
+      
+      const incrCmd = interceptedCommands[0];
+      assert.equal(incrCmd[0], 'INCR');
+      const transmittedKey = incrCmd[1];
+      assert.equal(transmittedKey.includes(phone), false, 'Upstash INCR command must not leak plaintext phone number');
+      assert.match(transmittedKey, /^ratelimit:otp-verify:[0-9a-f]{16}$/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

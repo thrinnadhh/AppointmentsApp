@@ -6,6 +6,8 @@
  * Includes zero-dependency in-memory fallback when UPSTASH credentials are not present.
  */
 
+import crypto from 'crypto';
+
 interface MemoryStoreEntry {
   value: string;
   expiresAt: number;
@@ -161,6 +163,53 @@ export async function releaseSlotLock(slotKey: string, lockToken?: string): Prom
 }
 
 /**
+ * Pseudonymizes sensitive identity strings (e.g. phone numbers, IP addresses, session tokens)
+ * using HMAC-SHA256 with a secret salt to prevent raw PII transmission to external Redis stores.
+ */
+export function hashRateLimitKey(target: string): string {
+  const salt = process.env.RATE_LIMIT_SALT || process.env.SUPABASE_JWT_SECRET || 'tpt-rate-limit-salt';
+  return crypto
+    .createHmac('sha256', salt)
+    .update(target.trim().toLowerCase())
+    .digest('hex')
+    .slice(0, 16);
+}
+
+/**
+ * Builds a pseudonymized Redis key for rate limiting.
+ * Retains category prefixes (e.g. "otp-verify", "otp-ip", "waitlist:phone") for operational
+ * observability while strictly hashing the identity component to prevent leaking PII.
+ */
+export function buildRateLimitRedisKey(identifier: string): string {
+  if (identifier.startsWith('otp-global')) {
+    return `ratelimit:${identifier}`;
+  }
+
+  const multiSegmentPrefixes = [
+    'waitlist:phone:',
+    'waitlist:ip:',
+    'logs-ingest:session:',
+    'queue-history:target:',
+  ];
+
+  for (const p of multiSegmentPrefixes) {
+    if (identifier.startsWith(p)) {
+      const target = identifier.slice(p.length);
+      return `ratelimit:${p}${hashRateLimitKey(target)}`;
+    }
+  }
+
+  const colonIdx = identifier.indexOf(':');
+  if (colonIdx !== -1) {
+    const prefix = identifier.slice(0, colonIdx);
+    const target = identifier.slice(colonIdx + 1);
+    return `ratelimit:${prefix}:${hashRateLimitKey(target)}`;
+  }
+
+  return `ratelimit:${hashRateLimitKey(identifier)}`;
+}
+
+/**
  * Sliding window rate-limiter for phone OTP, checkout, or search requests.
  *
  * PRODUCTION SAFETY: When Upstash IS configured but unreachable (network blip,
@@ -176,7 +225,7 @@ export async function checkRateLimit(
   limit: number = 10,
   windowSeconds: number = 60
 ): Promise<{ allowed: boolean; remaining: number; reset: number }> {
-  const key = `ratelimit:${identifier}`;
+  const key = buildRateLimitRedisKey(identifier);
   const now = Date.now();
 
   if (getIsUpstashConfigured()) {
