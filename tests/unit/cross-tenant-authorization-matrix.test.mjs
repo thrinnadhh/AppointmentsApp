@@ -119,11 +119,15 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     custA = await login('test.patient.01@test-tirupati.local');
     custB = await login('test.patient.02@test-tirupati.local');
 
-    // Ensure test patients are clean and unblocked
+    // Ensure test patients are clean, unblocked, and have no leftover staff assignments
     await fetch(`${supabaseUrl}/rest/v1/profiles?id=in.(${custA.user.id},${custB.user.id})`, {
       method: 'PATCH',
       headers: serviceHeaders,
       body: JSON.stringify({ no_show_count: 0, blocked_until: null, is_flagged: false }),
+    });
+    await fetch(`${supabaseUrl}/rest/v1/doctor_front_desk_assignments?user_id=in.(${custA.user.id},${custB.user.id})`, {
+      method: 'DELETE',
+      headers: serviceHeaders,
     });
 
     // 2. Resolve Hospital Providers & Resources

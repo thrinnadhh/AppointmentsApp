@@ -65,7 +65,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
 
   // Helper to create a test booking in CONFIRMED state with ₹100 deposit
   async function createTestBooking(offsetHours) {
-    const start = new Date(Date.now() + offsetHours * 3600000);
+    const start = new Date(Date.now() + (48 + offsetHours) * 3600000);
     const end = new Date(start.getTime() + 15 * 60000);
     const refCode = `NS-TEST-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
@@ -222,7 +222,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
   });
 
   it('6. Block Enforcement: Booking hold is rejected while account is blocked for 7 days', async () => {
-    const start = new Date(Date.now() + 24 * 3600000);
+    const start = new Date(Date.now() + 72 * 3600000);
     const end = new Date(start.getTime() + 15 * 60000);
 
     const holdRes = await fetch(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {

@@ -1738,6 +1738,7 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
       try {
         // 1. Send 6 requests to /api/account/delete-public-request with x-e2e-bypass: true from the same IP (limit is 5 per 300s)
         const testIp = `203.0.113.${Math.floor(150 + Math.random() * 90)}`;
+        const testEmail = `rate-test-${Date.now()}-${Math.floor(Math.random() * 10000)}@example.com`;
         let firstStatus = 0;
         let lastStatus = 0;
         for (let i = 1; i <= 6; i++) {
@@ -1750,7 +1751,7 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
               'x-vercel-id': 'bom1::rate-test',
               'x-vercel-forwarded-for': testIp,
             },
-            body: JSON.stringify({ identifier: 'nonexistent-rate-test@example.com' }),
+            body: JSON.stringify({ identifier: testEmail }),
           });
           const res = await postDeleteReq(req);
           if (i === 1) firstStatus = res.status;

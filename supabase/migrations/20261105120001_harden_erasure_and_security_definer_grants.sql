@@ -15,7 +15,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
-AS $function$
+AS $$
 DECLARE
     v_caller_role TEXT;
 BEGIN
@@ -84,7 +84,7 @@ BEGIN
 
     RETURN jsonb_build_object('success', true, 'anonymized_user', p_user_id);
 END;
-$function$;
+$$;
 
 REVOKE ALL ON FUNCTION public.anonymize_user_data(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.anonymize_user_data(uuid) TO service_role;

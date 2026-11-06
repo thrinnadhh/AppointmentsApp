@@ -265,6 +265,17 @@ describe('Subtask 7: Comprehensive Hospital Audit Logging', () => {
     assert.equal(logs[0].action, 'ASSIGNMENT_CHANGE');
     assert.equal(logs[0].target, 'doctor_front_desk_assignments');
     assert.ok(logs[0].metadata.after);
+
+    // Cleanup assignment to prevent test state pollution
+    await fetch(
+      `${appBaseUrl}/api/admin/doctor-assignments?providerId=${hospA.id}&doctorId=${neuroDocId}&userId=${tokens.patient1.user.id}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${tokens.adminApex.token}`,
+        },
+      }
+    );
   });
 
   // 5. Service / Resource Edit Audit Log
