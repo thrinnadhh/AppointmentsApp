@@ -61,7 +61,7 @@ const CONSENTS: ConsentItem[] = [
   {
     purpose: 'clinical_booking',
     label: 'Clinical Appointment Data',
-    description: 'When you book a doctor, we record the clinic and slot time. This data is not shared with third parties and is used only to manage your appointment.',
+    description: 'When you book a doctor, we record the clinic and slot time. This data is processed securely by our platform and healthcare providers to manage your appointment.',
     required: false,
     default: false,
   },

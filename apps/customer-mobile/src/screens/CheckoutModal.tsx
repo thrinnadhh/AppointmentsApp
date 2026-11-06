@@ -887,7 +887,7 @@ export default function CheckoutModal({
                     <Text style={styles.attachedFileName} numberOfLines={1}>
                       {attachedFileName}
                     </Text>
-                    <Text style={styles.attachedFileStatus}>✓ Encrypted in Supabase Vault</Text>
+                    <Text style={styles.attachedFileStatus}>✓ Stored in Private Storage</Text>
                   </View>
                   <TouchableOpacity
                     onPress={() => {
@@ -1046,7 +1046,7 @@ export default function CheckoutModal({
             <Text style={styles.secureText}>
               {isFreeFollowup
                 ? '🔒 Verified Provider Cooling Period Policy'
-                : '🔒 256-Bit Encrypted Payment Gateway'}
+                : '🔒 Secured by Razorpay (PCI-DSS Level 1)'}
             </Text>
           </View>
         </View>
