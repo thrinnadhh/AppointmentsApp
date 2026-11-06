@@ -2600,6 +2600,7 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         'supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql',
         'supabase/migrations/20261105100004_pg_net_booking_triggers.sql',
         'supabase/migrations/20261105100005_cron_lifecycle_jobs.sql',
+        'supabase/migrations/20261105120001_harden_erasure_and_security_definer_grants.sql',
       ];
       for (const file of migrationFiles) {
         const sql = fs.readFileSync(file, 'utf8');

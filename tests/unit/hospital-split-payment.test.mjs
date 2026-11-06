@@ -179,4 +179,17 @@ test('Split Payment Workflow Suite', async (t) => {
     assert.ok(Number(ticketData.booking.consultation_fee_amount) >= 200);
     assert.ok(ticketData.booking.consultation_collected_at);
   });
+
+  t.after(async () => {
+    if (bookingId) {
+      await fetch(`${supabaseUrl}/rest/v1/payments?booking_id=eq.${bookingId}`, {
+        method: 'DELETE',
+        headers: serviceHeaders,
+      });
+      await fetch(`${supabaseUrl}/rest/v1/bookings?id=eq.${bookingId}`, {
+        method: 'DELETE',
+        headers: serviceHeaders,
+      });
+    }
+  });
 });
