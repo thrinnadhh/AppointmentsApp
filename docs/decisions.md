@@ -105,7 +105,7 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
 - **Rules & Implementation**:
   1. **Account Binding**: When a customer profile is first created (or upon first appointment), a permanent 4-digit numeric PIN is assigned to the customer (`profiles.lifetime_pin` / `permanent_checkin_pin`).
   2. **Immutability**: All subsequent appointments booked by this customer share this permanent 4-digit PIN. Rescheduling an appointment retains the same PIN.
-  3. **Security & Visibility Window**: Per SPEC line 27, the 4-digit PIN is hidden/masked on the customer pass and web ticket until 60 minutes before the scheduled slot start (or until checked in). Front desk verification continues to check the PIN securely via cryptographic hash RPC (`verify_checkin_code`) without staff ever seeing the raw PIN beforehand.
+  3. **Security & Visibility Window**: Per SPEC line 27, the 4-digit PIN is hidden/masked on the customer pass and web ticket until 60 minutes before the scheduled slot start (or until checked in). Front desk verification continues to check the PIN securely via server-side RPC (`verify_checkin_code`) without staff seeing the customer's permanent PIN beforehand.
 
 ---
 

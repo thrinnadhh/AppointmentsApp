@@ -1474,7 +1474,7 @@ export default function AdminDashboardPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Cryptographically secured audit trail recording all territory reconfigurations, merchant governance, and administrative overrides
+                Immutable administrative audit trail recording all territory reconfigurations, merchant governance, and administrative overrides
               </p>
             </div>
             <div className="flex items-center gap-2">

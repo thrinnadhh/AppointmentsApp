@@ -96,7 +96,7 @@ export default function PrivacyPolicyPage() {
               </tr>
               <tr className="bg-slate-50/60">
                 <td className="px-3 py-2.5 font-medium text-slate-800">Clinical Appointment Data</td>
-                <td className="px-3 py-2.5 text-slate-600">Clinic name and slot — not shared with third parties. Used only for your appointment management.</td>
+                <td className="px-3 py-2.5 text-slate-600">Clinic name and slot — processed only by our platform and your selected healthcare provider for appointment management.</td>
                 <td className="px-3 py-2.5"><span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Optional</span></td>
               </tr>
               <tr className="bg-white">
@@ -120,10 +120,14 @@ export default function PrivacyPolicyPage() {
 
         <Section title="4. Who We Share Data With">
           <ul className="list-disc list-inside space-y-2 text-slate-700">
-            <li><strong>Service Providers you book with</strong> — they see your booking details only</li>
-            <li><strong>Razorpay / PayU</strong> — payment processor (their privacy policy applies to payment data)</li>
-            <li><strong>MSG91 / Twilio</strong> — SMS gateway for OTPs and reminders</li>
-            <li><strong>Supabase</strong> — cloud database and auth (SOC 2 Type II certified)</li>
+            <li><strong>Service Providers you book with</strong> — healthcare clinics and consultants see your booking details to deliver care</li>
+            <li><strong>Razorpay / PayU</strong> — payment processors (PCI-DSS Level 1 certified; their privacy policy applies to payment transactions)</li>
+            <li><strong>MSG91 / Twilio</strong> — SMS gateway for authentication OTPs and booking confirmations</li>
+            <li><strong>Meta / WhatsApp Cloud API</strong> — real-time booking confirmation and reminder delivery (when WhatsApp updates are enabled)</li>
+            <li><strong>Expo / EAS (Expo Push)</strong> — mobile push notification gateway</li>
+            <li><strong>Upstash Redis</strong> — distributed slot lock concurrency and rate limiting (using pseudonymized hashes to protect identity)</li>
+            <li><strong>Vercel</strong> — web application hosting and secure edge computing</li>
+            <li><strong>Supabase</strong> — cloud database, authentication, and private encrypted document storage (SOC 2 Type II certified)</li>
           </ul>
           <p className="mt-3 text-slate-600">We do <strong>not</strong> sell your data to third parties. We do not use your data for advertising profiling.</p>
         </Section>
@@ -159,7 +163,7 @@ export default function PrivacyPolicyPage() {
         </Section>
 
         <Section title="7. Security">
-          <p className="text-slate-700">All data is encrypted at rest and in transit (AES-256 / TLS 1.3). We use Row Level Security (RLS) so each user can only access their own data. Our cloud infrastructure (Supabase) is SOC 2 Type II certified.</p>
+          <p className="text-slate-700">Data in transit is protected using modern TLS protocols (TLS 1.2+), and stored data is encrypted at rest by our cloud infrastructure providers (Supabase / AWS). We enforce database Row Level Security (RLS) so users and healthcare providers access only authorized records.</p>
         </Section>
 
         <Section title="8. Changes to This Policy">
