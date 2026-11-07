@@ -586,4 +586,14 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     assert.equal(savedBooking.patient_phone, '+919876543219');
     assert.equal(savedBooking.patient_relationship, 'parent');
   });
+
+  after(async () => {
+    const validIds = createdBookingIds.filter(Boolean);
+    if (validIds.length > 0) {
+      await fetch(`${supabaseUrl}/rest/v1/bookings?id=in.(${validIds.join(',')})`, {
+        method: 'DELETE',
+        headers: serviceHeaders,
+      });
+    }
+  });
 });
