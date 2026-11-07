@@ -71,241 +71,37 @@ END $$;
 -- -----------------------------------------------------------------------------
 -- 4. CATEGORY B: RLS & Application Helper Functions in Schema public
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.is_admin(p_user_id uuid DEFAULT auth.uid())
-RETURNS boolean
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  -- If caller is authenticated user, ignore p_user_id to prevent probing other users
-  IF auth.role() = 'authenticated' THEN
-    RETURN EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    );
-  END IF;
-  
-  -- Service role / internal can check specific user
-  RETURN EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = p_user_id AND role = 'admin'
-  );
-END;
-$$;
-REVOKE ALL ON FUNCTION public.is_admin(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO authenticated, service_role;
-
-CREATE OR REPLACE FUNCTION public.hospital_role(p_provider_id UUID, p_user_id UUID)
-RETURNS text
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
+DO $$
 DECLARE
-  v_effective_uid UUID;
-  v_role text;
+  v_helper text;
+  v_helpers text[] := ARRAY[
+    'is_admin(uuid)',
+    'hospital_role(uuid, uuid)',
+    'hospital_role(uuid)',
+    'hospital_accessible_resource_ids(uuid, uuid)',
+    'hospital_accessible_resource_ids(uuid)',
+    'get_user_authorized_providers(uuid)',
+    'get_user_authorized_providers()',
+    'is_hospital_provider(uuid)',
+    'is_merchant_owner_or_admin(uuid, uuid)',
+    'is_merchant_owner_or_admin(uuid)'
+  ];
 BEGIN
-  IF auth.role() = 'authenticated' THEN
-    v_effective_uid := auth.uid();
-  ELSE
-    v_effective_uid := p_user_id;
-  END IF;
+  FOREACH v_helper IN ARRAY v_helpers LOOP
+    BEGIN
+      EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon;', v_helper);
+      EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO authenticated, service_role;', v_helper);
+    EXCEPTION WHEN OTHERS THEN
+      NULL;
+    END;
+  END LOOP;
+END $$;
 
-  IF v_effective_uid IS NULL THEN
-    RETURN 'none';
-  END IF;
+REVOKE ALL ON FUNCTION public.is_hospital_owner(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_hospital_owner(uuid, uuid) TO service_role;
 
-  IF EXISTS (SELECT 1 FROM public.profiles WHERE id = v_effective_uid AND role = 'admin') THEN
-    RETURN 'admin';
-  END IF;
-
-  IF EXISTS (SELECT 1 FROM public.providers WHERE id = p_provider_id AND owner_id = v_effective_uid) THEN
-    RETURN 'admin';
-  END IF;
-
-  SELECT role INTO v_role
-  FROM public.department_members
-  WHERE merchant_id = p_provider_id
-    AND user_id = v_effective_uid
-    AND status = 'active'
-  LIMIT 1;
-
-  IF v_role IS NOT NULL THEN
-    RETURN v_role;
-  END IF;
-
-  RETURN 'none';
-END;
-$$;
-REVOKE ALL ON FUNCTION public.hospital_role(UUID, UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.hospital_role(UUID, UUID) TO authenticated, service_role;
-
-CREATE OR REPLACE FUNCTION public.hospital_role(p_provider_id UUID)
-RETURNS text
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-  SELECT public.hospital_role(p_provider_id, auth.uid());
-$$;
-REVOKE ALL ON FUNCTION public.hospital_role(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.hospital_role(UUID) TO authenticated, service_role;
-
-CREATE OR REPLACE FUNCTION public.hospital_accessible_resource_ids(p_provider_id UUID, p_user_id UUID)
-RETURNS SETOF UUID
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-  v_effective_uid UUID;
-  v_role text;
-BEGIN
-  IF auth.role() = 'authenticated' THEN
-    v_effective_uid := auth.uid();
-  ELSE
-    v_effective_uid := p_user_id;
-  END IF;
-
-  IF v_effective_uid IS NULL THEN
-    RETURN;
-  END IF;
-
-  v_role := public.hospital_role(p_provider_id, v_effective_uid);
-
-  IF v_role = 'admin' THEN
-    RETURN QUERY SELECT id FROM public.resources WHERE provider_id = p_provider_id;
-  ELSIF v_role = 'doctor' THEN
-    RETURN QUERY SELECT id FROM public.resources WHERE provider_id = p_provider_id AND user_id = v_effective_uid;
-  ELSIF v_role = 'front_desk' THEN
-    RETURN QUERY
-    SELECT doctor_id FROM public.doctor_front_desk_assignments
-    WHERE provider_id = p_provider_id AND user_id = v_effective_uid AND is_active = true;
-  END IF;
-END;
-$$;
-REVOKE ALL ON FUNCTION public.hospital_accessible_resource_ids(UUID, UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.hospital_accessible_resource_ids(UUID, UUID) TO authenticated, service_role;
-
-CREATE OR REPLACE FUNCTION public.hospital_accessible_resource_ids(p_provider_id UUID)
-RETURNS SETOF UUID
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-  SELECT public.hospital_accessible_resource_ids(p_provider_id, auth.uid());
-$$;
-REVOKE ALL ON FUNCTION public.hospital_accessible_resource_ids(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.hospital_accessible_resource_ids(UUID) TO authenticated, service_role;
-
-CREATE OR REPLACE FUNCTION public.is_hospital_owner(p_user_id UUID, p_merchant_id UUID)
-RETURNS boolean
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.providers
-    WHERE id = p_merchant_id AND owner_id = p_user_id
-  );
-END;
-$$;
-REVOKE ALL ON FUNCTION public.is_hospital_owner(UUID, UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_hospital_owner(UUID, UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.get_user_department_id(p_user_id UUID, p_merchant_id UUID)
-RETURNS UUID
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-  v_dept_id UUID;
-BEGIN
-  SELECT department_id INTO v_dept_id
-  FROM public.department_members
-  WHERE merchant_id = p_merchant_id
-    AND user_id = p_user_id
-    AND status = 'active'
-  LIMIT 1;
-
-  RETURN v_dept_id;
-END;
-$$;
-REVOKE ALL ON FUNCTION public.get_user_department_id(UUID, UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.get_user_department_id(UUID, UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.get_user_authorized_providers(p_user_id UUID)
-RETURNS SETOF UUID
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  -- 1. Providers owned by the user
-  RETURN QUERY
-  SELECT id FROM public.providers WHERE owner_id = p_user_id;
-
-  -- 2. Providers where user is an active department member
-  RETURN QUERY
-  SELECT merchant_id FROM public.department_members WHERE user_id = p_user_id AND status = 'active';
-
-  -- 3. Providers where user has active front desk assignments
-  RETURN QUERY
-  SELECT provider_id FROM public.doctor_front_desk_assignments WHERE user_id = p_user_id AND is_active = true;
-END;
-$$;
-REVOKE ALL ON FUNCTION public.get_user_authorized_providers(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.get_user_authorized_providers(UUID) TO authenticated, service_role;
-
-CREATE OR REPLACE FUNCTION public.is_hospital_provider(p_provider_id UUID)
-RETURNS boolean
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.providers
-    WHERE id = p_provider_id AND category_id = 'clinics'
-  );
-END;
-$$;
-REVOKE ALL ON FUNCTION public.is_hospital_provider(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_hospital_provider(UUID) TO authenticated, service_role;
-
-CREATE OR REPLACE FUNCTION public.is_merchant_owner_or_admin(p_provider_id UUID, p_user_id UUID)
-RETURNS boolean
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id AND role = 'admin') THEN
-    RETURN true;
-  END IF;
-
-  RETURN EXISTS (
-    SELECT 1 FROM public.providers
-    WHERE id = p_provider_id AND owner_id = p_user_id
-  );
-END;
-$$;
-REVOKE ALL ON FUNCTION public.is_merchant_owner_or_admin(UUID, UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_merchant_owner_or_admin(UUID, UUID) TO authenticated, service_role;
-
+REVOKE ALL ON FUNCTION public.get_user_department_id(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_user_department_id(uuid, uuid) TO service_role;
 
 -- -----------------------------------------------------------------------------
 -- 5. CATEGORY C: Public by Design Functions (Sanitized with extensions search_path)
@@ -358,7 +154,7 @@ GRANT EXECUTE ON FUNCTION public.get_active_cities(boolean) TO anon, authenticat
 CREATE OR REPLACE FUNCTION public.search_directory_public(p_query text DEFAULT '')
 RETURNS jsonb
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
