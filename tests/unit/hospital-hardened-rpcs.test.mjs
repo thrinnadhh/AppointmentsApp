@@ -124,7 +124,7 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
       });
 
       // Cancel any active bookings for this doctor that could conflict on time
-      await fetch(`${url}/rest/v1/bookings?resource_id=eq.${docId}&status=in.(CONFIRMED,CHECKED_IN,PENDING)&reference_code=neq.${refCode}`, {
+      await fetch(`${url}/rest/v1/bookings?resource_id=eq.${docId}&status=in.(CONFIRMED,CHECKED_IN,PENDING_PAYMENT)&reference_code=neq.${refCode}`, {
         method: 'PATCH',
         headers: serviceHeaders,
         body: JSON.stringify({ status: 'CANCELLED' })

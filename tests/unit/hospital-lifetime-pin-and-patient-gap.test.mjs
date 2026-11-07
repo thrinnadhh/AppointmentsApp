@@ -569,7 +569,7 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
         booking_for_someone_else: true,
         patient_name: 'Lakshmi Mother',
         patient_phone: '+919876543219',
-        patient_relationship: 'Mother',
+        patient_relationship: 'parent',
       }),
     });
     const h2Data = await h2Res.json();
@@ -584,6 +584,6 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     assert.equal(savedBooking.booking_for_someone_else, true);
     assert.equal(savedBooking.patient_name, 'Lakshmi Mother');
     assert.equal(savedBooking.patient_phone, '+919876543219');
-    assert.equal(savedBooking.patient_relationship, 'Mother');
+    assert.equal(savedBooking.patient_relationship, 'parent');
   });
 });
