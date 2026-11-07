@@ -4,14 +4,12 @@
 --              1. Move extensions (btree_gist, citext, pg_trgm) to extensions schema
 --              2. Revoke default EXECUTE on functions in schema public
 --              3. Restrict Category A (Trigger/Internal) functions to service_role only
---              4. Move Category B (RLS Helper) functions to unexposed private schema
---                 + Provide private.is_admin and secure service-only public aliases
---              5. Harden Category C (Public by Design) functions (SECURITY INVOKER / sanitization)
---              6. Restrict Category D (Authenticated / Admin) RPCs to authorized roles
+--              4. Harden Category B (RLS Helper) functions in schema public with caller isolation
+--              5. Harden Category C (Public by Design) functions (sanitization & explicit extensions search_path)
+--              6. Restrict Category D (Authenticated vs Admin) RPCs strictly matching audited allowlist
 --              7. Restrict Category E (Server/Cron) functions to service_role only
 --              8. Restrict Category F (Test fixtures) to service_role only
 --              9. Add explicit deny RLS policies on internal & test tables
--- Rollback Note: Reverse schema moves and grant mappings are documented in each section.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -19,6 +17,8 @@
 -- -----------------------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS extensions;
 GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA extensions TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA extensions GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
 
 ALTER EXTENSION btree_gist SET SCHEMA extensions;
 ALTER EXTENSION citext SET SCHEMA extensions;
@@ -34,7 +34,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLI
 -- -----------------------------------------------------------------------------
 -- 3. CATEGORY A: Trigger / Internal Procedures (Never callable via PostgREST API)
 -- -----------------------------------------------------------------------------
--- Revoke execution from PUBLIC, anon, authenticated; grant only to service_role
 DO $$
 DECLARE
   v_proc text;
@@ -70,137 +69,247 @@ END $$;
 
 
 -- -----------------------------------------------------------------------------
--- 4. CATEGORY B: RLS Helper Functions (Move to unexposed private schema)
+-- 4. CATEGORY B: RLS & Application Helper Functions in Schema public
 -- -----------------------------------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS private;
-REVOKE ALL ON SCHEMA private FROM PUBLIC, anon;
-GRANT USAGE ON SCHEMA private TO authenticated, service_role;
-
-DO $$
-BEGIN
-  -- Move RLS helpers to private schema (Postgres RLS references them by OID, continuing to work)
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_admin' AND pronamespace = 'public'::regnamespace) THEN
-    ALTER FUNCTION public.is_admin(uuid) SET SCHEMA private;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_hospital_owner' AND pronamespace = 'public'::regnamespace) THEN
-    ALTER FUNCTION public.is_hospital_owner(uuid, uuid) SET SCHEMA private;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'hospital_role' AND pronamespace = 'public'::regnamespace) THEN
-    ALTER FUNCTION public.hospital_role(uuid, uuid) SET SCHEMA private;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'hospital_accessible_resource_ids' AND pronamespace = 'public'::regnamespace) THEN
-    ALTER FUNCTION public.hospital_accessible_resource_ids(uuid, uuid) SET SCHEMA private;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'get_user_department_id' AND pronamespace = 'public'::regnamespace) THEN
-    ALTER FUNCTION public.get_user_department_id(uuid, uuid) SET SCHEMA private;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'get_user_authorized_providers' AND pronamespace = 'public'::regnamespace) THEN
-    ALTER FUNCTION public.get_user_authorized_providers(uuid) SET SCHEMA private;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_hospital_provider' AND pronamespace = 'public'::regnamespace) THEN
-    ALTER FUNCTION public.is_hospital_provider(uuid) SET SCHEMA private;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_merchant_owner_or_admin' AND pronamespace = 'public'::regnamespace) THEN
-    ALTER FUNCTION public.is_merchant_owner_or_admin(uuid, uuid) SET SCHEMA private;
-  END IF;
-END $$;
-
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA private TO authenticated, service_role;
-
--- Provide internal-only public aliases for backward compatibility with existing migration SQL & triggers,
--- with execution strictly REVOKED from PUBLIC, anon, and authenticated so PostgREST never exposes them.
 CREATE OR REPLACE FUNCTION public.is_admin(p_user_id uuid DEFAULT auth.uid())
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.is_admin(p_user_id);
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  -- If caller is authenticated user, ignore p_user_id to prevent probing other users
+  IF auth.role() = 'authenticated' THEN
+    RETURN EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'admin'
+    );
+  END IF;
+  
+  -- Service role / internal can check specific user
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = p_user_id AND role = 'admin'
+  );
+END;
 $$;
-REVOKE ALL ON FUNCTION public.is_admin(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.is_admin(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.hospital_role(p_provider_id UUID, p_user_id UUID)
-RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.hospital_role(p_provider_id, p_user_id);
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_effective_uid UUID;
+  v_role text;
+BEGIN
+  IF auth.role() = 'authenticated' THEN
+    v_effective_uid := auth.uid();
+  ELSE
+    v_effective_uid := p_user_id;
+  END IF;
+
+  IF v_effective_uid IS NULL THEN
+    RETURN 'none';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE id = v_effective_uid AND role = 'admin') THEN
+    RETURN 'admin';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.providers WHERE id = p_provider_id AND owner_id = v_effective_uid) THEN
+    RETURN 'admin';
+  END IF;
+
+  SELECT role INTO v_role
+  FROM public.department_members
+  WHERE merchant_id = p_provider_id
+    AND user_id = v_effective_uid
+    AND status = 'active'
+  LIMIT 1;
+
+  IF v_role IS NOT NULL THEN
+    RETURN v_role;
+  END IF;
+
+  RETURN 'none';
+END;
 $$;
-REVOKE ALL ON FUNCTION public.hospital_role(UUID, UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.hospital_role(UUID, UUID) TO service_role;
+REVOKE ALL ON FUNCTION public.hospital_role(UUID, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.hospital_role(UUID, UUID) TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.hospital_role(p_provider_id UUID)
-RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.hospital_role(p_provider_id, auth.uid());
-$$;
-REVOKE ALL ON FUNCTION public.hospital_role(UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.hospital_role(UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.hospital_accessible_resource_ids(p_provider_id UUID, p_user_id UUID)
-RETURNS SETOF UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.hospital_accessible_resource_ids(p_provider_id, p_user_id);
-$$;
-REVOKE ALL ON FUNCTION public.hospital_accessible_resource_ids(UUID, UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.hospital_accessible_resource_ids(UUID, UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.hospital_accessible_resource_ids(p_provider_id UUID)
-RETURNS SETOF UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.hospital_accessible_resource_ids(p_provider_id, auth.uid());
-$$;
-REVOKE ALL ON FUNCTION public.hospital_accessible_resource_ids(UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.hospital_accessible_resource_ids(UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.is_hospital_owner(p_user_id UUID, p_merchant_id UUID)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.is_hospital_owner(p_user_id, p_merchant_id);
-$$;
-REVOKE ALL ON FUNCTION public.is_hospital_owner(UUID, UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.is_hospital_owner(UUID, UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.get_user_department_id(p_user_id UUID, p_merchant_id UUID)
-RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.get_user_department_id(p_user_id, p_merchant_id);
-$$;
-REVOKE ALL ON FUNCTION public.get_user_department_id(UUID, UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_user_department_id(UUID, UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.get_user_authorized_providers(p_user_id UUID)
-RETURNS SETOF UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.get_user_authorized_providers(p_user_id);
-$$;
-REVOKE ALL ON FUNCTION public.get_user_authorized_providers(UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_user_authorized_providers(UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.is_hospital_provider(p_provider_id UUID)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.is_hospital_provider(p_provider_id);
-$$;
-REVOKE ALL ON FUNCTION public.is_hospital_provider(UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.is_hospital_provider(UUID) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.is_merchant_owner_or_admin(p_provider_id UUID, p_user_id UUID)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = private, pg_temp AS $$
-  SELECT private.is_merchant_owner_or_admin(p_provider_id, p_user_id);
-$$;
-REVOKE ALL ON FUNCTION public.is_merchant_owner_or_admin(UUID, UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.is_merchant_owner_or_admin(UUID, UUID) TO service_role;
-
--- Public safe role accessor: Returns only the caller's own roles via auth.uid()
-CREATE OR REPLACE FUNCTION public.my_roles()
-RETURNS jsonb
+RETURNS text
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = 'public', 'pg_temp'
+SET search_path = public, pg_temp
 AS $$
-  SELECT jsonb_build_object(
-    'is_admin', COALESCE((SELECT role = 'admin' FROM public.profiles WHERE id = auth.uid()), false),
-    'role', (SELECT role FROM public.profiles WHERE id = auth.uid())
-  );
+  SELECT public.hospital_role(p_provider_id, auth.uid());
 $$;
+REVOKE ALL ON FUNCTION public.hospital_role(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.hospital_role(UUID) TO authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.my_roles() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.my_roles() TO authenticated, service_role;
+CREATE OR REPLACE FUNCTION public.hospital_accessible_resource_ids(p_provider_id UUID, p_user_id UUID)
+RETURNS SETOF UUID
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_effective_uid UUID;
+  v_role text;
+BEGIN
+  IF auth.role() = 'authenticated' THEN
+    v_effective_uid := auth.uid();
+  ELSE
+    v_effective_uid := p_user_id;
+  END IF;
+
+  IF v_effective_uid IS NULL THEN
+    RETURN;
+  END IF;
+
+  v_role := public.hospital_role(p_provider_id, v_effective_uid);
+
+  IF v_role = 'admin' THEN
+    RETURN QUERY SELECT id FROM public.resources WHERE provider_id = p_provider_id;
+  ELSIF v_role = 'doctor' THEN
+    RETURN QUERY SELECT id FROM public.resources WHERE provider_id = p_provider_id AND user_id = v_effective_uid;
+  ELSIF v_role = 'front_desk' THEN
+    RETURN QUERY
+    SELECT doctor_id FROM public.doctor_front_desk_assignments
+    WHERE provider_id = p_provider_id AND user_id = v_effective_uid AND is_active = true;
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.hospital_accessible_resource_ids(UUID, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.hospital_accessible_resource_ids(UUID, UUID) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.hospital_accessible_resource_ids(p_provider_id UUID)
+RETURNS SETOF UUID
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT public.hospital_accessible_resource_ids(p_provider_id, auth.uid());
+$$;
+REVOKE ALL ON FUNCTION public.hospital_accessible_resource_ids(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.hospital_accessible_resource_ids(UUID) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.is_hospital_owner(p_user_id UUID, p_merchant_id UUID)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.providers
+    WHERE id = p_merchant_id AND owner_id = p_user_id
+  );
+END;
+$$;
+REVOKE ALL ON FUNCTION public.is_hospital_owner(UUID, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_hospital_owner(UUID, UUID) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.get_user_department_id(p_user_id UUID, p_merchant_id UUID)
+RETURNS UUID
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_dept_id UUID;
+BEGIN
+  SELECT department_id INTO v_dept_id
+  FROM public.department_members
+  WHERE merchant_id = p_merchant_id
+    AND user_id = p_user_id
+    AND status = 'active'
+  LIMIT 1;
+
+  RETURN v_dept_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.get_user_department_id(UUID, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_user_department_id(UUID, UUID) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.get_user_authorized_providers(p_user_id UUID)
+RETURNS SETOF UUID
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  -- 1. Providers owned by the user
+  RETURN QUERY
+  SELECT id FROM public.providers WHERE owner_id = p_user_id;
+
+  -- 2. Providers where user is an active department member
+  RETURN QUERY
+  SELECT merchant_id FROM public.department_members WHERE user_id = p_user_id AND status = 'active';
+
+  -- 3. Providers where user has active front desk assignments
+  RETURN QUERY
+  SELECT provider_id FROM public.doctor_front_desk_assignments WHERE user_id = p_user_id AND is_active = true;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.get_user_authorized_providers(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_user_authorized_providers(UUID) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.is_hospital_provider(p_provider_id UUID)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.providers
+    WHERE id = p_provider_id AND category_id = 'clinics'
+  );
+END;
+$$;
+REVOKE ALL ON FUNCTION public.is_hospital_provider(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_hospital_provider(UUID) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.is_merchant_owner_or_admin(p_provider_id UUID, p_user_id UUID)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id AND role = 'admin') THEN
+    RETURN true;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1 FROM public.providers
+    WHERE id = p_provider_id AND owner_id = p_user_id
+  );
+END;
+$$;
+REVOKE ALL ON FUNCTION public.is_merchant_owner_or_admin(UUID, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_merchant_owner_or_admin(UUID, UUID) TO authenticated, service_role;
 
 
 -- -----------------------------------------------------------------------------
--- 5. CATEGORY C: Public by Design Functions (Sanitized and hardened)
+-- 5. CATEGORY C: Public by Design Functions (Sanitized with extensions search_path)
 -- -----------------------------------------------------------------------------
--- Ensure public.cities table is readable by public discovery
 GRANT SELECT ON TABLE public.cities TO anon, authenticated, service_role;
 ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS allow_read_active_cities ON public.cities;
@@ -208,8 +317,7 @@ CREATE POLICY allow_read_active_cities ON public.cities
   FOR SELECT TO anon, authenticated
   USING (status IN ('ACTIVE', 'EXPANDING'));
 
--- 5a. get_active_cities: Switch to SECURITY INVOKER with authentic city columns
-DROP FUNCTION IF EXISTS public.get_active_cities(boolean);
+-- 5a. get_active_cities
 CREATE OR REPLACE FUNCTION public.get_active_cities(p_include_expanding BOOLEAN DEFAULT TRUE)
 RETURNS TABLE (
   id TEXT,
@@ -222,7 +330,7 @@ RETURNS TABLE (
   active_providers_count BIGINT
 )
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
@@ -243,15 +351,14 @@ BEGIN
   ORDER BY (CASE WHEN c.status = 'ACTIVE' THEN 1 ELSE 2 END), c.name ASC;
 END;
 $$;
-
+REVOKE ALL ON FUNCTION public.get_active_cities(boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_active_cities(boolean) TO anon, authenticated, service_role;
 
--- 5b. search_directory_public: Switch to SECURITY INVOKER with authentic provider columns
-DROP FUNCTION IF EXISTS public.search_directory_public(text);
+-- 5b. search_directory_public
 CREATE OR REPLACE FUNCTION public.search_directory_public(p_query text DEFAULT '')
 RETURNS jsonb
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
@@ -318,10 +425,10 @@ BEGIN
       p.longitude,
       p.status,
       GREATEST(
-        extensions.word_similarity(v_sanitized_query, p.name),
-        extensions.word_similarity(v_sanitized_query, COALESCE(p.description, '')),
-        COALESCE(MAX(extensions.word_similarity(v_sanitized_query, r.name)), 0),
-        COALESCE(MAX(extensions.word_similarity(v_sanitized_query, COALESCE(r.department, ''))), 0)
+        word_similarity(v_sanitized_query, p.name),
+        word_similarity(v_sanitized_query, COALESCE(p.description, '')),
+        COALESCE(MAX(word_similarity(v_sanitized_query, r.name)), 0),
+        COALESCE(MAX(word_similarity(v_sanitized_query, COALESCE(r.department, ''))), 0)
       ) AS relevance
     FROM public.providers p
     LEFT JOIN public.resources r ON r.provider_id = p.id
@@ -331,9 +438,9 @@ BEGIN
         OR COALESCE(p.description, '') ILIKE '%' || v_sanitized_query || '%'
         OR r.name ILIKE '%' || v_sanitized_query || '%'
         OR COALESCE(r.department, '') ILIKE '%' || v_sanitized_query || '%'
-        OR extensions.word_similarity(v_sanitized_query, p.name) > 0.3
-        OR extensions.word_similarity(v_sanitized_query, COALESCE(r.name, '')) > 0.3
-        OR extensions.word_similarity(v_sanitized_query, COALESCE(r.department, '')) > 0.3
+        OR word_similarity(v_sanitized_query, p.name) > 0.3
+        OR word_similarity(v_sanitized_query, COALESCE(r.name, '')) > 0.3
+        OR word_similarity(v_sanitized_query, COALESCE(r.department, '')) > 0.3
       )
     GROUP BY p.id, p.name, p.category_id, p.address, p.city, p.opening_time, p.closing_time, p.description, p.photos, p.latitude, p.longitude, p.status
     ORDER BY relevance DESC
@@ -381,11 +488,175 @@ BEGIN
   RETURN v_results;
 END;
 $$;
-
+REVOKE ALL ON FUNCTION public.search_directory_public(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.search_directory_public(text) TO anon, authenticated, service_role;
 
--- 5c. get_nearby_providers: Clamped radius and public venue columns
-DROP FUNCTION IF EXISTS public.get_nearby_providers(numeric, numeric, text, integer);
+-- 5c. search_directory with extensions search path
+CREATE OR REPLACE FUNCTION public.search_directory(p_query text DEFAULT '')
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_results jsonb;
+  v_caller_id UUID := auth.uid();
+  v_is_admin BOOLEAN := FALSE;
+BEGIN
+  IF v_caller_id IS NOT NULL THEN
+    v_is_admin := public.is_admin(v_caller_id);
+  END IF;
+
+  IF p_query IS NULL OR trim(p_query) = '' THEN
+    SELECT COALESCE(
+      jsonb_agg(
+        jsonb_build_object(
+          'id', p.id,
+          'name', p.name,
+          'category_id', p.category_id,
+          'address', p.address,
+          'city', p.city,
+          'phone', CASE
+            WHEN v_is_admin OR (v_caller_id IS NOT NULL AND p.id IN (SELECT public.get_user_authorized_providers(v_caller_id)))
+            THEN p.phone
+            ELSE NULL
+          END,
+          'email', CASE
+            WHEN v_is_admin OR (v_caller_id IS NOT NULL AND p.id IN (SELECT public.get_user_authorized_providers(v_caller_id)))
+            THEN p.email
+            ELSE NULL
+          END,
+          'opening_time', p.opening_time,
+          'closing_time', p.closing_time,
+          'description', p.description,
+          'photos', p.photos,
+          'latitude', p.latitude,
+          'longitude', p.longitude,
+          'status', p.status,
+          'resources', COALESCE(
+            (SELECT jsonb_agg(
+              jsonb_build_object(
+                'id', r.id,
+                'provider_id', r.provider_id,
+                'name', r.name,
+                'type', r.type,
+                'department', r.department,
+                'department_id', r.department_id,
+                'deposit_amount', r.deposit_amount,
+                'duration_minutes', r.duration_minutes,
+                'capacity', r.capacity,
+                'is_active', r.is_active
+              )
+            ) FROM public.resources r WHERE r.provider_id = p.id AND r.is_active = true),
+            '[]'::jsonb
+          )
+        )
+      ),
+      '[]'::jsonb
+    )
+    INTO v_results
+    FROM public.providers p
+    WHERE p.status = 'ACTIVE';
+
+    RETURN v_results;
+  END IF;
+
+  WITH matched_providers AS (
+    SELECT
+      p.id,
+      p.name,
+      p.category_id,
+      p.address,
+      p.city,
+      p.phone,
+      p.email,
+      p.opening_time,
+      p.closing_time,
+      p.description,
+      p.photos,
+      p.latitude,
+      p.longitude,
+      p.status,
+      GREATEST(
+        word_similarity(p_query, p.name),
+        word_similarity(p_query, COALESCE(p.description, '')),
+        COALESCE(MAX(word_similarity(p_query, r.name)), 0),
+        COALESCE(MAX(word_similarity(p_query, COALESCE(r.department, ''))), 0)
+      ) AS relevance
+    FROM public.providers p
+    LEFT JOIN public.resources r ON r.provider_id = p.id
+    WHERE p.status = 'ACTIVE'
+      AND (
+        p.name ILIKE '%' || p_query || '%'
+        OR COALESCE(p.description, '') ILIKE '%' || p_query || '%'
+        OR r.name ILIKE '%' || p_query || '%'
+        OR COALESCE(r.department, '') ILIKE '%' || p_query || '%'
+        OR word_similarity(p_query, p.name) > 0.3
+        OR word_similarity(p_query, COALESCE(r.name, '')) > 0.3
+        OR word_similarity(p_query, COALESCE(r.department, '')) > 0.3
+      )
+    GROUP BY p.id, p.name, p.category_id, p.address, p.city, p.phone, p.email,
+             p.opening_time, p.closing_time, p.description, p.photos,
+             p.latitude, p.longitude, p.status
+  )
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object(
+        'id', mp.id,
+        'name', mp.name,
+        'category_id', mp.category_id,
+        'address', mp.address,
+        'city', mp.city,
+        'phone', CASE
+          WHEN v_is_admin OR (v_caller_id IS NOT NULL AND mp.id IN (SELECT public.get_user_authorized_providers(v_caller_id)))
+          THEN mp.phone
+          ELSE NULL
+        END,
+        'email', CASE
+          WHEN v_is_admin OR (v_caller_id IS NOT NULL AND mp.id IN (SELECT public.get_user_authorized_providers(v_caller_id)))
+          THEN mp.email
+          ELSE NULL
+        END,
+        'opening_time', mp.opening_time,
+        'closing_time', mp.closing_time,
+        'description', mp.description,
+        'photos', mp.photos,
+        'latitude', mp.latitude,
+        'longitude', mp.longitude,
+        'status', mp.status,
+        'relevance', mp.relevance,
+        'resources', COALESCE(
+          (SELECT jsonb_agg(
+            jsonb_build_object(
+              'id', r.id,
+              'provider_id', r.provider_id,
+              'name', r.name,
+              'type', r.type,
+              'department', r.department,
+              'department_id', r.department_id,
+              'deposit_amount', r.deposit_amount,
+              'duration_minutes', r.duration_minutes,
+              'capacity', r.capacity,
+              'is_active', r.is_active
+            )
+          ) FROM public.resources r WHERE r.provider_id = mp.id AND r.is_active = true),
+          '[]'::jsonb
+        )
+      )
+      ORDER BY mp.relevance DESC
+    ),
+    '[]'::jsonb
+  )
+  INTO v_results
+  FROM matched_providers mp;
+
+  RETURN v_results;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.search_directory(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_directory(text) TO authenticated, service_role;
+
+-- 5d. get_nearby_providers
 CREATE OR REPLACE FUNCTION public.get_nearby_providers(
   p_lat numeric,
   p_lng numeric,
@@ -394,7 +665,7 @@ CREATE OR REPLACE FUNCTION public.get_nearby_providers(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
@@ -472,11 +743,10 @@ BEGIN
   RETURN v_results;
 END;
 $$;
-
+REVOKE ALL ON FUNCTION public.get_nearby_providers(numeric, numeric, text, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_nearby_providers(numeric, numeric, text, integer) TO anon, authenticated, service_role;
 
--- 5d. submit_city_waitlist: Strict length capping and input sanitization
-DROP FUNCTION IF EXISTS public.submit_city_waitlist(text, text, text, text);
+-- 5e. submit_city_waitlist (without user_id column)
 CREATE OR REPLACE FUNCTION public.submit_city_waitlist(
   p_city_name text,
   p_phone text,
@@ -486,7 +756,7 @@ CREATE OR REPLACE FUNCTION public.submit_city_waitlist(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = 'public', 'pg_temp'
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_sanitized_city text;
@@ -495,7 +765,6 @@ DECLARE
   v_sanitized_notes text;
   v_existing_id uuid;
 BEGIN
-  -- 1. Validate mandatory inputs
   IF p_city_name IS NULL OR length(trim(p_city_name)) = 0 THEN
     RETURN jsonb_build_object('success', false, 'error', 'City name is required');
   END IF;
@@ -504,13 +773,11 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'A valid phone number is required');
   END IF;
 
-  -- 2. Sanitize and length-cap to prevent payload abuse
   v_sanitized_city := substr(trim(p_city_name), 1, 100);
   v_sanitized_phone := substr(regexp_replace(trim(p_phone), '[^0-9+]', '', 'g'), 1, 15);
   v_sanitized_vertical := substr(COALESCE(trim(p_vertical_interest), 'all'), 1, 50);
   v_sanitized_notes := CASE WHEN p_notes IS NOT NULL THEN substr(trim(p_notes), 1, 500) ELSE NULL END;
 
-  -- 3. Check for existing waitlist submission to prevent spam
   SELECT id INTO v_existing_id
   FROM public.city_waitlist
   WHERE phone = v_sanitized_phone
@@ -525,19 +792,20 @@ BEGIN
     );
   END IF;
 
-  -- 4. Insert sanitized waitlist record
   INSERT INTO public.city_waitlist (
     city_name,
     phone,
     vertical_interest,
     notes,
-    user_id
+    consent_given,
+    consent_timestamp
   ) VALUES (
     v_sanitized_city,
     v_sanitized_phone,
     v_sanitized_vertical,
     v_sanitized_notes,
-    auth.uid()
+    true,
+    NOW()
   )
   RETURNING id INTO v_existing_id;
 
@@ -548,11 +816,10 @@ BEGIN
   );
 END;
 $$;
-
+REVOKE ALL ON FUNCTION public.submit_city_waitlist(text, text, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.submit_city_waitlist(text, text, text, text) TO anon, authenticated, service_role;
 
--- 5e. log_client_event: Sanitize, truncate stack trace and metadata <= 8KB, ignore client role
-DROP FUNCTION IF EXISTS public.log_client_event(text, text, text, text, text, jsonb, jsonb, text, text, text, text, text, text, text, text, text, text, text, text, text, text);
+-- 5f. log_client_event
 CREATE OR REPLACE FUNCTION public.log_client_event(
   p_platform text,
   p_level text,
@@ -579,7 +846,7 @@ CREATE OR REPLACE FUNCTION public.log_client_event(
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = 'public', 'pg_temp'
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_actual_role text;
@@ -587,19 +854,16 @@ DECLARE
   v_capped_meta jsonb;
   v_new_id uuid;
 BEGIN
-  -- 1. Derive true authenticated role from context, never trust client-supplied role
   IF auth.uid() IS NOT NULL THEN
     SELECT role INTO v_actual_role FROM public.profiles WHERE id = auth.uid();
   ELSE
     v_actual_role := 'anon';
   END IF;
 
-  -- 2. Cap stack trace to 8KB
   IF p_stack_trace IS NOT NULL THEN
     v_capped_stack := substr(p_stack_trace, 1, 8192);
   END IF;
 
-  -- 3. Cap metadata JSON to 8KB
   IF p_metadata IS NOT NULL THEN
     IF length(p_metadata::text) > 8192 THEN
       v_capped_meta := jsonb_build_object(
@@ -613,7 +877,6 @@ BEGIN
     v_capped_meta := '{}'::jsonb;
   END IF;
 
-  -- 4. Insert into app_logs
   INSERT INTO public.app_logs (
     platform,
     level,
@@ -664,11 +927,13 @@ BEGIN
 
   RETURN v_new_id;
 EXCEPTION WHEN OTHERS THEN
-  -- Logging should never fail client operations
   RETURN NULL;
 END;
 $$;
-
+REVOKE ALL ON FUNCTION public.log_client_event(
+  text, text, text, text, text, jsonb, jsonb, text, text, text,
+  text, text, text, text, text, text, text, text, text, text, text
+) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.log_client_event(
   text, text, text, text, text, jsonb, jsonb, text, text, text,
   text, text, text, text, text, text, text, text, text, text, text
@@ -678,8 +943,7 @@ GRANT EXECUTE ON FUNCTION public.log_client_event(
 -- -----------------------------------------------------------------------------
 -- 6. CATEGORY D: Authenticated & Admin RPCs (Revoke anon / Public access)
 -- -----------------------------------------------------------------------------
--- 6a. Admin procedures called from Next.js server route handlers:
---     Restrict to service_role so they cannot be called directly via PostgREST as anon or authenticated
+-- 6a. Admin procedures called only via server route handlers: Restrict to service_role
 DO $$
 DECLARE
   v_admin_proc text;
@@ -699,7 +963,17 @@ DECLARE
     'get_city_director_stats(date, date)',
     'merchant_self_register(text, text, text, text, text, text, text, text)',
     'reveal_contact(uuid)',
-    'update_city_status(text, text, integer, text)'
+    'update_city_status(text, text, integer, text)',
+    'confirm_booking_by_merchant(uuid, text)',
+    'confirm_booking_by_merchant(uuid)',
+    'get_merchant_bookings(uuid)',
+    'get_provider_details(uuid)',
+    'merchant_register_shop_for_user(text, text, text, text, text, text, text, text, text)',
+    'merchant_register_shop_for_user(uuid, text, text, text, text, text, text)',
+    'merchant_update_cooling_period(uuid, integer)',
+    'record_no_show(uuid)',
+    'reorder_hospital_queue(uuid, uuid, date, integer)',
+    'reorder_hospital_queue(uuid, uuid, uuid[], uuid)'
   ];
 BEGIN
   FOREACH v_admin_proc IN ARRAY v_admin_procs LOOP
@@ -712,7 +986,7 @@ BEGIN
   END LOOP;
 END $$;
 
--- 6b. Authenticated caller-scoped RPCs: Revoke anon and PUBLIC execution
+-- 6b. Authenticated caller-scoped RPCs strictly matching audited allowlist
 DO $$
 DECLARE
   v_auth_proc text;
@@ -720,24 +994,22 @@ DECLARE
     'cancel_booking(uuid, text, text)',
     'cancel_doctor_emergency(uuid, timestamp with time zone, text, boolean)',
     'check_cooling_period_eligibility(uuid, uuid, timestamp with time zone)',
+    'collect_consultation_fee(uuid, numeric, text, text)',
     'complete_booking(uuid)',
-    'confirm_booking_by_merchant(uuid)',
+    'create_booking_hold(uuid, timestamp with time zone, timestamp with time zone, uuid, boolean, text, text, text, text, smallint, text)',
     'create_booking_hold(uuid, timestamp with time zone, timestamp with time zone, uuid, boolean, text, text, text)',
+    'get_daily_token_counters(uuid, date)',
+    'get_hospital_patient_history(uuid, uuid)',
     'get_masked_customer_info(uuid)',
-    'get_merchant_bookings(uuid)',
-    'get_provider_details(uuid)',
+    'get_my_role(uuid)',
+    'get_queue_state(uuid, date)',
     'mark_customer_reached(uuid)',
     'mark_present_manually(uuid)',
-    'merchant_register_shop_for_user(uuid, text, text, text, text, text, text)',
-    'merchant_update_cooling_period(uuid, integer)',
     'override_hospital_queue_position(uuid, integer, uuid)',
     'reassign_booking_resource(uuid, uuid, text)',
-    'record_no_show(uuid)',
-    'reorder_hospital_queue(uuid, uuid, uuid[], uuid)',
     'request_account_deletion(text)',
     'reschedule_booking_slot(uuid, timestamp with time zone, timestamp with time zone)',
     'reveal_customer_contact(uuid, text)',
-    'search_directory(text)',
     'sync_customer_profile(text, text, text)',
     'verify_checkin_code(uuid, text)'
   ];
@@ -807,7 +1079,6 @@ END $$;
 -- -----------------------------------------------------------------------------
 -- 9. RLS POLICIES ON INTERNAL & TEST TABLES
 -- -----------------------------------------------------------------------------
--- 9a. staff_checkin_rate_limits: Server-only table, deny public/anon/authenticated
 REVOKE ALL ON TABLE public.staff_checkin_rate_limits FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.staff_checkin_rate_limits TO service_role;
 
@@ -817,7 +1088,6 @@ CREATE POLICY staff_checkin_rate_limits_deny_all ON public.staff_checkin_rate_li
   USING (false)
   WITH CHECK (false);
 
--- 9b. test_provider_clock_links: Deny anon/authenticated direct access
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'test_provider_clock_links') THEN
@@ -829,7 +1099,6 @@ BEGIN
   END IF;
 END $$;
 
--- 9c. test_tenant_clocks: Deny anon/authenticated direct access
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'test_tenant_clocks') THEN

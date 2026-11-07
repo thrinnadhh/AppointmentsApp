@@ -2606,6 +2606,7 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         'supabase/migrations/20261107000002_harden_security_definer_and_default_privileges.sql',
         'supabase/migrations/20261107000003_complete_anonymize_user_data.sql',
         'supabase/migrations/20261107000004_db_lint_and_policy_message_remediation.sql',
+        'supabase/migrations/20261107000005_supabase_security_advisor_remediation.sql',
       ];
       for (const file of migrationFiles) {
         const sql = fs.readFileSync(file, 'utf8');
