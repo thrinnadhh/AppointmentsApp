@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | Appointments4u',
-  description: 'How Appointments4u collects, uses, and protects your personal data under the DPDPA 2023.',
+  description: 'How Appointments4u collects, uses, and protects your personal data when booking appointments.',
 };
 
 export default function PrivacyPolicyPage() {
@@ -54,9 +54,9 @@ export default function PrivacyPolicyPage() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-10">
 
-        {/* DPDPA notice banner */}
+        {/* Privacy notice banner */}
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 leading-relaxed">
-          <strong>India Digital Personal Data Protection Act, 2023 (DPDPA):</strong> This policy is compliant with the DPDPA 2023 and describes how Appointments4u processes your personal data as a Data Fiduciary.
+          <strong>Data Privacy Notice:</strong> This privacy policy describes how Appointments4u processes personal data collected when you book appointments on our platform.
         </div>
 
         <Section title="1. Who We Are">
@@ -128,11 +128,12 @@ export default function PrivacyPolicyPage() {
             <li><strong>Upstash Redis</strong> — distributed slot lock concurrency and rate limiting (using pseudonymized hashes to protect identity)</li>
             <li><strong>Vercel</strong> — web application hosting and secure edge computing</li>
             <li><strong>Supabase</strong> — cloud database, authentication, and private encrypted document storage (SOC 2 Type II certified)</li>
+            <li><strong>Sentry</strong> — application error diagnostics and telemetry (with sensitive user identity scrubbed)</li>
           </ul>
           <p className="mt-3 text-slate-600">We do <strong>not</strong> sell your data to third parties. We do not use your data for advertising profiling.</p>
         </Section>
 
-        <Section title="5. Your Rights Under DPDPA 2023">
+        <Section title="5. Your Data Rights">
           <div className="grid sm:grid-cols-2 gap-3">
             {[
               { right: 'Right to Access', desc: 'Request a copy of all data we hold about you.' },
@@ -140,7 +141,7 @@ export default function PrivacyPolicyPage() {
               { right: 'Right to Erasure', desc: 'Request account deletion via Settings → Account → Delete Account. 30-day grace period applies.' },
               { right: 'Right to Withdraw Consent', desc: 'Toggle optional consents off at any time in Settings → Privacy.' },
               { right: 'Right to Grievance Redressal', desc: 'Raise a concern with our Grievance Officer within 48 hours.' },
-              { right: 'Right to Nominate', desc: 'Nominate another person to exercise these rights in case of death or incapacity.' },
+              { right: 'Right to Nominate', desc: 'Nominate another individual to exercise data rights in case of death or incapacity (to be operationalized following central government procedural rules).' },
             ].map(({ right, desc }) => (
               <div key={right} className="rounded-lg border border-slate-200 bg-white p-4">
                 <p className="font-semibold text-slate-800 text-sm">{right}</p>

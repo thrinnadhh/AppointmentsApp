@@ -59,4 +59,37 @@ describe('Web & Legal Copy Security Claims Veracity Suite', () => {
       'ADR must state server-side RPC verification'
     );
   });
+
+  it('4. apps/* source code must not contain exaggerated marketing claims (zero-knowledge, AES-256, bank-grade, compliant with DPDPA 2023)', () => {
+    const prohibitedPatterns = [
+      /compliant with the DPDPA 2023/i,
+      /zero-?knowledge/i,
+      /bank-?grade/i,
+      /AES-256/i,
+      /never shared/i,
+    ];
+
+    function scanDir(dir) {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        if (e.name === 'node_modules' || e.name === '.next' || e.name === 'dist' || e.name === '.expo') continue;
+        const fullPath = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          scanDir(fullPath);
+        } else if (/\.(tsx?|jsx?|md)$/.test(e.name)) {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          for (const pattern of prohibitedPatterns) {
+            assert.equal(
+              pattern.test(content),
+              false,
+              `Exaggerated claim matching ${pattern} found in ${fullPath}`
+            );
+          }
+        }
+      }
+    }
+
+    scanDir(path.resolve('apps/merchant-web/src'));
+    scanDir(path.resolve('apps/customer-mobile/src'));
+  });
 });
