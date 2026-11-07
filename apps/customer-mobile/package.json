@@ -14,10 +14,12 @@
   },
   "dependencies": {
     "@appointments/shared": "workspace:*",
+    "@react-native-async-storage/async-storage": "^3.1.1",
     "@supabase/supabase-js": "^2.45.0",
     "expo": "~58.0.19",
     "expo-device": "^58.0.5",
     "expo-notifications": "^58.1.6",
+    "expo-secure-store": "^58.0.2",
     "expo-splash-screen": "~58.0.11",
     "expo-status-bar": "~58.0.1",
     "react": "19.3.0",

@@ -44,6 +44,9 @@ importers:
       '@appointments/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@react-native-async-storage/async-storage':
+        specifier: ^3.1.1
+        version: 3.1.1(react-native@0.88.0)(react@19.3.0)
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.116.0
@@ -56,6 +59,9 @@ importers:
       expo-notifications:
         specifier: ^58.1.6
         version: 58.1.6(patch_hash=onbm3psd3ydkxawcbc74w2wq4m)(expo@58.0.19)(react-native@0.88.0)(react@19.3.0)(typescript@6.0.3)
+      expo-secure-store:
+        specifier: ^58.0.2
+        version: 58.0.2(expo@58.0.19)
       expo-splash-screen:
         specifier: ~58.0.11
         version: 58.0.11(expo@58.0.19)(typescript@6.0.3)
@@ -2074,6 +2080,17 @@ packages:
       - react-native-b4a
       - supports-color
     dev: true
+
+  /@react-native-async-storage/async-storage@3.1.1(react-native@0.88.0)(react@19.3.0):
+    resolution: {integrity: sha512-z+PnLz1n6ECKhgoHZHkfc+dijXZEyZnNFSajbtE0NEbsJhmX8x9GlOeiMQIKX2E4DUqPSgfIh4FYBv1M49KgPQ==}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
+    dependencies:
+      idb: 8.0.3
+      react: 19.3.0
+      react-native: 0.88.0(@babel/core@7.29.7)(@types/react@18.3.18)(react@19.3.0)
+    dev: false
 
   /@react-native/asset-utils@0.88.0:
     resolution: {integrity: sha512-Bj1DxQt5f4OrjdlgSVkZT37Z3hx5hUIN5AUDSqL/e99vgtTcqj5vnm067epZL1EF/QiqsniZO8Q1GSkItOakDg==}
@@ -4652,6 +4669,14 @@ packages:
     dev: false
     patched: true
 
+  /expo-secure-store@58.0.2(expo@58.0.19):
+    resolution: {integrity: sha512-VupWWEuQF6IiQ06McSymtn7/tehs8ifThhFwAU4UK8poomZcaa2S0UVt/y7G2XozBdkI3xpiPSx+r0pS2zsuYQ==}
+    peerDependencies:
+      expo: '*'
+    dependencies:
+      expo: 58.0.19(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(react-dom@19.3.0)(react-native-web@0.21.4)(react-native@0.88.0)(react@19.3.0)(typescript@6.0.3)
+    dev: false
+
   /expo-server@58.0.6:
     resolution: {integrity: sha512-6DBlSZwxk3J0y1j2s4XebAWNiwGaMp32NcWX7b2kJC2+EFf1g+pCcVmx8ylawt2tyLmbDHswm4MHOfrd4bqfvA==}
     engines: {node: ^22.13.0 || ^24.3.0 || ^26.0.0 || >=27.0.0}
@@ -5301,6 +5326,10 @@ packages:
     dependencies:
       safer-buffer: 2.1.2
     dev: true
+
+  /idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
+    dev: false
 
   /ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
