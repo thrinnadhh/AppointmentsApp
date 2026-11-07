@@ -315,11 +315,26 @@ export default function MyBookingsScreen({
 
                 <Text style={styles.resourceName}>{booking.resource_name || 'Staff'}</Text>
 
-                {booking.booking_for_someone_else && (
+                {(booking.booked_for === 'family' || booking.booking_for_someone_else) && (
                   <View style={styles.familyPatientBadge} testID={`family-patient-${booking.id}`}>
-                    <Text style={styles.familyPatientText}>
-                      👥 Patient: {booking.patient_name || 'Family/Friend'} ({booking.patient_relationship || 'Family'})
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={styles.familyPatientText}>
+                        👥 Patient: {booking.patient_name || 'Family Member'}{booking.patient_relationship ? ` (${booking.patient_relationship})` : ''}
+                      </Text>
+                      {booking.patient_age !== undefined && booking.patient_age !== null && (
+                        <Text style={{ fontSize: 11, color: '#0369a1', fontWeight: '600' }}>• Age: {booking.patient_age}</Text>
+                      )}
+                      {(booking.is_minor || (booking.patient_age !== undefined && booking.patient_age !== null && booking.patient_age < 18)) && (
+                        <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#fde68a' }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: '#92400e' }}>MINOR</Text>
+                        </View>
+                      )}
+                    </View>
+                    {booking.booking_note && (
+                      <Text style={{ fontSize: 11, color: '#475569', marginTop: 2, fontStyle: 'italic' }}>
+                        Note: &ldquo;{booking.booking_note}&rdquo;
+                      </Text>
+                    )}
                   </View>
                 )}
 

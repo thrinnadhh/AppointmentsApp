@@ -413,8 +413,8 @@ export async function fetchCustomerBookingsFromSupabase(
         status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
         checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
         queue_position, estimated_wait_minutes, emergency_cancelled, emergency_doctor_arrived,
-        emergency_patient_choice, booking_for_someone_else, patient_name, patient_phone,
-        patient_relationship, total_charged,
+        emergency_patient_choice, booking_for_someone_else, booked_for, patient_name, patient_phone,
+        patient_relationship, patient_age, is_minor, booking_note, total_charged,
         created_at, updated_at,
         providers ( name ),
         resources ( name )
@@ -480,8 +480,8 @@ export async function fetchSingleCustomerBookingFromSupabase(
         status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
         checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
         queue_position, estimated_wait_minutes, emergency_cancelled, emergency_doctor_arrived,
-        emergency_patient_choice, booking_for_someone_else, patient_name, patient_phone,
-        patient_relationship, total_charged,
+        emergency_patient_choice, booking_for_someone_else, booked_for, patient_name, patient_phone,
+        patient_relationship, patient_age, is_minor, booking_note, total_charged,
         created_at, updated_at,
         providers ( name ),
         resources ( name )
@@ -577,6 +577,11 @@ export interface CreateHoldSupabaseResult {
   consultation_payment_status?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_age?: number | null;
+  is_minor?: boolean;
+  booking_note?: string | null;
   error?: string;
 }
 
@@ -588,7 +593,10 @@ export async function createHoldOnSupabase(
   bookingForSomeoneElse?: boolean,
   patientName?: string,
   patientPhone?: string,
-  patientRelationship?: string
+  patientRelationship?: string,
+  bookedFor?: 'self' | 'family',
+  patientAge?: number | null,
+  bookingNote?: string | null
 ): Promise<CreateHoldSupabaseResult> {
   // Route all resource hold operations strictly through backend API routes.
   // Direct client-side unmetered RPC access is disallowed to enforce Redis concurrency locks, rate limits, and business logic.
@@ -603,6 +611,7 @@ export async function createHoldOnSupabase(
       return { success: false, error: 'Authentication required to create a booking hold' };
     }
     headers['x-customer-id'] = resolvedCustomerId;
+    const isFamily = bookedFor === 'family' || Boolean(bookingForSomeoneElse);
     const resp = await fetch(`${API_BASE_URL}/api/bookings/hold`, {
       method: 'POST',
       headers,
@@ -611,10 +620,13 @@ export async function createHoldOnSupabase(
         resource_id: resourceId,
         slot_start: slotStart,
         slot_end: slotEnd,
-        booking_for_someone_else: Boolean(bookingForSomeoneElse),
+        booking_for_someone_else: isFamily,
+        booked_for: isFamily ? 'family' : 'self',
         patient_name: patientName || null,
         patient_phone: patientPhone || null,
         patient_relationship: patientRelationship || null,
+        patient_age: patientAge !== undefined ? patientAge : null,
+        booking_note: bookingNote || null,
       }),
     });
 
@@ -634,6 +646,11 @@ export async function createHoldOnSupabase(
         consultation_payment_status: json.consultation_payment_status,
         is_followup: json.is_followup,
         followup_original_booking_id: json.followup_original_booking_id,
+        booked_for: json.booked_for,
+        patient_name: json.patient_name,
+        patient_age: json.patient_age,
+        is_minor: json.is_minor,
+        booking_note: json.booking_note,
       };
     }
 

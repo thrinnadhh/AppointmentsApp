@@ -237,6 +237,15 @@ export default function BookingPassModal({
   const slotEndDate = new Date(booking.slot_end || slotDate.getTime() + 15 * 60 * 1000);
   const endTimeString = slotEndDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  const isFamily = booking?.booked_for === 'family' || Boolean(booking?.booking_for_someone_else);
+  const displayedPatientName = isFamily && booking?.patient_name?.trim()
+    ? booking.patient_name.trim()
+    : (patientDetails?.fullName || 'Registered Patient');
+  const isMinorPatient = isFamily && Boolean(
+    booking?.is_minor || 
+    (booking?.patient_age !== undefined && booking?.patient_age !== null && Number(booking.patient_age) < 18)
+  );
+
   // Build the Hospital OPD queue roster from live backend queue data, falling back to the patient's own slot
   const hospitalQueueRoster: HospitalQueueTokenItem[] =
     liveQueueItems.length > 0
@@ -244,7 +253,7 @@ export default function BookingPassModal({
       : [
           {
             tokenNumber: myTokenNumber,
-            patientName: 'You (Patient Pass)',
+            patientName: isFamily && booking?.patient_name ? `${booking.patient_name} (Patient Pass)` : 'You (Patient Pass)',
             slotTime: `${timeString} - ${endTimeString}`,
             expectedTime: timeString,
             isCurrentCustomer: true,
@@ -491,7 +500,7 @@ export default function BookingPassModal({
 
                     <Text style={styles.serviceName}>{booking.resource_name || 'OPD Consultation'}</Text>
 
-                    {/* Registered Patient Details & Token Banner */}
+                    {/* Registered / Family Patient Details & Token Banner */}
                     <View style={{
                       backgroundColor: '#eff6ff',
                       borderRadius: 10,
@@ -502,19 +511,37 @@ export default function BookingPassModal({
                     }} testID="pass-patient-details-card">
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={{ fontSize: 11, fontWeight: '800', color: '#1e40af', textTransform: 'uppercase' }}>
-                          Registered Patient Details
+                          {isFamily ? 'Family Patient Details' : 'Registered Patient Details'}
                         </Text>
                         <View style={{ backgroundColor: '#2563eb', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
                           <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 11 }}>TOKEN #{myTokenNumber}</Text>
                         </View>
                       </View>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#0f172a', marginTop: 4 }}>
-                        {patientDetails?.fullName || 'Registered Patient'}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>
-                        📱 {patientDetails?.phone || '+91 99999 99991'}
-                        {patientDetails?.email ? ` • ✉️ ${patientDetails.email}` : ''}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0f172a' }}>
+                          {displayedPatientName}
+                        </Text>
+                        {isFamily && booking.patient_relationship && (
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#0284c7' }}>
+                            ({booking.patient_relationship})
+                          </Text>
+                        )}
+                        {isMinorPatient && (
+                          <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#fde68a' }}>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#92400e' }}>MINOR</Text>
+                          </View>
+                        )}
+                      </View>
+                      {isFamily ? (
+                        <Text style={{ fontSize: 11, color: '#475569', marginTop: 3 }}>
+                          Booked by {patientDetails?.fullName || 'Account Holder'} (📱 {patientDetails?.phone || '+91 99999 99991'})
+                        </Text>
+                      ) : (
+                        <Text style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>
+                          📱 {patientDetails?.phone || '+91 99999 99991'}
+                          {patientDetails?.email ? ` • ✉️ ${patientDetails.email}` : ''}
+                        </Text>
+                      )}
                     </View>
 
                     <View style={styles.slotBox}>

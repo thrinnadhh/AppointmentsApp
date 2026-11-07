@@ -161,15 +161,15 @@ export default function CheckoutModal({
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'QR' | 'CARD'>('UPI');
   const [selectedUpiApp, setSelectedUpiApp] = useState<'phonepe' | 'gpay' | 'paytm' | 'bhim'>('phonepe');
 
-  // Booking for someone else (family/friend) state
-  const [isBookingForSomeoneElse, setIsBookingForSomeoneElse] = useState<boolean>(false);
+  // Who is this appointment for? choice: 'self' | 'family'
+  const [bookedFor, setBookedFor] = useState<'self' | 'family'>('self');
   const [otherPatientName, setOtherPatientName] = useState<string>('');
-  const [otherPatientPhone, setOtherPatientPhone] = useState<string>('');
-  const [patientRelationship, setPatientRelationship] = useState<string>('Family');
+  const [patientRelationship, setPatientRelationship] = useState<string>('Child');
+  const [patientAge, setPatientAge] = useState<string>('');
+  const [bookingNote, setBookingNote] = useState<string>('');
 
-  // Minor patient verification & parental consent (DPDP Act §9)
-  const [isPatientMinor, setIsPatientMinor] = useState<boolean>(false);
-  const [guardianConsentGiven, setGuardianConsentGiven] = useState<boolean>(false);
+  const parsedAge = patientAge.trim() ? parseInt(patientAge.trim(), 10) : null;
+  const isMinor = bookedFor === 'family' && parsedAge !== null && !isNaN(parsedAge) && parsedAge < 18;
 
   useEffect(() => {
     if (!visible) {
@@ -177,12 +177,11 @@ export default function CheckoutModal({
       setAttachedFileName(null);
       setAttachedPath(null);
       setPayError(null);
-      setIsBookingForSomeoneElse(false);
+      setBookedFor('self');
       setOtherPatientName('');
-      setOtherPatientPhone('');
-      setPatientRelationship('Family');
-      setIsPatientMinor(false);
-      setGuardianConsentGiven(false);
+      setPatientRelationship('Child');
+      setPatientAge('');
+      setBookingNote('');
       return;
     }
 
@@ -281,20 +280,19 @@ export default function CheckoutModal({
         return;
       }
 
-      if (isBookingForSomeoneElse) {
+      if (bookedFor === 'family') {
         if (!otherPatientName.trim()) {
           setPayError("Please enter the patient's full name.");
           setIsProcessing(false);
           return;
         }
-        const cleanPhone = otherPatientPhone.trim().replace(/\D/g, '');
-        if (!cleanPhone || cleanPhone.length < 10) {
-          setPayError("Please enter a valid 10-digit mobile number for the patient.");
+        if (parsedAge !== null && (isNaN(parsedAge) || parsedAge < 0 || parsedAge > 120)) {
+          setPayError("Please enter a valid age between 0 and 120.");
           setIsProcessing(false);
           return;
         }
-        if (isPatientMinor && !guardianConsentGiven) {
-          setPayError("Please confirm the parental/guardian consent declaration for minor patient.");
+        if (bookingNote.trim().length > 200) {
+          setPayError("Booking note cannot exceed 200 characters.");
           setIsProcessing(false);
           return;
         }
@@ -306,10 +304,13 @@ export default function CheckoutModal({
         resource.id,
         slot.start_time,
         slot.end_time,
-        isBookingForSomeoneElse,
-        isBookingForSomeoneElse ? otherPatientName.trim() : undefined,
-        isBookingForSomeoneElse ? otherPatientPhone.trim() : undefined,
-        isBookingForSomeoneElse ? patientRelationship : undefined
+        bookedFor === 'family',
+        bookedFor === 'family' ? otherPatientName.trim() : undefined,
+        undefined,
+        bookedFor === 'family' ? patientRelationship : undefined,
+        bookedFor,
+        bookedFor === 'family' && parsedAge !== null && !isNaN(parsedAge) ? parsedAge : undefined,
+        bookedFor === 'family' && bookingNote.trim() ? bookingNote.trim() : undefined
       );
 
       if (!holdRes.success || !holdRes.booking_id) {
@@ -320,7 +321,7 @@ export default function CheckoutModal({
           errMsg.toLowerCase().includes('one hour')
         ) {
           errMsg =
-            "Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for someone else'.";
+            "Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for family member / child'.";
         }
         setPayError(errMsg);
         setIsProcessing(false);
@@ -540,65 +541,62 @@ export default function CheckoutModal({
               </View>
             )}
 
-            {/* Patient & Registered Details / Family Toggle Overview */}
+            {/* "Who is this appointment for?" Section */}
             <View style={styles.patientCard} testID="patient-mode-card">
-              <View style={styles.patientCardHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.patientCardSub}>
-                    {isBookingForSomeoneElse ? 'Booking for Family / Friend' : 'Patient & Registered Contact'}
+              <Text style={styles.inputGroupLabel}>WHO IS THIS APPOINTMENT FOR?</Text>
+
+              {/* Segmented Control */}
+              <View style={styles.segmentedControl}>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, bookedFor === 'self' && styles.segmentBtnActive]}
+                  onPress={() => setBookedFor('self')}
+                  testID="segment-booked-for-self"
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.segmentBtnText, bookedFor === 'self' && styles.segmentBtnTextActive]}>
+                    Myself
                   </Text>
-                  <Text style={styles.patientCardName}>
-                    {isBookingForSomeoneElse ? (otherPatientName.trim() || 'Guest Patient') : (patientDetails?.fullName || 'Registered Patient')}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.segmentBtn, bookedFor === 'family' && styles.segmentBtnActive]}
+                  onPress={() => setBookedFor('family')}
+                  testID="segment-booked-for-family"
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.segmentBtnText, bookedFor === 'family' && styles.segmentBtnTextActive]}>
+                    Family member / child
                   </Text>
-                  <Text style={styles.patientCardPhone}>
-                    📞 {isBookingForSomeoneElse ? (otherPatientPhone.trim() || 'Enter patient phone') : patientDetails?.phone}
-                  </Text>
-                </View>
+                </TouchableOpacity>
               </View>
 
-              {/* Toggle: Booking for someone else */}
-              <View style={styles.toggleRow}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={styles.toggleTitle}>Booking for someone else?</Text>
-                  <Text style={styles.toggleDesc}>
-                    Family member or friend (No 1-hour gap restriction)
-                  </Text>
+              {bookedFor === 'self' ? (
+                <View style={styles.patientCardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.patientCardSub}>Registered Patient (Account Holder)</Text>
+                    <Text style={styles.patientCardName}>{patientDetails?.fullName || 'Registered Patient'}</Text>
+                    <Text style={styles.patientCardPhone}>📞 {patientDetails?.phone || '+91 99999 99991'}</Text>
+                  </View>
                 </View>
-                <Switch
-                  value={isBookingForSomeoneElse}
-                  onValueChange={setIsBookingForSomeoneElse}
-                  trackColor={{ false: '#cbd5e1', true: '#a7f3d0' }}
-                  thumbColor={isBookingForSomeoneElse ? '#047857' : '#f8fafc'}
-                  testID="toggle-booking-someone-else"
-                />
-              </View>
-
-              {isBookingForSomeoneElse && (
+              ) : (
                 <View style={styles.otherPatientForm} testID="other-patient-form">
+                  <Text style={styles.familyHelperText}>
+                    ℹ️ Booking on behalf of a family member or child. No ID needed.
+                  </Text>
+
                   <Text style={styles.inputGroupLabel}>PATIENT FULL NAME *</Text>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="e.g. Ramesh Kumar"
+                    placeholder="e.g. Aarav Sharma"
                     placeholderTextColor="#94a3b8"
                     value={otherPatientName}
                     onChangeText={setOtherPatientName}
-                    testID="input-other-patient-name"
+                    testID="input-patient-name"
                   />
 
-                  <Text style={[styles.inputGroupLabel, { marginTop: 10 }]}>PATIENT MOBILE NUMBER *</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="e.g. 9876543210"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="phone-pad"
-                    value={otherPatientPhone}
-                    onChangeText={setOtherPatientPhone}
-                    testID="input-other-patient-phone"
-                  />
-
-                  <Text style={[styles.inputGroupLabel, { marginTop: 10 }]}>RELATIONSHIP</Text>
+                  <Text style={[styles.inputGroupLabel, { marginTop: 10 }]}>RELATIONSHIP (OPTIONAL)</Text>
                   <View style={styles.relationshipPillsRow}>
-                    {['Family', 'Spouse', 'Child', 'Parent', 'Friend', 'Other'].map((rel) => {
+                    {['Child', 'Spouse', 'Parent', 'Sibling', 'Other'].map((rel) => {
                       const isSel = patientRelationship === rel;
                       return (
                         <TouchableOpacity
@@ -615,59 +613,32 @@ export default function CheckoutModal({
                     })}
                   </View>
 
+                  <Text style={[styles.inputGroupLabel, { marginTop: 10 }]}>PATIENT AGE (OPTIONAL)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 5"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="numeric"
+                    value={patientAge}
+                    onChangeText={setPatientAge}
+                    testID="input-patient-age"
+                  />
+
+                  <Text style={[styles.inputGroupLabel, { marginTop: 10 }]}>NOTE / SYMPTOMS (OPTIONAL, MAX 200 CHARS)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. Mild fever since yesterday"
+                    placeholderTextColor="#94a3b8"
+                    maxLength={200}
+                    value={bookingNote}
+                    onChangeText={setBookingNote}
+                    testID="input-booking-note"
+                  />
+
                   <View style={styles.gapExemptionNotice}>
                     <Text style={styles.gapExemptionText}>
                       🟢 <Text style={{ fontWeight: '700' }}>1-Hour Gap Rule Exemption:</Text> Appointments for different family members or friends have no minimum gap requirement and can be booked back-to-back or simultaneously.
                     </Text>
-                  </View>
-
-                  {/* Minor Verification & Parental Consent */}
-                  <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e293b' }}>
-                          Patient is under 18 years of age (Minor)
-                        </Text>
-                        <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                          Parent or lawful guardian consent is required under DPDP Act §9.
-                        </Text>
-                      </View>
-                      <Switch
-                        value={isPatientMinor}
-                        onValueChange={(val) => {
-                          setIsPatientMinor(val);
-                          if (!val) setGuardianConsentGiven(false);
-                        }}
-                        trackColor={{ false: '#cbd5e1', true: '#a7f3d0' }}
-                        thumbColor={isPatientMinor ? '#047857' : '#f8fafc'}
-                        testID="switch-minor-patient"
-                      />
-                    </View>
-
-                    {isPatientMinor && (
-                      <TouchableOpacity
-                        style={{
-                          marginTop: 10,
-                          backgroundColor: '#f0fdf4',
-                          borderWidth: 1,
-                          borderColor: '#bbf7d0',
-                          borderRadius: 8,
-                          padding: 10,
-                          flexDirection: 'row',
-                          alignItems: 'flex-start',
-                        }}
-                        activeOpacity={0.8}
-                        onPress={() => setGuardianConsentGiven(!guardianConsentGiven)}
-                        testID="checkbox-guardian-consent"
-                      >
-                        <Text style={{ fontSize: 16, marginRight: 8, marginTop: 1 }}>
-                          {guardianConsentGiven ? '☑️' : '⬜'}
-                        </Text>
-                        <Text style={{ flex: 1, fontSize: 11, color: '#166534', lineHeight: 16 }}>
-                          <Text style={{ fontWeight: '700' }}>Parental / Guardian Consent Declaration:</Text> I confirm that I am the parent or lawful guardian of this minor patient and consent to processing their appointment details for healthcare purposes.
-                        </Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
                 </View>
               )}
@@ -676,6 +647,21 @@ export default function CheckoutModal({
             {/* Booking Summary */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Appointment Summary</Text>
+              {bookedFor === 'family' && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Patient</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.summaryValue, { fontWeight: '700' }]}>
+                      {otherPatientName.trim() || 'Family Member'} ({patientRelationship})
+                    </Text>
+                    {isMinor && (
+                      <View style={styles.minorTag} testID="minor-patient-tag">
+                        <Text style={styles.minorTagText}>Minor</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Staff / Unit</Text>
                 <Text style={styles.summaryValue}>{resource.name}</Text>
@@ -2032,5 +2018,62 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#92400e',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 4,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  segmentBtnTextActive: {
+    fontWeight: '800',
+    color: '#047857',
+  },
+  familyHelperText: {
+    fontSize: 12,
+    color: '#059669',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    lineHeight: 16,
+  },
+  minorTag: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  minorTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#92400e',
+    textTransform: 'uppercase',
   },
 });
