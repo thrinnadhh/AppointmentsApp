@@ -54,7 +54,9 @@ DECLARE
     'validate_booking_update()',
     '_record_checkin_failure(uuid, timestamp with time zone)',
     'generate_appointment_checkin_code_for_booking(uuid)',
-    'dispatch_booking_notification(uuid, text)'
+    'dispatch_booking_notification(uuid, text)',
+    '_handle_ddl_setup()',
+    'auto_ensure_booking_customer()'
   ];
 BEGIN
   FOREACH v_proc IN ARRAY v_procs LOOP
@@ -66,6 +68,33 @@ BEGIN
     END;
   END LOOP;
 END $$;
+
+-- Explicitly ensure local dev / maintenance event trigger stubs have immutable search_path
+CREATE OR REPLACE FUNCTION public._handle_ddl_setup()
+RETURNS event_trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN;
+END;
+$$;
+REVOKE ALL ON FUNCTION public._handle_ddl_setup() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._handle_ddl_setup() TO service_role;
+
+CREATE OR REPLACE FUNCTION public.auto_ensure_booking_customer()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.auto_ensure_booking_customer() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.auto_ensure_booking_customer() TO service_role;
 
 
 -- -----------------------------------------------------------------------------

@@ -75,11 +75,13 @@ export async function GET(req: NextRequest) {
       });
       const isHospitalStaff = Boolean(hospRole && ['admin', 'front_desk', 'consultant'].includes(hospRole));
 
-      if (!isVenueStaff && !isOwner && !isHospitalStaff) {
-        return NextResponse.json(
-          { error: 'Forbidden: Caller is not authorized for this provider/venue' },
-          { status: 403 }
-        );
+      if (!isVenueStaff && !isOwner) {
+        if (!isHospitalStaff) {
+          return NextResponse.json(
+            { error: 'Forbidden: Caller is not authorized for this provider/venue' },
+            { status: 403 }
+          );
+        }
       }
     }
 

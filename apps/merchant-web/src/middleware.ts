@@ -110,10 +110,7 @@ export async function middleware(req: NextRequest) {
   const reqOrigin = req.headers.get('origin');
   const originAllowed = isAllowedOrigin(reqOrigin);
 
-  const isProduction =
-    process.env.NODE_ENV === 'production' ||
-    process.env.VERCEL_ENV === 'production' ||
-    process.env.APP_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === 'production';
 
   // Strictly block all test routes in production builds before any routing, E2E bypass, or auth logic
   if (pathname.startsWith('/api/test')) {

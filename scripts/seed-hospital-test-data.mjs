@@ -128,6 +128,14 @@ export async function seedHospitalTestData() {
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL app.trusted_write = 'true'");
+      const existing = await client.query(
+        `SELECT * FROM public.providers WHERE name = $1 AND owner_id = $2 LIMIT 1`,
+        [name, owner_id]
+      );
+      if (existing.rows.length > 0) {
+        await client.query('COMMIT');
+        return existing.rows[0];
+      }
       const res = await client.query(
         `INSERT INTO public.providers (name, category_id, owner_id, status, is_active, address, phone, city, latitude, longitude)
          VALUES ($1, $2, $3, 'ACTIVE', true, 'Test Medical Road, Tirupati, AP', '+919999900000', 'Tirupati', 13.6288, 79.4192)

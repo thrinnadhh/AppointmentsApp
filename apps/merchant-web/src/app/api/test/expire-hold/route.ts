@@ -6,8 +6,8 @@ import { isTestRouteDisabled, testRouteProductionResponse } from '@/lib/test-rou
 export async function POST(req: NextRequest) {
   try {
     // Strictly block this test helper in production
-    if (isTestRouteDisabled()) {
-      return testRouteProductionResponse();
+    if (process.env.NODE_ENV === 'production' || isTestRouteDisabled()) {
+      return NextResponse.json({ error: 'Not available in production' }, { status: 404 });
     }
 
     // Require CRON_SECRET or admin secret (rejecting committed default secrets)
