@@ -45,6 +45,18 @@ function getCorsHeaders(req: Request) {
   };
 }
 
+function timingSafeCompare(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const bufA = new TextEncoder().encode(a);
+  const bufB = new TextEncoder().encode(b);
+  if (bufA.byteLength !== bufB.byteLength) return false;
+  let diff = 0;
+  for (let i = 0; i < bufA.byteLength; i++) {
+    diff |= bufA[i] ^ bufB[i];
+  }
+  return diff === 0;
+}
+
 serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -77,7 +89,7 @@ serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Verify internal secret authorization header
+    // 1. Verify internal secret authorization header with timing-safe comparison
     const incomingSecret =
       req.headers.get('x-internal-secret') ||
       req.headers.get('x-internal-webhook-secret') ||
@@ -85,14 +97,14 @@ serve(async (req: Request) => {
 
     let authorized = false;
 
-    if (configuredSecret && configuredSecret !== 'REPLACE_ME' && incomingSecret === configuredSecret) {
+    if (configuredSecret && configuredSecret !== 'REPLACE_ME' && timingSafeCompare(incomingSecret, configuredSecret)) {
       authorized = true;
     } else {
       const { data: vaultSecret } = await supabase.rpc('get_vault_secret_by_name', {
         p_secret_name: 'internal_webhook_secret',
       });
 
-      if (vaultSecret && vaultSecret !== 'REPLACE_ME' && incomingSecret === vaultSecret) {
+      if (vaultSecret && vaultSecret !== 'REPLACE_ME' && timingSafeCompare(incomingSecret, vaultSecret)) {
         authorized = true;
       }
     }
@@ -159,37 +171,51 @@ serve(async (req: Request) => {
       let paymentId = payload.gateway_payment_id;
 
       try {
-        // Find gateway payment id if not provided in payload
-        if (!paymentId && appointment_id) {
-          const { data: bkg } = await supabase
-            .from('bookings')
-            .select('gateway_payment_id')
-            .eq('id', appointment_id)
-            .maybeSingle();
-          paymentId = bkg?.gateway_payment_id;
+        // Lookup booking to verify status, amount, and payment gateway id
+        const { data: bkg } = await supabase
+          .from('bookings')
+          .select('id, payment_status, total_amount, deposit_amount, refund_amount, gateway_payment_id')
+          .eq('id', appointment_id)
+          .maybeSingle();
+
+        // Prior Status Check: If already refunded, acknowledge and delete from queue
+        if (bkg?.payment_status === 'REFUNDED') {
+          await supabase.from('q_refunds' as any).delete().eq('msg_id', msgId);
+          processedCount++;
+          continue;
         }
 
+        paymentId = paymentId || bkg?.gateway_payment_id;
         if (!paymentId) {
           throw new Error(`Missing gateway_payment_id for appointment ${appointment_id}`);
         }
 
-        const isMockPayment =
-          paymentId.startsWith('sim_') ||
-          paymentId.startsWith('mock_') ||
-          !rzpKeyId ||
-          !rzpKeySecret ||
-          rzpKeySecret === 'REPLACE_ME';
+        // Amount Validation: ensure amount is positive and <= booking amount
+        const maxEligibleAmount = Number(bkg?.refund_amount || bkg?.deposit_amount || bkg?.total_amount || 0);
+        const requestedAmount = Number(payload.amount ?? maxEligibleAmount);
+        if (requestedAmount <= 0) {
+          throw new Error(`Invalid refund amount ${requestedAmount} for appointment ${appointment_id}`);
+        }
+        if (maxEligibleAmount > 0 && requestedAmount > maxEligibleAmount) {
+          throw new Error(`Refund amount ${requestedAmount} exceeds eligible amount ${maxEligibleAmount}`);
+        }
 
         let refundGatewayId = '';
+        const isMockPayment = paymentId.startsWith('sim_') || paymentId.startsWith('mock_');
 
         if (isMockPayment) {
-          // Simulated test/mock refund
+          // Simulated test/mock refund for test bookings only
           refundGatewayId = `rfnd_sim_${Date.now().toString(36)}_${appointment_id?.substring(0, 8)}`;
         } else {
+          // Real payment: fail closed if gateway credentials are unset or placeholder
+          if (!rzpKeyId || !rzpKeySecret || rzpKeySecret === 'REPLACE_ME') {
+            throw new Error(`Razorpay credentials are unconfigured or placeholder. Refusing to burn real refund for ${paymentId}`);
+          }
+
           // Real Razorpay Refunds API call with idempotency key
           const idempotencyKey = `refund_${appointment_id}_${paymentId}`;
           const authString = btoa(`${rzpKeyId}:${rzpKeySecret}`);
-          const refundAmountPaise = Math.round(Number(payload.amount || 0) * 100);
+          const refundAmountPaise = Math.round(requestedAmount * 100);
 
           const rzpResponse = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
             method: 'POST',

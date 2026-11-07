@@ -95,6 +95,18 @@ function getNotificationMessage(eventType: string): { title: string; body: strin
   }
 }
 
+function timingSafeCompare(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const bufA = new TextEncoder().encode(a);
+  const bufB = new TextEncoder().encode(b);
+  if (bufA.byteLength !== bufB.byteLength) return false;
+  let diff = 0;
+  for (let i = 0; i < bufA.byteLength; i++) {
+    diff |= bufA[i] ^ bufB[i];
+  }
+  return diff === 0;
+}
+
 serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -135,8 +147,8 @@ serve(async (req: Request) => {
 
     let authorized = false;
 
-    // Check against env var first
-    if (configuredSecret && configuredSecret !== 'REPLACE_ME' && incomingSecret === configuredSecret) {
+    // Check against env var first with timing-safe byte comparison
+    if (configuredSecret && configuredSecret !== 'REPLACE_ME' && timingSafeCompare(incomingSecret, configuredSecret)) {
       authorized = true;
     } else {
       // Fallback: query vault via get_vault_secret_by_name RPC
@@ -144,7 +156,7 @@ serve(async (req: Request) => {
         p_secret_name: 'internal_webhook_secret',
       });
 
-      if (vaultSecret && vaultSecret !== 'REPLACE_ME' && incomingSecret === vaultSecret) {
+      if (vaultSecret && vaultSecret !== 'REPLACE_ME' && timingSafeCompare(incomingSecret, vaultSecret)) {
         authorized = true;
       }
     }
