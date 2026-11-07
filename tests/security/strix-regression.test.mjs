@@ -278,17 +278,12 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
     before(async () => {
       // Create throwaway test customer and booking in database via PostgREST service_role
       testOrderId = `order_test_${Date.now()}`;
-      const providerRes = await fetch(`${SUPABASE_URL}/rest/v1/providers?limit=1`, {
-        headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
-      });
-      const providers = await providerRes.json();
-      const providerId = providers[0]?.id;
-
-      const resourceRes = await fetch(`${SUPABASE_URL}/rest/v1/resources?provider_id=eq.${providerId}&limit=1`, {
+      const resourceRes = await fetch(`${SUPABASE_URL}/rest/v1/resources?limit=1`, {
         headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
       });
       const resources = await resourceRes.json();
       const resourceId = resources[0]?.id;
+      const providerId = resources[0]?.provider_id;
 
       const custEmail = `strix-cust-${Date.now()}@test-tirupati.local`;
       const custPass = 'CustSecurePass2026!';
@@ -1018,14 +1013,11 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       assert.ok(session.access_token, 'Customer login failed');
 
       // 2. Create a PENDING_PAYMENT booking for this customer
-      const providerRes = await fetch(`${SUPABASE_URL}/rest/v1/providers?limit=1`, {
-        headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
-      });
-      const [provider] = await providerRes.json();
-      const resourceRes = await fetch(`${SUPABASE_URL}/rest/v1/resources?provider_id=eq.${provider.id}&limit=1`, {
+      const resourceRes = await fetch(`${SUPABASE_URL}/rest/v1/resources?limit=1`, {
         headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
       });
       const [resource] = await resourceRes.json();
+      const providerId = resource?.provider_id;
       const bookingId = crypto.randomUUID();
       const randOffset = 100000000 + Math.floor(Math.random() * 50000000);
       try {
@@ -1040,7 +1032,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
           body: JSON.stringify({
             id: bookingId,
             customer_id: customer.id,
-            provider_id: provider.id,
+            provider_id: providerId,
             resource_id: resource.id,
             slot_start: new Date(Date.now() + randOffset).toISOString(),
             slot_end: new Date(Date.now() + randOffset + 1800000).toISOString(),
