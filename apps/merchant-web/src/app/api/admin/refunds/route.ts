@@ -149,19 +149,15 @@ export async function POST(request: NextRequest) {
       });
 
       if (queueErr) {
-        // Fallback: if queue RPC encounters error, attempt direct fallback
-        try {
-          const res = await initiateRazorpayRefund({
-            supabaseAdmin,
-            bookingId: b.id,
-            refundAmountInr,
-            reason: 'Admin Manual Refund Reconciliation (Direct Fallback)',
-            actorId: authResult.user.id,
-          });
-          results.push(res);
-        } catch (fbErr: any) {
-          results.push({ booking_id: b.id, success: false, error: queueErr.message || fbErr.message });
-        }
+        results.push({ booking_id: b.id, success: false, error: queueErr.message });
+      } else if (queueRes && queueRes.success === false) {
+        // Double-enqueue guard: if already pending or refunded, return clear status without error
+        results.push({
+          booking_id: b.id,
+          success: false,
+          status: queueRes.payment_status || 'ALREADY_PENDING',
+          message: queueRes.error || 'Refund already queued or processed',
+        });
       } else {
         results.push({
           booking_id: b.id,
