@@ -43,6 +43,12 @@ export interface FrontDeskQueueBooking {
   platform_payment_status?: string;
   consultation_payment_status?: string;
   consultation_collected_at?: string;
+  booked_for?: string;
+  booking_for_someone_else?: boolean;
+  patient_relationship?: string;
+  patient_age?: number;
+  is_minor?: boolean;
+  booking_note?: string;
 }
 
 interface FrontDeskQueueTabsProps {
@@ -254,7 +260,9 @@ export default function FrontDeskQueueTabs({
             ) : (
               <div data-testid="waiting-queue-list" className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 {waitingBookings.map((booking, idx) => {
-                  const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
+                  const isFamily = booking.booked_for === 'family' || (Boolean(booking.booking_for_someone_else) && Boolean(booking.patient_name));
+                  const isMinor = Boolean(booking.is_minor || (booking.patient_age !== undefined && booking.patient_age !== null && Number(booking.patient_age) < 18));
+                  const patientName = (isFamily && booking.patient_name) ? booking.patient_name : (booking.customer?.full_name || 'Patient');
                   const slotStr = `${new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(booking.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                   const isUpNext = booking.id === upNextBookingId || (idx === 0 && (!upNextBookingId || upNextBookingId === booking.id));
 
@@ -270,6 +278,22 @@ export default function FrontDeskQueueTabs({
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-bold text-slate-900">{patientName}</span>
+                            {isFamily && (
+                              <span 
+                                data-testid={`frontdesk-family-badge-${booking.id}`}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                              >
+                                👥 Family booking
+                              </span>
+                            )}
+                            {isMinor && (
+                              <span 
+                                data-testid={`frontdesk-minor-badge-${booking.id}`}
+                                className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300"
+                              >
+                                Minor
+                              </span>
+                            )}
                             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
                               {booking.reference_code}
                             </span>
@@ -284,6 +308,18 @@ export default function FrontDeskQueueTabs({
                               </span>
                             )}
                           </div>
+                          {isFamily && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Booked by <strong className="text-slate-700">{booking.customer?.full_name || 'Account Holder'}</strong> ({booking.customer?.phone || 'Phone not provided'})
+                              {booking.patient_relationship ? ` • ${booking.patient_relationship}` : ''}
+                              {booking.patient_age !== undefined && booking.patient_age !== null ? ` • Age: ${booking.patient_age}` : ''}
+                            </p>
+                          )}
+                          {booking.booking_note && (
+                            <div className="mt-1 px-2 py-0.5 rounded bg-amber-50/80 border border-amber-200/60 text-[11px] text-amber-900 max-w-lg">
+                              <span className="font-bold text-amber-800">📝 Note:</span> <span className="italic">{booking.booking_note}</span>
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                             {booking.doctor_name && (
                               <span>Doctor: <strong className="text-slate-700">{booking.doctor_name}</strong></span>
@@ -372,7 +408,9 @@ export default function FrontDeskQueueTabs({
             ) : (
               <div data-testid="standby-queue-list" className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 {standbyBookings.map((booking, idx) => {
-                  const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
+                  const isFamily = booking.booked_for === 'family' || (Boolean(booking.booking_for_someone_else) && Boolean(booking.patient_name));
+                  const isMinor = Boolean(booking.is_minor || (booking.patient_age !== undefined && booking.patient_age !== null && Number(booking.patient_age) < 18));
+                  const patientName = (isFamily && booking.patient_name) ? booking.patient_name : (booking.customer?.full_name || 'Patient');
                   return (
                     <div 
                       key={booking.id}
@@ -385,11 +423,39 @@ export default function FrontDeskQueueTabs({
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-slate-900">{patientName}</span>
+                            {isFamily && (
+                              <span 
+                                data-testid={`frontdesk-family-badge-${booking.id}`}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                              >
+                                👥 Family booking
+                              </span>
+                            )}
+                            {isMinor && (
+                              <span 
+                                data-testid={`frontdesk-minor-badge-${booking.id}`}
+                                className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300"
+                              >
+                                Minor
+                              </span>
+                            )}
                             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
                               {booking.reference_code}
                             </span>
                             {getArrivalBadge('Late')}
                           </div>
+                          {isFamily && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Booked by <strong className="text-slate-700">{booking.customer?.full_name || 'Account Holder'}</strong>
+                              {booking.patient_relationship ? ` • ${booking.patient_relationship}` : ''}
+                              {booking.patient_age !== undefined && booking.patient_age !== null ? ` • Age: ${booking.patient_age}` : ''}
+                            </p>
+                          )}
+                          {booking.booking_note && (
+                            <div className="mt-1 px-2 py-0.5 rounded bg-amber-50/80 border border-amber-200/60 text-[11px] text-amber-900 max-w-lg">
+                              <span className="font-bold text-amber-800">📝 Note:</span> <span className="italic">{booking.booking_note}</span>
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                             {booking.doctor_name && <span>{booking.doctor_name}</span>}
                             <span>Original Slot: <strong className="font-mono text-slate-700">{new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
@@ -469,7 +535,9 @@ export default function FrontDeskQueueTabs({
             ) : (
               <div data-testid="expected-queue-list" className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 {filteredExpected.map((booking) => {
-                  const patientName = booking.patient_name || booking.customer?.full_name || 'Patient';
+                  const isFamily = booking.booked_for === 'family' || (Boolean(booking.booking_for_someone_else) && Boolean(booking.patient_name));
+                  const isMinor = Boolean(booking.is_minor || (booking.patient_age !== undefined && booking.patient_age !== null && Number(booking.patient_age) < 18));
+                  const patientName = (isFamily && booking.patient_name) ? booking.patient_name : (booking.customer?.full_name || 'Patient');
                   const slotStart = new Date(booking.slot_start);
                   const isPastSlot = Date.now() > slotStart.getTime();
 
@@ -481,11 +549,41 @@ export default function FrontDeskQueueTabs({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-slate-900">{patientName}</span>
+                          {isFamily && (
+                            <span 
+                              data-testid={`frontdesk-family-badge-${booking.id}`}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                            >
+                              👥 Family booking
+                            </span>
+                          )}
+                          {isMinor && (
+                            <span 
+                              data-testid={`frontdesk-minor-badge-${booking.id}`}
+                              className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300"
+                            >
+                              Minor
+                            </span>
+                          )}
                           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
                             {booking.reference_code}
                           </span>
                           {getArrivalBadge('Expected')}
                         </div>
+                        {isFamily && booking.customer?.full_name && (
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            Booked by <span className="font-medium text-slate-700">{booking.customer.full_name}</span>
+                            {booking.customer.phone && <span className="font-mono text-slate-600"> ({booking.customer.phone})</span>}
+                            {booking.patient_age !== undefined && booking.patient_age !== null && (
+                              <span className="ml-2 font-medium text-slate-600">• Age: {booking.patient_age}</span>
+                            )}
+                          </div>
+                        )}
+                        {booking.booking_note && (
+                          <div className="mt-1 text-xs text-slate-600 italic bg-slate-50 px-2 py-0.5 rounded border border-slate-200 inline-block">
+                            Note: &quot;{booking.booking_note}&quot;
+                          </div>
+                        )}
                         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                           {booking.doctor_name && <span>{booking.doctor_name}</span>}
                           <span>Booked Slot: <strong className="font-mono text-slate-700">{slotStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>

@@ -19,7 +19,8 @@ import {
   Bell,
   Calendar,
   History,
-  UserCheck
+  UserCheck,
+  Info
 } from 'lucide-react';
 import { 
   supabase, 
@@ -64,6 +65,7 @@ export default function BookingsManagementPage() {
   const [reassignReason, setReassignReason] = useState('Emergency specialist change');
   const [isReassigning, setIsReassigning] = useState(false);
   const [notificationModalBooking, setNotificationModalBooking] = useState<MerchantBookingWithDetails | null>(null);
+  const [detailModalBooking, setDetailModalBooking] = useState<MerchantBookingWithDetails | null>(null);
   const [bookingNotificationLogs, setBookingNotificationLogs] = useState<NotificationLog[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [doctorLeftMap, setDoctorLeftMap] = useState<Record<string, boolean>>({});
@@ -270,6 +272,7 @@ export default function BookingsManagementPage() {
     const matchesFilter = selectedFilter === 'ALL' || b.status === selectedFilter;
     const matchesSearch = 
       (b.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.patient_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.reference_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.resource_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.provider_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -739,61 +742,100 @@ export default function BookingsManagementPage() {
                   </div>
 
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="font-bold text-slate-900 text-sm">{booking.customer_name || 'Customer'}</h2>
-                      {booking.reference_code && (
-                        <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                          {booking.reference_code}
-                        </span>
-                      )}
-                      {booking.is_present && (
-                        <span 
-                          data-testid={`queue-present-badge-${booking.id}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                          <span>📍 PRESENT</span>
-                        </span>
-                      )}
-                      {booking.queue_position && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
-                          Token #{booking.queue_position}
-                        </span>
-                      )}
-                      {booking.estimated_wait_minutes && booking.estimated_wait_minutes > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                          Wait: ~{booking.estimated_wait_minutes}m
-                        </span>
-                      ) : null}
-                      {!booking.is_present && booking.status === 'CONFIRMED' && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-                          ⏳ NOT ARRIVED (STANDBY)
-                        </span>
-                      )}
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        booking.status === 'CONFIRMED'
-                          ? (booking.is_present ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800')
-                          : booking.status === 'HELD'
-                          ? 'bg-amber-100 text-amber-800'
-                          : booking.status === 'COMPLETED'
-                          ? 'bg-slate-100 text-slate-700'
-                          : booking.status === 'NO_SHOW'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {booking.status.replace('_', ' ')}
-                      </span>
-                      {booking.is_followup && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
-                          🔄 Free Follow-up
-                        </span>
-                      )}
-                      {(booking.no_show_count ?? 0) >= 3 && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                          ⚠️ {booking.no_show_count} Strikes
-                        </span>
-                      )}
-                    </div>
+                    {(() => {
+                      const isFamily = booking.booked_for === 'family' || (Boolean(booking.booking_for_someone_else) && Boolean(booking.patient_name));
+                      const isMinor = booking.is_minor || (booking.patient_age !== undefined && booking.patient_age !== null && Number(booking.patient_age) < 18);
+                      const displayPatientName = isFamily && booking.patient_name ? booking.patient_name : (booking.customer_name || 'Customer');
+                      return (
+                        <>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="font-bold text-slate-900 text-sm">{displayPatientName}</h2>
+                            {isFamily && (
+                              <span 
+                                data-testid={`family-booking-badge-${booking.id}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                              >
+                                👥 Family booking
+                              </span>
+                            )}
+                            {isMinor && (
+                              <span 
+                                data-testid={`minor-badge-${booking.id}`}
+                                className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300"
+                              >
+                                Minor
+                              </span>
+                            )}
+                            {booking.reference_code && (
+                              <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {booking.reference_code}
+                              </span>
+                            )}
+                            {booking.is_present && (
+                              <span 
+                                data-testid={`queue-present-badge-${booking.id}`}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                <span>📍 PRESENT</span>
+                              </span>
+                            )}
+                            {booking.queue_position && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                                Token #{booking.queue_position}
+                              </span>
+                            )}
+                            {booking.estimated_wait_minutes && booking.estimated_wait_minutes > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Wait: ~{booking.estimated_wait_minutes}m
+                              </span>
+                            ) : null}
+                            {!booking.is_present && booking.status === 'CONFIRMED' && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                                ⏳ NOT ARRIVED (STANDBY)
+                              </span>
+                            )}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              booking.status === 'CONFIRMED'
+                                ? (booking.is_present ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800')
+                                : booking.status === 'HELD'
+                                ? 'bg-amber-100 text-amber-800'
+                                : booking.status === 'COMPLETED'
+                                ? 'bg-slate-100 text-slate-700'
+                                : booking.status === 'NO_SHOW'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {booking.status.replace('_', ' ')}
+                            </span>
+                            {booking.is_followup && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
+                                🔄 Free Follow-up
+                              </span>
+                            )}
+                            {(booking.no_show_count ?? 0) >= 3 && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                ⚠️ {booking.no_show_count} Strikes
+                              </span>
+                            )}
+                          </div>
+
+                          {isFamily && (
+                            <p className="text-xs text-slate-500 mt-1" data-testid={`booked-by-${booking.id}`}>
+                              Booked by <strong className="text-slate-700">{booking.customer_name || 'Account Holder'}</strong> ({booking.customer_phone || 'Contact not provided'})
+                              {booking.patient_relationship ? ` • Relationship: ${booking.patient_relationship}` : ''}
+                              {booking.patient_age !== undefined && booking.patient_age !== null ? ` • Age: ${booking.patient_age}` : ''}
+                            </p>
+                          )}
+                          {booking.booking_note && (
+                            <div className="mt-1 px-2.5 py-1 rounded bg-amber-50/90 border border-amber-200 text-[11px] text-amber-900 flex items-center gap-1.5 max-w-xl">
+                              <span className="font-bold text-amber-800">📝 Note:</span>
+                              <span className="italic">{booking.booking_note}</span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     <p className="text-xs text-slate-600 mt-1">
                       Venue: <strong className="text-slate-800">{booking.provider_name}</strong> • {verticalConfig.resourceLabelSingular}: <strong className="text-slate-800">{booking.resource_name}</strong>
@@ -839,6 +881,15 @@ export default function BookingsManagementPage() {
                       >
                         <MessageSquare className="w-3 h-3 text-emerald-600" />
                         WhatsApp Logs
+                      </button>
+                      <button
+                        onClick={() => setDetailModalBooking(booking)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded transition cursor-pointer"
+                        title="View full booking & patient details"
+                        data-testid={`view-detail-btn-${booking.id}`}
+                      >
+                        <Info className="w-3 h-3 text-slate-500" />
+                        Details
                       </button>
                       {booking.status === 'CONFIRMED' && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200/60 px-1.5 py-0.5 rounded">
@@ -1303,6 +1354,137 @@ export default function BookingsManagementPage() {
               <button
                 onClick={() => setNotificationModalBooking(null)}
                 className="px-4 py-1.5 text-xs font-semibold bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Detail Modal */}
+      {detailModalBooking && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+          data-testid="appointment-detail-modal"
+        >
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-base">Appointment Details</h3>
+                {detailModalBooking.reference_code && (
+                  <span className="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                    {detailModalBooking.reference_code}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setDetailModalBooking(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* Patient Info */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold uppercase tracking-wider text-slate-500 text-[10px]">Patient Information</span>
+                  <div className="flex items-center gap-1.5">
+                    {(detailModalBooking.booked_for === 'family' || detailModalBooking.booking_for_someone_else) && (
+                      <span 
+                        data-testid="detail-family-badge"
+                        className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                      >
+                        👥 Family booking
+                      </span>
+                    )}
+                    {(detailModalBooking.is_minor || (detailModalBooking.patient_age !== undefined && detailModalBooking.patient_age !== null && Number(detailModalBooking.patient_age) < 18)) && (
+                      <span 
+                        data-testid="detail-minor-badge"
+                        className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300"
+                      >
+                        Minor
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Patient Name</span>
+                    <strong className="text-slate-900 text-sm" data-testid="detail-patient-name">
+                      {(detailModalBooking.booked_for === 'family' && detailModalBooking.patient_name)
+                        ? detailModalBooking.patient_name
+                        : (detailModalBooking.customer_name || 'Customer')}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Relationship</span>
+                    <span className="text-slate-700 font-medium" data-testid="detail-patient-relationship">
+                      {detailModalBooking.patient_relationship || (detailModalBooking.booked_for === 'family' ? 'Family Member' : 'Self')}
+                    </span>
+                  </div>
+
+                  {detailModalBooking.patient_age !== undefined && detailModalBooking.patient_age !== null && (
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Age</span>
+                      <strong className="text-slate-900" data-testid="detail-patient-age">
+                        {detailModalBooking.patient_age} years old
+                      </strong>
+                    </div>
+                  )}
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Booked By (Account Holder)</span>
+                    <span className="text-slate-700 font-medium" data-testid="detail-booker-name">
+                      {detailModalBooking.customer_name || 'Account Holder'}
+                    </span>
+                  </div>
+                </div>
+
+                {detailModalBooking.booking_note && (
+                  <div className="mt-2 pt-2 border-t border-slate-200/60" data-testid="detail-booking-note">
+                    <span className="text-slate-500 font-bold block text-[10px] uppercase">Booking Note / Symptoms</span>
+                    <p className="text-slate-800 italic mt-0.5 bg-white p-2.5 rounded-lg border border-slate-200 leading-relaxed">
+                      &ldquo;{detailModalBooking.booking_note}&rdquo;
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Consultation & Schedule Info */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/60 space-y-1.5">
+                <span className="font-bold uppercase tracking-wider text-slate-500 text-[10px]">Appointment & Venue</span>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Venue</span>
+                    <span className="text-slate-800 font-semibold">{detailModalBooking.provider_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Specialist / Doctor</span>
+                    <span className="text-slate-800 font-semibold">{detailModalBooking.resource_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Slot Time</span>
+                    <span className="text-slate-800 font-medium">
+                      {new Date(detailModalBooking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({new Date(detailModalBooking.slot_start).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', weekday: 'short' })})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Status</span>
+                    <span className="font-bold text-slate-800">{detailModalBooking.status}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setDetailModalBooking(null)}
+                className="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
               >
                 Close
               </button>
