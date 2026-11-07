@@ -867,6 +867,20 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
       WHERE table_name = 'bookings' AND column_name IN ('booked_for', 'patient_name', 'patient_age', 'patient_relationship', 'booking_note', 'is_minor');
     `);
     assert.equal(colRes.rows.length, 6, 'All 6 columns must exist after rerun');
+
+    // Restore downstream migrations so test runner database state remains at latest schema
+    const downstream = [
+      'supabase/migrations/20261106000002_dpdp_scrub_family_booking_pii.sql',
+      'supabase/migrations/20261107000001_production_readiness_audit_hardening.sql',
+      'supabase/migrations/20261107000002_harden_security_definer_and_default_privileges.sql',
+      'supabase/migrations/20261107000003_complete_anonymize_user_data.sql',
+      'supabase/migrations/20261107000004_db_lint_and_policy_message_remediation.sql',
+    ];
+    for (const file of downstream) {
+      if (fs.existsSync(file)) {
+        await dbPool.query(fs.readFileSync(file, 'utf8'));
+      }
+    }
   });
 
   // F-19: UI states & Double-tap protection
