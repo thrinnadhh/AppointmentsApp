@@ -2602,6 +2602,7 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         'supabase/migrations/20261105100004_pg_net_booking_triggers.sql',
         'supabase/migrations/20261105100005_cron_lifecycle_jobs.sql',
         'supabase/migrations/20261105120001_harden_erasure_and_security_definer_grants.sql',
+        'supabase/migrations/20261107000001_production_readiness_audit_hardening.sql',
       ];
       for (const file of migrationFiles) {
         const sql = fs.readFileSync(file, 'utf8');
@@ -2623,30 +2624,79 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       );
       assert.equal(trigRes.rows[0].cnt, 1, 'Expected exactly 1 trg_booking_pgnet_webhook trigger');
 
-      // 39.5 A failing notification or refund ends up in its DLQ after N attempts
-      // Test refunds DLQ routing with read_ct >= 5
-      const testRefundPayload = {
-        appointment_id: crypto.randomUUID(),
-        tenant_id: hospA.id,
-        user_id: custA.user.id,
-        type: 'REFUND_REQUESTED',
-        amount: 250,
-        reason: 'DLQ test failure simulation',
-      };
-      const sendRes = await pgClient.query("SELECT pgmq.send('refunds', $1::jsonb) as msg_id", [JSON.stringify(testRefundPayload)]);
-      const testMsgId = sendRes.rows[0].msg_id;
+      // 39.5 Vault Secret Allowlist Check
+      let allowlistBlocked = false;
+      try {
+        await pgClient.query("SELECT public.get_vault_secret_by_name('unauthorized_secret_test')");
+      } catch (err) {
+        allowlistBlocked = err.message.includes('not in the allowed vault access list');
+      }
+      assert.ok(allowlistBlocked, 'get_vault_secret_by_name must reject non-allowlisted secret names');
+
+      // 39.6 Double-Submit & DLQ Status Sync Verification
+      // Create a test booking for refund lifecycle
+      const testBkgRes = await pgClient.query(`
+        INSERT INTO public.bookings (
+          customer_id, provider_id, resource_id, department_id,
+          slot_start, slot_end, status, payment_status, total_amount, deposit_amount
+        ) VALUES (
+          $1, $2, $3, $4,
+          NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day' + INTERVAL '15 minutes',
+          'CANCELLED', 'CAPTURED', 500, 100
+        ) RETURNING id;
+      `, [custA.user.id, hospA.id, docA.resource.id, docA.resource.department_id]);
+      const refundBkgId = testBkgRes.rows[0].id;
+
+      // Create matching captured payment
+      await pgClient.query(`
+        INSERT INTO public.payments (
+          booking_id, amount, status, gateway_payment_id
+        ) VALUES (
+          $1, 100, 'CAPTURED', 'sim_pay_test_dlq_123'
+        );
+      `, [refundBkgId]);
+
+      // Enqueue refund 1st time -> succeeds
+      const enq1Res = await pgClient.query("SELECT public.enqueue_refund_request($1, $2, 'Test Refund') as res", [refundBkgId, custA.user.id]);
+      assert.equal(enq1Res.rows[0].res.success, true);
+      assert.equal(enq1Res.rows[0].res.payment_status, 'REFUND_PENDING');
+      const testMsgId = enq1Res.rows[0].res.queue_msg_id;
+
+      // Double-enqueue guard: Enqueue refund 2nd time while REFUND_PENDING -> fails closed
+      const enq2Res = await pgClient.query("SELECT public.enqueue_refund_request($1, $2, 'Double submit attempt') as res", [refundBkgId, custA.user.id]);
+      assert.equal(enq2Res.rows[0].res.success, false);
+      assert.equal(enq2Res.rows[0].res.payment_status, 'REFUND_PENDING');
 
       // Simulate 5 reads by setting read_ct = 5 and vt = NOW()
       await pgClient.query("UPDATE pgmq.q_refunds SET read_ct = 5, vt = NOW() WHERE msg_id = $1", [testMsgId]);
 
-      // Read with DLQ helper
+      // Read with DLQ helper -> moves to refunds_dlq AND updates bookings/payments to REFUND_FAILED
       await pgClient.query("SELECT * FROM public.read_queue_with_dlq('refunds', 'refunds_dlq', 30, 10, 5)");
 
       // Verify message has moved to refunds_dlq
-      const dlqRes = await pgClient.query("SELECT * FROM pgmq.q_refunds_dlq WHERE message->>'appointment_id' = $1", [testRefundPayload.appointment_id]);
+      const dlqRes = await pgClient.query("SELECT * FROM pgmq.q_refunds_dlq WHERE message->>'appointment_id' = $1", [refundBkgId]);
       assert.equal(dlqRes.rows.length, 1, 'Failing refund message must end up in refunds_dlq after 5 reads');
       assert.equal(Number(dlqRes.rows[0].message?._original_msg_id), Number(testMsgId));
       assert.equal(dlqRes.rows[0].message?._dlq_reason, 'max_read_count_exceeded');
+
+      // Verify booking status was atomically updated to REFUND_FAILED
+      const bkgCheck = await pgClient.query("SELECT payment_status FROM public.bookings WHERE id = $1", [refundBkgId]);
+      assert.equal(bkgCheck.rows[0].payment_status, 'REFUND_FAILED', 'Booking payment_status must update to REFUND_FAILED on DLQ movement');
+
+      // 39.7 Replay DLQ message back to active queue
+      const dlqMsgId = dlqRes.rows[0].msg_id;
+      const replayRes = await pgClient.query("SELECT public.replay_dlq_message('refunds_dlq', 'refunds', $1) as res", [dlqMsgId]);
+      assert.equal(replayRes.rows[0].res.success, true);
+      assert.equal(replayRes.rows[0].res.target_queue, 'refunds');
+
+      // Verify booking was restored to REFUND_PENDING
+      const bkgReplayCheck = await pgClient.query("SELECT payment_status FROM public.bookings WHERE id = $1", [refundBkgId]);
+      assert.equal(bkgReplayCheck.rows[0].payment_status, 'REFUND_PENDING', 'Booking payment_status must restore to REFUND_PENDING after replay');
+
+      // Cleanup test booking and payment
+      await pgClient.query("DELETE FROM public.payments WHERE booking_id = $1", [refundBkgId]);
+      await pgClient.query("DELETE FROM public.bookings WHERE id = $1", [refundBkgId]);
+      await pgClient.query("DELETE FROM pgmq.q_refunds WHERE message->>'appointment_id' = $1", [refundBkgId]);
 
       // Cleanup test token
       await fetch(`${supabaseUrl}/rest/v1/push_tokens?token=eq.${tokenCustA}`, {
