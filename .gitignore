@@ -22,6 +22,8 @@ dist/
 
 # TypeScript
 *.tsbuildinfo
+*.dump
+supabase/backups/
 next-env.d.ts
 
 # OS, IDE & Signing Keys
