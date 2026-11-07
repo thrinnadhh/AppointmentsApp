@@ -7,6 +7,9 @@
     "apps/*",
     "packages/*"
   ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "check:agents": "python3 .agents/scripts/validate_kit.py",
     "check:legal": "node scripts/check-legal-placeholders.js",
