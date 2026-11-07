@@ -53,6 +53,7 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
 | 2026-11-05 | Production Readiness Group 7 (Production Safety, /api/test/* Route Lock & Guest Slot-Picker Sign-In Prompt) | DECIDED | Resolved supabase/roles.sql by untracking from git index (git rm --cached) preserving local disk copy per .gitignore:79. Enforced defense-in-depth lock on /api/test/* via Next.js middleware and test-route-guard helper, returning HTTP 404 in production builds regardless of bypass headers. Replaced 'Unauthorized... retry' error banner in customer mobile slot picker with friendly 'Sign In to View Available Slots' prompt and 'Sign In to Book Slot →' CTA opening profile sign-in modal. Preserved customer-slots-error for network failures. Verified with tests/unit/production-safety-and-guest-ux.test.mjs (3/3 PASS). |
 | 2026-11-05 | Supabase Power Features: pg_cron, pg_net Webhook Triggers, pgmq Queues, and Vault Integration | DECIDED | Enabled and wired up four Supabase power features with full idempotency across migrations 20261105100001 to 20261105100005. Locked down pgmq schema from anon and authenticated roles. Created Vault secret placeholders with zero plain secrets. Configured privacy-safe queues (notifications, notifications_dlq, refunds, refunds_dlq) with DLQ failover after 5 attempts. Established non-blocking pg_net triggers and scheduled pg_cron lifecycle jobs. Created Edge Functions process-notification-queue and process-refund-queue verifying internal secrets. Migrated merchant-web refund actions to asynchronous queued pattern. Verified 39/39 cross-tenant authorization matrix tests. |
 | 2026-11-06 | Ruthless Security & Privacy Audit Remediation (Layers 1-4) | DECIDED | Hardened public.anonymize_user_data to scrub checkin PIN and message_content; revoked cron/queue SECURITY DEFINER grants from public/anon/authenticated to service_role; hashed Upstash Redis rate-limit keys with HMAC-SHA256 salt to prevent PII leakage; corrected false claims in customer mobile UI (Vault -> Private Storage; 256-bit -> Razorpay PCI-DSS); updated merchant-web privacy policy and admin copy to accurately disclose processors and encryption standards. Verified with 42/42 test suites (375 tests, 0 failures), clean typecheck, and production build. |
+| 2026-11-06 | Booking for Family / Minor & DPDP Dependent PII Scrub | DECIDED | Implemented lightweight Practo/Apollo-style dependent booking (booked_for='self'|'family', patient_name, patient_age, patient_relationship, booking_note, computed is_minor). Booker (auth.uid()) remains single account owner and refund payee. Forward migrations 20261106000001 and 20261106000002 added schema columns with CHECK constraints, updated RPCs, secured merchant views, and enhanced anonymize_user_data to scrub dependent PII (patient_name, patient_age, patient_relationship, booking_note) under statutory DPDP Act erasure requests. |
 
 
 
@@ -407,3 +408,41 @@ Architecture, policy, and design decisions recorded per Standing Rule 7 (date, d
   7. **Full Serial Gate Verification**:
      - Ran full clean serial gate: `npx supabase db reset`, `node scripts/seed-hospital-test-data.mjs`, serial run of all 39 test suites (365/365 tests passed, 0 failed), `pnpm -r exec tsc --noEmit` (0 errors), and `pnpm --filter @appointments/merchant-web build` (clean exit code 0).
      - Ran full clean serial gate: `npx supabase db reset`, `node scripts/seed-hospital-test-data.mjs`, serial run of all 39 test suites (347/347 tests passed), `pnpm -r exec tsc --noEmit` (0 errors), and `pnpm --filter @appointments/merchant-web build` (52/52 pages built).
+
+
+---
+
+### Decision 19: Family & Minor Dependent Booking Support
+- **Date**: 2026-11-06
+- **Status**: DECIDED (Implemented & Verified)
+- **Requirement & Architecture**:
+  1. **Practo / Apollo 24/7 / 1mg Industry Standard Pattern**:
+     - Followed standard Indian healthcare booking flow: an adult account holder books on behalf of a dependent (family member or child).
+     - Strict no-slop product rule: NO parental identity verification, NO government ID, NO Aadhaar/PAN, NO document upload, and NO OTP for the dependent.
+     - Booker (`auth.uid()`) remains the single owner of the row, responsible for booking, payment, and refund.
+  2. **Database Schema & Constraints (`20261106000001_family_minor_booking_support.sql`)**:
+     - Added additive columns to `public.bookings`:
+       - `booked_for`: `text NOT NULL DEFAULT 'self' CHECK (booked_for IN ('self', 'family'))`
+       - `patient_age`: `smallint NULL CHECK (patient_age IS NULL OR (patient_age BETWEEN 0 AND 120))`
+       - `booking_note`: `text NULL CHECK (booking_note IS NULL OR length(booking_note) <= 200)`
+       - `is_minor`: `boolean GENERATED ALWAYS AS (patient_age IS NOT NULL AND patient_age < 18) STORED`
+       - CHECK constraint enforcing non-empty `patient_name` whenever `booked_for = 'family'`.
+     - Backward compatibility: Backfilled existing rows with `booking_for_someone_else = true` to `booked_for = 'family'`. Added trigger `trg_sync_booking_for_family` keeping legacy boolean flag and `booked_for` in lockstep.
+     - Dropped old 8-argument `create_booking_hold` and created 11-argument `create_booking_hold` with defaults and server-side validation.
+     - Updated `merchant_bookings` view to include family fields.
+     - Updated `anonymize_user_data` to scrub `patient_age` and `booking_note`.
+  3. **Customer Mobile UX (`apps/customer-mobile`)**:
+     - In `CheckoutModal.tsx`, replaced toggle & DPDP consent with "Who is this appointment for?" segmented control (`Myself` vs `Family member / child`).
+     - Added helper text: *"Booking on behalf of a family member or child. No ID needed."*
+     - If `Family member / child` is selected: Patient name (required), Relationship dropdown/pills, Age (optional numeric), Note/symptoms (optional, max 200 chars).
+     - Added subtle `Minor` tag when age < 18.
+     - Updated `BookingPassModal.tsx` and `MyBookingsScreen.tsx` to prominently show patient name, relationship, age, and Minor badge.
+  4. **Merchant Web UI (`apps/merchant-web`)**:
+     - In `bookings/page.tsx` and `FrontDeskQueueTabs.tsx` (Waiting, Standby, Expected tabs):
+       - Displays `patient_name` with `👥 Family booking` badge and `Minor` tag.
+       - Displays `"Booked by <customer_name> (<phone>)"` as secondary text.
+       - Displays booking notes and patient age.
+       - Search and filtering matches `patient_name`, booker name, phone, or reference code.
+  5. **Notifications & Razorpay Refunds**:
+     - Notifications (push, SMS/WhatsApp) are sent to the booker's device/phone, naming the patient in the copy (e.g. `Appointment for Aarav is confirmed`).
+     - Payments and Razorpay refunds remain strictly bound to the booker's account (`customer_id`).
