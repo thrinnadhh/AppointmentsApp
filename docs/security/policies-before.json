@@ -1,0 +1,578 @@
+[
+  {
+    "table": "account_deletion_requests",
+    "name": "Users see own deletion request",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+    "with_check": null
+  },
+  {
+    "table": "admin_audit_logs",
+    "name": "Admins can view audit logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "is_admin(( SELECT auth.uid() AS uid))",
+    "with_check": null
+  },
+  {
+    "table": "admin_audit_logs",
+    "name": "Service role full access to audit logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{service_role}",
+    "cmd": "ALL",
+    "qual": "true",
+    "with_check": "true"
+  },
+  {
+    "table": "app_logs",
+    "name": "Only admins can view app logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "is_admin(( SELECT auth.uid() AS uid))",
+    "with_check": null
+  },
+  {
+    "table": "app_logs",
+    "name": "Service role full access to app logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{service_role}",
+    "cmd": "ALL",
+    "qual": "true",
+    "with_check": "true"
+  },
+  {
+    "table": "appointment_checkin_codes",
+    "name": "customers_read_own_checkin_codes",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(customer_id = ( SELECT auth.uid() AS uid))",
+    "with_check": null
+  },
+  {
+    "table": "audit_logs",
+    "name": "insert_audit_logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated,service_role}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "((( SELECT auth.role() AS role) = 'service_role'::text) OR (( SELECT auth.uid() AS uid) IS NOT NULL))"
+  },
+  {
+    "table": "audit_logs",
+    "name": "owner_read_audit_logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated,service_role}",
+    "cmd": "SELECT",
+    "qual": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (merchant_id IN ( SELECT providers.id\n   FROM providers\n  WHERE (providers.owner_id = ( SELECT auth.uid() AS uid)))) OR (hospital_role(merchant_id, ( SELECT auth.uid() AS uid)) = 'admin'::text))",
+    "with_check": null
+  },
+  {
+    "table": "bookings",
+    "name": "Customers can create bookings",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(( SELECT auth.uid() AS uid) = customer_id)"
+  },
+  {
+    "table": "bookings",
+    "name": "allow_reading_bookings",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "((( SELECT auth.uid() AS uid) = customer_id) OR is_admin(( SELECT auth.uid() AS uid)) OR ((NOT is_hospital_provider(provider_id)) AND (provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers))))",
+    "with_check": null
+  },
+  {
+    "table": "bookings",
+    "name": "allow_updating_bookings",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "((( SELECT auth.uid() AS uid) = customer_id) OR is_admin(( SELECT auth.uid() AS uid)) OR ((NOT is_hospital_provider(provider_id)) AND (provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers))))",
+    "with_check": "((( SELECT auth.uid() AS uid) = customer_id) OR is_admin(( SELECT auth.uid() AS uid)) OR ((NOT is_hospital_provider(provider_id)) AND (provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers))))"
+  },
+  {
+    "table": "bookings",
+    "name": "hospital_members_read_accessible_bookings",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(is_hospital_provider(provider_id) AND ((hospital_role(provider_id, ( SELECT auth.uid() AS uid)) = 'admin'::text) OR ((resource_id IS NOT NULL) AND (resource_id IN ( SELECT hospital_accessible_resource_ids(bookings.provider_id, ( SELECT auth.uid() AS uid)) AS hospital_accessible_resource_ids)) AND ((department_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM departments d\n  WHERE ((d.id = bookings.department_id) AND (('appointments'::text = ANY (d.allowed_modules)) OR ('queue_schedule'::text = ANY (d.allowed_modules)) OR ('check_in'::text = ANY (d.allowed_modules))))))))))",
+    "with_check": null
+  },
+  {
+    "table": "bookings",
+    "name": "hospital_members_update_accessible_bookings",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "(is_hospital_provider(provider_id) AND ((hospital_role(provider_id, ( SELECT auth.uid() AS uid)) = 'admin'::text) OR ((resource_id IS NOT NULL) AND (resource_id IN ( SELECT hospital_accessible_resource_ids(bookings.provider_id, ( SELECT auth.uid() AS uid)) AS hospital_accessible_resource_ids)) AND ((department_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM departments d\n  WHERE ((d.id = bookings.department_id) AND (('appointments'::text = ANY (d.allowed_modules)) OR ('queue_schedule'::text = ANY (d.allowed_modules)) OR ('check_in'::text = ANY (d.allowed_modules))))))))))",
+    "with_check": "(is_hospital_provider(provider_id) AND ((hospital_role(provider_id, ( SELECT auth.uid() AS uid)) = 'admin'::text) OR ((resource_id IS NOT NULL) AND (resource_id IN ( SELECT hospital_accessible_resource_ids(bookings.provider_id, ( SELECT auth.uid() AS uid)) AS hospital_accessible_resource_ids)))))"
+  },
+  {
+    "table": "categories",
+    "name": "Categories are readable by everyone",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "table": "cities",
+    "name": "Allow admin full manage cities",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = 'admin'::user_role))))",
+    "with_check": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = 'admin'::user_role))))"
+  },
+  {
+    "table": "cities",
+    "name": "Allow public read cities",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "table": "cities",
+    "name": "allow_read_active_cities",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "SELECT",
+    "qual": "(status = ANY (ARRAY['ACTIVE'::text, 'EXPANDING'::text]))",
+    "with_check": null
+  },
+  {
+    "table": "city_settlements",
+    "name": "Admins manage settlements",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "ALL",
+    "qual": "is_admin()",
+    "with_check": null
+  },
+  {
+    "table": "city_settlements",
+    "name": "City directors view own settlement",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND ((profiles.role)::text = 'city_director'::text) AND (profiles.assigned_city_id = city_settlements.city_id))))",
+    "with_check": null
+  },
+  {
+    "table": "city_waitlist",
+    "name": "Admins only read city waitlist",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "is_admin(( SELECT auth.uid() AS uid))",
+    "with_check": null
+  },
+  {
+    "table": "city_waitlist",
+    "name": "Allow admin manage city waitlist",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = 'admin'::user_role))))",
+    "with_check": null
+  },
+  {
+    "table": "contact_reveal_audit",
+    "name": "Admins only read reveal audits",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "is_admin(( SELECT auth.uid() AS uid))",
+    "with_check": null
+  },
+  {
+    "table": "crash_alert_dedup",
+    "name": "Admins and service role view dedup",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "is_admin(( SELECT auth.uid() AS uid))",
+    "with_check": null
+  },
+  {
+    "table": "crash_alert_dedup",
+    "name": "Service role full access dedup",
+    "permissive": "PERMISSIVE",
+    "roles": "{service_role}",
+    "cmd": "ALL",
+    "qual": "true",
+    "with_check": "true"
+  },
+  {
+    "table": "department_members",
+    "name": "hospital_admin_manage_department_members",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated,service_role}",
+    "cmd": "ALL",
+    "qual": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(merchant_id) AND (hospital_role(merchant_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)) OR ((NOT is_hospital_provider(merchant_id)) AND (merchant_id IN ( SELECT providers.id\n   FROM providers\n  WHERE (providers.owner_id = ( SELECT auth.uid() AS uid))))))",
+    "with_check": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(merchant_id) AND (hospital_role(merchant_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)) OR ((NOT is_hospital_provider(merchant_id)) AND (merchant_id IN ( SELECT providers.id\n   FROM providers\n  WHERE (providers.owner_id = ( SELECT auth.uid() AS uid))))))"
+  },
+  {
+    "table": "department_members",
+    "name": "members_view_own_membership",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "((user_id = ( SELECT auth.uid() AS uid)) OR (lower(email) = lower((auth.jwt() ->> 'email'::text))))",
+    "with_check": null
+  },
+  {
+    "table": "departments",
+    "name": "hospital_admin_manage_departments",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated,service_role}",
+    "cmd": "ALL",
+    "qual": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(merchant_id) AND (hospital_role(merchant_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)) OR ((NOT is_hospital_provider(merchant_id)) AND (merchant_id IN ( SELECT providers.id\n   FROM providers\n  WHERE (providers.owner_id = ( SELECT auth.uid() AS uid))))))",
+    "with_check": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(merchant_id) AND (hospital_role(merchant_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)) OR ((NOT is_hospital_provider(merchant_id)) AND (merchant_id IN ( SELECT providers.id\n   FROM providers\n  WHERE (providers.owner_id = ( SELECT auth.uid() AS uid))))))"
+  },
+  {
+    "table": "departments",
+    "name": "members_view_own_department",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(id IN ( SELECT department_members.department_id\n   FROM department_members\n  WHERE ((department_members.user_id = ( SELECT auth.uid() AS uid)) AND (department_members.status = 'active'::text) AND (department_members.merchant_id = departments.merchant_id))))",
+    "with_check": null
+  },
+  {
+    "table": "doctor_front_desk_assignments",
+    "name": "hospital_admin_manage_doctor_assignments",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated,service_role}",
+    "cmd": "ALL",
+    "qual": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(provider_id) AND (hospital_role(provider_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)) OR ((NOT is_hospital_provider(provider_id)) AND (provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers))))",
+    "with_check": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(provider_id) AND (hospital_role(provider_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)) OR ((NOT is_hospital_provider(provider_id)) AND (provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers))))"
+  },
+  {
+    "table": "doctor_front_desk_assignments",
+    "name": "hospital_admin_read_doctor_assignments",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated,service_role}",
+    "cmd": "SELECT",
+    "qual": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(provider_id) AND (hospital_role(provider_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)) OR ((NOT is_hospital_provider(provider_id)) AND (provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers))))",
+    "with_check": null
+  },
+  {
+    "table": "merchant_memberships",
+    "name": "members_view_own_memberships",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "((user_id = ( SELECT auth.uid() AS uid)) OR is_admin(( SELECT auth.uid() AS uid)))",
+    "with_check": null
+  },
+  {
+    "table": "merchant_memberships",
+    "name": "store_owners_manage_memberships",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "qual": "is_merchant_owner_or_admin(provider_id, ( SELECT auth.uid() AS uid))",
+    "with_check": "is_merchant_owner_or_admin(provider_id, ( SELECT auth.uid() AS uid))"
+  },
+  {
+    "table": "notification_logs",
+    "name": "Admins and customer owners read notification logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(is_admin(auth.uid()) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.customer_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "table": "notification_logs",
+    "name": "Allow trusted and service role write to notification logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "ALL",
+    "qual": "((( SELECT auth.role() AS role) = 'service_role'::text) OR (current_setting('app.trusted_write'::text, true) = 'true'::text))",
+    "with_check": null
+  },
+  {
+    "table": "payments",
+    "name": "Users can read own payments",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((booking_id IN ( SELECT b.id\n   FROM bookings b\n  WHERE (b.customer_id = ( SELECT auth.uid() AS uid)))) OR (booking_id IN ( SELECT b.id\n   FROM (bookings b\n     JOIN providers p ON ((b.provider_id = p.id)))\n  WHERE ((p.owner_id = ( SELECT auth.uid() AS uid)) OR (p.id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers))))) OR is_admin(( SELECT auth.uid() AS uid))))",
+    "with_check": null
+  },
+  {
+    "table": "platform_config",
+    "name": "service_role_only_platform_config",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "ALL",
+    "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
+    "with_check": null
+  },
+  {
+    "table": "profiles",
+    "name": "Users can insert own profile",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(( SELECT auth.uid() AS uid) = id)"
+  },
+  {
+    "table": "profiles",
+    "name": "users_read_own_profile",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "((auth.uid() = id) OR is_admin(auth.uid()) OR (EXISTS ( SELECT 1\n   FROM merchant_memberships mm\n  WHERE ((mm.user_id = profiles.id) AND (mm.provider_id IN ( SELECT get_user_authorized_providers(auth.uid()) AS get_user_authorized_providers))))))",
+    "with_check": null
+  },
+  {
+    "table": "profiles",
+    "name": "users_update_own_profile",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "(auth.uid() = id)",
+    "with_check": "(auth.uid() = id)"
+  },
+  {
+    "table": "providers",
+    "name": "Active providers are readable by everyone",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "((status = 'ACTIVE'::provider_status) OR (( SELECT auth.uid() AS uid) = owner_id))",
+    "with_check": null
+  },
+  {
+    "table": "providers",
+    "name": "Merchants can insert own provider",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(( SELECT auth.uid() AS uid) = owner_id)"
+  },
+  {
+    "table": "providers",
+    "name": "Merchants can update own provider",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "UPDATE",
+    "qual": "(( SELECT auth.uid() AS uid) = owner_id)",
+    "with_check": null
+  },
+  {
+    "table": "providers",
+    "name": "merchants_update_own_provider",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "UPDATE",
+    "qual": "((id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers)) OR is_admin(( SELECT auth.uid() AS uid)))",
+    "with_check": null
+  },
+  {
+    "table": "push_tokens",
+    "name": "push_tokens_delete_own",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "table": "push_tokens",
+    "name": "push_tokens_insert_own",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "table": "push_tokens",
+    "name": "push_tokens_select_own",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": null
+  },
+  {
+    "table": "push_tokens",
+    "name": "push_tokens_update_own",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "qual": "(auth.uid() = user_id)",
+    "with_check": "(auth.uid() = user_id)"
+  },
+  {
+    "table": "resource_availability",
+    "name": "Availability is readable by everyone",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "table": "resource_availability",
+    "name": "Merchants can delete availability",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "DELETE",
+    "qual": "(resource_id IN ( SELECT r.id\n   FROM (resources r\n     JOIN providers p ON ((r.provider_id = p.id)))\n  WHERE (p.owner_id = ( SELECT auth.uid() AS uid))))",
+    "with_check": null
+  },
+  {
+    "table": "resource_availability",
+    "name": "Merchants can insert availability",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(resource_id IN ( SELECT r.id\n   FROM (resources r\n     JOIN providers p ON ((r.provider_id = p.id)))\n  WHERE (p.owner_id = ( SELECT auth.uid() AS uid))))"
+  },
+  {
+    "table": "resource_availability",
+    "name": "Merchants can update availability",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "UPDATE",
+    "qual": "(resource_id IN ( SELECT r.id\n   FROM (resources r\n     JOIN providers p ON ((r.provider_id = p.id)))\n  WHERE (p.owner_id = ( SELECT auth.uid() AS uid))))",
+    "with_check": null
+  },
+  {
+    "table": "resources",
+    "name": "Active resources are readable by everyone",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "((is_active = true) OR (provider_id IN ( SELECT p.id\n   FROM providers p\n  WHERE (p.owner_id = ( SELECT auth.uid() AS uid)))))",
+    "with_check": null
+  },
+  {
+    "table": "resources",
+    "name": "Merchants can delete resources",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "DELETE",
+    "qual": "(provider_id IN ( SELECT p.id\n   FROM providers p\n  WHERE (p.owner_id = ( SELECT auth.uid() AS uid))))",
+    "with_check": null
+  },
+  {
+    "table": "resources",
+    "name": "Merchants can insert resources",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(provider_id IN ( SELECT p.id\n   FROM providers p\n  WHERE (p.owner_id = ( SELECT auth.uid() AS uid))))"
+  },
+  {
+    "table": "resources",
+    "name": "Merchants can update resources",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "UPDATE",
+    "qual": "(provider_id IN ( SELECT p.id\n   FROM providers p\n  WHERE (p.owner_id = ( SELECT auth.uid() AS uid))))",
+    "with_check": null
+  },
+  {
+    "table": "resources",
+    "name": "hospital_admin_manage_resources",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated,service_role}",
+    "cmd": "ALL",
+    "qual": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(provider_id) AND (hospital_role(provider_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)))",
+    "with_check": "((( SELECT auth.role() AS role) = 'service_role'::text) OR is_admin(( SELECT auth.uid() AS uid)) OR (is_hospital_provider(provider_id) AND (hospital_role(provider_id, ( SELECT auth.uid() AS uid)) = 'admin'::text)))"
+  },
+  {
+    "table": "resources",
+    "name": "merchants_delete_resources",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "DELETE",
+    "qual": "((NOT is_hospital_provider(provider_id)) AND ((provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers)) OR is_admin(( SELECT auth.uid() AS uid))))",
+    "with_check": null
+  },
+  {
+    "table": "resources",
+    "name": "merchants_insert_resources",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "((NOT is_hospital_provider(provider_id)) AND ((provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers)) OR is_admin(( SELECT auth.uid() AS uid))))"
+  },
+  {
+    "table": "resources",
+    "name": "merchants_update_resources",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "UPDATE",
+    "qual": "((NOT is_hospital_provider(provider_id)) AND ((provider_id IN ( SELECT get_user_authorized_providers(( SELECT auth.uid() AS uid)) AS get_user_authorized_providers)) OR is_admin(( SELECT auth.uid() AS uid))))",
+    "with_check": null
+  },
+  {
+    "table": "staff_checkin_rate_limits",
+    "name": "staff_checkin_rate_limits_deny_all",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "ALL",
+    "qual": "false",
+    "with_check": "false"
+  },
+  {
+    "table": "sub_categories",
+    "name": "Subcategories are readable by everyone",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "table": "test_provider_clock_links",
+    "name": "test_provider_clock_links_deny_all",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "ALL",
+    "qual": "false",
+    "with_check": "false"
+  },
+  {
+    "table": "test_tenant_clocks",
+    "name": "test_tenant_clocks_deny_all",
+    "permissive": "PERMISSIVE",
+    "roles": "{anon,authenticated}",
+    "cmd": "ALL",
+    "qual": "false",
+    "with_check": "false"
+  },
+  {
+    "table": "user_consents",
+    "name": "Users manage own consents",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "ALL",
+    "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+    "with_check": null
+  }
+]
