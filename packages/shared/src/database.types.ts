@@ -323,9 +323,13 @@ export type Database = {
           is_followup: boolean
           is_present: boolean
           expected_payment_amount_paise: number | null
+          booked_for: 'self' | 'family'
           patient_name: string | null
           patient_phone: string | null
           patient_relationship: string | null
+          patient_age: number | null
+          is_minor: boolean
+          booking_note: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           platform_fee: number | null
           platform_fee_amount: number | null
@@ -377,9 +381,13 @@ export type Database = {
           is_followup?: boolean
           is_present?: boolean
           expected_payment_amount_paise?: number | null
+          booked_for?: 'self' | 'family'
           patient_name?: string | null
           patient_phone?: string | null
           patient_relationship?: string | null
+          patient_age?: number | null
+          is_minor?: boolean
+          booking_note?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
           platform_fee_amount?: number | null
@@ -431,9 +439,13 @@ export type Database = {
           is_followup?: boolean
           is_present?: boolean
           expected_payment_amount_paise?: number | null
+          booked_for?: 'self' | 'family'
           patient_name?: string | null
           patient_phone?: string | null
           patient_relationship?: string | null
+          patient_age?: number | null
+          is_minor?: boolean
+          booking_note?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
           platform_fee_amount?: number | null
@@ -1462,6 +1474,13 @@ export type Database = {
           status: Database["public"]["Enums"]["booking_status"] | null
           total_amount: number | null
           updated_at: string | null
+          booked_for: 'self' | 'family' | null
+          patient_name: string | null
+          patient_phone: string | null
+          patient_relationship: string | null
+          patient_age: number | null
+          is_minor: boolean | null
+          booking_note: string | null
         }
         Relationships: [
           {

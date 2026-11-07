@@ -153,9 +153,13 @@ export interface Booking {
   emergency_doctor_arrived?: boolean;
   emergency_patient_choice?: string | null;
   booking_for_someone_else?: boolean;
+  booked_for?: 'self' | 'family';
   patient_name?: string | null;
   patient_phone?: string | null;
   patient_relationship?: string | null;
+  patient_age?: number | null;
+  booking_note?: string | null;
+  is_minor?: boolean;
   total_charged?: number | null;
   version?: number;
   provider?: Provider;

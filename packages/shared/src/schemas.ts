@@ -8,9 +8,12 @@ export interface CreateHoldRequest {
   slot_end: string;
   customer_id: string;
   booking_for_someone_else?: boolean;
+  booked_for?: 'self' | 'family';
   patient_name?: string | null;
   patient_phone?: string | null;
   patient_relationship?: string | null;
+  patient_age?: number | null;
+  booking_note?: string | null;
 }
 
 export interface CreateHoldResponse {
@@ -27,6 +30,12 @@ export interface CreateHoldResponse {
   hold_expires_at?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_age?: number | null;
+  patient_relationship?: string | null;
+  is_minor?: boolean;
+  booking_note?: string | null;
   error?: string;
 }
 
