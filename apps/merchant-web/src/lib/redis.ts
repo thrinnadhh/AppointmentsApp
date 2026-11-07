@@ -37,15 +37,52 @@ function getIsUpstashConfigured(): boolean {
   return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 }
 
+let devRandomSalt: string | null = null;
+
+/**
+ * Asserts that a dedicated RATE_LIMIT_SALT (min 32 chars) is configured in production.
+ * Throws in production if RATE_LIMIT_SALT is missing or less than 32 characters.
+ */
+export function assertRateLimitSaltConfiguredInProduction(): void {
+  if (process.env.NODE_ENV === 'production') {
+    const salt = process.env.RATE_LIMIT_SALT;
+    if (!salt || typeof salt !== 'string' || salt.trim().length < 32) {
+      throw new Error(
+        'FATAL CONFIGURATION ERROR: RATE_LIMIT_SALT (min 32 chars) is required in production for rate limit pseudonymization.'
+      );
+    }
+  }
+}
+
+/**
+ * Retrieves the salt for rate-limit key pseudonymization.
+ * Uses dedicated RATE_LIMIT_SALT when configured (required >= 32 chars in production).
+ * In dev/test: generates an ephemeral random 32-byte salt per process if unset.
+ * Never defaults to a hardcoded string and never reuses SUPABASE_JWT_SECRET.
+ */
+export function getRateLimitSalt(): string {
+  const envSalt = process.env.RATE_LIMIT_SALT;
+  if (envSalt && envSalt.trim().length >= 32) {
+    return envSalt.trim();
+  }
+  if (!devRandomSalt) {
+    devRandomSalt = crypto.randomBytes(32).toString('hex');
+  }
+  return devRandomSalt;
+}
+
 /**
  * Asserts that Upstash Redis credentials are present in production environments.
  * Throws in production if UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN is missing.
  */
 export function assertRedisConfiguredInProduction(): void {
-  if (process.env.NODE_ENV === 'production' && !getIsUpstashConfigured()) {
-    throw new Error(
-      'FATAL CONFIGURATION ERROR: Upstash Redis credentials (UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN) are required in production for distributed locking and rate limiting.'
-    );
+  if (process.env.NODE_ENV === 'production') {
+    if (!getIsUpstashConfigured()) {
+      throw new Error(
+        'FATAL CONFIGURATION ERROR: Upstash Redis credentials (UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN) are required in production for distributed locking and rate limiting.'
+      );
+    }
+    assertRateLimitSaltConfiguredInProduction();
   }
 }
 
@@ -164,10 +201,10 @@ export async function releaseSlotLock(slotKey: string, lockToken?: string): Prom
 
 /**
  * Pseudonymizes sensitive identity strings (e.g. phone numbers, IP addresses, session tokens)
- * using HMAC-SHA256 with a secret salt to prevent raw PII transmission to external Redis stores.
+ * using HMAC-SHA256 with the dedicated salt to prevent raw PII transmission to external Redis stores.
  */
 export function hashRateLimitKey(target: string): string {
-  const salt = process.env.RATE_LIMIT_SALT || process.env.SUPABASE_JWT_SECRET || 'tpt-rate-limit-salt';
+  const salt = getRateLimitSalt();
   return crypto
     .createHmac('sha256', salt)
     .update(target.trim().toLowerCase())

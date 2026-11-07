@@ -4,6 +4,7 @@ import {
   acquireSlotLock,
   checkRateLimit,
   assertRedisConfiguredInProduction,
+  assertRateLimitSaltConfiguredInProduction,
   buildRateLimitRedisKey,
   hashRateLimitKey,
 } from '../../apps/merchant-web/src/lib/redis';
@@ -107,6 +108,7 @@ describe('Rate-Limit Backend & Concurrency Security Audit', () => {
     process.env.NODE_ENV = 'production';
     process.env.UPSTASH_REDIS_REST_URL = 'https://fake-upstash.mock.io';
     process.env.UPSTASH_REDIS_REST_TOKEN = 'mock-secret-token';
+    process.env.RATE_LIMIT_SALT = 'mock-dedicated-rate-limit-salt-at-least-32-chars';
 
     const phone = '+919999988888';
     let interceptedCommands = [];
@@ -134,6 +136,49 @@ describe('Rate-Limit Backend & Concurrency Security Audit', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it('9. assertRateLimitSaltConfiguredInProduction throws in production when salt is missing or < 32 chars', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.UPSTASH_REDIS_REST_URL = 'https://fake-upstash.mock.io';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'mock-secret-token';
+    delete process.env.RATE_LIMIT_SALT;
+
+    assert.throws(
+      () => assertRateLimitSaltConfiguredInProduction(),
+      /FATAL CONFIGURATION ERROR: RATE_LIMIT_SALT \(min 32 chars\) is required in production/
+    );
+
+    assert.throws(
+      () => assertRedisConfiguredInProduction(),
+      /FATAL CONFIGURATION ERROR: RATE_LIMIT_SALT \(min 32 chars\) is required in production/
+    );
+
+    process.env.RATE_LIMIT_SALT = 'too-short-salt';
+    assert.throws(
+      () => assertRateLimitSaltConfiguredInProduction(),
+      /FATAL CONFIGURATION ERROR: RATE_LIMIT_SALT \(min 32 chars\) is required in production/
+    );
+
+    process.env.RATE_LIMIT_SALT = 'valid-production-salt-that-is-at-least-32-chars-long';
+    assert.doesNotThrow(() => assertRateLimitSaltConfiguredInProduction());
+    assert.doesNotThrow(() => assertRedisConfiguredInProduction());
+  });
+
+  it('10. in dev/test without RATE_LIMIT_SALT, random per-process salt is generated and hashed keys never leak PII', () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.RATE_LIMIT_SALT;
+
+    const rawPhone = '+919912345678';
+    const rawIp = '10.0.0.1';
+
+    const phoneKey = buildRateLimitRedisKey(`otp-verify:${rawPhone}`);
+    assert.equal(phoneKey.includes(rawPhone), false);
+    assert.match(phoneKey, /^ratelimit:otp-verify:[0-9a-f]{16}$/);
+
+    const ipKey = buildRateLimitRedisKey(`otp-ip:${rawIp}`);
+    assert.equal(ipKey.includes(rawIp), false);
+    assert.match(ipKey, /^ratelimit:otp-ip:[0-9a-f]{16}$/);
   });
 });
 
