@@ -4,16 +4,16 @@
 **Date**: 2026-11-07  
 **Branch**: `audit/hardening-v3`  
 **Target Project Ref**: `ynkdnwhubfknnnzjtpeg`  
-**Total Advisor Findings Evaluated**: 101  
-**Total Resolved via Migrations / Code**: 100  
+**Total Advisor Findings Evaluated**: 102  
+**Total Resolved via Migrations / Code**: 101  
 **Total Manual Dashboard Actions Required**: 1  
 
 ---
 
 ## Executive Summary
 
-This report accounts for every single finding reported by the Supabase Security Advisor (101 items total). Each item has been audited and categorized as either:
-- **FIXED**: Remediated in versioned SQL migrations (`supabase/migrations/20261107000005_supabase_security_advisor_remediation.sql`) or code.
+This report accounts for every single finding reported by the Supabase Security Advisor (102 items total). Each item has been audited and categorized as either:
+- **FIXED**: Remediated in versioned SQL migrations (`20261107000005_supabase_security_advisor_remediation.sql`, `20261107000006_global_default_privileges_revoke.sql`, `20261107000007_fix_push_tokens_updated_at_search_path.sql`).
 - **ACCEPTED-WITH-REASON**: Kept executable for legitimate application operation with rigorous caller isolation (`auth.uid()` derivation, RLS parameter binding, payload length & rate limits, and audited against regression tests).
 - **MANUAL-ACTION-REQUIRED**: Cloud dashboard toggle requiring organization administrator credentials (`auth_leaked_password_protection`).
 
@@ -25,22 +25,24 @@ Every database change is authored strictly as a versioned migration. Zero old mi
 
 | Advisor Rule | Count | FIXED | ACCEPTED-WITH-REASON | MANUAL |
 | :--- | :---: | :---: | :---: | :---: |
+| `function_search_path_mutable` | 1 | 1 | 0 | 0 |
 | `extension_in_public` | 3 | 3 | 0 | 0 |
 | `rls_enabled_no_policy` | 3 | 3 | 0 | 0 |
 | `anon_security_definer_function_executable` | 19 | 15 | 4 | 0 |
 | `authenticated_security_definer_function_executable` | 75 | 53 | 22 | 0 |
 | `auth_leaked_password_protection` | 1 | 0 | 0 | 1 |
-| **Total** | **101** | **71** | **26** | **1** |
+| **Total** | **102** | **72** | **26** | **1** |
 
-*(Note: The 26 ACCEPTED-WITH-REASON functions correspond to the audited SECURITY DEFINER allowlist verified by tests/security/strix-regression.test.mjs test 3.5).*
+*(Note: The 26 ACCEPTED-WITH-REASON functions correspond to the audited SECURITY DEFINER allowlist verified by tests/security/strix-regression.test.mjs test 3.5 and supabase/tests/database/01_function_privileges.test.sql).*
 
 ---
 
-## Complete 101-Item Audit & Resolution Matrix
+## Complete 102-Item Audit & Resolution Matrix
 
 | # | Advisor Rule | Object / Name | Status | Technical Remediation & Security Rationale | Evidence / Verification |
 | :-: | :--- | :--- | :---: | :--- | :--- |
-| 1 | `extension_in_public` | `btree_gist` | **FIXED** | Moved extension `btree_gist` from public to `extensions` schema in migration 20261107000005. Explicitly granted USAGE to authenticated, anon, service_role. | Migration 20261107000005 section 1; 0 extension_in_public in db advisors |
+| 1 | `function_search_path_mutable` | `public.trg_push_tokens_updated_at` | **FIXED** | Configured explicit immutable search path `SET search_path = public, pg_temp` and restricted execute strictly to service_role in migration 20261107000007. | Migration 20261107000007; verified by pgTAP suite 03 test 1 |
+| 2 | `extension_in_public` | `btree_gist` | **FIXED** | Moved extension `btree_gist` from public to `extensions` schema in migration 20261107000005. Explicitly granted USAGE to authenticated, anon, service_role. | Migration 20261107000005 section 1; 0 extension_in_public in db advisors |
 | 2 | `extension_in_public` | `citext` | **FIXED** | Moved extension `citext` from public to `extensions` schema in migration 20261107000005. Explicitly granted USAGE to authenticated, anon, service_role. | Migration 20261107000005 section 1; 0 extension_in_public in db advisors |
 | 3 | `extension_in_public` | `pg_trgm` | **FIXED** | Moved extension `pg_trgm` from public to `extensions` schema in migration 20261107000005. Explicitly granted USAGE to authenticated, anon, service_role. | Migration 20261107000005 section 1; 0 extension_in_public in db advisors |
 | 4 | `anon_security_definer_function_executable` | `check_department_member_limit` | **FIXED** | Revoked EXECUTE on `check_department_member_limit` from PUBLIC, anon, authenticated in migration 20261107000005. Granted strictly to service_role. | Migration 20261107000005 section 3; 0 anon findings in db advisors |
