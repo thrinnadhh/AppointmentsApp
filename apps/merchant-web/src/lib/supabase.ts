@@ -163,6 +163,14 @@ export interface MerchantBookingWithDetails {
   resource_name?: string;
   resource_type?: string;
   provider_name?: string;
+  booking_for_someone_else?: boolean;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_phone?: string | null;
+  patient_relationship?: string | null;
+  patient_age?: number | null;
+  is_minor?: boolean;
+  booking_note?: string | null;
 }
 
 export async function manageLateQueueBooking(
@@ -232,7 +240,9 @@ export async function fetchMerchantBookings(
       hold_expires_at, created_at, updated_at, attachment_url, reminder_1h_sent_at,
       is_present, customer_name, customer_phone, no_show_count,
       resource_name, resource_type, provider_name, department_name, queue_position,
-      estimated_wait_minutes, checked_in_at
+      estimated_wait_minutes, checked_in_at,
+      booking_for_someone_else, booked_for, patient_name, patient_phone,
+      patient_relationship, patient_age, is_minor, booking_note
     `)
     .order('slot_start', { ascending: true })
     .range(offset, offset + limit - 1);
@@ -270,7 +280,9 @@ export async function fetchMerchantBookingById(
       hold_expires_at, created_at, updated_at, attachment_url, reminder_1h_sent_at,
       is_present, customer_name, customer_phone, no_show_count,
       resource_name, resource_type, provider_name, department_name, queue_position,
-      estimated_wait_minutes, checked_in_at
+      estimated_wait_minutes, checked_in_at,
+      booking_for_someone_else, booked_for, patient_name, patient_phone,
+      patient_relationship, patient_age, is_minor, booking_note
     `)
     .eq('id', bookingId)
     .maybeSingle();

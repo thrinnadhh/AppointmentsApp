@@ -20,6 +20,12 @@ interface RpcHoldResult {
   hold_expires_at?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_age?: number | null;
+  patient_relationship?: string | null;
+  is_minor?: boolean;
+  booking_note?: string | null;
   error?: string;
 }
 
@@ -108,6 +114,59 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Invalid slot duration: duration must be between 5 minutes and 8 hours' },
         { status: 400 }
       );
+    }
+
+    // Server-side validation for family / minor bookings
+    const bookedFor: 'self' | 'family' = body.booked_for || (body.booking_for_someone_else ? 'family' : 'self');
+    if (bookedFor !== 'self' && bookedFor !== 'family') {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid booked_for parameter: must be "self" or "family"' },
+        { status: 400 }
+      );
+    }
+
+    let validatedPatientName: string | null = body.patient_name ? body.patient_name.trim() : null;
+    let validatedPatientAge: number | null = body.patient_age !== undefined && body.patient_age !== null ? Number(body.patient_age) : null;
+    let validatedPatientRelationship: string | null = body.patient_relationship ? body.patient_relationship.trim() : null;
+    let validatedBookingNote: string | null = body.booking_note ? body.booking_note.trim() : null;
+
+    if (bookedFor === 'family') {
+      if (!validatedPatientName || validatedPatientName.length === 0) {
+        return NextResponse.json<CreateHoldResponse>(
+          { success: false, error: 'Patient name is required when booking for family / minor' },
+          { status: 400 }
+        );
+      }
+      if (validatedPatientName.length > 100) {
+        return NextResponse.json<CreateHoldResponse>(
+          { success: false, error: 'Patient name must not exceed 100 characters' },
+          { status: 400 }
+        );
+      }
+      if (validatedPatientAge !== null) {
+        if (isNaN(validatedPatientAge) || !Number.isInteger(validatedPatientAge) || validatedPatientAge < 0 || validatedPatientAge > 120) {
+          return NextResponse.json<CreateHoldResponse>(
+            { success: false, error: 'Patient age must be between 0 and 120' },
+            { status: 400 }
+          );
+        }
+      }
+      if (validatedPatientRelationship) {
+        const ALLOWED_RELATIONSHIPS = new Set(['child', 'spouse', 'parent', 'sibling', 'other']);
+        const lowerRel = validatedPatientRelationship.toLowerCase();
+        validatedPatientRelationship = ALLOWED_RELATIONSHIPS.has(lowerRel) ? lowerRel : 'other';
+      }
+      if (validatedBookingNote && validatedBookingNote.length > 200) {
+        return NextResponse.json<CreateHoldResponse>(
+          { success: false, error: 'Booking note must not exceed 200 characters' },
+          { status: 400 }
+        );
+      }
+    } else {
+      validatedPatientName = null;
+      validatedPatientAge = null;
+      validatedPatientRelationship = null;
+      validatedBookingNote = null;
     }
 
     // Customer Rate Limit: max 10 reservation attempts per customer per minute (relaxed in test)
@@ -289,10 +348,13 @@ export async function POST(req: NextRequest) {
       p_slot_start: slot_start,
       p_slot_end: slot_end,
       p_customer_id: customer_id,
-      p_booking_for_someone_else: Boolean(body.booking_for_someone_else),
-      p_patient_name: body.patient_name || null,
+      p_booking_for_someone_else: bookedFor === 'family',
+      p_patient_name: validatedPatientName,
       p_patient_phone: body.patient_phone || null,
-      p_patient_relationship: body.patient_relationship || null,
+      p_patient_relationship: validatedPatientRelationship,
+      p_booked_for: bookedFor,
+      p_patient_age: validatedPatientAge,
+      p_booking_note: validatedBookingNote,
     });
 
     if (error) {
@@ -378,6 +440,12 @@ export async function POST(req: NextRequest) {
         hold_expires_at: result.hold_expires_at,
         is_followup: result.is_followup,
         followup_original_booking_id: result.followup_original_booking_id,
+        booked_for: result.booked_for,
+        patient_name: result.patient_name ?? null,
+        patient_age: result.patient_age ?? null,
+        patient_relationship: result.patient_relationship ?? null,
+        is_minor: result.is_minor ?? false,
+        booking_note: result.booking_note ?? null,
       },
       { status: 201 }
     );

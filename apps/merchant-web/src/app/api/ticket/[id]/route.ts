@@ -22,7 +22,7 @@ export async function GET(
     // 1. Fetch booking
     const { data: booking, error: bErr } = await supabaseAdmin
       .from("bookings")
-      .select("id, reference_code, slot_start, slot_end, status, payment_status, deposit_amount, total_amount, platform_fee_amount, consultation_fee_amount, platform_payment_status, consultation_payment_status, consultation_collected_at, is_present, queue_position, checked_in_at, checked_in_method, customer_id, provider_id, resource_id")
+      .select("id, reference_code, slot_start, slot_end, status, payment_status, deposit_amount, total_amount, platform_fee_amount, consultation_fee_amount, platform_payment_status, consultation_payment_status, consultation_collected_at, is_present, queue_position, checked_in_at, checked_in_method, customer_id, provider_id, resource_id, booked_for, patient_name, patient_age, patient_relationship, is_minor, booking_note")
       .eq("id", id)
       .maybeSingle();
 
@@ -149,6 +149,12 @@ export async function GET(
         queue_position: booking.queue_position ?? null,
         checked_in_at: booking.checked_in_at,
         checked_in_method: booking.checked_in_method,
+        booked_for: booking.booked_for || 'self',
+        patient_name: booking.patient_name || null,
+        patient_age: booking.patient_age ?? null,
+        patient_relationship: booking.patient_relationship || null,
+        is_minor: Boolean(booking.is_minor),
+        booking_note: booking.booking_note || null,
       },
       customer: {
         id: booking.customer_id,

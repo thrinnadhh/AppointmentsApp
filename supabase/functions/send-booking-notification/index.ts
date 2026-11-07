@@ -70,30 +70,34 @@ interface NotificationRequest {
 }
 
 /**
- * Builds strictly privacy-safe notifications with ZERO patient names and ZERO health details.
+ * Builds notifications with ZERO health details or clinical symptoms.
+ * When booked for a family member, names the patient for clarity (e.g. "Appointment for Aarav is confirmed").
  */
 export function buildPrivacySafeNotification(
   eventType: NotificationEventType,
-  referenceCode?: string
+  referenceCode?: string,
+  patientName?: string | null
 ): { title: string; body: string } {
   const refSuffix = referenceCode ? ` (${referenceCode})` : '';
+  const trimmedPatient = patientName?.trim();
+  const patientSuffix = trimmedPatient ? ` for ${trimmedPatient}` : '';
 
   switch (eventType) {
     case 'BOOKING_CONFIRMED':
       return {
         title: `Appointment Confirmed${refSuffix}`,
-        body: 'Your appointment is confirmed. Arrival window is ±10 minutes of scheduled time.',
+        body: `Your appointment${patientSuffix} is confirmed. Arrival window is ±10 minutes of scheduled time.`,
       };
     case 'BOOKING_REMINDER':
     case 'BOOKING_REMINDER_1H':
     case 'BOOKING_REMINDER_30M':
       return {
         title: `Appointment Reminder${refSuffix}`,
-        body: 'Your appointment is scheduled soon. Please plan to arrive within your window.',
+        body: `Appointment${patientSuffix} is scheduled soon. Please plan to arrive within your window.`,
       };
     case 'PATIENT_UP_NEXT':
       return {
-        title: `You're Up Next${refSuffix}`,
+        title: trimmedPatient ? `${trimmedPatient} is Up Next${refSuffix}` : `You're Up Next${refSuffix}`,
         body: 'Please proceed to the consultation room area. Your turn is next.',
       };
     case 'ETA_LEFT_WINDOW':
@@ -109,12 +113,12 @@ export function buildPrivacySafeNotification(
     case 'BOOKING_CANCELLED':
       return {
         title: `Appointment Cancelled${refSuffix}`,
-        body: 'Your appointment has been cancelled. Tap to review status.',
+        body: `Appointment${patientSuffix} has been cancelled. Tap to review status.`,
       };
     default:
       return {
         title: `Appointment Update${refSuffix}`,
-        body: 'Your appointment status has updated. Tap to view your pass.',
+        body: `Appointment status${patientSuffix} has updated. Tap to view your pass.`,
       };
   }
 }
@@ -265,7 +269,7 @@ serve(async (req: Request) => {
     // Fetch booking to verify ownership and derive recipient
     const { data: booking, error: bkgErr } = await supabase
       .from('bookings')
-      .select('id, reference_code, customer_id, provider_id, status')
+      .select('id, reference_code, customer_id, provider_id, status, booked_for, patient_name')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -355,8 +359,10 @@ serve(async (req: Request) => {
       }
     }
 
-    // ── 4. Build Privacy-Preserving Notification (NO Patient Name / NO Health Details) ──
-    const notificationContent = buildPrivacySafeNotification(event_type, booking.reference_code);
+    // ── 4. Build Notification Content (Names patient if family booking) ─────
+    const targetPatientName =
+      (booking.booked_for === 'family' && booking.patient_name) ? booking.patient_name : null;
+    const notificationContent = buildPrivacySafeNotification(event_type, booking.reference_code, targetPatientName);
 
     const isProductionEnv =
       Deno.env.get('ENVIRONMENT') === 'production' ||
