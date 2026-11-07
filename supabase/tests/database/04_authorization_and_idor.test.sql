@@ -10,6 +10,11 @@
 BEGIN;
 SELECT plan(8);
 
+-- Insert throwaway test user to satisfy foreign key constraints during unauthorized simulation
+INSERT INTO auth.users (id, aud, role, email)
+VALUES ('99999999-9999-9999-9999-999999999991', 'authenticated', 'authenticated', 'unauthorized-test@example.com')
+ON CONFLICT (id) DO NOTHING;
+
 -- -----------------------------------------------------------------------------
 -- 1. Unauthenticated (anon) Caller Denials
 -- -----------------------------------------------------------------------------
@@ -108,12 +113,16 @@ SELECT is(
 -- -----------------------------------------------------------------------------
 -- 4. Cross-Tenant IDOR Rejection (reveal_customer_contact)
 -- -----------------------------------------------------------------------------
+CREATE TEMP TABLE test_idor_booking AS
+SELECT id FROM public.bookings LIMIT 1;
+GRANT SELECT ON test_idor_booking TO authenticated;
+
 SELECT throws_ok(
   $$
   SET LOCAL ROLE authenticated;
   SET LOCAL "request.jwt.claims" = '{"sub": "99999999-9999-9999-9999-999999999991", "role": "authenticated"}';
   SELECT public.reveal_customer_contact(
-    (SELECT id FROM public.bookings LIMIT 1),
+    (SELECT id FROM test_idor_booking),
     'Unauthorized audit attempt'
   );
   $$,

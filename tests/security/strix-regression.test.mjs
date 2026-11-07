@@ -970,22 +970,34 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         'FATAL: Trigger and maintenance functions must NOT be in public grant list!'
       );
 
-      // 2. Strict set comparison against reviewed allowlist
-      const expectedList = Array.from(REVIEWED_ALLOWLIST.keys()).sort();
+      // 2. Strict assertion: ZERO SECURITY DEFINER functions in public exposed to anon/authenticated
       const actualSorted = [...actualPublicFuncs].sort();
-
-      const unreviewed = actualSorted.filter(f => !REVIEWED_ALLOWLIST.has(f));
       assert.strictEqual(
-        unreviewed.length,
+        actualSorted.length,
         0,
-        `Detected unreviewed public SECURITY DEFINER functions granted to anon/authenticated:\n${unreviewed.join(', ')}`
+        `Expected ZERO public SECURITY DEFINER functions exposed to anon/authenticated under Pattern B architecture, got ${actualSorted.length}: ${actualSorted.join(', ')}`
       );
 
-      assert.deepStrictEqual(
-        actualSorted,
-        expectedList,
-        `Public SECURITY DEFINER allowlist mismatch. Expected ${expectedList.length} audited functions, got ${actualSorted.length}.`
-      );
+      // 3. Verify underlying implementations in private schema are SECURITY DEFINER
+      const privateQuery = `
+        SELECT DISTINCT p.proname
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'private'
+          AND p.prosecdef = true
+        ORDER BY p.proname;
+      `;
+      const privateOut = execSync(`docker exec -i supabase_db_Appointments psql -U postgres -d postgres -t -A -c "${privateQuery}"`, {
+        encoding: 'utf8'
+      }).trim();
+      const actualPrivateFuncs = privateOut.split('\n').map(s => s.trim()).filter(Boolean);
+      const expectedList = Array.from(REVIEWED_ALLOWLIST.keys()).sort();
+      for (const expectedFn of expectedList) {
+        assert.ok(
+          actualPrivateFuncs.includes(expectedFn),
+          `Expected private.${expectedFn} to be SECURITY DEFINER in private schema`
+        );
+      }
     });
 
     it('3.6 vuln-0003: Customer calling /rest/v1/rpc/confirm_booking_payment on their own PENDING booking fails (403), booking unchanged', async () => {
