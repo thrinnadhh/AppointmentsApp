@@ -769,7 +769,8 @@ DECLARE
     'merchant_update_cooling_period(uuid, integer)',
     'record_no_show(uuid)',
     'reorder_hospital_queue(uuid, uuid, date, integer)',
-    'reorder_hospital_queue(uuid, uuid, uuid[], uuid)'
+    'reorder_hospital_queue(uuid, uuid, uuid[], uuid)',
+    'collect_consultation_fee(uuid, numeric, text, text)'
   ];
 BEGIN
   FOREACH v_admin_proc IN ARRAY v_admin_procs LOOP
@@ -790,7 +791,6 @@ DECLARE
     'cancel_booking(uuid, text, text)',
     'cancel_doctor_emergency(uuid, timestamp with time zone, text, boolean)',
     'check_cooling_period_eligibility(uuid, uuid, timestamp with time zone)',
-    'collect_consultation_fee(uuid, numeric, text, text)',
     'complete_booking(uuid)',
     'create_booking_hold(uuid, timestamp with time zone, timestamp with time zone, uuid, boolean, text, text, text, text, smallint, text)',
     'create_booking_hold(uuid, timestamp with time zone, timestamp with time zone, uuid, boolean, text, text, text)',
