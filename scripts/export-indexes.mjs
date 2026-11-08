@@ -94,3 +94,4 @@ if (process.argv[1] && process.argv[1].endsWith('export-indexes.mjs')) {
     process.exit(1);
   });
 }
+

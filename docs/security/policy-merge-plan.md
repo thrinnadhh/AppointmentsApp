@@ -135,3 +135,4 @@ Before modifying or merging any policy on a table:
 - **Merge Strategy**:
   - Keep `Active resources are readable by everyone` for SELECT (TO public, authenticated).
   - Consolidate INSERT, UPDATE, DELETE into single policies per command TO authenticated combining merchant authorization and hospital admin authorization.
+
