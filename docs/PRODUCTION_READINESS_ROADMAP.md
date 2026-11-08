@@ -195,7 +195,7 @@ Report with file:line evidence and test output.
   - Executed read-only audit across 321 commits.
   - History was **NOT** rewritten or purged (`git rev-parse HEAD~1` confirms 46c25ab integrity).
   - Identified historical commits containing sensitive credentials that need operator rotation and filter-repo purging:
-    - `scripts/e2e-trinadh-hospital-test.mjs` (commit `9305ab5`): hardcoded Supabase project URL (`ynkdnwhubfknnnzjtpeg.supabase.co`), real service_role JWT key, and anon JWT key.
+    - `scripts/e2e-trinadh-hospital-test.mjs` (commit `9305ab5`): hardcoded Supabase project URL (`<project-ref>.supabase.co`), real service_role JWT key, and anon JWT key.
     - `tests/e2e/compliance-pages.spec.ts` (commit `5e51519`) & `tests/e2e/payment-full-flow.spec.ts` (commit `34b7d2c`): anon key for the same external Supabase instance.
     - Historical scripts `test-admin-logs.mjs` and `verify-logging.mjs` (commit `fb2e401`).
   - Generated copy-pasteable `git filter-repo` commands and step-by-step operator runbook covering backup mirroring, blob replacements, remote re-linking, force-push team coordination, and external credential rotation.

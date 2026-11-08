@@ -1,0 +1,146 @@
+=== GITLEAKS ALLOWLIST ENTRIES AUDIT (Total: 36) ===
+
+[ENTRY] "whsec_dGVzdF9ob29rX3NlY3JldF8xMjM0NTY3ODkwMTI="
+  Files appearing: .gitleaks.toml, tests/scripts/test-whatsapp-integration.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "whsec_dGVzdF_hook_secret_1234567890"
+  Files appearing: .gitleaks.toml
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vI"
+  Files appearing: tests/e2e/stories/seed.mjs, tests/e2e/stories/story-helpers.mjs, tests/e2e/test-clock-audit.test.mjs, tests/e2e/workstreams/sa2-checkin-arrival.test.mjs, tests/e2e/workstreams/sa4-consultation-flow.test.mjs, tests/e2e/workstreams/sa6-consultant-isolation.test.mjs, tests/e2e/workstreams/sa7-admin-governance.test.mjs, tests/k6/load-test-config.json, tests/scripts/generate-load-test-tokens.mjs, tests/scripts/run-mission-full-verification.mjs, tests/scripts/seed-mission-e2e.mjs, tests/scripts/test-customer-pagination-and-admin-dashboards.mjs, tests/scripts/test-e2e-logging-and-alerts.mjs, tests/scripts/test-expired-holds-limit.mjs, tests/scripts/test-logging-baseline.mjs, tests/scripts/test-profiles-security.mjs, tests/scripts/test-realtime-fanout.mjs, tests/scripts/test-ticket-freshness.mjs, tests/scripts/test-waitlist-security.mjs, tests/unit/hospital-split-payment.test.mjs, tests/unit/phase1-security-blockers.test.mjs, apps/merchant-web/src/app/api/bookings/confirm/route.ts, apps/merchant-web/src/lib/auth-admin.ts, apps/merchant-web/src/lib/supabase.ts, tests/e2e/harness/client-helpers.mjs, tests/e2e/harness/tenant-factory.mjs, tests/e2e/harness/test-clock.mjs, tests/e2e/workstreams/sa1-setup-roles.test.mjs, tests/e2e/workstreams/sa4-checkin.test.mjs, tests/e2e/workstreams/sa5-queue-integration.test.mjs
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "eyJhbGciOiJFUzI1NiIsImtpZCI6ImY4NjVkNGZlLWMxZDItNGY2Zi1iZDVmLWMxOGM1MzVhYjI2MiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vI"
+  Files appearing: playwright.config.ts, scripts/generate-full-test-table.mjs, scripts/seed-hospital-test-data.mjs, tests/e2e/edge-customer.spec.ts, tests/e2e/edge-integrations.spec.ts, tests/unit/hospital-hardened-rpcs.test.mjs, tests/unit/mantis-track1-database-hardening.test.mjs
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder"
+  Files appearing: .github/workflows/ci.yml, tests/unit/production-safety-and-guest-ux.test.mjs
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0"
+  Files appearing: .gitleaks.toml
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "valid-strong-anon-key-at-least-32-chars-long-1234567890"
+  Files appearing: .gitleaks.toml
+  Matches deployed environment credential? NO: synthetic mock length validator string
+
+[ENTRY] "whsec_live_validsecret12345678901234567890"
+  Files appearing: .gitleaks.toml
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "whsec_live_valid_9876543210"
+  Files appearing: .gitleaks.toml, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "valid_test_secret_12345678901234567890"
+  Files appearing: .gitleaks.toml
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "valid_test_secret_123456"
+  Files appearing: .gitleaks.toml, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "live_secret_valid_9876543210"
+  Files appearing: .gitleaks.toml, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "prod_anon_key_valid_length_123456"
+  Files appearing: .gitleaks.toml, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? NO: synthetic mock length validator string
+
+[ENTRY] "rzp_live_placeholder"
+  Files appearing: .github/workflows/ci.yml, .gitleaks.toml, apps/merchant-web/src/env.mjs, tests/scripts/test-security.mjs, tests/scripts/test-validation.mjs, tests/unit/git-secrets-and-ci-hygiene.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_test_placeholder"
+  Files appearing: .gitleaks.toml, apps/merchant-web/src/env.mjs, tests/scripts/test-security.mjs, tests/scripts/test-validation.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_live_your_key_id"
+  Files appearing: .gitleaks.toml, apps/customer-mobile/.env.example, apps/merchant-web/.env.example, tests/unit/git-secrets-and-ci-hygiene.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_test_51MockAppPlatform"
+  Files appearing: .github/workflows/ci.yml, .gitleaks.toml, playwright.config.ts
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_live_ValidKeyId12345"
+  Files appearing: .gitleaks.toml, tests/unit/git-secrets-and-ci-hygiene.test.mjs, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_live_SimulatedProductionKey"
+  Files appearing: .gitleaks.toml, tests/unit/git-secrets-and-ci-hygiene.test.mjs, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_live_ProductionKeySecret12345"
+  Files appearing: .gitleaks.toml, tests/unit/git-secrets-and-ci-hygiene.test.mjs, tests/unit/razorpay-refund-integration.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_live_ClientPublicKey99999"
+  Files appearing: .gitleaks.toml, tests/unit/git-secrets-and-ci-hygiene.test.mjs, tests/unit/razorpay-refund-integration.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_live_realauthkey123"
+  Files appearing: .gitleaks.toml, docs/backlog.md, tests/unit/git-secrets-and-ci-hygiene.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_test_ValidTestKey123"
+  Files appearing: .gitleaks.toml, tests/unit/phase2-functional-blockers.test.mjs, tests/unit/razorpay-refund-integration.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_test_FreshRefundKey"
+  Files appearing: .gitleaks.toml, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_test_RecoveryKey123"
+  Files appearing: .gitleaks.toml, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "mock_secret_key_1234567890"
+  Files appearing: .github/workflows/ci.yml, .gitleaks.toml, tests/unit/cross-tenant-authorization-matrix.test.mjs, playwright.config.ts
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "placeholder_production_"
+  Files appearing: .github/workflows/ci.yml, .gitleaks.toml, apps/merchant-web/src/env.mjs, tests/scripts/test-security.mjs, tests/scripts/test-validation.mjs
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "tirupati_e2e_secure_bypass_key_2026_x9k2"
+  Files appearing: .github/workflows/ci.yml, .gitleaks.toml, playwright.config.ts, scripts/simulate-otp-attack-before-after.mjs, tests/e2e/compliance-pages.spec.ts, tests/e2e/fixtures/test-fixtures.ts, tests/e2e/phase2-tenant-isolation.spec.ts, tests/scripts/test-expired-holds-limit.mjs, tests/scripts/verify-comprehensive-qa-and-security.mjs, tests/security/test-api-security-remediation.mjs, tests/unit/otp-circuit-breaker.test.mjs, tests/unit/phase2-functional-blockers.test.mjs
+  Matches deployed environment credential? YES: equals hardcoded fallback for SUPERADMIN_E2E_TOKEN and ADMIN_SECRET in CI workflow and dev server scripts
+
+[ENTRY] "d24831bb6c322697ea855e7464e8e9767191d1f4d340548e400bab603f927cfe"
+  Files appearing: .github/workflows/ci.yml, .gitleaks.toml
+  Matches deployed environment credential? YES: equals hardcoded fallback for DELETION_TOKEN_SECRET in .github/workflows/ci.yml (commit f7fcd52)
+
+[ENTRY] "4db7bab98814a119b6623780cca8595c148f0fc9d722884743a979a12aab37e3"
+  Files appearing: .gitleaks.toml, tests/scripts/verify-comprehensive-qa-and-security.mjs
+  Matches deployed environment credential? YES: equals hardcoded fallback for RAZORPAY_WEBHOOK_SECRET in historical test scripts (commit 7df953b)
+
+[ENTRY] "30772a35dc5bf0a5889b1af5dfd0409c364749e83c6e0e1d"
+  Files appearing: .gitleaks.toml, tests/e2e/razorpay-gateway.spec.ts, apps/merchant-web/src/app/api/webhooks/razorpay/route.ts
+  Matches deployed environment credential? YES: equals hardcoded fallback for RAZORPAY_WEBHOOK_SECRET in tests/e2e/payment-full-flow.spec.ts (commit 2b4289b)
+
+[ENTRY] "sk_live_xyz123"
+  Files appearing: .gitleaks.toml, tests/scripts/verify-logging.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "sk_live_998124912849124"
+  Files appearing: .gitleaks.toml, tests/scripts/utils/verify-logging.mjs, tests/scripts/verify-logging.mjs
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.do_not_leak"
+  Files appearing: tests/scripts/test-admin-logs.mjs
+  Matches deployed environment credential? NO (synthetic / test placeholder / mock pattern)
+
+[ENTRY] "rzp_test_TirupatiAppointmentsMock"
+  Files appearing: .gitleaks.toml, docs/SECRETS_OPERATOR_CHECKLIST.md, apps/merchant-web/src/lib/razorpay.ts
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+
+[ENTRY] "rzp_test_TirupatiAppointments"
+  Files appearing: .gitleaks.toml, docs/SECRETS_OPERATOR_CHECKLIST.md, apps/merchant-web/src/app/settings/page.tsx, apps/merchant-web/src/lib/razorpay.ts
+  Matches deployed environment credential? NO: mock token / test fixture identifier in unit tests
+

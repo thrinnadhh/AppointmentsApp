@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -100,7 +100,7 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
 
   test('TC-GOOGLE-07: Image upload API and shop registration persists photoUrl to providers.photos', async ({ request }) => {
     const uniqueSuffix = Date.now();
-    const testPhotoUrl = `https://ynkdnwhubfknnnzjtpeg.supabase.co/storage/v1/object/public/venue-assets/test-shop-${uniqueSuffix}.webp`;
+    const testPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/venue-assets/test-shop-${uniqueSuffix}.webp`;
 
     const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
     // Provision a clean unlinked test user to avoid email collision with existing merchants

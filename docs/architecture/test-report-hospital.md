@@ -3,7 +3,7 @@
 **Platform:** Tirupati Appointments Platform (`thrinnadhh/AppointmentsApp`)  
 **Target Vertical:** Hospital Medical Departments (`clinics` / `hospital`)  
 **Date of Execution:** 2026-10-18  
-**Connected Database:** Supabase Staging (`https://ynkdnwhubfknnnzjtpeg.supabase.co`)  
+**Connected Database:** Supabase Staging (`https://<project-ref>.supabase.co`)  
 **Environment Mode:** Strict Test Mode (Mock Clock IST, Razorpay Test Key, Fake Test Personas `@test-tirupati.local`)
 
 ---

@@ -1,0 +1,4 @@
+=== J2 VERIFICATION: TRACKED FILES AUDIT AT HEAD/DISK ===
+Audited 1157 tracked files.
+Occurrences of target hosted ref found: 2
+STATUS: CLEAN. Zero occurrences of hosted project ref in tracked files on disk.

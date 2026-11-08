@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { MerchantPortalPage } from './pages/merchant-portal.page';
 
 // Initialize Supabase Client mirroring Customer Mobile App configuration
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const customerSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

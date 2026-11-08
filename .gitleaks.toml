@@ -69,7 +69,6 @@ regexes = [
   '''sk_live_998124912849124''',
   # Historical prototype tokens in git history (flagged for operator rotation / purge in docs/SECRETS_OPERATOR_CHECKLIST.md)
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.do_not_leak''',
-  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlua2Rud2h1YmZrbm5uemp0cGVnI''',
   '''rzp_test_TirupatiAppointmentsMock''',
   '''rzp_test_TirupatiAppointments''',
 ]

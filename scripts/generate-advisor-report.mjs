@@ -7,7 +7,7 @@ let md = `# Supabase Security Advisor Resolution Report
 **Document Status**: COMPLETE & VERIFIED  
 **Date**: 2026-11-07  
 **Branch**: \`audit/hardening-v3\`  
-**Target Project Ref**: \`ynkdnwhubfknnnzjtpeg\`  
+**Target Project Ref**: \`<target-project-ref>\`  
 **Total Advisor Findings Evaluated**: 101  
 **Total Resolved via Migrations / Code**: 100  
 **Total Manual Dashboard Actions Required**: 1  
@@ -138,7 +138,7 @@ For findings that cannot be resolved via SQL migrations (\`auth_leaked_password_
 
 ### Remediation Steps (Production Supabase Dashboard)
 1. Log in to the [Supabase Dashboard](https://supabase.com/dashboard).
-2. Select target project ref: **\`ynkdnwhubfknnnzjtpeg\`**.
+2. Select target project ref: **\`<target-project-ref>\`**.
 3. In the left navigation sidebar, navigate to **Authentication** -> **Configuration** (or **Password Protection**).
 4. Locate the **"Leaked Password Protection"** toggle.
 5. Toggle **"Check for leaked passwords"** to **Enabled** (uses HaveIBeenPwned API with k-anonymity).

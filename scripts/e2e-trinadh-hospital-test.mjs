@@ -14,12 +14,21 @@
 
 import { createClient } from '../apps/merchant-web/node_modules/@supabase/supabase-js/dist/index.mjs';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+if (!SUPABASE_URL) {
+  console.error('Error: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL environment variable is required to run this script.');
+  process.exit(1);
+}
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SERVICE_ROLE_KEY) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required to run this administrative test script.');
+  console.error('Error: SUPABASE_SERVICE_ROLE_KEY environment variable is required to run this administrative test script.');
+  process.exit(1);
 }
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+if (!ANON_KEY) {
+  console.error('Error: NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY environment variable is required to run this script.');
+  process.exit(1);
+}
 
 const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },

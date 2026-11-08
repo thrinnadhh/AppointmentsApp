@@ -208,7 +208,7 @@
 
 ## docs/security/perf-advisor-resolution.md
 
-- **External Target Project Reference**: Line 7 specifies `Target Project Ref: ynkdnwhubfknnnzjtpeg`, which is an external hosted Supabase project, whereas local development and gate enforcement operate against local Supabase at `127.0.0.1:54322`.
+- **External Target Project Reference**: Earlier revisions specified an external hosted Supabase project ref, whereas local development and gate enforcement operate against local Supabase at `127.0.0.1:54322`.
 - **Unmerged `cities` Policy**: Section "Executive Summary" notes that `public.cities` multiple permissive policies consolidation was halted due to Rule 5 Security Gate because `Allow public read cities` contains `USING (true)`.
 
 ---

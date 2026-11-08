@@ -2,7 +2,7 @@
 
 > **Target Platform:** Appointments Platform (`thrinnadhh/AppointmentsApp`)  
 > **Vertical:** Hospital / Clinic Medical Departments  
-> **Environment:** Test / Staging (`https://ynkdnwhubfknnnzjtpeg.supabase.co`)  
+> **Environment:** Test / Staging (`https://<project-ref>.supabase.co`)  
 > **Merchant Web:** `http://localhost:3000` (Local Dev)  
 > **Default Password:** `HospitalTest2026!` (for all test personas)
 

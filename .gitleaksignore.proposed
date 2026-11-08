@@ -1,0 +1,6 @@
+# Proposed .gitleaksignore entries for historical leaked Supabase credentials
+# These require manual operator confirmation and key rotation/purge before activation.
+9305ab5c32ecc4b00eab078583cf257ea6790d2f:scripts/e2e-trinadh-hospital-test.mjs:jwt:19
+9305ab5c32ecc4b00eab078583cf257ea6790d2f:scripts/e2e-trinadh-hospital-test.mjs:jwt:21
+34b7d2c76c3f4008f2d56b9f3c75937ba9583b75:tests/e2e/payment-full-flow.spec.ts:jwt:7
+5e51519501ec2fbdab1291da76d27e2adba7ae51:tests/e2e/compliance-pages.spec.ts:jwt:342

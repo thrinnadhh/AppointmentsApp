@@ -1,0 +1,52 @@
+Finding:     '[1;3;mREDACTED[0m'
+Secret:      [1;3;mREDACTED[0m
+RuleID:      jwt
+Entropy:     5.548213
+File:        scripts/e2e-trinadh-hospital-test.mjs
+Line:        19
+Commit:      9305ab5c32ecc4b00eab078583cf257ea6790d2f
+Author:      thrinnadhh
+Email:       thrinnadhh.b97@gmail.com
+Date:        2026-10-03T13:24:51Z
+Fingerprint: 9305ab5c32ecc4b00eab078583cf257ea6790d2f:scripts/e2e-trinadh-hospital-test.mjs:jwt:19
+Link:        https://github.com/thrinnadhh/AppointmentsApp/blob/9305ab5c32ecc4b00eab078583cf257ea6790d2f/scripts/e2e-trinadh-hospital-test.mjs#L19
+
+Finding:     '[1;3;mREDACTED[0m'
+Secret:      [1;3;mREDACTED[0m
+RuleID:      jwt
+Entropy:     5.584548
+File:        scripts/e2e-trinadh-hospital-test.mjs
+Line:        21
+Commit:      9305ab5c32ecc4b00eab078583cf257ea6790d2f
+Author:      thrinnadhh
+Email:       thrinnadhh.b97@gmail.com
+Date:        2026-10-03T13:24:51Z
+Fingerprint: 9305ab5c32ecc4b00eab078583cf257ea6790d2f:scripts/e2e-trinadh-hospital-test.mjs:jwt:21
+Link:        https://github.com/thrinnadhh/AppointmentsApp/blob/9305ab5c32ecc4b00eab078583cf257ea6790d2f/scripts/e2e-trinadh-hospital-test.mjs#L21
+
+Finding:     ...PABASE_ANON_KEY || '[1;3;mREDACTED[0m'
+Secret:      [1;3;mREDACTED[0m
+RuleID:      jwt
+Entropy:     5.584548
+File:        tests/e2e/payment-full-flow.spec.ts
+Line:        7
+Commit:      34b7d2c76c3f4008f2d56b9f3c75937ba9583b75
+Author:      thrinnadhh
+Email:       thrinnadhh.b97@gmail.com
+Date:        2026-09-19T07:31:52Z
+Fingerprint: 34b7d2c76c3f4008f2d56b9f3c75937ba9583b75:tests/e2e/payment-full-flow.spec.ts:jwt:7
+Link:        https://github.com/thrinnadhh/AppointmentsApp/blob/34b7d2c76c3f4008f2d56b9f3c75937ba9583b75/tests/e2e/payment-full-flow.spec.ts#L7
+
+Finding:     ...PABASE_ANON_KEY || '[1;3;mREDACTED[0m'
+Secret:      [1;3;mREDACTED[0m
+RuleID:      jwt
+Entropy:     5.584548
+File:        tests/e2e/compliance-pages.spec.ts
+Line:        342
+Commit:      5e51519501ec2fbdab1291da76d27e2adba7ae51
+Author:      thrinnadhh
+Email:       thrinnadhh.b97@gmail.com
+Date:        2026-09-23T17:44:16Z
+Fingerprint: 5e51519501ec2fbdab1291da76d27e2adba7ae51:tests/e2e/compliance-pages.spec.ts:jwt:342
+Link:        https://github.com/thrinnadhh/AppointmentsApp/blob/5e51519501ec2fbdab1291da76d27e2adba7ae51/tests/e2e/compliance-pages.spec.ts#L342
+

@@ -4,7 +4,7 @@
 **Date**: 2026-11-08  
 **Branch**: `phase-perf-advisor-hardening`  
 **Target Local DB**: `postgresql://postgres:postgres@127.0.0.1:54322/postgres` (Port 54322)  
-**Target Project Ref**: `ynkdnwhubfknnnzjtpeg` (Manual migration deployment by user)  
+**Target Project Ref**: `<target-project-ref>` (Manual migration deployment by user)  
 **Total Advisor Findings Evaluated**: 84  
 **Total Database Advisor Warnings Remaining**: **0** (All WARN findings resolved or gate-halted per Rule 5)  
 
@@ -122,7 +122,7 @@ Querying for unindexed foreign keys across the entire database now returns **0 r
   - **KEEP-C**: Accelerates critical query paths (trigrams, timestamps, queues, statuses, geo lookups) (32 indexes).
   - **DROP-CANDIDATE**: Provably redundant exact duplicates (3 indexes, dropped in Migration 11).
 - **Post-Launch Revisit Plan**:
-  - After **2 to 4 weeks** of live production traffic on project `ynkdnwhubfknnnzjtpeg`, execute:
+  - After **2 to 4 weeks** of live production traffic on the production project, execute:
     ```sql
     SELECT schemaname, relname as table_name, indexrelname as index_name, idx_scan
     FROM pg_stat_user_indexes

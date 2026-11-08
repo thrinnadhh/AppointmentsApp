@@ -118,7 +118,7 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     expect([401, 403]).toContain(unauthResponse.status());
 
     // 2. Authenticated Admin request must succeed and return structured logs
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     const authRes = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
       headers: {
