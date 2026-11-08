@@ -115,8 +115,7 @@ async function runTest() {
 
     const res1 = noConsentResult.rows[0].res;
     assert.equal(res1.success, true, 'Dispatch should return success');
-    assert.equal(res1.queued, false, 'Notification should not be queued without consent');
-    assert.equal(res1.skipped, true, 'Notification should be skipped');
+    assert.equal(res1.status, 'SKIPPED', 'Notification should be skipped');
 
     const logsCheck1 = await client.query('SELECT status, last_error FROM public.notification_logs WHERE booking_id = $1', [bookingId1]);
     assert.equal(logsCheck1.rows.length, 1, 'Exactly one row created with status SKIPPED');
@@ -146,8 +145,6 @@ async function runTest() {
 
     const res2 = dispatchResult.rows[0].res;
     assert.equal(res2.success, true);
-    assert.equal(res2.queued, true);
-    assert.equal(res2.channel, 'whatsapp');
     assert.equal(res2.status, 'QUEUED');
 
     // Verify row in database

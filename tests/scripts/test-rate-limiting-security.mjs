@@ -34,11 +34,13 @@ describe('F-07 Rate Limiting & Distributed Locking Security Audit', () => {
     const origEnv = process.env.NODE_ENV;
     const origUrl = process.env.UPSTASH_REDIS_REST_URL;
     const origToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    const origSalt = process.env.RATE_LIMIT_SALT;
 
     try {
       process.env.NODE_ENV = 'production';
       process.env.UPSTASH_REDIS_REST_URL = 'https://fake-upstash-instance.upstash.io';
       process.env.UPSTASH_REDIS_REST_TOKEN = 'AXXXfakeTokenYYY';
+      process.env.RATE_LIMIT_SALT = 'mock_rate_limit_salt_32_chars_minimum_value';
 
       assert.doesNotThrow(
         () => assertRedisConfiguredInProduction(),
@@ -48,6 +50,7 @@ describe('F-07 Rate Limiting & Distributed Locking Security Audit', () => {
       process.env.NODE_ENV = origEnv;
       if (origUrl) process.env.UPSTASH_REDIS_REST_URL = origUrl; else delete process.env.UPSTASH_REDIS_REST_URL;
       if (origToken) process.env.UPSTASH_REDIS_REST_TOKEN = origToken; else delete process.env.UPSTASH_REDIS_REST_TOKEN;
+      if (origSalt) process.env.RATE_LIMIT_SALT = origSalt; else delete process.env.RATE_LIMIT_SALT;
     }
   });
 
