@@ -85,12 +85,12 @@ export async function POST(req: NextRequest) {
       const doctorLeft = Boolean((resource?.attributes as Record<string, unknown> | null)?.doctor_left);
       const isTestBypass =
         process.env.NODE_ENV !== 'production' &&
-        Boolean((body as Record<string, unknown>)?.force_e2e_bypass || caller?.id === '88888888-8888-8888-8888-888888888881');
+        Boolean((body as Record<string, unknown>)?.force_e2e_bypass);
 
       if (!isTestBypass) {
         if (!isSlotTimeUp) {
           return NextResponse.json<RecordNoShowResponse>(
-            { success: false, error: 'Premature no-show: Appointment slot time has not ended yet' },
+            { success: false, error: 'Premature no-show: Appointment slot time has not ended yet. Cannot report no-show for a future appointment.' },
             { status: 400 }
           );
         }

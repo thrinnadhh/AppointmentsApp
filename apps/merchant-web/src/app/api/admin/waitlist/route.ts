@@ -131,12 +131,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: rpcRes?.message || 'Failed to submit waitlist' }, { status: 400 });
     }
 
-    if (rpcRes.duplicate || rpcRes.already_registered) {
+    const isDuplicate = Boolean(
+      rpcRes.duplicate ||
+      rpcRes.already_registered ||
+      (typeof rpcRes.message === 'string' && rpcRes.message.toLowerCase().includes('already registered'))
+    );
+
+    if (isDuplicate) {
       return NextResponse.json({
         success: true,
         duplicate: true,
         already_registered: true,
-        message: 'Waitlist interest already registered for this city and phone',
+        message: rpcRes.message || 'Waitlist interest already registered for this city and phone',
         id: rpcRes.id,
       }, { status: 200 });
     }

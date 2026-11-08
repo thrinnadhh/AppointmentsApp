@@ -61,9 +61,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (booking.status !== 'CONFIRMED' && booking.status !== 'CHECKED_IN') {
+    if (booking.status !== 'CONFIRMED' && booking.status !== 'CHECKED_IN' && booking.status !== 'IN_CONSULTATION') {
       return NextResponse.json(
-        { success: false, error: `Invalid transition: Only CONFIRMED or CHECKED_IN bookings can be completed (current: ${booking.status})` },
+        { success: false, error: `Invalid transition: Only CONFIRMED, CHECKED_IN, or IN_CONSULTATION bookings can be completed (current: ${booking.status})` },
         { status: 400 }
       );
     }

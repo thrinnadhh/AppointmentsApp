@@ -66,12 +66,18 @@ export function isAllowedOrigin(origin: string | null): boolean {
       }
     }
 
-    // Production & preview whitelisted domains (Vercel & Cloudflare preview dynamic subdomains restricted to team slug)
-    const teamSlug = process.env.VERCEL_TEAM_SLUG || 'appointments4u';
-    const isVercelPreview =
-      /^appointments-merchant-(?:git-[a-z0-9_.-]+|[a-z0-9-]{8,})-(?:[a-z0-9-]+)\.vercel\.app$/i.test(host) &&
-      !host.startsWith('appointments-merchant-evil') &&
-      (host.endsWith(`-${teamSlug}.vercel.app`) || host.endsWith(`_${teamSlug}.vercel.app`));
+    // Production & preview whitelisted domains (restricted to explicit team slug and trusted preview branch prefixes)
+    // Fail-closed in production: previews rejected if VERCEL_TEAM_SLUG is not explicitly set.
+    const teamSlug = process.env.VERCEL_TEAM_SLUG || (process.env.NODE_ENV !== 'production' ? 'appointments4u' : null);
+    let isVercelPreview = false;
+    if (teamSlug) {
+      const escapedTeamSlug = teamSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const vercelPreviewRegex = new RegExp(
+        `^appointments-merchant-(?:git-(?:preview|staging|dev|release|main)(?:-[a-z0-9_.-]+)?|[a-z0-9]{9})-(?:${escapedTeamSlug})\\.vercel\\.app$`,
+        'i'
+      );
+      isVercelPreview = vercelPreviewRegex.test(host);
+    }
 
     if (
       host === 'appointments4u.in' ||

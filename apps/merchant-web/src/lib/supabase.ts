@@ -198,10 +198,12 @@ export async function manageLateQueueBooking(
   }
 }
 
+export const PROVIDER_SELECT_COLUMNS = 'id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, category_id, sub_category_id, weekly_hours, auto_accept_bookings, daily_booking_limit, is_booking_frozen, cooling_period_days, owner_id, created_at, updated_at';
+
 export async function fetchAllProviders(): Promise<(Provider & { resources: Resource[] })[]> {
   const { data, error } = await supabase
     .from('providers')
-    .select('*, resources(*)')
+    .select(`${PROVIDER_SELECT_COLUMNS}, resources(*)`)
     .order('name');
   if (error) {
     console.error('Error fetching providers:', error);
@@ -734,7 +736,7 @@ export async function fetchTenantContextData(): Promise<{
   if (defaultProviderId) {
     const { data: prov, error } = await supabase
       .from('providers')
-      .select('*, resources(*)')
+      .select(`${PROVIDER_SELECT_COLUMNS}, resources(*)`)
       .eq('id', defaultProviderId)
       .single();
     if (!error && prov) {
@@ -757,7 +759,7 @@ export async function fetchTenantContextData(): Promise<{
   if (!activeProvider && !isSuperAdmin) {
     const { data: ownedProviders } = await supabase
       .from('providers')
-      .select('*, resources(*)')
+      .select(`${PROVIDER_SELECT_COLUMNS}, resources(*)`)
       .eq('owner_id', userProfile.user.id)
       .limit(1);
     if (ownedProviders && ownedProviders.length > 0) {
@@ -770,7 +772,7 @@ export async function fetchTenantContextData(): Promise<{
     const userEmail = userProfile.user.email.toLowerCase().trim();
     const { data: matchedProviders } = await supabase
       .from('providers')
-      .select('*, resources(*)')
+      .select(`${PROVIDER_SELECT_COLUMNS}, resources(*)`)
       .ilike('email', userEmail)
       .limit(1);
 
@@ -809,7 +811,7 @@ export async function fetchTenantContextData(): Promise<{
       try {
         const { data: fallbackProv } = await supabase
           .from('providers')
-          .select('*, resources(*)')
+          .select(`${PROVIDER_SELECT_COLUMNS}, resources(*)`)
           .eq('id', fallbackId)
           .single();
         if (fallbackProv) {

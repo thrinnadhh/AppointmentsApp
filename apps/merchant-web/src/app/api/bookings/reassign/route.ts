@@ -39,7 +39,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, false);
+    const { data: isAdminRpc } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+    let isProvAdmin = Boolean(isAdminRpc);
+
+    if (!isProvAdmin) {
+      const { data: prov } = await supabaseAdmin
+        .from('providers')
+        .select('owner_id')
+        .eq('id', booking.provider_id)
+        .maybeSingle();
+      if (prov && prov.owner_id === caller.id) {
+        isProvAdmin = true;
+      }
+    }
+
+    if (!isProvAdmin) {
+      const { data: hRole } = await (supabaseAdmin.rpc as any)('hospital_role', {
+        p_provider_id: booking.provider_id,
+        p_user_id: caller.id,
+      });
+      if (hRole === 'admin' || hRole === 'owner') {
+        isProvAdmin = true;
+      }
+    }
+
+    if (!isProvAdmin) {
+      return NextResponse.json<ReassignResourceResponse>(
+        { success: false, error: 'Unauthorized: Only hospital administrators or merchant owners can reassign doctors' },
+        { status: 403 }
+      );
+    }
+
     const currentResourceCheck = await authorizeHospitalResourceOrMerchant(
       req,
       caller.id,
@@ -52,7 +82,7 @@ export async function POST(req: NextRequest) {
       booking.provider_id,
       new_resource_id
     );
-    if (!isAuthorized || !currentResourceCheck.authorized || !targetResourceCheck.authorized) {
+    if (!currentResourceCheck.authorized || !targetResourceCheck.authorized) {
       return NextResponse.json<ReassignResourceResponse>(
         { success: false, error: 'Unauthorized: Only authorized merchant staff or administrators can reassign resources' },
         { status: 403 }

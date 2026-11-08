@@ -47,7 +47,8 @@ import {
   Resource,
   WeeklyHours,
   DayOfWeek,
-  DaySchedule
+  DaySchedule,
+  PROVIDER_SELECT_COLUMNS
 } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 import { CustomerContactBadge } from '@/components/CustomerContactBadge';
@@ -1284,7 +1285,7 @@ export default function MerchantOverviewPage() {
     setLoading(true);
     setErrorMessage(null);
     try {
-      let query = supabase.from('providers').select('*, resources(*)').order('name');
+      let query = supabase.from('providers').select(`${PROVIDER_SELECT_COLUMNS}, resources(*)`).order('name');
       if (!isSuperAdmin && selectedProviderId) query = query.eq('id', selectedProviderId);
       const { data: fetchedProviders, error: providerError } = await query;
       if (providerError && !isDemoMode) throw providerError;

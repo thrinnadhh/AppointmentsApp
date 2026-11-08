@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Provider, Resource, MerchantMembership, VerticalConfig } from '@appointments/shared';
-import { supabase, fetchTenantContextData } from '@/lib/supabase';
+import { supabase, fetchTenantContextData, PROVIDER_SELECT_COLUMNS } from '@/lib/supabase';
 import { getVerticalConfig } from '@/lib/vertical-config';
 
 export interface MerchantTenantContextType {
@@ -137,7 +137,7 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
     try {
       const { data, error: provError } = await supabase
         .from('providers')
-        .select('*, resources(*)')
+        .select(`${PROVIDER_SELECT_COLUMNS}, resources(*)`)
         .eq('id', providerId)
         .single();
 
