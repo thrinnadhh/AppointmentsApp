@@ -856,37 +856,31 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
 
   // F-18: Migration idempotency
   it('F-18: Migration idempotency - re-running migration on existing data causes 0 errors', async () => {
-    const migrationSql = fs.readFileSync('supabase/migrations/20261106000001_family_minor_booking_support.sql', 'utf8');
-    // Execute full migration SQL
-    await dbPool.query(migrationSql);
-
-    // Assert columns and constraints still exist and function
-    const colRes = await dbPool.query(`
-      SELECT column_name, data_type, is_nullable 
-      FROM information_schema.columns 
-      WHERE table_name = 'bookings' AND column_name IN ('booked_for', 'patient_name', 'patient_age', 'patient_relationship', 'booking_note', 'is_minor');
+    // 1. Robust function snapshot via pg_get_functiondef to preserve latest schema
+    const snapshotRes = await dbPool.query(`
+      SELECT pg_get_functiondef(p.oid) as def
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname IN ('public', 'private')
     `);
-    assert.equal(colRes.rows.length, 6, 'All 6 columns must exist after rerun');
+    const fnSnapshots = snapshotRes.rows.map(r => r.def);
 
-    // Restore downstream migrations so test runner database state remains at latest schema
-    const downstream = [
-      'supabase/migrations/20261106000002_dpdp_scrub_family_booking_pii.sql',
-      'supabase/migrations/20261107000001_production_readiness_audit_hardening.sql',
-      'supabase/migrations/20261107000002_harden_security_definer_and_default_privileges.sql',
-      'supabase/migrations/20261107000003_complete_anonymize_user_data.sql',
-      'supabase/migrations/20261107000004_db_lint_and_policy_message_remediation.sql',
-      'supabase/migrations/20261107000005_supabase_security_advisor_remediation.sql',
-      'supabase/migrations/20261107000006_global_default_privileges_revoke.sql',
-      'supabase/migrations/20261107000007_fix_push_tokens_updated_at_search_path.sql',
-      'supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql',
-      'supabase/migrations/20261107000009_perf_auth_rls_initplan.sql',
-      'supabase/migrations/20261107000010_perf_multiple_permissive_policies.sql',
-      'supabase/migrations/20261107000011_perf_indexes.sql',
-      'supabase/migrations/20261108000001_perf_consolidate_cities_and_profiles.sql',
-    ];
-    for (const file of downstream) {
-      if (fs.existsSync(file)) {
-        await dbPool.query(fs.readFileSync(file, 'utf8'));
+    try {
+      const migrationSql = fs.readFileSync('supabase/migrations/20261106000001_family_minor_booking_support.sql', 'utf8');
+      // Execute full migration SQL
+      await dbPool.query(migrationSql);
+
+      // Assert columns and constraints still exist and function
+      const colRes = await dbPool.query(`
+        SELECT column_name, data_type, is_nullable 
+        FROM information_schema.columns 
+        WHERE table_name = 'bookings' AND column_name IN ('booked_for', 'patient_name', 'patient_age', 'patient_relationship', 'booking_note', 'is_minor');
+      `);
+      assert.equal(colRes.rows.length, 6, 'All 6 columns must exist after rerun');
+    } finally {
+      // 2. Restore all functions from snapshot so no function definition is downgraded
+      for (const def of fnSnapshots) {
+        await dbPool.query(def);
       }
     }
   });

@@ -350,8 +350,168 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
     assert.equal(alreadyCount, 1, 'Losing concurrent caller must receive ALREADY_CHECKED_IN');
   });
 
+  // 6. complete_booking RPC rejects non-CONFIRMED bookings
+  it('6. complete_booking RPC rejects non-CONFIRMED bookings (CHECKED_IN, IN_CONSULTATION, CANCELLED)', async () => {
+    // Create test booking in CHECKED_IN status
+    const bkgRes = await fetch(`${url}/rest/v1/bookings`, {
+      method: 'POST',
+      headers: serviceHeaders,
+      body: JSON.stringify({
+        customer_id: tokens.patient1.user.id,
+        provider_id: hospA.id,
+        resource_id: doc1.id,
+        department_id: deptNeuro.id,
+        slot_start: new Date(Date.now() + 1500 * 3600 * 1000).toISOString(),
+        slot_end: new Date(Date.now() + 1500 * 3600 * 1000 + 15 * 60 * 1000).toISOString(),
+        status: 'CHECKED_IN',
+        payment_status: 'CAPTURED',
+        reference_code: 'ST4-RPC-CMP',
+        deposit_amount: 100,
+        platform_fee: 10,
+        total_amount: 500,
+      }),
+    });
+    const bkg = (await bkgRes.json())[0];
+    assert.ok(bkg?.id, 'Booking must be created');
+
+    // 1. Call complete_booking RPC when status = 'CHECKED_IN'
+    const rpcCheckedIn = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
+      method: 'POST',
+      headers: userHeaders(tokens.adminApex),
+      body: JSON.stringify({ p_booking_id: bkg.id }),
+    });
+    const dataCheckedIn = await rpcCheckedIn.json();
+    assert.equal(dataCheckedIn.success, false, 'RPC must fail on CHECKED_IN booking');
+    assert.ok(dataCheckedIn.error.includes('Only CONFIRMED bookings can be completed'), `Expected error message but got: ${dataCheckedIn.error}`);
+
+    // 2. Change status to 'IN_CONSULTATION' and test RPC
+    await fetch(`${url}/rest/v1/bookings?id=eq.${bkg.id}`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: JSON.stringify({ status: 'IN_CONSULTATION' }),
+    });
+    const rpcInConsult = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
+      method: 'POST',
+      headers: userHeaders(tokens.neuroDoc),
+      body: JSON.stringify({ p_booking_id: bkg.id }),
+    });
+    const dataInConsult = await rpcInConsult.json();
+    assert.equal(dataInConsult.success, false, 'RPC must fail on IN_CONSULTATION booking');
+    assert.ok(dataInConsult.error.includes('Only CONFIRMED bookings can be completed'));
+
+    // 3. Change status to 'CONFIRMED' and test RPC succeeds
+    await fetch(`${url}/rest/v1/bookings?id=eq.${bkg.id}`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: JSON.stringify({ status: 'CONFIRMED' }),
+    });
+    const rpcConfirmed = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
+      method: 'POST',
+      headers: userHeaders(tokens.adminApex),
+      body: JSON.stringify({ p_booking_id: bkg.id }),
+    });
+    const dataConfirmed = await rpcConfirmed.json();
+    assert.equal(dataConfirmed.success, true, 'RPC must succeed on CONFIRMED booking');
+    assert.equal(dataConfirmed.status, 'COMPLETED');
+
+    // 4. Test calling again on COMPLETED booking
+    const rpcCompletedAgain = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
+      method: 'POST',
+      headers: userHeaders(tokens.adminApex),
+      body: JSON.stringify({ p_booking_id: bkg.id }),
+    });
+    const dataCompletedAgain = await rpcCompletedAgain.json();
+    assert.equal(dataCompletedAgain.success, false, 'RPC must fail on COMPLETED booking');
+  });
+
+  // 7. Hospital route status transitions: CHECKED_IN -> IN_CONSULTATION -> COMPLETED
+  it('7. Hospital route status transitions: CHECKED_IN -> IN_CONSULTATION -> COMPLETED with role checks', async () => {
+    const appBaseUrl = process.env.TEST_APP_URL || 'http://localhost:3000';
+    // Create test booking in CHECKED_IN status for doc1
+    const bkgRes = await fetch(`${url}/rest/v1/bookings`, {
+      method: 'POST',
+      headers: serviceHeaders,
+      body: JSON.stringify({
+        customer_id: tokens.patient1.user.id,
+        provider_id: hospA.id,
+        resource_id: doc1.id,
+        department_id: deptNeuro.id,
+        slot_start: new Date(Date.now() + 1600 * 3600 * 1000).toISOString(),
+        slot_end: new Date(Date.now() + 1600 * 3600 * 1000 + 15 * 60 * 1000).toISOString(),
+        status: 'CHECKED_IN',
+        payment_status: 'CAPTURED',
+        reference_code: 'ST4-TRANS',
+        deposit_amount: 100,
+        platform_fee: 10,
+        total_amount: 500,
+      }),
+    });
+    const bkg = (await bkgRes.json())[0];
+    assert.ok(bkg?.id, 'Booking must be created');
+
+    // Unauthorized caller: patient attempting to start consultation (403)
+    const unauthStart = await fetch(`${appBaseUrl}/api/bookings/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.patient1.token}` },
+      body: JSON.stringify({ booking_id: bkg.id }),
+    });
+    assert.equal(unauthStart.status, 403, 'Patient cannot start consultation');
+
+    // Cross-hospital admin attempting to start consultation (403)
+    const crossStart = await fetch(`${appBaseUrl}/api/bookings/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.adminBalaji.token}` },
+      body: JSON.stringify({ booking_id: bkg.id }),
+    });
+    assert.equal(crossStart.status, 403, 'Cross-hospital admin cannot start consultation');
+
+    // Authorized consultant (neuroDoc) starts consultation: CHECKED_IN -> IN_CONSULTATION
+    const authStart = await fetch(`${appBaseUrl}/api/bookings/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.neuroDoc.token}` },
+      body: JSON.stringify({ booking_id: bkg.id }),
+    });
+    assert.equal(authStart.status, 200, 'Authorized doctor can start consultation');
+    const startData = await authStart.json();
+    assert.equal(startData.status, 'IN_CONSULTATION');
+
+    // Illegal transition: attempt to admit (CHECKED_IN) on IN_CONSULTATION must be rejected (409)
+    const illegalAdmit = await fetch(`${appBaseUrl}/api/bookings/admit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.neuroDesk.token}` },
+      body: JSON.stringify({ booking_id: bkg.id }),
+    });
+    assert.equal(illegalAdmit.status, 409, 'Cannot revert IN_CONSULTATION to CHECKED_IN');
+
+    // Unauthorized caller: patient attempting to complete consultation (403)
+    const unauthComplete = await fetch(`${appBaseUrl}/api/bookings/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.patient1.token}` },
+      body: JSON.stringify({ booking_id: bkg.id }),
+    });
+    assert.equal(unauthComplete.status, 403, 'Patient cannot complete consultation');
+
+    // Authorized consultant completes consultation: IN_CONSULTATION -> COMPLETED
+    const authComplete = await fetch(`${appBaseUrl}/api/bookings/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.neuroDoc.token}` },
+      body: JSON.stringify({ booking_id: bkg.id }),
+    });
+    assert.equal(authComplete.status, 200, 'Authorized doctor can complete consultation');
+    const completeData = await authComplete.json();
+    assert.equal(completeData.status, 'COMPLETED');
+
+    // Terminal state protection: Cannot start or admit a COMPLETED booking
+    const illegalStartOnCompleted = await fetch(`${appBaseUrl}/api/bookings/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.neuroDoc.token}` },
+      body: JSON.stringify({ booking_id: bkg.id }),
+    });
+    assert.equal(illegalStartOnCompleted.status, 409, 'Cannot transition COMPLETED to IN_CONSULTATION');
+  });
+
   after(async () => {
-    for (const ref of ['ST4-DOC1', 'ST4-DOC2', 'ST4-DERMA']) {
+    for (const ref of ['ST4-DOC1', 'ST4-DOC2', 'ST4-DERMA', 'ST4-RPC-CMP', 'ST4-TRANS']) {
       await fetch(`${url}/rest/v1/bookings?reference_code=eq.${ref}`, {
         method: 'DELETE',
         headers: serviceHeaders

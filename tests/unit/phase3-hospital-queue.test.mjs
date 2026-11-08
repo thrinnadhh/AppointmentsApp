@@ -36,10 +36,10 @@ const fmtIST = (date) =>
   }).format(date instanceof Date ? date : new Date(date));
 
 describe('Phase 3: Hospital Queue Engine & Console/Customer Parity (R1-R7, Items 1-11)', () => {
-  it('Item 1: Shared GRACE = 5 minutes and pure per-consultant (resource_id) queue isolation', () => {
-    assert.equal(ON_TIME_GRACE_MINUTES, 5, 'Shared ON_TIME_GRACE_MINUTES must be 5');
-    assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 300,000ms');
-    assert.equal(SCHEDULER_GRACE_MINUTES, 5, 'Scheduler ON_TIME_GRACE_MINUTES must be 5');
+  it('Item 1: Shared GRACE = 10 minutes and pure per-consultant (resource_id) queue isolation', () => {
+    assert.equal(ON_TIME_GRACE_MINUTES, 10, 'Shared ON_TIME_GRACE_MINUTES must be 10 per SPEC.md');
+    assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 600,000ms');
+    assert.equal(SCHEDULER_GRACE_MINUTES, 10, 'Scheduler ON_TIME_GRACE_MINUTES must be 10');
     assert.equal(
       typeof evaluateConsultantQueue,
       'function',
@@ -119,16 +119,16 @@ describe('Phase 3: Hospital Queue Engine & Console/Customer Parity (R1-R7, Items
       slotStart: t('09:50').toISOString(),
       durationMinutes: 15,
       status: 'BOOKED',
-      arrivedAt: t('09:58').toISOString(),
+      arrivedAt: t('10:02').toISOString(), // Late (> 09:50 + 10m)
       bookingType: 'ONLINE',
     });
     // L2 (slot 10:00, 10m duration) arrived late at 10:06 (> 10:00 + 5m grace) -> standbyQueue
     engine.addBooking({
       id: 'L2_LATE_10M',
-      slotStart: t('10:00').toISOString(),
+      slotStart: t('09:55').toISOString(),
       durationMinutes: 10,
       status: 'BOOKED',
-      arrivedAt: t('10:06').toISOString(),
+      arrivedAt: t('10:06').toISOString(), // Late (> 09:55 + 10m)
       bookingType: 'ONLINE',
     });
     // P9 (slot 10:20, 10m duration) has NOT arrived yet (arrivedAt: null)
@@ -159,7 +159,7 @@ describe('Phase 3: Hospital Queue Engine & Console/Customer Parity (R1-R7, Items
       slotStart: t('09:50').toISOString(),
       durationMinutes: 15,
       status: 'BOOKED',
-      arrivedAt: t('09:58').toISOString(),
+      arrivedAt: t('10:02').toISOString(), // Late (> 09:50 + 10m)
       bookingType: 'ONLINE',
     });
     engineOnlyP6.addBooking({
@@ -831,7 +831,7 @@ describe('Phase 3: Hospital Queue Engine & Console/Customer Parity (R1-R7, Items
         duration_minutes: 15,
         status: 'CONFIRMED',
         is_present: true,
-        arrived_at: t('09:10').toISOString(), // Late (> 09:00 + 5m)
+        arrived_at: t('09:12').toISOString(), // Late (> 09:00 + 10m)
       },
       {
         id: 'ONTIME_P2',

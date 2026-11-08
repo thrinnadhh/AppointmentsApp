@@ -399,9 +399,9 @@ describe('Hospital Vertical: Queue Logic & Arrival Tags Test Suite', () => {
   // PHASE 1: Live Production Routes, Shared Constants, IST Date Helper & SQL
   // ---------------------------------------------------------------------------
   describe('Phase 1. Production Route & SQL Fixes (D2, D4, D6)', () => {
-    it('P1.1: exports shared ON_TIME_GRACE_MINUTES (5) and ON_TIME_GRACE_MS (300000)', () => {
-      assert.equal(ON_TIME_GRACE_MINUTES, 5);
-      assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000);
+    it('P1.1: exports shared ON_TIME_GRACE_MINUTES (10) and ON_TIME_GRACE_MS (600000) per SPEC.md', () => {
+      assert.equal(ON_TIME_GRACE_MINUTES, 10);
+      assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000);
     });
 
     it('P1.2: toClinicDateString buckets 00:15 IST (18:45 UTC previous day) into the correct IST date', () => {

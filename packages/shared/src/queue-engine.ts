@@ -27,7 +27,9 @@
 
 export type ArrivalTag = 'Early' | 'On Time' | 'Late' | 'Expected';
 
-export const ON_TIME_GRACE_MINUTES = 5;
+// SPEC.md Time and Queue: "Arrival window is plus or minus 10 minutes of the booked time."
+// "A patient is Late if checked in more than 10 minutes after the booked time;"
+export const ON_TIME_GRACE_MINUTES = 10;
 export const ON_TIME_GRACE_MS = ON_TIME_GRACE_MINUTES * 60 * 1000;
 
 /**

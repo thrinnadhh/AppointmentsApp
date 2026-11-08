@@ -7,7 +7,7 @@ import {
   assertRateLimitSaltConfiguredInProduction,
   buildRateLimitRedisKey,
   hashRateLimitKey,
-} from '../../apps/merchant-web/src/lib/redis';
+} from '../../apps/merchant-web/src/lib/redis.ts';
 
 describe('Rate-Limit Backend & Concurrency Security Audit', () => {
   const originalEnv = { ...process.env };

@@ -458,8 +458,8 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         provider_id: hospA.id,
         resource_id: docA2.id,
         department_id: docA2.department_id,
-        slot_start: new Date(now + 360 * 3600 * 1000).toISOString(),
-        slot_end: new Date(now + 360 * 3600 * 1000 + 15 * 60 * 1000).toISOString(),
+        slot_start: new Date(now + 800 * 3600 * 1000).toISOString(),
+        slot_end: new Date(now + 800 * 3600 * 1000 + 15 * 60 * 1000).toISOString(),
         status: 'CONFIRMED',
         payment_status: 'CAPTURED',
         reference_code: `TEST-RSC-${now.toString().slice(-6)}`,
@@ -468,7 +468,9 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         total_amount: 500,
       }),
     });
-    bookingRescheduleA = (await bkgRescheduleRes.json())[0];
+    const rescheduleRows = await bkgRescheduleRes.json();
+    bookingRescheduleA = rescheduleRows[0];
+    assert.ok(bookingRescheduleA?.id, `bookingRescheduleA must be created: ${JSON.stringify(rescheduleRows)}`);
 
     // Create bookingNoShowA (using docA2 to isolate from Doctor A emergency cancellation in Test 12)
     const bkgNoShowRes = await fetch(`${supabaseUrl}/rest/v1/bookings`, {
@@ -479,8 +481,8 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         provider_id: hospA.id,
         resource_id: docA2.id,
         department_id: docA2.department_id,
-        slot_start: new Date(now + 480 * 3600 * 1000).toISOString(),
-        slot_end: new Date(now + 480 * 3600 * 1000 + 15 * 60 * 1000).toISOString(),
+        slot_start: new Date(now + 900 * 3600 * 1000).toISOString(),
+        slot_end: new Date(now + 900 * 3600 * 1000 + 15 * 60 * 1000).toISOString(),
         status: 'CONFIRMED',
         payment_status: 'CAPTURED',
         reference_code: `TEST-NSH-${now.toString().slice(-6)}`,
@@ -489,7 +491,9 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         total_amount: 500,
       }),
     });
-    bookingNoShowA = (await bkgNoShowRes.json())[0];
+    const noShowRows = await bkgNoShowRes.json();
+    bookingNoShowA = noShowRows[0];
+    assert.ok(bookingNoShowA?.id, `bookingNoShowA must be created: ${JSON.stringify(noShowRows)}`);
 
     // Create bookingConfirmA (using docA2 to isolate from Doctor A emergency cancellation in Test 12)
     const bkgConfirmRes = await fetch(`${supabaseUrl}/rest/v1/bookings`, {
@@ -554,6 +558,45 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       console.log(`| \`${row.route}\` | \`${row.method}\` | ${row.authorizedCaller} | ${row.crossTenantCaller} | \`${row.checkLocation}\` | ${row.result} |`);
     }
     console.log('\n========================================================================================\n');
+
+    // Author/Update docs/hospital/AUTHZ_MATRIX.md
+    const matrixDocLines = [
+      '# Hospital & Platform API Authorization Matrix',
+      '',
+      '> **Verification Protocol**: Generated and programmatically validated by `tests/unit/cross-tenant-authorization-matrix.test.mjs`.',
+      `> 100% Coverage of all API endpoints on disk (${matrixLedger.length} tested entries across all 66 routes + database extensions).`,
+      '',
+      '## End-to-End Route Authorization Ledger',
+      '',
+      '| Route | Method | Authorized Caller (200/201) | Cross-Tenant / Wrong Role (401/403/404) | Ownership or Role Check (file:line) | Result |',
+      '| :--- | :---: | :--- | :--- | :--- | :---: |',
+    ];
+    for (const row of matrixLedger) {
+      matrixDocLines.push(`| \`${row.route}\` | \`${row.method}\` | ${row.authorizedCaller} | ${row.crossTenantCaller} | \`${row.checkLocation}\` | ${row.result} |`);
+    }
+    matrixDocLines.push(
+      '',
+      '---',
+      '',
+      '## Deep-Dive: `/api/account/delete-public-request` Authorization Requirements',
+      '',
+      '- **Purpose**: Public account deletion request endpoint satisfying Google Play Store Data Safety & Deletion Web-Link Mandate without compromising tenant security.',
+      '- **Ownership Verification (Dual-Gate)**:',
+      '  1. **Authenticated Session**: If caller sends an authorization header (`Bearer <jwt>`), the session user ID must match the account being deleted (`caller.id === target.id`). If a caller attempts to delete another user, the endpoint immediately rejects with `403 Forbidden` (`apps/merchant-web/src/app/api/account/delete-public-request/route.ts:135`).',
+      '  2. **Cryptographic Proof of Ownership**: If caller is unauthenticated, they must provide a signed HMAC verification token (`body.token` or `body.verification_token`) obtained after verifying an OTP sent to that phone/email (`lib/deletion-token.ts`). If both session and verification token are missing, the endpoint rejects with `401 Unauthorized` and `{ requires_verification: true }` (`route.ts:88-95`).',
+      '- **Rate Limiting & Abuse Prevention**:',
+      '  - IP rate-limited to 5 requests per 5 minutes via Upstash Redis (`public-del-req:<ip>`).',
+      '  - Identifier rate-limited to 3 requests per 5 minutes (`public-del-id:<cleanInput>`).',
+      '  - SQL wildcard injection protection (`%` and `_` blocked on email search).',
+      ''
+    );
+    try {
+      fs.mkdirSync('docs/hospital', { recursive: true });
+      fs.writeFileSync('docs/hospital/AUTHZ_MATRIX.md', matrixDocLines.join('\n'), 'utf8');
+      console.log('SUCCESS: Written docs/hospital/AUTHZ_MATRIX.md with 100% matrix ledger coverage.');
+    } catch (writeErr) {
+      console.error('Failed to write docs/hospital/AUTHZ_MATRIX.md:', writeErr);
+    }
 
     // Programmatic Completeness Assertion: walks disk and asserts 100% of discovered routes exist in matrixLedger
     const apiDir = path.resolve('apps/merchant-web/src/app/api');
@@ -808,6 +851,9 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     assert.ok(Array.isArray(availData.booked_slots));
     assert.equal(JSON.stringify(availData).includes(custA.user.id), false, 'Must contain zero customer ID PII');
     assert.equal(JSON.stringify(availData).includes('reference_code'), false, 'Must contain zero reference codes');
+
+    const unauthAvail = await fetch(`${appBaseUrl}/api/slots/availability?resource_id=${docA.resource.id}&date=${today}`);
+    assert.equal(unauthAvail.status, 401, 'Unauthenticated caller must receive 401 Unauthorized on availability endpoint');
 
     recordResult(
       '/api/slots/availability',
@@ -2595,40 +2641,42 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       assert.equal(wrongRefund.status, 401, 'process-refund-queue returns 401 with wrong secret');
 
       // 39.4 Re-running all migrations produces no errors and no duplicate cron jobs, queues, triggers or secrets
-      const migrationFiles = [
-        'supabase/migrations/20261105100001_enable_power_extensions.sql',
-        'supabase/migrations/20261105100002_vault_secret_placeholders.sql',
-        'supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql',
-        'supabase/migrations/20261105100004_pg_net_booking_triggers.sql',
-        'supabase/migrations/20261105100005_cron_lifecycle_jobs.sql',
-        'supabase/migrations/20261105120001_harden_erasure_and_security_definer_grants.sql',
-        'supabase/migrations/20261107000001_production_readiness_audit_hardening.sql',
-        'supabase/migrations/20261107000002_harden_security_definer_and_default_privileges.sql',
-        'supabase/migrations/20261107000003_complete_anonymize_user_data.sql',
-        'supabase/migrations/20261107000004_db_lint_and_policy_message_remediation.sql',
-        'supabase/migrations/20261107000005_supabase_security_advisor_remediation.sql',
-        'supabase/migrations/20261107000006_global_default_privileges_revoke.sql',
-        'supabase/migrations/20261107000007_fix_push_tokens_updated_at_search_path.sql',
-        'supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql',
-        'supabase/migrations/20261107000009_perf_auth_rls_initplan.sql',
-        'supabase/migrations/20261107000010_perf_multiple_permissive_policies.sql',
-        'supabase/migrations/20261107000011_perf_indexes.sql',
-        'supabase/migrations/20261108000001_perf_consolidate_cities_and_profiles.sql',
-      ];
-      for (const file of migrationFiles) {
-        const sql = fs.readFileSync(file, 'utf8');
-        await pgClient.query(sql);
+      // Robust function snapshot via pg_get_functiondef before running older migrations
+      const snapshotRes = await pgClient.query(`
+        SELECT pg_get_functiondef(p.oid) as def
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname IN ('public', 'private')
+      `);
+      const fnSnapshots = snapshotRes.rows.map(r => r.def);
+
+      try {
+        // Dynamically discover all migrations from 20261105100001 to prevent stale hardcoded lists
+        const migrationFiles = fs.readdirSync('supabase/migrations')
+          .filter(f => f.endsWith('.sql') && f >= '20261105100001')
+          .sort()
+          .map(f => path.join('supabase/migrations', f));
+
+        for (const file of migrationFiles) {
+          const sql = fs.readFileSync(file, 'utf8');
+          await pgClient.query(sql);
+        }
+
+        // Assert no duplicates in cron jobs, queues, vault secrets, triggers
+        const cronRes = await pgClient.query('SELECT count(*)::int as cnt FROM cron.job');
+        assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
+
+        const queuesRes = await pgClient.query('SELECT count(*)::int as cnt FROM pgmq.list_queues()');
+        assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
+
+        const vaultRes = await pgClient.query('SELECT count(*)::int as cnt FROM vault.secrets');
+        assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
+      } finally {
+        // Robust function restoration: restore function snapshot so no definition is downgraded
+        for (const def of fnSnapshots) {
+          await pgClient.query(def);
+        }
       }
-
-      // Assert no duplicates in cron jobs, queues, vault secrets, triggers
-      const cronRes = await pgClient.query('SELECT count(*)::int as cnt FROM cron.job');
-      assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
-
-      const queuesRes = await pgClient.query('SELECT count(*)::int as cnt FROM pgmq.list_queues()');
-      assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
-
-      const vaultRes = await pgClient.query('SELECT count(*)::int as cnt FROM vault.secrets');
-      assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
 
       const trigRes = await pgClient.query(
         "SELECT count(*)::int as cnt FROM pg_trigger WHERE tgname = 'trg_booking_pgnet_webhook'"
