@@ -62,8 +62,8 @@ const TABLE_TARGETS = {
       provider_id: FIXTURE_IDS.PROVIDER_H1,
       resource_id: FIXTURE_IDS.RESOURCE_H1,
       department_id: FIXTURE_IDS.DEPT_H1,
-      slot_start: new Date(Date.now() + 86400000).toISOString(),
-      slot_end: new Date(Date.now() + 86400000 + 1800000).toISOString(),
+      slot_start: new Date(Date.now() + 86400000 * 20).toISOString(),
+      slot_end: new Date(Date.now() + 86400000 * 20 + 1800000).toISOString(),
       status: 'CONFIRMED',
       deposit_amount: 100.00,
       payment_status: 'CAPTURED'
@@ -74,8 +74,8 @@ const TABLE_TARGETS = {
       provider_id: FIXTURE_IDS.PROVIDER_H2,
       resource_id: FIXTURE_IDS.RESOURCE_H2,
       department_id: FIXTURE_IDS.DEPT_H2,
-      slot_start: new Date(Date.now() + 86400000).toISOString(),
-      slot_end: new Date(Date.now() + 86400000 + 1800000).toISOString(),
+      slot_start: new Date(Date.now() + 86400000 * 30).toISOString(),
+      slot_end: new Date(Date.now() + 86400000 * 30 + 1800000).toISOString(),
       status: 'CONFIRMED',
       deposit_amount: 100.00,
       payment_status: 'CAPTURED'
@@ -364,6 +364,7 @@ export async function runAccessMatrix(pool) {
         };
 
         // 1. SELECT
+        await client.query('SAVEPOINT sp_select');
         try {
           const sel = await client.query(`SELECT id::text FROM public.${table} ORDER BY id::text;`);
           tableResult.select = {
@@ -372,6 +373,8 @@ export async function runAccessMatrix(pool) {
           };
         } catch (err) {
           tableResult.select = { error: err.message, count: 0, visible_ids: [] };
+        } finally {
+          await client.query('ROLLBACK TO SAVEPOINT sp_select');
         }
 
         const target = TABLE_TARGETS[table];

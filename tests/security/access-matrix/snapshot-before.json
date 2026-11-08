@@ -1,7 +1,41 @@
 {
   "anon": {
     "bookings": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table bookings",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
     },
     "cities": {
       "select": {
@@ -47,28 +81,300 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table city_settlements",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table city_waitlist",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table department_members",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
     },
     "departments": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table departments",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
     },
     "doctor_front_desk_assignments": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table doctor_front_desk_assignments",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
     },
     "merchant_memberships": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table merchant_memberships",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
     },
     "notification_logs": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table notification_logs",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
     },
     "profiles": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
     },
     "providers": {
       "select": {
@@ -120,10 +426,78 @@
       }
     },
     "resources": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table providers",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
     },
     "push_tokens": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table push_tokens",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      }
     }
   },
   "customerA": {
@@ -209,10 +583,77 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -361,7 +802,7 @@
     "notification_logs": {
       "select": {
         "visible_ids": [
-          "252c34d4-870c-48e2-a36d-120443c5906c",
+          "c8c5cfce-5af8-44a1-bace-045c83e6d56b",
           "f0000000-0000-0000-0000-000000000001"
         ],
         "count": 2
@@ -667,10 +1108,77 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -819,7 +1327,7 @@
     "notification_logs": {
       "select": {
         "visible_ids": [
-          "e9469b1f-34cd-4f3a-bffa-7d2c0cf05a62",
+          "cc59ac5f-cdc0-4165-b6bf-4de8f2c89df3",
           "f0000000-0000-0000-0000-000000000002"
         ],
         "count": 2
@@ -1123,10 +1631,77 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -1576,10 +2151,77 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -2031,10 +2673,77 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -2492,10 +3201,77 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -2947,10 +3723,77 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -3402,10 +4245,77 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -3857,10 +4767,79 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [
+          "f2000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -4330,10 +5309,80 @@
       }
     },
     "city_settlements": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "visible_ids": [
+          "f2000000-0000-0000-0000-000000000001",
+          "f2000000-0000-0000-0000-000000000002"
+        ],
+        "count": 2
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
     },
     "city_waitlist": {
-      "fatal_error": "current transaction is aborted, commands ignored until end of transaction block"
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
     },
     "department_members": {
       "select": {
@@ -4533,7 +5582,6 @@
         "visible_ids": [
           "01a7f181-fdad-4d15-9da1-9d102f450ab0",
           "1676687f-505b-4b13-a288-9eedae905d51",
-          "252c34d4-870c-48e2-a36d-120443c5906c",
           "34a07694-f182-475a-80cf-019fe13ed7ca",
           "3a0704d8-9cc9-46c7-abb5-71b468b4120b",
           "4897d2f8-859c-4f16-a87e-9281479e80cf",
@@ -4551,9 +5599,10 @@
           "b2cf52c9-a4c9-4a14-8bad-bf27f5dccc5d",
           "c66d38bb-fbd1-4f1b-af1f-1101b9a5dbf6",
           "c7bc34de-d5b3-4bfb-9928-5560fab6d386",
+          "c8c5cfce-5af8-44a1-bace-045c83e6d56b",
+          "cc59ac5f-cdc0-4165-b6bf-4de8f2c89df3",
           "d2d155a2-1a6e-4f27-81a8-4d31c3582f77",
           "e608472c-e109-4050-9538-8bf85e48923d",
-          "e9469b1f-34cd-4f3a-bffa-7d2c0cf05a62",
           "e95cbb00-960a-4126-810f-57d28f403097",
           "ece03033-1649-4c8c-a013-10229e55a2ab",
           "ee49cfaa-6854-4d2b-85ae-f6c45402e0fb",
@@ -4873,14 +5922,14 @@
         "count": 21
       },
       "insert_own": {
-        "allowed": false,
-        "rowCount": 0,
-        "error": "conflicting key value violates exclusion constraint \"no_overlapping_active_bookings\""
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
       },
       "insert_other": {
-        "allowed": false,
-        "rowCount": 0,
-        "error": "conflicting key value violates exclusion constraint \"no_overlapping_active_bookings\""
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
       },
       "update_own": {
         "allowed": true,
@@ -5230,7 +6279,6 @@
         "visible_ids": [
           "01a7f181-fdad-4d15-9da1-9d102f450ab0",
           "1676687f-505b-4b13-a288-9eedae905d51",
-          "252c34d4-870c-48e2-a36d-120443c5906c",
           "34a07694-f182-475a-80cf-019fe13ed7ca",
           "3a0704d8-9cc9-46c7-abb5-71b468b4120b",
           "4897d2f8-859c-4f16-a87e-9281479e80cf",
@@ -5248,9 +6296,10 @@
           "b2cf52c9-a4c9-4a14-8bad-bf27f5dccc5d",
           "c66d38bb-fbd1-4f1b-af1f-1101b9a5dbf6",
           "c7bc34de-d5b3-4bfb-9928-5560fab6d386",
+          "c8c5cfce-5af8-44a1-bace-045c83e6d56b",
+          "cc59ac5f-cdc0-4165-b6bf-4de8f2c89df3",
           "d2d155a2-1a6e-4f27-81a8-4d31c3582f77",
           "e608472c-e109-4050-9538-8bf85e48923d",
-          "e9469b1f-34cd-4f3a-bffa-7d2c0cf05a62",
           "e95cbb00-960a-4126-810f-57d28f403097",
           "ece03033-1649-4c8c-a013-10229e55a2ab",
           "ee49cfaa-6854-4d2b-85ae-f6c45402e0fb",

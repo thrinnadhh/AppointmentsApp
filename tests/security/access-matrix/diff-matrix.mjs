@@ -102,3 +102,4 @@ if (process.argv[1] && process.argv[1].endsWith('diff-matrix.mjs')) {
       process.exit(1);
     });
 }
+

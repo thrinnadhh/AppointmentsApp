@@ -20,6 +20,8 @@ DROP POLICY IF EXISTS "allow_reading_bookings" ON public.bookings;
 DROP POLICY IF EXISTS "hospital_members_read_accessible_bookings" ON public.bookings;
 DROP POLICY IF EXISTS "allow_updating_bookings" ON public.bookings;
 DROP POLICY IF EXISTS "hospital_members_update_accessible_bookings" ON public.bookings;
+DROP POLICY IF EXISTS "bookings_select_policy" ON public.bookings;
+DROP POLICY IF EXISTS "bookings_update_policy" ON public.bookings;
 
 -- Consolidated SELECT policy (authenticated)
 CREATE POLICY "bookings_select_policy"
@@ -119,8 +121,44 @@ CREATE POLICY "bookings_update_policy"
 -- 2. Table: public.city_settlements
 -- =============================================================================
 
+-- Helper function for city director check following Pattern B
+CREATE OR REPLACE FUNCTION private.is_city_director_for_city(p_city_id text, p_user_id uuid DEFAULT auth.uid())
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = p_user_id
+      AND role = 'city_director'::public.user_role
+      AND assigned_city_id = p_city_id
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_city_director_for_city(p_city_id text, p_user_id uuid DEFAULT auth.uid())
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY INVOKER
+SET search_path = ''
+AS $$
+  SELECT private.is_city_director_for_city(p_city_id, p_user_id);
+$$;
+
+REVOKE ALL ON FUNCTION private.is_city_director_for_city(text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_city_director_for_city(text, uuid) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.is_city_director_for_city(text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_city_director_for_city(text, uuid) TO authenticated, service_role;
+
 DROP POLICY IF EXISTS "Admins manage settlements" ON public.city_settlements;
 DROP POLICY IF EXISTS "City directors view own settlement" ON public.city_settlements;
+DROP POLICY IF EXISTS "city_settlements_select_policy" ON public.city_settlements;
+DROP POLICY IF EXISTS "city_settlements_insert_policy" ON public.city_settlements;
+DROP POLICY IF EXISTS "city_settlements_update_policy" ON public.city_settlements;
+DROP POLICY IF EXISTS "city_settlements_delete_policy" ON public.city_settlements;
 
 CREATE POLICY "city_settlements_select_policy"
   ON public.city_settlements
@@ -129,13 +167,7 @@ CREATE POLICY "city_settlements_select_policy"
   USING (
     is_admin((SELECT auth.uid()))
     OR is_admin()
-    OR (EXISTS (
-      SELECT 1
-      FROM public.profiles
-      WHERE profiles.id = (SELECT auth.uid())
-        AND (profiles.role)::text = 'city_director'::text
-        AND profiles.assigned_city_id = city_settlements.city_id
-    ))
+    OR public.is_city_director_for_city(city_id, (SELECT auth.uid()))
   );
 
 CREATE POLICY "city_settlements_insert_policy"
@@ -163,6 +195,10 @@ CREATE POLICY "city_settlements_delete_policy"
 
 DROP POLICY IF EXISTS "Admins only read city waitlist" ON public.city_waitlist;
 DROP POLICY IF EXISTS "Allow admin manage city waitlist" ON public.city_waitlist;
+DROP POLICY IF EXISTS "city_waitlist_select_policy" ON public.city_waitlist;
+DROP POLICY IF EXISTS "city_waitlist_insert_policy" ON public.city_waitlist;
+DROP POLICY IF EXISTS "city_waitlist_update_policy" ON public.city_waitlist;
+DROP POLICY IF EXISTS "city_waitlist_delete_policy" ON public.city_waitlist;
 
 CREATE POLICY "city_waitlist_select_policy"
   ON public.city_waitlist
@@ -235,6 +271,10 @@ CREATE POLICY "city_waitlist_delete_policy"
 
 DROP POLICY IF EXISTS "hospital_admin_manage_department_members" ON public.department_members;
 DROP POLICY IF EXISTS "members_view_own_membership" ON public.department_members;
+DROP POLICY IF EXISTS "department_members_select_policy" ON public.department_members;
+DROP POLICY IF EXISTS "department_members_insert_policy" ON public.department_members;
+DROP POLICY IF EXISTS "department_members_update_policy" ON public.department_members;
+DROP POLICY IF EXISTS "department_members_delete_policy" ON public.department_members;
 
 CREATE POLICY "department_members_select_policy"
   ON public.department_members
@@ -304,6 +344,10 @@ CREATE POLICY "department_members_delete_policy"
 
 DROP POLICY IF EXISTS "hospital_admin_manage_departments" ON public.departments;
 DROP POLICY IF EXISTS "members_view_own_department" ON public.departments;
+DROP POLICY IF EXISTS "departments_select_policy" ON public.departments;
+DROP POLICY IF EXISTS "departments_insert_policy" ON public.departments;
+DROP POLICY IF EXISTS "departments_update_policy" ON public.departments;
+DROP POLICY IF EXISTS "departments_delete_policy" ON public.departments;
 
 CREATE POLICY "departments_select_policy"
   ON public.departments
@@ -378,6 +422,10 @@ CREATE POLICY "departments_delete_policy"
 
 DROP POLICY IF EXISTS "hospital_admin_manage_doctor_assignments" ON public.doctor_front_desk_assignments;
 DROP POLICY IF EXISTS "hospital_admin_read_doctor_assignments" ON public.doctor_front_desk_assignments;
+DROP POLICY IF EXISTS "doctor_front_desk_assignments_select_policy" ON public.doctor_front_desk_assignments;
+DROP POLICY IF EXISTS "doctor_front_desk_assignments_insert_policy" ON public.doctor_front_desk_assignments;
+DROP POLICY IF EXISTS "doctor_front_desk_assignments_update_policy" ON public.doctor_front_desk_assignments;
+DROP POLICY IF EXISTS "doctor_front_desk_assignments_delete_policy" ON public.doctor_front_desk_assignments;
 
 CREATE POLICY "doctor_front_desk_assignments_select_policy"
   ON public.doctor_front_desk_assignments
@@ -445,6 +493,10 @@ CREATE POLICY "doctor_front_desk_assignments_delete_policy"
 
 DROP POLICY IF EXISTS "members_view_own_memberships" ON public.merchant_memberships;
 DROP POLICY IF EXISTS "store_owners_manage_memberships" ON public.merchant_memberships;
+DROP POLICY IF EXISTS "merchant_memberships_select_policy" ON public.merchant_memberships;
+DROP POLICY IF EXISTS "merchant_memberships_insert_policy" ON public.merchant_memberships;
+DROP POLICY IF EXISTS "merchant_memberships_update_policy" ON public.merchant_memberships;
+DROP POLICY IF EXISTS "merchant_memberships_delete_policy" ON public.merchant_memberships;
 
 CREATE POLICY "merchant_memberships_select_policy"
   ON public.merchant_memberships
@@ -483,6 +535,10 @@ CREATE POLICY "merchant_memberships_delete_policy"
 -- so it no longer overlaps with SELECT for authenticated users.
 DROP POLICY IF EXISTS "Allow trusted and service role write to notification logs" ON public.notification_logs;
 DROP POLICY IF EXISTS "Admins and customer owners read notification logs" ON public.notification_logs;
+DROP POLICY IF EXISTS "notification_logs_select_policy" ON public.notification_logs;
+DROP POLICY IF EXISTS "notification_logs_insert_policy" ON public.notification_logs;
+DROP POLICY IF EXISTS "notification_logs_update_policy" ON public.notification_logs;
+DROP POLICY IF EXISTS "notification_logs_delete_policy" ON public.notification_logs;
 
 CREATE POLICY "notification_logs_select_policy"
   ON public.notification_logs
@@ -537,6 +593,8 @@ CREATE POLICY "notification_logs_delete_policy"
 DROP POLICY IF EXISTS "Merchants can update own provider" ON public.providers;
 DROP POLICY IF EXISTS "merchants_update_own_provider" ON public.providers;
 DROP POLICY IF EXISTS "Merchants can insert own provider" ON public.providers;
+DROP POLICY IF EXISTS "merchants_insert_provider" ON public.providers;
+DROP POLICY IF EXISTS "merchants_update_provider" ON public.providers;
 
 CREATE POLICY "merchants_insert_provider"
   ON public.providers
@@ -571,6 +629,10 @@ DROP POLICY IF EXISTS "Merchants can update resources" ON public.resources;
 DROP POLICY IF EXISTS "merchants_update_resources" ON public.resources;
 DROP POLICY IF EXISTS "Merchants can delete resources" ON public.resources;
 DROP POLICY IF EXISTS "merchants_delete_resources" ON public.resources;
+DROP POLICY IF EXISTS "resources_select_policy" ON public.resources;
+DROP POLICY IF EXISTS "resources_insert_policy" ON public.resources;
+DROP POLICY IF EXISTS "resources_update_policy" ON public.resources;
+DROP POLICY IF EXISTS "resources_delete_policy" ON public.resources;
 
 CREATE POLICY "resources_select_policy"
   ON public.resources

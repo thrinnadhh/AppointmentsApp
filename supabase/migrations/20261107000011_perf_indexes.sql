@@ -51,3 +51,4 @@ COMMIT;
 -- ALTER TABLE public.appointment_checkin_codes ADD CONSTRAINT appointment_checkin_codes_booking_id_key UNIQUE (booking_id);
 -- CREATE INDEX IF NOT EXISTS idx_checkin_codes_booking_id ON public.appointment_checkin_codes (booking_id);
 -- CREATE INDEX IF NOT EXISTS idx_bookings_reference_code ON public.bookings (reference_code);
+

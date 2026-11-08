@@ -76,6 +76,15 @@ export async function setupAccessMatrixFixture(pool) {
     // Ensure we run with superuser privileges
     await client.query("SET LOCAL app.trusted_write = 'true'");
 
+    // Clean up any previous matrix fixture rows to make setup idempotent
+    await client.query(`
+      DELETE FROM public.department_members WHERE id IN ('${FIXTURE_IDS.DEPT_MEMBER_DOC_H1}', '${FIXTURE_IDS.DEPT_MEMBER_DESK_H1}', '${FIXTURE_IDS.DEPT_MEMBER_DESK_UNASSIGNED_H1}');
+      DELETE FROM public.doctor_front_desk_assignments WHERE id = '${FIXTURE_IDS.ASSIGNMENT_DESK_H1}';
+      DELETE FROM public.notification_logs WHERE id IN ('${FIXTURE_IDS.NOTIF_CUSTA}', '${FIXTURE_IDS.NOTIF_CUSTB}');
+      DELETE FROM public.push_tokens WHERE id IN ('${FIXTURE_IDS.PUSH_CUSTA}', '${FIXTURE_IDS.PUSH_CUSTB}');
+      DELETE FROM public.bookings WHERE id IN ('${FIXTURE_IDS.BOOKING_CUSTA_H1}', '${FIXTURE_IDS.BOOKING_CUSTB_H2}');
+    `);
+
     // 1. Ensure Cities exist
     await client.query(`
       INSERT INTO public.cities (id, name, state, status, latitude, longitude)
