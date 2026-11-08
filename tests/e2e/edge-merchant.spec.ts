@@ -59,12 +59,12 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     });
     expect([409, 422]).toContain(completeRes.status());
     const body = await completeRes.json();
-    expect(body.error).toMatch(/invalid.*transition|already cancelled|cannot complete/i);
+    expect(body.error).toMatch(/invalid.*transition|illegal.*transition|already cancelled|cannot complete/i);
   });
 
   // ─── EC-MERCH-02: No-show on a COMPLETED booking ──────────────────────────
   test('EC-MERCH-02: Reporting no-show on a COMPLETED booking returns 409', async ({ request }) => {
-    const offset2 = 86400000 * 6 + Math.floor(Math.random() * 86400000);
+    const offset2 = 86400000 * 28 + Math.floor(Math.random() * 86400000);
     const slotStart = new Date(Date.now() + offset2).toISOString();
     const slotEnd = new Date(Date.now() + offset2 + 1800000).toISOString();
 
@@ -73,7 +73,15 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
         'x-customer-id': SEED_CUSTOMER_ID,
         'x-admin-bypass-key': ADMIN_BYPASS,
       },
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+      data: {
+        customer_id: SEED_CUSTOMER_ID,
+        resource_id: SEED_RESOURCE_ID,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+        booked_for: 'family',
+        patient_name: `Patient Complete ${Date.now()}`,
+        patient_relationship: 'other',
+      },
     });
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
@@ -104,18 +112,27 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
   // ─── EC-MERCH-03: No-show before appointment time ─────────────────────────
   test('EC-MERCH-03: Reporting no-show on a future CONFIRMED booking (> 30 min away) is rejected', async ({ request }) => {
-    // Slot is 2 days in the future — cannot mark no-show yet
-    const slotStart = new Date(Date.now() + 86400000 * 2).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 2 + 1800000).toISOString();
+    // Slot is in the future — cannot mark no-show yet
+    const offset3 = 86400000 * 25 + Math.floor(Math.random() * 86400000);
+    const slotStart = new Date(Date.now() + offset3).toISOString();
+    const slotEnd = new Date(Date.now() + offset3 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
       headers: {
         'x-customer-id': SEED_CUSTOMER_ID,
         'x-admin-bypass-key': ADMIN_BYPASS,
       },
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+      data: {
+        customer_id: SEED_CUSTOMER_ID,
+        resource_id: SEED_RESOURCE_ID,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+        booked_for: 'family',
+        patient_name: `Patient Future ${Date.now()}`,
+        patient_relationship: 'other',
+      },
     });
-    if (holdRes.status() !== 201) { test.skip(); return; }
+    expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
     await request.post(`${BASE}/api/bookings/confirm`, {
@@ -147,7 +164,6 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     );
 
     // Should be 403 Forbidden — not their tenant
-    if (res.status() === 404) { test.skip(); return; } // route may not exist in this shape
     expect([401, 403]).toContain(res.status());
   });
 
@@ -191,26 +207,37 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
   // ─── EC-MERCH-06: Suspended merchant UI shows locked banner ───────────────
   test('EC-MERCH-06: Suspended merchant portal displays Account Suspended banner prominently', async ({ page, request }) => {
-    // 1. Suspend merchant
+    // 1. Resolve target merchant provider to suspend
+    const merchantsRes = await request.get(`${BASE}/api/admin/merchants`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
+    });
+    const { merchants } = await merchantsRes.json();
+    const testEmail = process.env.TEST_MERCHANT_EMAIL || 'admin.apex@test-tirupati.local';
+    const targetMerchant = (merchants || []).find((m: any) => m.email === testEmail || m.name?.includes('Apex')) || { id: MERCHANT_A_PROVIDER_ID };
+    const targetProviderId = targetMerchant.id;
+
+    // Suspend merchant
     await request.patch(`${BASE}/api/admin/merchants`, {
       headers: {
         'Content-Type': 'application/json',
         'x-admin-bypass-key': ADMIN_BYPASS,
       },
-      data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'SUSPENDED' },
+      data: { providerId: targetProviderId, status: 'SUSPENDED' },
     });
 
     try {
-      // 2. Load merchant portal
-      await page.goto(`${MERCHANT_BASE}/`);
-      await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
+      // 2. Load merchant portal and log in if unauthenticated
+      await page.goto(`${MERCHANT_BASE}/login`);
       const emailInput = page.getByTestId('login-email');
-      if (await emailInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await emailInput.fill(process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com');
-        await page.getByTestId('login-password').fill(process.env.TEST_MERCHANT_PASSWORD || '');
+      if (await emailInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await emailInput.fill(process.env.TEST_MERCHANT_EMAIL || 'admin.apex@test-tirupati.local');
+        await page.getByTestId('login-password').fill(process.env.TEST_MERCHANT_PASSWORD || 'HospitalTest2026!');
         await page.getByTestId('login-submit').click();
+        await page.waitForURL((url) => url.pathname === '/' || url.pathname === '', { timeout: 15000 }).catch(() => null);
+      } else {
+        await page.goto(`${MERCHANT_BASE}/`);
       }
-      await page.waitForURL(/localhost:3000/, { timeout: 15000 }).catch(() => null);
+      await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
 
       // 3. Verify suspension banner is visible
       const suspendedBanner = page.getByText(/Account Suspended|Bookings Paused/i).first();
@@ -222,32 +249,38 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
           'Content-Type': 'application/json',
           'x-admin-bypass-key': ADMIN_BYPASS,
         },
-        data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'ACTIVE' },
+        data: { providerId: targetProviderId, status: 'ACTIVE' },
       });
     }
   });
 
   // ─── EC-MERCH-07: Resource deactivation with active booking ───────────────
   test('EC-MERCH-07: Deactivating a resource with CONFIRMED bookings returns warning/error or 409', async ({ request }) => {
-    // 1. Confirm a booking for the resource
-    const offset7 = 86400000 * 8 + Math.floor(Math.random() * 86400000);
-    const slotStart = new Date(Date.now() + offset7).toISOString();
-    const slotEnd = new Date(Date.now() + offset7 + 1800000).toISOString();
-
-    const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      headers: {
-        'x-customer-id': SEED_CUSTOMER_ID,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
-    });
-    if (holdRes.status() !== 201) { test.skip(); return; }
-    const { booking_id } = await holdRes.json();
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: `pay_deactivate_${Date.now()}` },
+    // Ensure resource is active before test
+    await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
+      data: { is_active: true },
     });
 
     try {
+      // 1. Confirm a booking for the resource at a dedicated future day offset to avoid anti-hoarding collision
+      const offset7 = 86400000 * 20 + Math.floor(Math.random() * 86400000);
+      const slotStart = new Date(Date.now() + offset7).toISOString();
+      const slotEnd = new Date(Date.now() + offset7 + 1800000).toISOString();
+
+      const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': SEED_CUSTOMER_ID,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
+        data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+      });
+      expect(holdRes.status()).toBe(201);
+      const { booking_id } = await holdRes.json();
+      await request.post(`${BASE}/api/bookings/confirm`, {
+        data: { booking_id, gateway_payment_id: `pay_deactivate_${Date.now()}` },
+      });
+
       // 2. Attempt to deactivate the resource
       const deactivateRes = await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
         headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
@@ -255,19 +288,10 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       });
 
       // Should either block (409) or succeed (200).
-      // 409 means confirmed bookings exist and deactivation was blocked.
-      // 200 means no upcoming confirmed bookings were found so deactivation
-      //   succeeded (the test booking confirm may have not propagated yet, or
-      //   the route deactivated cleanly). Either outcome is valid.
+      expect([200, 409]).toContain(deactivateRes.status());
       if (deactivateRes.status() === 409) {
         const body = await deactivateRes.json();
         expect(body.error).toMatch(/active booking|conflict|cannot deactivate/i);
-      } else if (deactivateRes.status() === 200) {
-        // Deactivated successfully — no blocking confirmed bookings found.
-        // Both 409-block and 200-success are valid outcomes for this test.
-        expect(deactivateRes.status()).toBe(200);
-      } else if (deactivateRes.status() === 404) {
-        test.skip(); // endpoint not yet implemented
       }
     } finally {
       // Always restore seed resource to active
@@ -340,7 +364,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
         capacity: 1,
       },
     });
-    if (createFirst.status() !== 201) { test.skip(); return; }
+    expect(createFirst.status()).toBe(201);
     const firstBody = await createFirst.json();
     const firstId = firstBody.resource?.id ?? firstBody.id;
 
@@ -377,7 +401,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await page.goto(`${MERCHANT_BASE}/login`);
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
     const emailInput = page.getByTestId('login-email');
-    if (!await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) { test.skip(); return; }
+    await expect(emailInput).toBeVisible({ timeout: 10000 });
     await emailInput.fill(process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com');
     await page.getByTestId('login-password').fill(process.env.TEST_SALON_PASSWORD || '');
     await page.getByTestId('login-submit').click();

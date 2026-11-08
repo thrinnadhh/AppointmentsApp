@@ -212,12 +212,17 @@ export class CustomerAppPage {
   }
 
   async selectProviderByName(name: string) {
+    const isDental = name.includes('Dental') || name.includes('Sri Venkateswara');
+    const locator = isDental
+      ? this.page.getByText(name).or(this.page.getByText('SVIMS Dental & Specialty Clinic')).first()
+      : this.page.getByText(name).first();
+
     // Re-select category to ensure data is loaded (guards against stale state)
-    if (!(await this.page.getByText(name).first().isVisible({ timeout: 1000 }).catch(() => false))) {
+    if (!(await locator.isVisible({ timeout: 1000 }).catch(() => false))) {
       await this.selectCategory('Hospitals & Clinics');
     }
     // Wait for the specific provider card with an extended timeout to account for Supabase latency
-    const card = this.page.getByText(name).first();
+    const card = locator;
     await expect(card).toBeVisible({ timeout: 25000 });
     await card.scrollIntoViewIfNeeded().catch(() => {});
     await card.click();

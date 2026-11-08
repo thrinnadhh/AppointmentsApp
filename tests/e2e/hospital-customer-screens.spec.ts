@@ -1,8 +1,155 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 
+const DEMO_LOCKED_PAYLOAD = {
+  success: true,
+  is_window_open: false,
+  window_opens_at: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
+  booking: {
+    id: 'demo-locked-id',
+    resource_id: 'demo-res-1',
+    provider_id: 'demo-provider-id',
+    reference_code: 'TEST-LOCKED-PASS',
+    slot_start: new Date(Date.now() + 180 * 60 * 1000).toISOString(),
+    slot_end: new Date(Date.now() + 195 * 60 * 1000).toISOString(),
+    status: 'CONFIRMED',
+    payment_status: 'CAPTURED',
+    deposit_amount: 100,
+    is_present: false,
+    checked_in_at: null,
+    checked_in_method: null,
+    queue_position: 5,
+  },
+  customer: {
+    name: 'Demo Patient',
+    email: 'demo.patient@hospital.local',
+    phone: '+919999900001',
+  },
+  hospital: {
+    name: 'Tirupati Apex Hospital',
+    address: 'Test Medical Road, Tirupati, AP',
+    phone: '+919999900000',
+  },
+  doctor: {
+    id: 'demo-res-1',
+    name: 'Dr. A. Sharma (Neurologist)',
+    department: 'Neurology',
+    duration_minutes: 30,
+    price: 500,
+  },
+  checkin_code: null,
+};
+
+const DEMO_UNLOCKED_PAYLOAD = {
+  success: true,
+  is_window_open: true,
+  window_opens_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  booking: {
+    id: 'demo-booking-id',
+    resource_id: 'demo-res-1',
+    provider_id: 'demo-provider-id',
+    reference_code: 'TEST-DEMO-PASS',
+    slot_start: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    slot_end: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    status: 'CONFIRMED',
+    payment_status: 'CAPTURED',
+    deposit_amount: 100,
+    is_present: false,
+    checked_in_at: null,
+    checked_in_method: null,
+    queue_position: 1,
+  },
+  customer: {
+    name: 'Demo Patient',
+    email: 'demo.patient@hospital.local',
+    phone: '+919999900001',
+  },
+  hospital: {
+    name: 'Tirupati Apex Hospital',
+    address: 'Test Medical Road, Tirupati, AP',
+    phone: '+919999900000',
+  },
+  doctor: {
+    id: 'demo-res-1',
+    name: 'Dr. A. Sharma (Neurologist)',
+    department: 'Neurology',
+    duration_minutes: 30,
+    price: 500,
+  },
+  checkin_code: '4282',
+};
+
+const DEMO_QUEUE_SLOTS = [
+  {
+    slotIndex: 1,
+    slotStart: new Date(Date.now()).toISOString(),
+    slotEnd: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    formattedStartTime: '10:00 AM',
+    formattedEndTime: '10:15 AM',
+    type: 'SCHEDULED',
+    tokenNumber: 1,
+    referenceCode: 'TEST-DEMO-PASS',
+    bookingId: 'demo-booking-id',
+    patientName: 'Demo Patient',
+    isPresent: true,
+    isCurrentPatient: true,
+    statusLabel: 'In Consultation',
+    statusDescription: 'Patient is currently seeing doctor',
+    isGuaranteedUndisturbed: true,
+    isFastTracked: false,
+    isUpNext: false,
+  },
+  {
+    slotIndex: 2,
+    slotStart: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    slotEnd: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    formattedStartTime: '10:15 AM',
+    formattedEndTime: '10:30 AM',
+    type: 'SCHEDULED',
+    tokenNumber: 2,
+    referenceCode: 'TEST-NEXT-PASS',
+    bookingId: 'demo-next-id',
+    patientName: 'Next Patient',
+    isPresent: true,
+    isCurrentPatient: false,
+    statusLabel: 'Waiting',
+    statusDescription: 'Patient is waiting in lounge',
+    isGuaranteedUndisturbed: true,
+    isFastTracked: false,
+    isUpNext: true,
+  },
+];
+
 test.describe.serial('Phase 5d: Hospital Customer Web Ticket & OPD Booking Pass', () => {
   const baseUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
+
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/ticket/demo-locked*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(DEMO_LOCKED_PAYLOAD),
+      });
+    });
+    await page.route('**/api/ticket/demo', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(DEMO_UNLOCKED_PAYLOAD),
+      });
+    });
+    await page.route('**/api/customer/queue-and-history*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          queue: DEMO_QUEUE_SLOTS,
+          attendance: null,
+        }),
+      });
+    });
+  });
 
   test('1. Locked Check-in PIN Card renders with countdown timer when > 60 minutes before slot start', async ({ page }) => {
     await page.goto(`${baseUrl}/ticket/demo-locked`);
@@ -36,7 +183,7 @@ test.describe.serial('Phase 5d: Hospital Customer Web Ticket & OPD Booking Pass'
     await expect(page.getByText(/Reception Check-in PIN/i)).toBeVisible();
 
     // Verify Reference code badge
-    await expect(page.getByText('TEST-DEMO-PASS')).toBeVisible();
+    await expect(page.getByText('TEST-DEMO-PASS').first()).toBeVisible();
   });
 
   test('3. Next 10 Slots Queue Stepper and Realtime Status renders on ticket', async ({ page }) => {
@@ -51,19 +198,15 @@ test.describe.serial('Phase 5d: Hospital Customer Web Ticket & OPD Booking Pass'
   });
 
   test('4. Live database booking pass loads confirmed appointment from seed manifest', async ({ page }) => {
-    let manifest;
-    try {
-      manifest = JSON.parse(fs.readFileSync('scripts/test-seed-manifest.json', 'utf8'));
-    } catch {
-      test.skip(true, 'Test seed manifest not present');
-      return;
-    }
+    expect(fs.existsSync('scripts/test-seed-manifest.json')).toBe(true);
+    const manifest = JSON.parse(fs.readFileSync('scripts/test-seed-manifest.json', 'utf8'));
 
     const booking = manifest.bookings?.[0];
-    if (!booking) {
-      test.skip(true, 'No seeded booking found');
-      return;
-    }
+    expect(booking).toBeTruthy();
+
+    await page.addInitScript(({ id, last4 }) => {
+      sessionStorage.setItem(`ticket_phone_${id}`, last4);
+    }, { id: booking.id, last4: '0010' });
 
     await page.goto(`${baseUrl}/ticket/${booking.id}`);
 

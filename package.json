@@ -17,7 +17,7 @@
     "test:antigravity": "python3 -m unittest discover -s .agents/scripts/tests -v",
     "status": "python3 .agents/scripts/session_manager.py status .",
     "dev:merchant": "pnpm --filter @appointments/merchant-web dev",
-    "dev:mobile": "pnpm --filter @appointments/customer-mobile start",
+    "dev:mobile": "pnpm --filter @appointments/customer-mobile web --port 8081",
     "db:wipe": "node scripts/wipe-test-data.mjs",
     "db:seed": "node scripts/seed-hospital-test-data.mjs",
     "build": "pnpm -r --if-present build",
