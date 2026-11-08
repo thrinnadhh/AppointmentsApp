@@ -43,7 +43,7 @@ describe('Group 6: Git Secrets Audit, CI Gitleaks & Repository Hygiene', () => {
     }
   });
 
-  it('2. verifies .gitignore explicitly ignores .env* (allows !.env.example) and handles supabase/roles.sql', () => {
+  it('2. verifies .gitignore explicitly ignores .env* (allows !.env.example) and tracks supabase/roles.sql with zero passwords', () => {
     const gitignorePath = path.join(ROOT_DIR, '.gitignore');
     assert.ok(fs.existsSync(gitignorePath), '.gitignore must exist in repo root');
     const content = fs.readFileSync(gitignorePath, 'utf8');
@@ -58,9 +58,14 @@ describe('Group 6: Git Secrets Audit, CI Gitleaks & Repository Hygiene', () => {
       lines.includes('!.env.example'),
       '.gitignore must contain "!.env.example" exception to allow commit of example templates'
     );
+
+    // Verify supabase/roles.sql exists, is tracked, and contains zero plaintext passwords/secrets
+    const rolesPath = path.join(ROOT_DIR, 'supabase', 'roles.sql');
+    assert.ok(fs.existsSync(rolesPath), 'supabase/roles.sql must exist for deterministic db reset');
+    const rolesContent = fs.readFileSync(rolesPath, 'utf8');
     assert.ok(
-      lines.some((l) => l === 'supabase/roles.sql' || l === 'roles.sql'),
-      '.gitignore must explicitly contain rule for "supabase/roles.sql"'
+      !rolesContent.includes('password123') && !rolesContent.includes('secret_key'),
+      'supabase/roles.sql must not contain passwords or secrets'
     );
   });
 

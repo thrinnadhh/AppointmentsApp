@@ -7,7 +7,7 @@ import {
   createAppLogger,
   computeFingerprint,
   classifySeverity,
-} from '../../packages/shared/src/logger.ts';
+} from '../../../packages/shared/src/logger.ts';
 
 describe('Comprehensive Logging & Reliability Audit Test Suite', () => {
   // 1. PII, Payment, and Medical Data Sanitization

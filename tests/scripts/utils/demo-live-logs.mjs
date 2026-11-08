@@ -1,4 +1,4 @@
-import { createAppLogger, sanitizeLogData } from './packages/shared/src/logger.ts';
+import { createAppLogger, sanitizeLogData } from '../../../packages/shared/src/logger.ts';
 
 console.log('================================================================');
 console.log('🚀 LIVE APPLICATION LOGGING DEMONSTRATION & VERIFICATION');

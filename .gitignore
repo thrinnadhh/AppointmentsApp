@@ -78,7 +78,6 @@ signing_keys.json
 tests/e2e/stories/story-manifest.json
 story-manifest.json
 supabase/signing_keys.json
-supabase/roles.sql
 scripts/test-seed-manifest.json
 *signing_keys*.json
 scratch/

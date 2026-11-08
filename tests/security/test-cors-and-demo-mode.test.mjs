@@ -44,8 +44,48 @@ describe('CORS and Demo Mode Security Suite', () => {
     );
   });
 
+  it('strictly rejects arbitrary attacker project names (appointments-merchant-attackerproject-<our-team-slug>.vercel.app)', async () => {
+    const attackerOrigin = 'https://appointments-merchant-attackerproject-appointments4u.vercel.app';
+    const res = await fetch(`${APP_URL}/api/health`, {
+      headers: { Origin: attackerOrigin },
+    });
+    const allowOrigin = res.headers.get('access-control-allow-origin');
+    const allowCredentials = res.headers.get('access-control-allow-credentials');
+
+    assert.equal(
+      allowOrigin,
+      null,
+      `Attacker project origin ${attackerOrigin} must NOT receive Access-Control-Allow-Origin`
+    );
+    assert.equal(
+      allowCredentials,
+      null,
+      `Attacker project origin ${attackerOrigin} must NOT receive Access-Control-Allow-Credentials`
+    );
+  });
+
+  it('strictly rejects malicious or unauthorized git branch previews (appointments-merchant-git-x-evil-<our-team-slug>.vercel.app)', async () => {
+    const evilBranchOrigin = 'https://appointments-merchant-git-x-evil-appointments4u.vercel.app';
+    const res = await fetch(`${APP_URL}/api/health`, {
+      headers: { Origin: evilBranchOrigin },
+    });
+    const allowOrigin = res.headers.get('access-control-allow-origin');
+    const allowCredentials = res.headers.get('access-control-allow-credentials');
+
+    assert.equal(
+      allowOrigin,
+      null,
+      `Untrusted branch preview origin ${evilBranchOrigin} must NOT receive Access-Control-Allow-Origin`
+    );
+    assert.equal(
+      allowCredentials,
+      null,
+      `Untrusted branch preview origin ${evilBranchOrigin} must NOT receive Access-Control-Allow-Credentials`
+    );
+  });
+
   it('allows verified team preview origin but suppresses Access-Control-Allow-Credentials', async () => {
-    const teamPreviewOrigin = 'https://appointments-merchant-preview-123-appointments4u.vercel.app';
+    const teamPreviewOrigin = 'https://appointments-merchant-git-preview-123-appointments4u.vercel.app';
     const res = await fetch(`${APP_URL}/api/health`, {
       headers: { Origin: teamPreviewOrigin },
     });

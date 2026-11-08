@@ -23,11 +23,25 @@ const logger = createAppLogger({
 console.log('1. Simulating Component-Level Error in ProviderDetailScreen...');
 const providerDetailLogger = logger.forComponent('ProviderDetailScreen');
 
+// Planted Canary Secrets for Leak Detection
+const CANARY_SECRETS = [
+  'CANARY_PASSWORD_SECRET_987654',
+  'CANARY_BEARER_JWT_PAYLOAD_ABC123',
+  'canary_raw_jwt_signature_xyz',
+  'CANARY_PAN_ABCDE1234F',
+  '9440123456',
+  'CANARY_API_KEY_sk_live_canary999',
+  'top_secret_auth_key',
+];
+
 await providerDetailLogger.error('Failed to reserve requested slot due to concurrency collision', new Error('Slot occupied at 10:30 AM'), {
   slotId: 'slot_99812_tirupati',
-  authHeader: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_token_payload.abc',
+  authHeader: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.CANARY_BEARER_JWT_PAYLOAD_ABC123.abc',
   customerPhone: '+91 94401 23456',
   internalSecretKey: 'top_secret_auth_key',
+  password: 'CANARY_PASSWORD_SECRET_987654',
+  apiKey: 'CANARY_API_KEY_sk_live_canary999',
+  pan: 'CANARY_PAN_ABCDE1234F',
   priceBreakdown: {
     serviceFee: 500,
     depositAmount: 50,
@@ -52,7 +66,7 @@ const mobileBoundaryLogger = mobileLogger.forComponent('MobileErrorBoundary');
 
 await mobileBoundaryLogger.error('Render crash: Cannot read property "provider_name" of undefined', new Error('TypeError: undefined is not an object'), {
   screen: 'CheckoutModal',
-  userToken: 'eyJh_secret_user_jwt.xxx.yyy',
+  userToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.canary_raw_jwt_signature_xyz',
   customerMobile: '9440123456',
   componentStack: '\n  in CheckoutModal (at App.tsx:550)\n  in ErrorBoundary (at App.tsx:538)',
 });
@@ -73,11 +87,14 @@ liveLogStore.forEach((log, index) => {
 
 console.log('\n✅ Verification Check:');
 const serialized = JSON.stringify(liveLogStore);
-const leakedSecrets = serialized.includes('top_secret_auth_key') || serialized.includes('dummy_token_payload') || serialized.includes('9440123456');
 
-if (!leakedSecrets) {
-  console.log('🎉 100% PII & Secret Redaction Confirmed: No credentials, raw phone numbers, or tokens were leaked!');
+const leakedCanaries = CANARY_SECRETS.filter((secret) => serialized.includes(secret));
+
+if (leakedCanaries.length === 0) {
+  console.log(`🎉 100% PII & Secret Redaction Confirmed: All ${CANARY_SECRETS.length} planted canary secrets were completely sanitized!`);
+  console.log('Zero credentials, raw phone numbers, PANs, passwords, or tokens leaked into logs.');
 } else {
-  console.error('❌ Alert: Potential secret leak detected.');
+  console.error('❌ CRITICAL SECURITY ALERT: Leaked canary secrets detected in logs:', leakedCanaries);
   process.exit(1);
 }
+

@@ -24,6 +24,7 @@ paths = [
   '''(^|/)\.env\.production$''',
   '''(^|/)\.env\.production\.local$''',
   '''^tests/e2e/stories/story-manifest\.json$''',
+  '''^tests/scripts/demo-live-logs\.mjs$''',
   '''^pnpm-lock\.yaml$''',
   '''^package-lock\.json$''',
 ]
@@ -66,6 +67,11 @@ regexes = [
   '''30772a35dc5bf0a5889b1af5dfd0409c364749e83c6e0e1d''',
   '''sk_live_xyz123''',
   '''sk_live_998124912849124''',
+  # Historical prototype tokens in git history (flagged for operator rotation / purge in docs/SECRETS_OPERATOR_CHECKLIST.md)
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.do_not_leak''',
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlua2Rud2h1YmZrbm5uemp0cGVnI''',
+  '''rzp_test_TirupatiAppointmentsMock''',
+  '''rzp_test_TirupatiAppointments''',
 ]
 
 # Dedicated rule to strictly catch real Razorpay Live Keys
@@ -98,6 +104,8 @@ regexes = [
   '''rzp_test_ValidTestKey123''',
   '''rzp_test_FreshRefundKey''',
   '''rzp_test_RecoveryKey123''',
+  '''rzp_test_TirupatiAppointmentsMock''',
+  '''rzp_test_TirupatiAppointments''',
 ]
 
 # Dedicated rule to catch Supabase Service Role Secret Keys
