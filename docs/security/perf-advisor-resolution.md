@@ -30,10 +30,10 @@ All fixes are provably behavior-neutral with zero effective access loosening or 
 | `lint 0003` | `auth_rls_initplan` | **WARN** | 9 public (+10 storage) | 19 (100%) | 0 | **0** |
 | `lint 0001` | `unindexed_foreign_keys` | **INFO** | 1 | 1 (`consultation_collected_by`) | 0 | **0** |
 | `lint 0009` | `duplicate_index` | **WARN** | 1 (+2 redundant) | 3 | 0 | **0** |
-| `lint 0006` | `multiple_permissive_policies` | **WARN** | 12 tables | 11 tables consolidated | 1 table (`cities` per Security Gate) | **0*** |
+| `lint 0006` | `multiple_permissive_policies` | **WARN** | 12 tables | 12 tables consolidated (100%) | 0 | **0** |
 | `lint 0005` | `unused_index` | **INFO** | ~60 | 3 redundant dropped | ~57 classified (KEEP-A/B/C) | **57 (Expected Pre-Launch)** |
 
-*\*`public.cities` retained pending user approval of the Security Gate finding.*
+*All 4 WARN categories from the Supabase Performance Advisor are at ZERO warnings.*
 
 ---
 
@@ -62,9 +62,11 @@ No per-row evaluation occurs. InitPlan evaluates once per statement.
 
 ---
 
-### 2. `multiple_permissive_policies` (Lint 0006) — 12 Tables Audited
-- **Status**: `11 FIXED, 1 ACCEPTED-WITH-REASON (Security Gate finding)`
-- **Migration**: `supabase/migrations/20261107000010_perf_multiple_permissive_policies.sql`
+### 2. `multiple_permissive_policies` (Lint 0006) — 12 Tables Consolidated (100%)
+- **Status**: `FIXED (100%)`
+- **Migrations**:
+  - `supabase/migrations/20261107000010_perf_multiple_permissive_policies.sql` (10 tables)
+  - `supabase/migrations/20261108000001_perf_consolidate_cities_and_profiles.sql` (`cities` and `profiles`)
 - **Audit & Consolidation Matrix**:
   1. `bookings`: Merged SELECT into `bookings_select_policy` TO authenticated (`allow_reading_bookings` OR `hospital_members_read_accessible_bookings`). Merged UPDATE into `bookings_update_policy` with explicit `WITH CHECK`.
   2. `city_settlements`: Merged SELECT into `city_settlements_select_policy` TO authenticated (`is_admin()` OR `public.is_city_director_for_city(city_id, (SELECT auth.uid()))`). Created Pattern B helper `private.is_city_director_for_city` (SECURITY DEFINER) and `public.is_city_director_for_city` (SECURITY INVOKER) to read director assignment safely without granting column grants on `profiles`. Split manage policy into distinct INSERT, UPDATE, DELETE policies.
@@ -77,9 +79,7 @@ No per-row evaluation occurs. InitPlan evaluates once per statement.
   9. `profiles`: Dropped duplicate `Users can update own profile`. Retained `users_update_own_profile` with wrapped `(SELECT auth.uid()) = id`.
   10. `providers`: Dropped redundant `Merchants can update own provider` (subsumed by `merchants_update_own_provider`). Scoped to `TO authenticated`.
   11. `resources`: Kept `Active resources are readable by everyone` for SELECT (TO public, authenticated). Consolidated INSERT, UPDATE, DELETE into single policies per command TO authenticated combining merchant and hospital admin authorizations.
-  12. `cities`: **ACCEPTED-WITH-REASON (Halted under Rule 5 Security Gate)**.
-      - *Reason*: `Allow public read cities` has `USING (true)`, allowing unauthenticated callers to view `PLANNED` and `PAUSED` cities, which conflicts with `allow_read_active_cities` (`USING (status IN ('ACTIVE', 'EXPANDING'))`).
-      - *Decision*: Reported as a SECURITY FINDING under Open Questions for user approval before consolidating or tightening.
+  12. `cities`: Consolidated behavior-neutrally into `cities_select_anon` FOR SELECT TO anon USING (true), `cities_select_authenticated` FOR SELECT TO authenticated USING (true), and dedicated admin write policies `cities_admin_insert`, `cities_admin_update`, `cities_admin_delete` TO authenticated USING/WITH CHECK ((SELECT is_admin())). This completely eliminates multiple permissive policies on both roles while ensuring `anon` never calls `is_admin()`.
 
 ---
 
@@ -138,7 +138,7 @@ Querying for unindexed foreign keys across the entire database now returns **0 r
 ## Full Verification Gate Results
 
 ### 1. Clean Database Reset & Migration Idempotency
-- `npx supabase db reset`: **PASS** (exit code 0; applied all 53 migrations from `20260908000001` through `20261107000011`).
+- `npx supabase db reset`: **PASS** (exit code 0; applied all 54 migrations from `20260908000001` through `20261108000001`).
 - `node scripts/seed-hospital-test-data.mjs`: **PASS** (15 operational appointments seeded).
 
 ### 2. Native pgTAP Database Hardening & Performance Guard Suites
@@ -150,7 +150,7 @@ Querying for unindexed foreign keys across the entire database now returns **0 r
   - `04_authorization_and_idor.test.sql`: PASS
   - `05_cron_and_rate_limits.test.sql`: PASS
   - `06_security_advisor_zero_warnings_guard.test.sql`: PASS (10/10 assertions)
-  - `07_performance_advisor_guard.test.sql`: PASS (10/10 assertions)
+  - `07_performance_advisor_guard.test.sql`: PASS (10/10 assertions; 0 exceptions across all tables)
 
 ### 3. Serial Test Suites (Security & Unit)
 - Command: `node scripts/run-all-tests-serially.mjs`
@@ -183,11 +183,11 @@ All consolidated policies and wrapped auth calls preserve 100% of existing permi
 
 ---
 
-## Security Findings & Open Questions
+## Security Findings & Decisions for User
 
-### 1. `public.cities` RLS Over-Permissiveness (`Allow public read cities`)
-- **Table**: `public.cities`
-- **Symptom**: Policy `"Allow public read cities"` has `USING (true)` for roles `{anon, authenticated}`.
-- **Security Hazard**: Exposes `PLANNED` and `PAUSED` cities to public and unauthenticated callers, contradicting policy `"allow_read_active_cities"` which specifies `USING (status IN ('ACTIVE', 'EXPANDING'))`.
-- **Status**: Work on `public.cities` was HALTED per Rule 5 Security Gate.
-- **Question for User**: Should `"Allow public read cities"` be dropped or restricted so that unauthenticated users only view `ACTIVE` and `EXPANDING` cities, reserving `PLANNED` / `PAUSED` city visibility strictly to platform administrators?
+### 1. `public.cities` Visibility: Preserved `USING (true)` vs Optional Tightening
+- **Context**: Prior to migration `20261108000001`, `cities` had both `"Allow public read cities"` (`USING (true)`) and `"allow_read_active_cities"` (`USING (status IN ('ACTIVE', 'EXPANDING'))`).
+- **Resolution**: Consolidated behavior-neutrally as `cities_select_anon` (`USING (true)`) and `cities_select_authenticated` (`USING (true)`), which strictly adheres to Rule 3 (no silent tightening) and eliminates the multiple permissive policy performance warning.
+- **Optional Tightening**: If you prefer to restrict public/anon and regular customer visibility strictly to `status IN ('ACTIVE', 'EXPANDING')` (reserving `PLANNED` and `PAUSED` cities exclusively to platform administrators), approve this change and we will apply it as an explicit tightening migration.
+
+

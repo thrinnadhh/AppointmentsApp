@@ -882,6 +882,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
       'supabase/migrations/20261107000009_perf_auth_rls_initplan.sql',
       'supabase/migrations/20261107000010_perf_multiple_permissive_policies.sql',
       'supabase/migrations/20261107000011_perf_indexes.sql',
+      'supabase/migrations/20261108000001_perf_consolidate_cities_and_profiles.sql',
     ];
     for (const file of downstream) {
       if (fs.existsSync(file)) {
