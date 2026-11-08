@@ -95,7 +95,6 @@ SELECT is_empty(
     JOIN pg_class c ON c.oid = p.polrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
-      AND c.relname != 'cities' -- Documented exception: public.cities halted per Rule 5 Security Gate
       AND p.polpermissive = true
   )
   SELECT tablename, role_name, polcmd, count(*)
