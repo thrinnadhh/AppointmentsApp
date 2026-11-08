@@ -8,9 +8,10 @@
  *    x-admin-bypass-key and x-customer-id headers on real HTTP endpoints.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '../..');
 const MERCHANT_DIR = path.join(ROOT_DIR, 'apps/merchant-web');
@@ -21,10 +22,15 @@ async function sleep(ms) {
 }
 
 async function runProductionBootTests() {
+  if (!fs.existsSync(path.join(MERCHANT_DIR, '.next/BUILD_ID'))) {
+    console.log('Building production bundle for boot test...');
+    execSync('npx next build', { cwd: MERCHANT_DIR, stdio: 'ignore' });
+  }
+
   console.log('=== TEST PART 1: Boot built server with ALLOW_MOCK_PAYMENTS=true under NODE_ENV=production ===');
   
   const bootFailPromise = new Promise((resolve) => {
-    const proc = spawn('pnpm', ['exec', 'next', 'start', '-p', String(PROD_PORT)], {
+    const proc = spawn('npx', ['next', 'start', '-p', String(PROD_PORT)], {
       cwd: MERCHANT_DIR,
       env: {
         ...process.env,
@@ -62,7 +68,7 @@ async function runProductionBootTests() {
   console.log('✔ PASS: Server refused to boot with ALLOW_MOCK_PAYMENTS=true in production!\n');
 
   console.log('=== TEST PART 2: Boot built production server with ENABLE_E2E_BYPASS unset ===');
-  const prodProc = spawn('pnpm', ['exec', 'next', 'start', '-p', String(PROD_PORT)], {
+  const prodProc = spawn('npx', ['next', 'start', '-p', String(PROD_PORT)], {
     cwd: MERCHANT_DIR,
     env: {
       ...process.env,

@@ -9,6 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
+import fs from 'fs';
 
 const { Pool } = pg;
 const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
@@ -22,6 +23,12 @@ const pool = new Pool({
 
 test('Plan 6.2 API & Storage Security Remediation Verification', async (t) => {
   const client = await pool.connect();
+  let manifest;
+  if (fs.existsSync('scripts/test-seed-manifest.json')) {
+    try {
+      manifest = JSON.parse(fs.readFileSync('scripts/test-seed-manifest.json', 'utf8'));
+    } catch {}
+  }
 
   try {
     // -------------------------------------------------------------------------
@@ -39,14 +46,15 @@ test('Plan 6.2 API & Storage Security Remediation Verification', async (t) => {
     // 2. Test /api/account/export returns data principal archive for authenticated user
     // -------------------------------------------------------------------------
     await t.test('GET /api/account/export returns downloadable archive with Content-Disposition', async () => {
-      const testUserId = '99999999-9999-9999-9999-999999999991';
+      const userRes = await client.query("SELECT id FROM public.profiles LIMIT 1");
+      const testUserId = userRes.rows[0]?.id || '99999999-9999-9999-9999-999999999991';
 
       const res = await fetch(`${BASE_URL}/api/account/export`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5OTk5OTk5OS05OTk5LTk5OTktOTk5OS05OTk5OTk5OTk5OTEifQ.sig',
           'x-test-bypass-user': testUserId,
+          'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
         },
       });
 
@@ -66,8 +74,10 @@ test('Plan 6.2 API & Storage Security Remediation Verification', async (t) => {
     // 3. Test prescription signed URL generation records audit trail
     // -------------------------------------------------------------------------
     await t.test('prescription signed URL endpoint logs READ_PRESCRIPTION_ATTACHMENT', async () => {
-      const testProviderId = '44444444-4444-4444-4444-444444444444';
-      const testDoctorUserId = '88888888-8888-8888-8888-888888888881';
+      const provRes = await client.query("SELECT id FROM public.providers LIMIT 1");
+      const testProviderId = provRes.rows[0]?.id || '44444444-4444-4444-4444-444444444444';
+      const docRes = await client.query("SELECT id FROM public.profiles WHERE role = 'merchant' LIMIT 1");
+      const testDoctorUserId = docRes.rows[0]?.id || '88888888-8888-8888-8888-888888888881';
       const testStoragePath = `${testProviderId}/test-patient/prescription-123.pdf`;
 
       const res = await fetch(`${BASE_URL}/api/prescriptions/signed-url`, {

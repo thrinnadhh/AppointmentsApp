@@ -23,6 +23,12 @@ const pool = new Pool({
 
 test('Plan 6.1 Database Security Remediation Verification', async (t) => {
   const client = await pool.connect();
+  const provRow = (await client.query("SELECT id FROM public.providers LIMIT 1")).rows[0];
+  const resRow = (await client.query("SELECT id FROM public.resources WHERE provider_id = $1 LIMIT 1", [provRow.id])).rows[0];
+  const userRow = (await client.query("SELECT id FROM public.profiles LIMIT 1")).rows[0];
+  const pId = provRow.id;
+  const rId = resRow.id;
+  const uId = userRow.id;
 
   try {
     // -------------------------------------------------------------------------
@@ -49,9 +55,9 @@ test('Plan 6.1 Database Security Remediation Verification', async (t) => {
           provider_id, resource_id, customer_id, slot_start, slot_end, status, deposit_amount,
           booking_for_someone_else, patient_name, patient_phone
         ) VALUES (
-          '44444444-4444-4444-4444-444444444444',
-          'dddddddd-dddd-dddd-dddd-dddddddddddd',
-          '99999999-9999-9999-9999-999999999991',
+          '${pId}',
+          '${rId}',
+          '${uId}',
           NOW() + INTERVAL '10 days',
           NOW() + INTERVAL '10 days 30 minutes',
           'CONFIRMED',
@@ -112,8 +118,8 @@ test('Plan 6.1 Database Security Remediation Verification', async (t) => {
           provider_id, resource_id, customer_id, slot_start, slot_end, status, deposit_amount,
           booking_for_someone_else, patient_name, patient_phone
         ) VALUES (
-          '44444444-4444-4444-4444-444444444444',
-          'dddddddd-dddd-dddd-dddd-dddddddddddd',
+          '${pId}',
+          '${rId}',
           '${dummyUserId}',
           NOW() + INTERVAL '12 days',
           NOW() + INTERVAL '12 days 30 minutes',
@@ -178,7 +184,7 @@ test('Plan 6.1 Database Security Remediation Verification', async (t) => {
       await client.query(`
         UPDATE public.profiles
         SET phone = '+919999999991'
-        WHERE id = '99999999-9999-9999-9999-999999999991';
+        WHERE id = '${uId}';
       `);
 
       const bkgRes = await client.query(`
@@ -186,9 +192,9 @@ test('Plan 6.1 Database Security Remediation Verification', async (t) => {
           provider_id, resource_id, customer_id, slot_start, slot_end, status, deposit_amount,
           booking_for_someone_else, patient_name, patient_phone
         ) VALUES (
-          '44444444-4444-4444-4444-444444444444',
-          'dddddddd-dddd-dddd-dddd-dddddddddddd',
-          '99999999-9999-9999-9999-999999999991',
+          '${pId}',
+          '${rId}',
+          '${uId}',
           NOW() + INTERVAL '15 days',
           NOW() + INTERVAL '15 days 30 minutes',
           'CONFIRMED',
