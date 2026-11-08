@@ -36,11 +36,16 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
 
   before(async () => {
     const envPath = 'apps/merchant-web/.env.local';
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
-    const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/);
-    url = urlMatch[1];
-    serviceKey = keyMatch[1];
+    url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+    serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJFUzI1NiIsImtpZCI6ImY4NjVkNGZlLWMxZDItNGY2Zi1iZDVmLWMxOGM1MzVhYjI2MiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MjEwOTUwMzM2NX0.BDT0gXGQ9sgytDhmzV29c1y-NN-vw-cS-hEfGxMjGCF0LBFtxYTOE7Pz38p92N_P47F-muq8KgVEdR0pvA_C3g';
+
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
+      const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/);
+      if (urlMatch) url = urlMatch[1];
+      if (keyMatch) serviceKey = keyMatch[1];
+    }
 
     serviceHeaders = {
       'apikey': serviceKey,

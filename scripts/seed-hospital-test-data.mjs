@@ -23,21 +23,16 @@ const TEST_PASSWORD = 'HospitalTest2026!';
 
 export async function seedHospitalTestData() {
   const envPath = 'apps/merchant-web/.env.local';
-  if (!fs.existsSync(envPath)) {
-    console.error('.env.local not found');
-    process.exit(1);
-  }
-  const envContent = fs.readFileSync(envPath, 'utf8');
-  const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
-  const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/);
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+  let key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJFUzI1NiIsImtpZCI6ImY4NjVkNGZlLWMxZDItNGY2Zi1iZDVmLWMxOGM1MzVhYjI2MiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MjEwOTUwMzM2NX0.BDT0gXGQ9sgytDhmzV29c1y-NN-vw-cS-hEfGxMjGCF0LBFtxYTOE7Pz38p92N_P47F-muq8KgVEdR0pvA_C3g';
 
-  if (!urlMatch || !keyMatch) {
-    console.error('Missing Supabase credentials in .env.local');
-    process.exit(1);
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
+    const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/);
+    if (urlMatch) url = urlMatch[1];
+    if (keyMatch) key = keyMatch[1];
   }
-
-  const url = urlMatch[1];
-  const key = keyMatch[1];
 
   const headers = {
     'apikey': key,
