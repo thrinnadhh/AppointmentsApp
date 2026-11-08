@@ -1,6 +1,13 @@
-# Dynamic Late-Arrival Queue & +2 Member Buffer Plan
+# [RETIRED / DEPRECATED] Dynamic Late-Arrival Queue & +2 Member Buffer Plan
 
-## Goal
+> **ARCHITECTURAL STATUS: RETIRED / SUPERSEDED**  
+> Per [`docs/hospital/SPEC.md`](../hospital/SPEC.md) line 40: *"The old '+2 appointments later' late-queue rule is retired."*  
+> This plan has been superseded by the **Hospital Standby Queue Engine** in [`packages/shared/src/queue-engine.ts`](../../packages/shared/src/queue-engine.ts) (`HospitalDepartmentQueueEngine.ts` and `evaluateConsultantQueue`).  
+> Late arrivals (>10m after booked time) enter the Standby Queue in original booking order (FIFO) and are dispatched during time-fitting gaps without displacing on-time scheduled patients.
+
+---
+
+## Historical Goal (Superseded)
 Implement the dynamic queueing and late-arrival buffer system for appointments:
 1. When a patient has not arrived at their scheduled appointment slot time, allow the receptionist to move them to the **Late Standby Queue** (freeing up the doctor for on-time arrivals).
 2. When the patient physically arrives (via mobile "I've Reached" button or merchant desk check-in), dynamically place them **after 2 member appointments** (+2 buffer rule).

@@ -414,9 +414,9 @@ export default function BookingPassModal({
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.presenceBadgeNotPresent}>🔴 NOT PRESENT (AWAITING ARRIVAL)</Text>
-                      <Text style={styles.presenceTitleNotPresent}>Show 4-Digit Code at Reception</Text>
+                      <Text style={styles.presenceTitleNotPresent}>Show 4-Digit PIN at Reception</Text>
                       <Text style={styles.presenceSubtextNotPresent}>
-                        You are marked as not present. Tell your OTP code below to the front desk upon reaching to turn this status GREEN.
+                        You are marked as not present. Tell your 4-digit check-in PIN below to the front desk upon reaching to turn this status GREEN.
                       </Text>
                     </View>
                   </View>
@@ -587,7 +587,7 @@ export default function BookingPassModal({
                         </Text>
                       </View>
                     ) : (liveStatus === 'CONFIRMED' && isWindowOpen) ? (
-                      /* Check-in Code Box with high contrast OTP */
+                      /* Check-in Code Box with high contrast PIN */
                       <View style={styles.checkinCodeBox} testID="pass-checkin-code-box">
                         <View style={styles.checkinCodeHeader}>
                           <Text style={styles.checkinCodeIcon}>🎟️</Text>
@@ -608,9 +608,9 @@ export default function BookingPassModal({
                       <View style={styles.checkinEarlyBox} testID="pass-checkin-early-box">
                         <Text style={styles.checkinEarlyIcon}>🔒</Text>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.checkinEarlyTitle}>Check-in Code Opening Soon</Text>
+                          <Text style={styles.checkinEarlyTitle}>Check-in PIN Opening Soon</Text>
                           <Text style={styles.checkinEarlySubtitle}>
-                            Your 4-digit reception OTP will appear here 60 minutes before your slot (at {new Date(windowOpenMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).
+                            Your 4-digit reception PIN will appear here 60 minutes before your slot (at {new Date(windowOpenMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).
                           </Text>
                         </View>
                       </View>

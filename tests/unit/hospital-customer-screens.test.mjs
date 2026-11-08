@@ -376,6 +376,15 @@ describe('Phase 5d: Hospital Customer Screens & Booking Pass Suite', () => {
     });
   });
 
+  describe('6. Canonical Customer Pass Terminology (SPEC lines 26 & 28)', () => {
+    it('enforces canonical PIN terminology and rejects legacy OTP phrasing in BookingPassModal', () => {
+      const modalSrc = fs.readFileSync('apps/customer-mobile/src/screens/BookingPassModal.tsx', 'utf8');
+      assert.doesNotMatch(modalSrc, /Tell your OTP code/i, 'BookingPassModal must use PIN instead of OTP');
+      assert.doesNotMatch(modalSrc, /reception OTP/i, 'BookingPassModal must use reception PIN instead of reception OTP');
+      assert.match(modalSrc, /Tell your 4-digit check-in PIN/i, 'BookingPassModal must instruct customer with 4-digit check-in PIN');
+    });
+  });
+
   after(async () => {
     await fetch(`${supabaseUrl}/rest/v1/bookings?customer_id=in.(${tokens.patient1.user.id},${tokens.patient2.user.id})&reference_code=not.like.TEST-REF-%25`, {
       method: 'DELETE',
