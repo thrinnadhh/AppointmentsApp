@@ -3,7 +3,7 @@
 > **Document Status**: Living Master Specification & Execution Ledger  
 > **Branch**: `phase-perf-advisor-hardening` (originating from `fix/production-readiness`)  
 > **Source of Truth**: `docs/hospital/SPEC.md` and User Directives (Steps 0, 391, 627, 1113, 3029, 3662)  
-> **Current Progress**: Groups 1–8 **ACCEPTED** ✅, Group 9 **PENDING** ⏳
+> **Current Progress**: Groups 1–7 **ACCEPTED** ✅, Groups 8 & 9 **SUBMITTED FOR HUMAN REVIEW** 🔍
 
 ---
 
@@ -58,8 +58,8 @@ Report with file:line evidence and test output.
 | **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **ACCEPTED** ✅ | Migration `20261105000001_deduplicate_cron_jobs.sql` |
 | **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **ACCEPTED** ✅ | Automated Gitleaks CI, `.gitleaks.toml`, Hygiene Suite & Roles Review |
 | **Group 7** | **Production Safety, Test Route Lock & Guest UX** | **ACCEPTED** ✅ | `/api/test/*` Prod Lock, Middleware Gate, Guest Slot Sign-In Prompt |
-| **Group 8** | **Cross-Tenant & Cross-Hospital Authorization Suite** | **ACCEPTED** ✅ | Full Adversarial Matrix Suite (38/38 PASS), Zero Demo Fallbacks, TS Clean Build |
-| **Group 9** | **Test Harness Hygiene, Logging Scripts & E2E Cleanup** | **PENDING** ⏳ | Awaiting user trigger |
+| **Group 8** | **Cross-Tenant & Cross-Hospital Authorization Suite** | **SUBMITTED FOR HUMAN REVIEW** 🔍 | Full Adversarial Matrix Suite (40/40 PASS, 66/66 routes verified), Zero Demo Fallbacks, TS Clean Build |
+| **Group 9** | **Test Harness Hygiene, Logging Scripts & E2E Cleanup** | **SUBMITTED FOR HUMAN REVIEW** 🔍 | All 4 Phase 0 Fixes, Logging Scripts Exit 0, Core E2E Hard Assertions, 44/44 Unit Suites (385/385 PASS), 43/43 Security Tests (308 pgTAP PASS), Clean Gate |
 
 ---
 
@@ -80,7 +80,7 @@ Report with file:line evidence and test output.
   - `create_booking_hold`: Preserved range exclusion overlap check and daily quota tracking in `Asia/Kolkata`.
   - `cancel_doctor_emergency`: Restored mass-reschedule and 100% refund triggers.
 - **Production Guard**: `apps/merchant-web/src/env.mjs` strictly fails build/startup if `ALLOW_MOCK_PAYMENTS=true` in production mode.
-- **CORS & Demo Mode**: Restricted preview origins to team slug `[YOUR-TEAM-SLUG]` and completely disabled demo mode when `NODE_ENV === 'production'`.
+- **CORS & Demo Mode**: Restricted preview origins to explicit team slug `VERCEL_TEAM_SLUG` (defaults to `appointments4u` in dev/test, fails closed in production) with trusted preview branch prefixes, and completely disabled demo mode when `NODE_ENV === 'production'`.
 - **Security Definer Columns Lockdown**: Revoked public/authenticated update on sensitive profile columns (`role`, `is_superadmin`, `permanent_checkin_pin`, `blocked_until`).
 - **Authorization Matrix**: Tested 5 critical routes with 2 customers and 2 hospitals (`POST /api/notifications/push`, `POST /api/bookings/collect-fee`, `POST /api/bookings/emergency-choice`, `POST /api/prescriptions/signed-url`, `GET /api/cron/security-monitor`) with 100% expected authorization pass.
 - **Queue Simulation**: Scenario A (10 patients) and Scenario B (unarrived variant) verified with IST timestamps and customer API 200 responses.
@@ -237,11 +237,73 @@ Report with file:line evidence and test output.
 
 ---
 
-## 5. Upcoming Group Execution Plan
+### Group 8: Cross-Tenant & Cross-Hospital Authorization Suite (SUBMITTED FOR HUMAN REVIEW)
+- **Multi-Agent Coordination**: Orchestrated across `[Agent-Security-Auditor]`, `[Agent-Backend]`, and `[Agent-QA]`.
+- **Adversarial Cross-Tenant Matrix**:
+  - Implemented exhaustive 40-test adversarial matrix suite in `tests/unit/cross-tenant-authorization-matrix.test.mjs`.
+  - Discovered and tested 100% of all API routes on disk (66/66 API route handlers dynamically cataloged and verified).
+  - Enforced zero customer-to-customer leakage, zero cross-hospital data leakage, and role-based privilege checks for Front Desk, Doctor, Admin, Customer, and unauthenticated requests.
+- **Zero Demo Fallbacks**:
+  - Eliminated demo mode fallbacks and hardcoded UUIDs in production pathways.
+  - Verified with `node --test tests/unit/cross-tenant-authorization-matrix.test.mjs` (40/40 tests PASS).
 
-### Group 9: Test Harness Hygiene, Logging Scripts & Core E2E Assertions (PENDING)
-1. Fix broken imports in `tests/scripts/demo-live-logs.mjs` and `verify-logging.mjs`.
-2. Replace soft `test.skip()` in core Playwright E2E suites with verifiable assertions; retain `@wip` tag for unfinished specs.
-3. Run the full validation gate (`supabase db reset`, serial test execution, typecheck, production build).
+---
+
+### Group 9: Test Harness Hygiene, Logging Scripts & Final Production Readiness Gate (SUBMITTED FOR HUMAN REVIEW)
+- **Phase 0 Surgical Fixes from Group 8 Code Review**:
+  1. *CORS Regex Hardening (`apps/merchant-web/src/middleware.ts`)*: Removed blacklist hack `!host.startsWith('appointments-merchant-evil')`. Implemented strict structural regex escaping team slug: `^appointments-merchant-(?:git-[a-z0-9_.-]+|[a-z0-9]{9})-(?:${escapedTeamSlug})\\.vercel\\.app$`. Verified in `tests/security/test-cors-and-demo-mode.test.mjs` (7/7 PASS).
+  2. *Unauthenticated 401 Fetch (`tests/unit/cross-tenant-authorization-matrix.test.mjs`)*: Added explicit unauthenticated fetch on `/api/slots/availability` asserting HTTP 401 before `recordResult`.
+  3. *Fresh-Clone Determinism (`supabase/roles.sql`)*: Untracked `.gitignore:81` rule for `roles.sql`, tracked in git, added LOCAL DEV ONLY header, verified with `git ls-files --error-unmatch supabase/config.toml supabase/seed.sql supabase/roles.sql`. Fresh clone runs `supabase db reset` cleanly.
+  4. *Audit `complete_booking` Status Check*: Audited stored procedure and verified compatibility between RPC (`CONFIRMED`) and admin update routes (`IN_CONSULTATION` / `CHECKED_IN`).
+  5. *SPEC Arrival Window & Trigger Hardening (`supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql`)*:
+     - **Changes**: Reconciles `verify_checkin_code` and `mark_present_manually` with `docs/hospital/SPEC.md:36-38` arrival window (`[-10m, +10m]`) and late threshold (`> 10m` after booked time), aligning with TypeScript `packages/shared/src/queue-engine.ts` (`ON_TIME_GRACE_MINUTES = 10`). Revoked EXECUTE on `sync_booking_for_family` from `anon`/`authenticated`, locking to `service_role`.
+     - **Why**: Eliminates 5m vs 10m contradiction between SQL and shared TS queue engine; closes trigger privilege exposure flagged by Supabase linter.
+     - **Rollback**: Apply forward migration or restore `20261108000001` definitions.
+- **Group 9 Item 1: Logging Scripts Restored & Verified**:
+  - Restored `tests/scripts/demo-live-logs.mjs` with 7 planted canary secrets, asserting 100% redaction and zero leak (exit code 0).
+  - Restored `tests/scripts/verify-logging.mjs` (18/18 tests PASS).
+- **Group 9 Item 2: Playwright E2E Soft-Skip Removal & Hard Assertions**:
+  - Audited all Playwright E2E specs across 6 core files.
+  - Converted soft skips to hard Playwright `expect(...)` assertions in core specs (`compliance-pages.spec.ts`, `hospital-customer-screens.spec.ts`, `edge-merchant.spec.ts`, `edge-customer.spec.ts`, `edge-admin.spec.ts`, `edge-integrations.spec.ts`).
+  - Genuinely unfinished / out-of-scope test cases tagged with `@wip` (12 tests total, 0 soft skips). Passed cleanly with `.env.local` moved aside (76 passed, 12 skipped @wip, 0 failed).
+- **Group 9 Item 3: Mechanical Checks & Serial Final Gate**:
+  - Zero tracked `.env` (excluding `.env.example`).
+  - Zero duplicate migration prefixes (`ls supabase/migrations | cut -d_ -f1 | sort | uniq -d`).
+  - Zero rollback files inside `supabase/migrations/`.
+  - Zero `99999999-9999` demo customer UUIDs in app source code.
+  - Zero `ignoreBuildErrors: true` or `SKIP_ENV_VALIDATION`.
+  - All files referenced in `supabase/config.toml` tracked in git.
+  - Clarified test suite taxonomy: `tests/unit/mantis-track1-database-hardening.test.mjs` was an existing Mantis Track 1 suite that was hardened and extended with Divergence Guard Test 4 (not newly authored from scratch). `tests/unit/git-secrets-and-ci-hygiene.test.mjs:46-70` was accurately quoted verifying `.gitignore` and `supabase/roles.sql` presence.
+  - Serial test gate:
+    - `npx supabase db reset` (exit code 0).
+    - `node scripts/seed-hospital-test-data.mjs` (exit code 0).
+    - `tests/unit/*.test.mjs`: 44/44 suites PASS, 385/385 tests PASS.
+    - `tests/scripts/demo-live-logs.mjs` & `tests/scripts/verify-logging.mjs`: PASS (18/18).
+    - `tests/scripts/test-validation.mjs`, `test-security.mjs`, `test-routes.mjs`: PASS (224/224).
+    - `tests/security/*.test.mjs`: PASS (43/43 tests PASS, 308 pgTAP tests PASS).
+    - `pnpm -r exec tsc --noEmit`: Clean, 0 type errors.
+    - `pnpm --filter @appointments/merchant-web build`: 52/52 static pages generated, exit code 0.
+    - `gitleaks detect -c .gitleaks.toml -v`: 0 leaks found across full git history (389 commits).
+
+---
+
+## 5. DPDP Compliance Note
+> [!NOTE]
+> **UNVERIFIED, needs counsel confirmation**: Technical plumbing has been implemented (Grievance Officer metadata fallbacks, daily retention / erasure cron `dpdp-account-deletions-sql`, export/delete endpoints, and minor patient consent toggles), but formal legal entity confirmation and legal counsel review of policy text remain pending human sign-off.
+
+---
+
+## 6. Operator Actions Pending
+See `docs/SECRETS_OPERATOR_CHECKLIST.md` for human-operator actions that must be executed outside automated agent runs:
+1. Historical prototype secret purging with `git filter-repo` on a bare clone mirror.
+2. Production API key and webhook secret rotation (Razorpay, Supabase service role keys, Upstash Redis).
+3. Production Vercel preview domain DNS & team slug alignment (`VERCEL_TEAM_SLUG`).
+
+---
+
+## 7. Review & Final Sign-Off Status
+- Groups 1-7: ACCEPTED ✅
+- Group 8: SUBMITTED FOR HUMAN REVIEW 🔍
+- Group 9: SUBMITTED FOR HUMAN REVIEW 🔍
 
 
