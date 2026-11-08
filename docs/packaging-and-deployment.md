@@ -14,7 +14,7 @@
 | **Merchant & Admin Web** | `1.0.0` (Next.js 15.5.28) | Optimized Node Server / Static Bundle | Vercel / Cloud Run / Docker |
 | **Customer Mobile (Android)** | `1.0.0` (VersionCode `1`) | `.apk` (Preview/QA) & `.aab` (Play Store) | Google Play Internal Testing |
 | **Customer Mobile (iOS)** | `1.0.0` (Build `1`) | `.ipa` / TestFlight Bundle | Apple TestFlight / App Store |
-| **Database Migrations** | `20261024181600` (18 migrations) | PostgreSQL DDL & RLS Policies | Supabase Cloud Database |
+| **Database Migrations** | 155 migrations (`supabase/migrations/`) | PostgreSQL DDL & RLS Policies | Supabase Cloud Database |
 
 ---
 
@@ -24,7 +24,7 @@ All pre-flight gates have been empirically verified and passed:
 
 - [x] **Typecheck**: `pnpm typecheck` passed with 0 errors across `@appointments/shared`, `@appointments/customer-mobile`, and `@appointments/merchant-web`.
 - [x] **Unit & Integration Tests**: `node scripts/run-all-unit-tests-serially.mjs` passed 22/22 suites and 166/166 tests in 40.38s.
-- [x] **Database Migrations**: 18 migrations applied cleanly from clean slate via `supabase db reset`.
+- [x] **Database Migrations**: 155 migrations applied cleanly from clean slate via `supabase db reset`.
 - [x] **Security Remediation**: Next.js 15.5.28 upgrade, `payments` DML grants, and production environment assertions locked down.
 - [x] **Production Build**: `ALLOW_MOCK_PAYMENTS=false pnpm build` completed with 0 errors.
 - [x] **Legal Compliance**: `node scripts/check-legal-placeholders.js --strict` confirmed 0 placeholder tokens across privacy and terms screens.

@@ -9,7 +9,7 @@
 
 1. **Database Schema & Migrations**:
    - The **canonical single source of truth** for all database migrations and schema definitions is **`supabase/migrations/`**.
-   - `apps/backend/src/main/resources/db/migration/V1__initial_schema.sql` is obsolete and superseded by the 80+ migrations in `supabase/migrations/`.
+   - `apps/backend/src/main/resources/db/migration/V1__initial_schema.sql` is obsolete and superseded by the 155 migrations in `supabase/migrations/`.
    - Do NOT run Flyway migrations from this package against production databases.
 
 2. **API Routes & Business Logic**:

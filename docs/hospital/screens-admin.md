@@ -25,7 +25,7 @@ This document inventories every screen required for the Hospital Admin role, spe
 ## 2. Screen Specifications
 
 ### Screen 1: Hospital Dashboard (All Departments)
-- **Route:** `/` (or `/hospital`)
+- **Route:** `/` (Dynamically routed based on merchant vertical `clinics` / `hospital` and user role)
 - **Title:** Hospital Operations Command Center
 - **Purpose:** Central real-time visibility across all hospital departments. Displays hospital-wide active consultations, live queues, upcoming bookings, doctor availability, patient flow metrics, and emergency controls.
 - **API Routes:**
@@ -58,11 +58,11 @@ This document inventories every screen required for the Hospital Admin role, spe
 - **API Routes:**
   - `GET /api/hospital/departments`: Fetches all departments with member count and module configurations.
   - `POST /api/hospital/departments`: Creates a new clinical department (name, allowed modules).
-  - `PATCH /api/hospital/departments`: Updates department name, active status, or module permissions.
-  - `DELETE /api/hospital/departments`: Deletes empty department (protected by database against departments with active bookings).
+  - `PUT /api/hospital/departments`: Updates department name, active status, or module permissions.
+  - `DELETE /api/hospital/departments?id={id}&force={force}`: Deletes empty department (protected by database against departments with active bookings).
   - `GET /api/hospital/members?department_id={id}`: Fetches department roster (email, role, status, invite expiry).
   - `POST /api/hospital/members`: Invites a Consultant or Front Desk member to the department (enforces max 3 members via database trigger `trg_check_department_member_limit`).
-  - `DELETE /api/hospital/members?id={id}`: Revokes member, immediately cutting RLS access.
+  - `PUT /api/hospital/members`: Performs member lifecycle actions (`action: 'revoke' | 'cancel_invite' | 'resend'`) via request body `{ member_id, action }`.
 - **Allowed Actions:**
   - Create new department with name and selected modules (`appointments`, `queue_schedule`, `check_in`).
   - Toggle department modules.
@@ -91,7 +91,7 @@ This document inventories every screen required for the Hospital Admin role, spe
 - **API Routes:**
   - `GET /api/hospital/members`: Master list of all staff with department names and roles.
   - `POST /api/hospital/members`: Provisions member with credentials and binds department membership atomically in one step.
-  - `DELETE /api/hospital/members`: Revokes staff access and removes membership.
+  - `PUT /api/hospital/members`: Revokes staff access or cancels pending invite (`action: 'revoke' | 'cancel_invite'`).
   - `GET /api/admin/resources`: Fetches doctor profiles to verify matching consultant desk.
 - **Allowed Actions:**
   - "Add Team Member" modal that provisions user in one step:

@@ -1,9 +1,9 @@
 # Production Readiness Audit & Execution Roadmap (Groups 1–9)
 
 > **Document Status**: Living Master Specification & Execution Ledger  
-> **Branch**: `fix/production-readiness`  
+> **Branch**: `phase-perf-advisor-hardening` (originating from `fix/production-readiness`)  
 > **Source of Truth**: `docs/hospital/SPEC.md` and User Directives (Steps 0, 391, 627, 1113, 3029, 3662)  
-> **Current Progress**: Group 1 **ACCEPTED**, Group 2 **ACCEPTED**, Group 3 **ACCEPTED**, Group 4 **ACCEPTED**, Groups 5–9 **PENDING**
+> **Current Progress**: Groups 1–8 **ACCEPTED** ✅, Group 9 **PENDING** ⏳
 
 ---
 
@@ -58,7 +58,7 @@ Report with file:line evidence and test output.
 | **Group 5** | **Cron Job Deduplication & Security Monitor Evaluation** | **ACCEPTED** ✅ | Migration `20261105000001_deduplicate_cron_jobs.sql` |
 | **Group 6** | **Git Secrets Audit, CI Gitleaks & Roles Review** | **ACCEPTED** ✅ | Automated Gitleaks CI, `.gitleaks.toml`, Hygiene Suite & Roles Review |
 | **Group 7** | **Production Safety, Test Route Lock & Guest UX** | **ACCEPTED** ✅ | `/api/test/*` Prod Lock, Middleware Gate, Guest Slot Sign-In Prompt |
-| **Group 8** | **Cross-Tenant & Cross-Hospital Authorization Suite** | **SUBMITTED FOR HUMAN REVIEW** 🔍 | Full Adversarial Matrix Suite (20/20 PASS), Zero Demo Fallbacks, TS Clean Build |
+| **Group 8** | **Cross-Tenant & Cross-Hospital Authorization Suite** | **ACCEPTED** ✅ | Full Adversarial Matrix Suite (38/38 PASS), Zero Demo Fallbacks, TS Clean Build |
 | **Group 9** | **Test Harness Hygiene, Logging Scripts & E2E Cleanup** | **PENDING** ⏳ | Awaiting user trigger |
 
 ---
@@ -237,51 +237,11 @@ Report with file:line evidence and test output.
 
 ---
 
-## 5. Upcoming Groups Execution Plan
+## 5. Upcoming Group Execution Plan
 
-### Group 3: Razorpay Refund API & Idempotency
-1. Retrieve official Razorpay Refund API documentation for idempotency header naming.
-2. Determine exact header (`X-Refund-Idempotency` vs `X-Idempotency-Key` vs `X-Razorpay-Idempotency`) and reconcile codebase.
-3. Rename Test 4d in `tests/unit/phase2-functional-blockers.test.mjs` as a mocked unit test.
-4. Add separate integration test executing real test-mode payment creation and refund; skip with clear message when test keys are missing, hard-fail if key begins with `rzp_live_`.
-
-### Group 4: OTP Circuit Breaker & Attack Resistance
-1. Replace hard global daily cap with multi-tier circuit breaker:
-   - High volume global ceiling with security alert logging.
-   - Per-IP and per-phone-prefix sliding-window rate limits.
-   - Hook requiring CAPTCHA verification when global traffic spikes past threshold.
-2. Produce simulation demonstrating legitimate user experience before vs after an attacker fires 500 OTP requests.
-3. Quantify SMS cost impact under baseline vs circuit-breaker regimes.
-
-### Group 5: Cron Deduplication & Security Monitor
-1. Author migration removing duplicate cron schedules:
-   - `release-expired-booking-holds` vs `release-expired-holds-sql`.
-   - `process-expired-account-deletions` vs `dpdp-account-deletions-sql`.
-2. Formulate architectural recommendation on `/api/cron/security-monitor` existence and operational value.
-
-### Group 6: Git Secrets Audit & Roles Review
-1. Provide exact `git filter-repo` commands and runbook for repository history cleansing (dry-run only; no history rewriting).
-2. Add Gitleaks secret scanning step to `.github/workflows/ci.yml`.
-3. Verify tracked environment files (ensuring only `.env.example` is committed).
-4. Inspect `supabase/roles.sql` for cleartext credentials and present security review.
-
-### Group 7: Production Safety & Test Routes Guard
-1. Add strict runtime guard preventing `/api/test/*` routes from executing in production environments, backed by unit tests.
-2. Update customer slot picker UI: replace "Unauthorized... retry" message for guest users with an intuitive sign-in prompt.
-
-### Group 8: Comprehensive Tenant & Cross-Hospital Authorization Suite
-- **Status**: SUBMITTED FOR HUMAN REVIEW (Full Serial Gate Passed: 39 suites / 365 tests, 0 typecheck errors, 52/52 Next.js static pages built + 72 dynamic API routes)
-1. **Adversarial Matrix Suite**: Built `tests/unit/cross-tenant-authorization-matrix.test.mjs` executing 38 distinct test scenarios covering 100% of discovered API routes (all 66 routes under `apps/merchant-web/src/app/api`) across 2 customers (A & B) and 2 hospitals (Hosp 1 & 2: Admin, Front Desk, Consultant, Department, Resource). Proven 200/201 on authorized caller and 401/403/404 or masked PII on cross-tenant/cross-role callers with zero 400 Bad Requests masquerading as passes. Includes programmatic completeness assertion verifying 0 uncovered routes on disk.
-2. **Demo Customer ID Purge**: Purged all occurrences of `'99999999-9999-9999-9999-999999999991'` across `apps/customer-mobile/` (0 matches in `.ts`/`.tsx`).
-3. **Mock Payments Production Guard**: Validated fail-fast boot guard in `apps/merchant-web/src/env.mjs` and `payments/verify` preventing boot when `ALLOW_MOCK_PAYMENTS=true` in production (exit code 1).
-4. **CORS & Demo Isolation**: Verified strict team preview origin matching (`tests/security/test-cors-and-demo-mode.test.mjs`, 5/5 PASS), rejecting malicious Vercel subdomains (`appointments-merchant-evil-<team-slug>.vercel.app`) without credentials.
-5. **TypeScript & Build Integrity**: Removed `typescript: { ignoreBuildErrors: true }` from `apps/merchant-web/next.config.mjs`. Added `pnpm -r exec tsc --noEmit` to `.github/workflows/ci.yml`. Ran `tsc --noEmit` (0 errors) and production build (52/52 pages).
-6. **Rate-Limit Backend & Redis**: Proved fail-closed architecture in production (`tests/unit/rate-limit-backend.test.mjs`, 6/6 PASS).
-7. **RPC Security Audit**: Verified `complete_booking` and `override_hospital_queue_position` stored procedures enforce `SECURITY DEFINER`, search paths, and caller authorization checks.
-8. **Roles Tracking**: Resolved `supabase/roles.sql` tracking in git; verified clean `supabase db reset`.
-
-### Group 9: Test Harness Hygiene & Core E2E Assertions
+### Group 9: Test Harness Hygiene, Logging Scripts & Core E2E Assertions (PENDING)
 1. Fix broken imports in `tests/scripts/demo-live-logs.mjs` and `verify-logging.mjs`.
-2. Replace soft `test.skip()` in core Playwright E2E suites with verifiable assertions; tag in-progress specs with `@wip`.
+2. Replace soft `test.skip()` in core Playwright E2E suites with verifiable assertions; retain `@wip` tag for unfinished specs.
 3. Run the full validation gate (`supabase db reset`, serial test execution, typecheck, production build).
+
 

@@ -8,14 +8,18 @@
 appointments-monorepo/
 ├── apps/
 │   ├── merchant-web/       # Next.js 15 — Admin & merchant dashboard
-│   └── customer-mobile/    # Expo (React Native) — Customer booking app
+│   ├── customer-mobile/    # Expo SDK 58 (React Native) — Customer booking app
+│   └── backend/            # Spring Boot (Legacy / Deprecated; superseded by Next.js + Supabase)
 ├── packages/
-│   └── shared/             # Shared types, schemas, constants
+│   └── shared/             # Shared types, schemas, queue algorithms, constants
 ├── supabase/
-│   ├── migrations/         # PostgreSQL schema, RLS, stored procedures
+│   ├── migrations/         # PostgreSQL schema, RLS, stored procedures (155 migrations)
 │   ├── functions/          # Edge functions (cron, webhooks)
 │   └── seed.sql            # Demo data for development
+├── scripts/                # Verification, seed, and CI test runner scripts
 └── tests/
+    ├── unit/               # Fast serial node:test unit suites
+    ├── scripts/            # Security, advisor, and integration test scripts
     └── e2e/                # Playwright E2E test suite
 ```
 
@@ -24,17 +28,17 @@ appointments-monorepo/
 | Layer | Technology |
 |-------|-----------|
 | **Frontend (Web)** | Next.js 15, React 18, Tailwind CSS 3 |
-| **Frontend (Mobile)** | Expo 57, React Native 0.86 |
+| **Frontend (Mobile)** | Expo 58, React Native 0.88, React 19 |
 | **Backend** | Supabase (PostgreSQL 15, RLS, Auth, Realtime, Edge Functions) |
 | **Payments** | Razorpay (HMAC SHA256 webhook verification) |
 | **Shared Types** | TypeScript 5, pnpm workspaces |
-| **Testing** | Playwright (E2E), TypeScript strict mode |
+| **Testing** | Node test runner (serial unit suites), pgTAP (database), Playwright (E2E) |
 
 ## Prerequisites
 
-- Node.js ≥ 18
-- pnpm ≥ 8
-- Supabase project (free tier works)
+- Node.js ≥ 22.0.0
+- pnpm ≥ 9
+- Supabase CLI & Docker (for local Supabase dev instance)
 
 ## Setup
 
@@ -89,21 +93,27 @@ pnpm dev:mobile
 ## Testing
 
 ```bash
+# Run unit test suites serially (Standing Rule 4)
+node scripts/run-all-unit-tests-serially.mjs
+
+# Run security & advisor tests
+pnpm test:security
+
+# TypeScript type checking across all workspaces
+pnpm -r --if-present typecheck
+
 # Run E2E tests (requires merchant-web dev server running)
 npx playwright test
-
-# TypeScript type checking
-pnpm --filter @appointments/merchant-web typecheck
-pnpm --filter @appointments/customer-mobile typecheck
 ```
 
 ## Key Features
 
 - **Deposit-backed booking**: 5-minute hold → payment → confirmation flow
-- **Multi-vertical support**: Clinics, salons, gaming, restaurants, pets
+- **Multi-vertical support**: Clinics & Hospitals, Salons, Gaming Turfs, Restaurants, Pet Care
+- **Hospital Vertical (SPEC.md)**: Department governance (max 3 staff/dept), front-desk doctor assignments, permanent check-in PIN revealed 60m pre-slot, doctor emergency departure refund flow
 - **Realtime sync**: Supabase Realtime channels for instant booking updates
-- **Anti-no-show system**: Deposit forfeiture + customer flagging after 4 no-shows
-- **Role-based access**: Admin, merchant, and customer roles with RLS policies
+- **6-Strike Anti-no-show policy**: Strikes 1–2 courtesy refund, strikes 3–5 ₹60 penalty split, 6th strike triggers 7-day account block (SPEC.md)
+- **Role-based access**: Admin, hospital admin, front desk, consultant, merchant, and customer roles with locked-down RLS policies
 - **Razorpay integration**: Webhook-verified payment confirmation
 
 ## License
