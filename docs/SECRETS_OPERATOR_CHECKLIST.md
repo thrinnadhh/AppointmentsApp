@@ -128,3 +128,4 @@ Rewriting commit SHAs changes the entire DAG. Follow this strict coordination pl
      git checkout feature-branch
      git rebase --onto origin/main <old-fork-point> feature-branch
      ```
+

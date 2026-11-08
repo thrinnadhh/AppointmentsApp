@@ -615,6 +615,8 @@ BEGIN
       'success', true,
       'channel', 'whatsapp',
       'status', 'SKIPPED',
+      'queued', false,
+      'skipped', true,
       'reason', 'Consent not granted'
     );
   END IF;
@@ -666,9 +668,196 @@ BEGIN
     'whatsapp_id', v_whatsapp_id,
     'whatsapp_log_id', v_whatsapp_id,
     'queued', true,
+    'skipped', false,
     'channel', 'whatsapp',
     'status', 'QUEUED',
     'template_name', v_template_name
   );
+END;
+$function$;
+
+-- 5. Align private.submit_city_waitlist contract (duplicate boolean and INVALID_PHONE error)
+CREATE OR REPLACE FUNCTION private.submit_city_waitlist(
+  p_city_name text,
+  p_phone text,
+  p_vertical_interest text DEFAULT 'all'::text,
+  p_notes text DEFAULT NULL::text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  v_clean_city text;
+  v_clean_phone text;
+  v_digits text;
+  v_existing_id uuid;
+  v_new_id uuid;
+BEGIN
+  -- 1. Validate City Name
+  v_clean_city := trim(COALESCE(p_city_name, ''));
+  IF length(v_clean_city) < 2 OR length(v_clean_city) > 100 THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'INVALID_CITY',
+      'message', 'City name must be between 2 and 100 characters'
+    );
+  END IF;
+
+  -- 2. Validate & Normalize Phone Number
+  v_clean_phone := trim(COALESCE(p_phone, ''));
+  v_digits := regexp_replace(v_clean_phone, '\D', '', 'g');
+
+  IF length(v_digits) < 10 OR length(v_digits) > 15 THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'INVALID_PHONE',
+      'message', 'Phone number must contain between 10 and 15 digits'
+    );
+  END IF;
+
+  -- Format national 10-digit Indian numbers with +91 if needed
+  IF length(v_digits) = 10 THEN
+    v_clean_phone := '+91' || v_digits;
+  ELSIF NOT v_clean_phone LIKE '+%' THEN
+    v_clean_phone := '+' || v_digits;
+  END IF;
+
+  -- 3. Deduplication Check (same city and phone)
+  SELECT id INTO v_existing_id
+  FROM public.city_waitlist
+  WHERE lower(city_name) = lower(v_clean_city)
+    AND (
+      phone = v_clean_phone
+      OR regexp_replace(phone, '\D', '', 'g') = v_digits
+    )
+  LIMIT 1;
+
+  IF v_existing_id IS NOT NULL THEN
+    RETURN jsonb_build_object(
+      'success', true,
+      'duplicate', true,
+      'already_registered', true,
+      'id', v_existing_id,
+      'city_name', initcap(v_clean_city),
+      'message', 'Waitlist interest already recorded for this city and phone'
+    );
+  END IF;
+
+  -- 4. Atomic Insert
+  INSERT INTO public.city_waitlist (
+    city_name,
+    phone,
+    vertical_interest,
+    notes,
+    consent_given,
+    consent_timestamp
+  ) VALUES (
+    initcap(v_clean_city),
+    v_clean_phone,
+    COALESCE(substring(trim(p_vertical_interest) from 1 for 50), 'customer'),
+    substring(trim(p_notes) from 1 for 500),
+    true,
+    clock_timestamp()
+  )
+  RETURNING id INTO v_new_id;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'duplicate', false,
+    'already_registered', false,
+    'id', v_new_id,
+    'city_name', initcap(v_clean_city),
+    'message', 'Successfully joined expansion waitlist'
+  );
+END;
+$function$;
+
+-- 6. Backfill missing city_id and ensure get_admin_velocity_analytics uses LEFT JOIN
+DO $$
+BEGIN
+  PERFORM set_config('app.trusted_write', 'true', true);
+  UPDATE public.providers
+  SET city_id = 'tirupati'
+  WHERE city_id IS NULL OR city ILIKE '%tirupati%';
+END $$;
+
+CREATE OR REPLACE FUNCTION public.get_admin_velocity_analytics(
+    p_time_window text DEFAULT 'today'::text,
+    p_city_id text DEFAULT NULL::text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public', 'pg_temp'
+AS $function$
+DECLARE
+    v_start_time TIMESTAMPTZ;
+    v_result JSONB;
+BEGIN
+    IF auth.role() != 'service_role' AND NOT public.is_admin(auth.uid()) THEN
+        RAISE EXCEPTION 'Access Denied: Administrator authority required to view velocity analytics' USING ERRCODE = '42501';
+    END IF;
+
+    IF p_time_window = 'today' THEN
+        v_start_time := date_trunc('day', NOW());
+    ELSIF p_time_window = '3days' THEN
+        v_start_time := NOW() - INTERVAL '3 days';
+    ELSIF p_time_window = '7days' THEN
+        v_start_time := NOW() - INTERVAL '7 days';
+    ELSIF p_time_window = '30days' THEN
+        v_start_time := NOW() - INTERVAL '30 days';
+    ELSE
+        v_start_time := '2020-01-01'::TIMESTAMPTZ;
+    END IF;
+
+    WITH filtered_bookings AS (
+        SELECT
+            b.id,
+            b.status,
+            b.payment_status,
+            b.deposit_amount,
+            p.city_id,
+            COALESCE(c.name, 'Unassigned') AS city_name
+        FROM public.bookings b
+        JOIN public.resources r ON b.resource_id = r.id
+        JOIN public.providers p ON r.provider_id = p.id
+        LEFT JOIN public.cities c ON p.city_id = c.id
+        WHERE b.created_at >= v_start_time
+          AND (p_city_id IS NULL OR p.city_id = p_city_id)
+    ),
+    city_density AS (
+        SELECT
+            city_id,
+            city_name,
+            COUNT(*) AS booking_count,
+            COUNT(*) FILTER (WHERE status = 'COMPLETED') AS completed_count,
+            COALESCE(SUM(deposit_amount) FILTER (WHERE payment_status IN ('CAPTURED', 'FORFEITED')), 0) AS total_revenue
+        FROM filtered_bookings
+        GROUP BY city_id, city_name
+    ),
+    hourly_trends AS (
+        SELECT
+            to_char(date_trunc('hour', b.created_at), 'YYYY-MM-DD"T"HH24:00:00"Z"') AS hour_bucket,
+            COUNT(*) AS booking_velocity
+        FROM public.bookings b
+        JOIN public.resources r ON b.resource_id = r.id
+        JOIN public.providers p ON r.provider_id = p.id
+        WHERE b.created_at >= v_start_time
+          AND (p_city_id IS NULL OR p.city_id = p_city_id)
+        GROUP BY date_trunc('hour', b.created_at)
+        ORDER BY date_trunc('hour', b.created_at) ASC
+    )
+    SELECT jsonb_build_object(
+        'window', p_time_window,
+        'city_id', p_city_id,
+        'total_bookings', (SELECT COUNT(*) FROM filtered_bookings),
+        'total_revenue', (SELECT COALESCE(SUM(deposit_amount) FILTER (WHERE payment_status IN ('CAPTURED', 'FORFEITED')), 0) FROM filtered_bookings),
+        'by_city', COALESCE((SELECT jsonb_agg(row_to_json(cd)) FROM city_density cd), '[]'::JSONB),
+        'velocity_trend', COALESCE((SELECT jsonb_agg(row_to_json(ht)) FROM hourly_trends ht), '[]'::JSONB)
+    ) INTO v_result;
+
+    RETURN v_result;
 END;
 $function$;

@@ -28,7 +28,7 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 -- 3. Insert Verified Providers in Tirupati
 -- Provider 1: Dental Clinic
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '11111111-1111-1111-1111-111111111111',
     'clinics',
@@ -37,6 +37,7 @@ INSERT INTO public.providers (
     'Comprehensive oral surgery, smile design, and pediatric dental services in central Tirupati.',
     'Shop 12, Bhavani Nagar, Near RTC Bus Stand',
     'Tirupati',
+    'tirupati',
     13.6328000,
     79.4197000,
     '+919876543210',
@@ -49,7 +50,7 @@ INSERT INTO public.providers (
 
 -- Provider 2: Restaurant
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '22222222-2222-2222-2222-222222222222',
     'restaurants',
@@ -58,6 +59,7 @@ INSERT INTO public.providers (
     'Authentic South Indian thalis and multi-cuisine table reservations with zero waiting.',
     'Renigunta Road, Opp. Reliance Trends',
     'Tirupati',
+    'tirupati',
     13.6288000,
     79.4285000,
     '+919876543211',
@@ -70,7 +72,7 @@ INSERT INTO public.providers (
 
 -- Provider 3: Turf & Box Cricket
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '33333333-3333-3333-3333-333333333333',
     'gaming',
@@ -79,6 +81,7 @@ INSERT INTO public.providers (
     'FIFA-standard turf with floodlights for Box Cricket and 5-a-side Football.',
     'Korlagunta Main Road, Near Reliance Mart',
     'Tirupati',
+    'tirupati',
     13.6412000,
     79.4310000,
     '+919876543212',
@@ -91,7 +94,7 @@ INSERT INTO public.providers (
 
 -- Provider 4: Salon & Spa
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '44444444-4444-4444-4444-444444444444',
     'salons',
@@ -100,6 +103,7 @@ INSERT INTO public.providers (
     'Premium hair styling, beard grooming, and rejuvenating facials by senior stylists.',
     'Air Bypass Road, Beside Domino’s Pizza',
     'Tirupati',
+    'tirupati',
     13.6355000,
     79.4123000,
     '+919876543213',
@@ -112,7 +116,7 @@ INSERT INTO public.providers (
 
 -- Provider 5: Pet Care & Hospital
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '55555555-5555-5555-5555-555555555555',
     'pets',
@@ -121,6 +125,7 @@ INSERT INTO public.providers (
     'Professional veterinary consultations, vaccination schedules, and dog grooming suites.',
     'Alipiri Bypass Road, Near Balaji Colony',
     'Tirupati',
+    'tirupati',
     13.6450000,
     79.4080000,
     '+919876543214',

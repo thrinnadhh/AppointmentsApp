@@ -16,7 +16,6 @@ function runTest(filePath) {
       timeout: 120000,
       env: {
         ...process.env,
-        HOME: '/tmp',
         DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
         NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321',
         SUPABASE_SERVICE_ROLE_KEY: resolvedKey,

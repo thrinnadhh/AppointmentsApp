@@ -132,8 +132,8 @@ export async function seedHospitalTestData() {
         return existing.rows[0];
       }
       const res = await client.query(
-        `INSERT INTO public.providers (name, category_id, owner_id, status, is_active, address, phone, city, latitude, longitude)
-         VALUES ($1, $2, $3, 'ACTIVE', true, 'Test Medical Road, Tirupati, AP', '+919999900000', 'Tirupati', 13.6288, 79.4192)
+        `INSERT INTO public.providers (name, category_id, owner_id, status, is_active, address, phone, city, city_id, latitude, longitude)
+         VALUES ($1, $2, $3, 'ACTIVE', true, 'Test Medical Road, Tirupati, AP', '+919999900000', 'Tirupati', 'tirupati', 13.6288, 79.4192)
          RETURNING *`,
         [name, category_id, owner_id]
       );
