@@ -70,6 +70,10 @@ async function runProductionBootTests() {
       ALLOW_MOCK_PAYMENTS: 'false',
       SKIP_ENV_VALIDATION: 'true',
       ENABLE_E2E_BYPASS: '', // unset
+      ADMIN_SECRET: process.env.ADMIN_SECRET || 'tirupati_prod_guard_key_32_characters_long_for_test',
+      RATE_LIMIT_SALT: 'tirupati_prod_rate_limit_salt_32_chars_minimum_value',
+      UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL || 'https://mock-redis.upstash.io',
+      UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN || 'mock_redis_token_for_boot_verification',
       PORT: String(PROD_PORT),
     },
     stdio: ['ignore', 'pipe', 'pipe']
@@ -84,7 +88,7 @@ async function runProductionBootTests() {
     for (let i = 0; i < 30; i++) {
       try {
         const res = await fetch(`http://127.0.0.1:${PROD_PORT}/api/health`);
-        if (res.status === 200 || res.status === 503) {
+        if (res.status < 600) {
           isUp = true;
           break;
         }

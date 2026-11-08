@@ -43,6 +43,7 @@ test('Plan 6.1 Database Security Remediation Verification', async (t) => {
     // 2. Test reveal_customer_contact enforces reason and audits it
     // -------------------------------------------------------------------------
     await t.test('reveal_customer_contact requires non-empty reason and persists it', async () => {
+      await client.query("SET request.jwt.claim.role = 'service_role';");
       const fixtureRes = await client.query(`
         INSERT INTO public.bookings (
           provider_id, resource_id, customer_id, slot_start, slot_end, status, deposit_amount,
@@ -151,7 +152,7 @@ test('Plan 6.1 Database Security Remediation Verification', async (t) => {
         INSERT INTO public.notification_logs (
           booking_id, recipient_phone, recipient_name, event_type, channel, status, message_content, created_at
         ) VALUES (
-          '${validBookingId}', '+919876543210', 'Test Old Recipient', 'BOOKING_CONFIRMED', 'sms', 'SENT', 'Test message', NOW() - INTERVAL '10 days'
+          '${validBookingId}', '+919876543210', 'Test Old Recipient', 'MASK_TEST_ALERT', 'sms', 'SENT', 'Test message', NOW() - INTERVAL '10 days'
         ) RETURNING id;
       `);
       const notifId = dummyNotifRes.rows[0].id;
