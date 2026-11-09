@@ -94,6 +94,7 @@ function evaluateCorsHeaders(origin, env = process.env) {
 function evaluateMiddlewareAccess(pathname, isAuthenticated) {
   const PUBLIC_API_ROUTES = [
     '/api/webhooks/razorpay',
+    '/api/webhooks/cashfree',
     '/api/auth/callback',
   ];
 
@@ -391,11 +392,14 @@ describe('Authentication, Toll-Fraud & Gateway Defense Remediation', () => {
       assert.match(code, /script\.crossOrigin\s*=\s*['"]anonymous['"]/, 'Must specify crossOrigin="anonymous"');
     });
 
-    it('verifies next.config.mjs CSP disallows unsafe wildcards and explicitly allows Razorpay', () => {
+    it('verifies next.config.mjs CSP disallows unsafe wildcards and explicitly allows Razorpay and Cashfree', () => {
       const configPath = path.join(rootDir, 'apps/merchant-web/next.config.mjs');
       const code = fs.readFileSync(configPath, 'utf8');
       assert.match(code, /script-src[^;]*https:\/\/checkout\.razorpay\.com/, 'CSP script-src must allow Razorpay checkout');
+      assert.match(code, /script-src[^;]*https:\/\/sdk\.cashfree\.com/, 'CSP script-src must allow Cashfree SDK');
       assert.match(code, /frame-src[^;]*https:\/\/api\.razorpay\.com/, 'CSP frame-src must allow Razorpay api');
+      assert.match(code, /frame-src[^;]*https:\/\/sdk\.cashfree\.com/, 'CSP frame-src must allow Cashfree SDK');
+      assert.match(code, /connect-src[^;]*https:\/\/api\.cashfree\.com/, 'CSP connect-src must allow Cashfree API');
       assert.doesNotMatch(code, /script-src[^;]*\bhttp:\s/, 'CSP script-src must not contain http: wildcard');
       assert.doesNotMatch(code, /script-src[^;]*\bhttps:\s/, 'CSP script-src must not contain https: wildcard');
     });
@@ -812,6 +816,15 @@ describe('Priority 5 Security Remediation: Strix Deep Scan Findings (vuln-0001 -
     assert.match(webhookCode, /p_deposit_amount: expectedDepositAmount/);
     assert.match(webhookCode, /if \(rpcError \|\| !rpcData \|\| !\(rpcData as any\)\.success\)/);
     assert.match(webhookCode, /paymentInsertError/);
+  });
+
+  // Cashfree Webhook Settlement & Timing-Safe Verification
+  it('verifies cashfree webhook verifies raw body HMAC SHA-256 signature and uses timing-safe comparison', () => {
+    const webhookCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/webhooks/cashfree/route.ts'), 'utf8');
+    assert.match(webhookCode, /req\.text\(\)/, 'Must read raw body as text');
+    assert.match(webhookCode, /x-webhook-signature/, 'Must inspect x-webhook-signature header');
+    assert.match(webhookCode, /x-webhook-timestamp/, 'Must inspect x-webhook-timestamp header');
+    assert.match(webhookCode, /adapter\.verifyWebhook/, 'Must verify signature via Cashfree adapter');
   });
 
   // vuln-0004: Client-Controlled Proxy Header Rate-Limit Bypass
