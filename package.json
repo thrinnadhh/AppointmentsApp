@@ -59,7 +59,8 @@
       "next": "15.5.28",
       "@types/react": "18.3.18",
       "@types/react-dom": "18.3.5",
-      "zod": ">=3.24.0"
+      "zod": ">=3.24.0",
+      "undici": ">=6.29.1"
     },
     "patchedDependencies": {
       "expo-notifications@58.1.6": "patches/expo-notifications@58.1.6.patch"

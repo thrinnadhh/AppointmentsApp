@@ -24,7 +24,17 @@ const APPROVED_WAIVERS = [
 ];
 
 function main() {
-  console.log('Running pnpm audit --prod --json...');
+  const minLevel = (process.argv.find(arg => arg.startsWith('--audit-level='))?.split('=')[1]) ||
+                   process.env.AUDIT_LEVEL ||
+                   'high';
+  const severities = ['info', 'low', 'moderate', 'high', 'critical'];
+  const minIndex = severities.indexOf(minLevel.toLowerCase());
+  const isTargetSeverity = (sev) => {
+    const idx = severities.indexOf((sev || '').toLowerCase());
+    return idx >= (minIndex === -1 ? 3 : minIndex);
+  };
+
+  console.log(`Running pnpm audit --prod --json (minimum audit level: ${minLevel.toUpperCase()})...`);
   const res = spawnSync('pnpm', ['audit', '--prod', '--json'], { encoding: 'utf8', env: process.env });
 
   // Clean JSON string (strip any leading deprecation warnings)
@@ -57,12 +67,23 @@ function main() {
 
   const unwaived = [];
   const waived = [];
+  const ignored = [];
 
   for (const id of advisoryIds) {
     const adv = advisories[id];
     const moduleName = adv.module_name;
     const ghsaId = adv.github_advisory_id;
     const findings = adv.findings || [];
+
+    if (!isTargetSeverity(adv.severity)) {
+      ignored.push({
+        module: moduleName,
+        ghsaId,
+        severity: adv.severity,
+        title: adv.title
+      });
+      continue;
+    }
 
     for (const finding of findings) {
       const paths = finding.paths || [];
@@ -92,6 +113,10 @@ function main() {
         }
       }
     }
+  }
+
+  if (ignored.length > 0) {
+    console.log(`\nℹ Notice: ${ignored.length} advisory/advisories below ${minLevel.toUpperCase()} threshold were skipped.`);
   }
 
   if (waived.length > 0) {

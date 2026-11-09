@@ -19,6 +19,7 @@ overrides:
   '@types/react': 18.3.18
   '@types/react-dom': 18.3.5
   zod: '>=3.24.0'
+  undici: '>=6.29.1'
 
 patchedDependencies:
   expo-notifications@58.1.6:
@@ -8327,11 +8328,6 @@ packages:
   /undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
-  /undici@6.29.0:
-    resolution: {integrity: sha512-R+RODBqp6i2pPflGdq+xIOUkl+RNfGgHwoinecKu/JCuf2uO06cOKoDbI2P7Dn6KcswdKwrczbU6IYJ6K8X+wg==}
-    engines: {node: '>=18.17'}
-    dev: true
-
   /undici@7.30.0:
     resolution: {integrity: sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ==}
     engines: {node: '>=20.18.1'}
@@ -8480,7 +8476,7 @@ packages:
       '@wdio/utils': 9.32.0
       deepmerge-ts: 8.0.2
       https-proxy-agent: 7.0.6
-      undici: 6.29.0
+      undici: 7.30.0
       ws: 8.21.3
     transitivePeerDependencies:
       - bare-abort-controller
