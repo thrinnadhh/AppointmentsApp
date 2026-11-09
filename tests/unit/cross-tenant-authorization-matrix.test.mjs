@@ -2409,7 +2409,7 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         city_id: 'tirupati',
-        phone: `+91998877${Date.now().toString().slice(-4)}`,
+        phone: `+919988${Math.floor(100000 + Math.random() * 900000)}`,
         role_interest: 'customer',
       }),
     });
@@ -2641,16 +2641,9 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       assert.equal(wrongRefund.status, 401, 'process-refund-queue returns 401 with wrong secret');
 
       // 39.4 Re-running all migrations produces no errors and no duplicate cron jobs, queues, triggers or secrets
-      // Robust function snapshot via pg_get_functiondef before running older migrations
-      const snapshotRes = await pgClient.query(`
-        SELECT pg_get_functiondef(p.oid) as def
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname IN ('public', 'private')
-      `);
-      const fnSnapshots = snapshotRes.rows.map(r => r.def);
-
+      // Runs inside isolated transaction so older migrations roll back completely without tainting functions, triggers, or ACLs
       try {
+        await pgClient.query('BEGIN');
         // Dynamically discover all migrations from 20261105100001 to prevent stale hardcoded lists
         const migrationFiles = fs.readdirSync('supabase/migrations')
           .filter(f => f.endsWith('.sql') && f >= '20261105100001')
@@ -2672,10 +2665,7 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         const vaultRes = await pgClient.query('SELECT count(*)::int as cnt FROM vault.secrets');
         assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
       } finally {
-        // Robust function restoration: restore function snapshot so no definition is downgraded
-        for (const def of fnSnapshots) {
-          await pgClient.query(def);
-        }
+        await pgClient.query('ROLLBACK');
       }
 
       const trigRes = await pgClient.query(

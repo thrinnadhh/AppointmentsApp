@@ -4,8 +4,15 @@
 > Under standing project security rules, automated agents are strictly forbidden from rewriting git history, force-pushing, rotating live third-party keys, or running `git filter-repo`.
 > This checklist provides the exact operational protocol for the repository administrator to remediate historical credentials.
 >
-> **Repository Visibility Notice**:
-> Repository visibility (public vs private) is **unknown to the agent**. If this repository is or was ever public, any credentials pushed to any branch must be presumed compromised and accessible to third-party scrapers. Even in a private repository, credentials must be treated as exposed and rotated immediately.
+> **Repository Visibility Notice (PUBLIC REPOSITORY)**:
+> **The GitHub repository is PUBLIC.** The leaked Supabase `service_role` and `anon` keys are present in pushed git history (including remote branch `origin/fix/strix-vulnerabilities-remediation`, commit `43652d0`).
+> Because the repository is public, credentials must be presumed scraped and compromised immediately:
+> 1. **Rotate keys first**: Rotate the Supabase `JWT Secret` / `service_role` / `anon` keys in the Supabase Dashboard BEFORE executing any git history rewrite.
+> 2. **Check project logs**: Audit Supabase project authentication, database, and API request logs immediately for unexpected foreign IP addresses or anomalous data queries during the exposure window.
+> 3. **Persistent GitHub artifacts**: Note that `git filter-repo` rewrites your local and pushed branches, but forks, GitHub cached views (commit SHA pages), and internal pull request refs persist in GitHub's internal caches even after force-pushing. Contact GitHub Support to request an explicit cache purge / ref eviction after rewriting history.
+> 4. **Repository Privacy**: Strongly consider making the repository **private** to reduce public exposure surface while remediation is in flight.
+> 5. **Legal / Compliance**: Consult legal counsel to determine whether the public exposure of the database credentials constitutes a reportable security incident under applicable data protection regulations (e.g. DPDP Act 2023 / GDPR).
+> *(Documented for operator action; automated agents must not execute history rewrites or access hosted accounts.)*
 
 ---
 

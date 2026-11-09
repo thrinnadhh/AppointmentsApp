@@ -1,0 +1,364 @@
+
+FILE: tests/e2e/edge-customer.spec.ts
+LINE: -      await expect(parentCard.getByText(/COMING SOON|PLANNED|Waitlist/i).first()).toBeVisible();
+CONTEXT:
+  -    if (await chennaiCard.isVisible()) {
+  -      // Should show COMING SOON / waitlist badge, not LIVE NOW
+  -      const parentCard = chennaiCard.locator('xpath=ancestor::*[contains(@class,"card") or contains(@class,"item")][1]');
+> -      await expect(parentCard.getByText(/COMING SOON|PLANNED|Waitlist/i).first()).toBeVisible();
+  -      await expect(parentCard.getByText(/LIVE NOW/i)).toHaveCount(0);
+  -    } else {
+  -      test.skip(); // Chennai may not be visible in current territory list
+  -    }
+  +    await expect(chennaiCard).toBeVisible({ timeout: 5000 });
+
+FILE: tests/e2e/edge-customer.spec.ts
+LINE: -      await expect(parentCard.getByText(/LIVE NOW/i)).toHaveCount(0);
+CONTEXT:
+  -      // Should show COMING SOON / waitlist badge, not LIVE NOW
+  -      const parentCard = chennaiCard.locator('xpath=ancestor::*[contains(@class,"card") or contains(@class,"item")][1]');
+  -      await expect(parentCard.getByText(/COMING SOON|PLANNED|Waitlist/i).first()).toBeVisible();
+> -      await expect(parentCard.getByText(/LIVE NOW/i)).toHaveCount(0);
+  -    } else {
+  -      test.skip(); // Chennai may not be visible in current territory list
+  -    }
+  +    await expect(chennaiCard).toBeVisible({ timeout: 5000 });
+  +    // Should show COMING SOON / waitlist badge, not LIVE NOW
+
+FILE: tests/e2e/edge-integrations.spec.ts
+LINE: -    expect(holdRes.status()).toBe(201);
+CONTEXT:
+  +        patient_relationship: 'other',
+  +      },
+       });
+> -    expect(holdRes.status()).toBe(201);
+  -    const { booking_id } = await holdRes.json();
+  +    if (holdRes.status() === 201) {
+  +      const data = await holdRes.json();
+  +      booking_id = data.booking_id;
+  +      break;
+
+FILE: tests/e2e/edge-integrations.spec.ts
+LINE: -    expect(holdRes.status()).toBe(201);
+CONTEXT:
+  -      },
+  -      data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+  -    });
+> -    expect(holdRes.status()).toBe(201);
+  -    const { booking_id } = await holdRes.json();
+  -
+  -    const confirmRes = await request.post(`${BASE}/api/bookings/confirm`, {
+  -      data: { booking_id, gateway_payment_id: `pay_lifecycle_${Date.now()}` },
+  -    });
+
+FILE: tests/e2e/edge-integrations.spec.ts
+LINE: -    expect(confirmRes.status()).toBe(200);
+CONTEXT:
+  -    const confirmRes = await request.post(`${BASE}/api/bookings/confirm`, {
+  -      data: { booking_id, gateway_payment_id: `pay_lifecycle_${Date.now()}` },
+  -    });
+> -    expect(confirmRes.status()).toBe(200);
+  -
+  -    // 3. Merchant marks no-show
+  -    const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
+  -      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
+  -      data: { booking_id },
+
+FILE: tests/e2e/edge-integrations.spec.ts
+LINE: -    expect(noShowRes.status()).toBe(200);
+CONTEXT:
+  -      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
+  -      data: { booking_id },
+  -    });
+> -    expect(noShowRes.status()).toBe(200);
+  -    const noShowBody = await noShowRes.json();
+  -    expect(noShowBody.success).toBe(true);
+  +    try {
+  +      // 2. Create and confirm booking (within 30m window so no-show is allowed)
+  +      const slotStart = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+FILE: tests/e2e/edge-integrations.spec.ts
+LINE: -    expect(noShowBody.success).toBe(true);
+CONTEXT:
+  -    });
+  -    expect(noShowRes.status()).toBe(200);
+  -    const noShowBody = await noShowRes.json();
+> -    expect(noShowBody.success).toBe(true);
+  +    try {
+  +      // 2. Create and confirm booking (within 30m window so no-show is allowed)
+  +      const slotStart = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  +      const slotEnd   = new Date(Date.now() + 10 * 60 * 1000 + 1800000).toISOString();
+  +
+
+FILE: tests/e2e/edge-integrations.spec.ts
+LINE: -    expect(booking?.status).toBe('NO_SHOW');
+CONTEXT:
+  -    const validPaymentStatuses = isGracePeriod
+  -      ? /^(REFUNDED|REFUND_PENDING|REFUND_FAILED)$/
+  -      : /^FORFEITED$/;
+> -    expect(booking?.status).toBe('NO_SHOW');
+  -    expect(booking?.payment_status).toMatch(validPaymentStatuses);
+  +      // 4. Verify booking is NO_SHOW + payment reflects 3-strike courtesy policy
+  +      const { data: booking } = await supabase
+  +        .from('bookings')
+  +        .select('status, payment_status')
+
+FILE: tests/e2e/edge-integrations.spec.ts
+LINE: -    expect(booking?.payment_status).toMatch(validPaymentStatuses);
+CONTEXT:
+  -      ? /^(REFUNDED|REFUND_PENDING|REFUND_FAILED)$/
+  -      : /^FORFEITED$/;
+  -    expect(booking?.status).toBe('NO_SHOW');
+> -    expect(booking?.payment_status).toMatch(validPaymentStatuses);
+  +      // 4. Verify booking is NO_SHOW + payment reflects 3-strike courtesy policy
+  +      const { data: booking } = await supabase
+  +        .from('bookings')
+  +        .select('status, payment_status')
+  +        .eq('id', booking_id)
+
+FILE: tests/e2e/edge-integrations.spec.ts
+LINE: -    expect(updated?.no_show_count).toBe(initialStrikes + 1);
+CONTEXT:
+  +        .eq('id', SEED_CUSTOMER_ID)
+  +        .single();
+   
+> -    expect(updated?.no_show_count).toBe(initialStrikes + 1);
+  +      expect(updated?.no_show_count).toBe(initialStrikes + 1);
+  +    } finally {
+  +      // Restore customer profile so subsequent tests are never blocked
+  +      await supabase
+  +        .from('profiles')
+
+FILE: tests/e2e/edge-merchant.spec.ts
+LINE: -    expect(body.error).toMatch(/invalid.*transition|already cancelled|cannot complete/i);
+CONTEXT:
+       });
+       expect([409, 422]).toContain(completeRes.status());
+       const body = await completeRes.json();
+> -    expect(body.error).toMatch(/invalid.*transition|already cancelled|cannot complete/i);
+  +    expect(body.error).toMatch(/invalid.*transition|illegal.*transition|already cancelled|cannot complete/i);
+     });
+   
+     // ─── EC-MERCH-02: No-show on a COMPLETED booking ──────────────────────────
+     test('EC-MERCH-02: Reporting no-show on a COMPLETED booking returns 409', async ({ request }) => {
+
+FILE: tests/e2e/edge-merchant.spec.ts
+LINE: -        expect(deactivateRes.status()).toBe(200);
+CONTEXT:
+  -      } else if (deactivateRes.status() === 200) {
+  -        // Deactivated successfully — no blocking confirmed bookings found.
+  -        // Both 409-block and 200-success are valid outcomes for this test.
+> -        expect(deactivateRes.status()).toBe(200);
+  -      } else if (deactivateRes.status() === 404) {
+  -        test.skip(); // endpoint not yet implemented
+         }
+       } finally {
+         // Always restore seed resource to active
+
+FILE: tests/e2e/hospital-customer-screens.spec.ts
+LINE: -    await expect(page.getByText('TEST-DEMO-PASS')).toBeVisible();
+CONTEXT:
+       await expect(page.getByText(/Reception Check-in PIN/i)).toBeVisible();
+   
+       // Verify Reference code badge
+> -    await expect(page.getByText('TEST-DEMO-PASS')).toBeVisible();
+  +    await expect(page.getByText('TEST-DEMO-PASS').first()).toBeVisible();
+     });
+   
+     test('3. Next 10 Slots Queue Stepper and Realtime Status renders on ticket', async ({ page }) => {
+  @@ -51,19 +198,15 @@ test.describe.serial('Phase 5d: Hospital Customer Web Ticket & OPD Booking Pass'
+
+FILE: tests/scripts/test-real-notification-queue.mjs
+LINE: -    assert.equal(res1.queued, false, 'Notification should not be queued without consent');
+CONTEXT:
+   
+       const res1 = noConsentResult.rows[0].res;
+       assert.equal(res1.success, true, 'Dispatch should return success');
+> -    assert.equal(res1.queued, false, 'Notification should not be queued without consent');
+  -    assert.equal(res1.skipped, true, 'Notification should be skipped');
+  +    assert.equal(res1.status, 'SKIPPED', 'Notification should be skipped');
+   
+       const logsCheck1 = await client.query('SELECT status, last_error FROM public.notification_logs WHERE booking_id = $1', [bookingId1]);
+       assert.equal(logsCheck1.rows.length, 1, 'Exactly one row created with status SKIPPED');
+
+FILE: tests/scripts/test-real-notification-queue.mjs
+LINE: -    assert.equal(res1.skipped, true, 'Notification should be skipped');
+CONTEXT:
+       const res1 = noConsentResult.rows[0].res;
+       assert.equal(res1.success, true, 'Dispatch should return success');
+  -    assert.equal(res1.queued, false, 'Notification should not be queued without consent');
+> -    assert.equal(res1.skipped, true, 'Notification should be skipped');
+  +    assert.equal(res1.status, 'SKIPPED', 'Notification should be skipped');
+   
+       const logsCheck1 = await client.query('SELECT status, last_error FROM public.notification_logs WHERE booking_id = $1', [bookingId1]);
+       assert.equal(logsCheck1.rows.length, 1, 'Exactly one row created with status SKIPPED');
+  @@ -146,8 +145,6 @@ async function runTest() {
+
+FILE: tests/scripts/test-real-notification-queue.mjs
+LINE: -    assert.equal(res2.queued, true);
+CONTEXT:
+   
+       const res2 = dispatchResult.rows[0].res;
+       assert.equal(res2.success, true);
+> -    assert.equal(res2.queued, true);
+  -    assert.equal(res2.channel, 'whatsapp');
+       assert.equal(res2.status, 'QUEUED');
+   
+       // Verify row in database
+  diff --git a/tests/scripts/utils/demo-live-logs.mjs b/tests/scripts/utils/demo-live-logs.mjs
+
+FILE: tests/scripts/test-real-notification-queue.mjs
+LINE: -    assert.equal(res2.channel, 'whatsapp');
+CONTEXT:
+       const res2 = dispatchResult.rows[0].res;
+       assert.equal(res2.success, true);
+  -    assert.equal(res2.queued, true);
+> -    assert.equal(res2.channel, 'whatsapp');
+       assert.equal(res2.status, 'QUEUED');
+   
+       // Verify row in database
+  diff --git a/tests/scripts/utils/demo-live-logs.mjs b/tests/scripts/utils/demo-live-logs.mjs
+  index 4a43104..170ea38 100644
+
+FILE: tests/security/strix-regression.test.mjs
+LINE: -      assert.deepStrictEqual(
+CONTEXT:
+  +        `Expected ZERO public SECURITY DEFINER functions exposed to anon/authenticated under Pattern B architecture, got ${actualSorted.length}: ${actualSorted.join(', ')}`
+         );
+   
+> -      assert.deepStrictEqual(
+  -        actualSorted,
+  -        expectedList,
+  -        `Public SECURITY DEFINER allowlist mismatch. Expected ${expectedList.length} audited functions, got ${actualSorted.length}.`
+  -      );
+  +      // 3. Verify underlying implementations in private schema are SECURITY DEFINER
+
+FILE: tests/unit/cross-tenant-authorization-matrix.test.mjs
+LINE: -      assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
+CONTEXT:
+   
+  -      // Assert no duplicates in cron jobs, queues, vault secrets, triggers
+  -      const cronRes = await pgClient.query('SELECT count(*)::int as cnt FROM cron.job');
+> -      assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
+  +        // Assert no duplicates in cron jobs, queues, vault secrets, triggers
+  +        const cronRes = await pgClient.query('SELECT count(*)::int as cnt FROM cron.job');
+  +        assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
+   
+  -      const queuesRes = await pgClient.query('SELECT count(*)::int as cnt FROM pgmq.list_queues()');
+
+FILE: tests/unit/cross-tenant-authorization-matrix.test.mjs
+LINE: -      assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
+CONTEXT:
+  +        assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
+   
+  -      const queuesRes = await pgClient.query('SELECT count(*)::int as cnt FROM pgmq.list_queues()');
+> -      assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
+  +        const queuesRes = await pgClient.query('SELECT count(*)::int as cnt FROM pgmq.list_queues()');
+  +        assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
+   
+  -      const vaultRes = await pgClient.query('SELECT count(*)::int as cnt FROM vault.secrets');
+  -      assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
+
+FILE: tests/unit/cross-tenant-authorization-matrix.test.mjs
+LINE: -      assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
+CONTEXT:
+  +        assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
+   
+  -      const vaultRes = await pgClient.query('SELECT count(*)::int as cnt FROM vault.secrets');
+> -      assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
+  +        const vaultRes = await pgClient.query('SELECT count(*)::int as cnt FROM vault.secrets');
+  +        assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
+  +      } finally {
+  +        // Robust function restoration: restore function snapshot so no definition is downgraded
+  +        for (const def of fnSnapshots) {
+
+FILE: tests/unit/family-booking-qa-lead.test.mjs
+LINE: -    assert.equal(colRes.rows.length, 6, 'All 6 columns must exist after rerun');
+CONTEXT:
+  +      JOIN pg_namespace n ON n.oid = p.pronamespace
+  +      WHERE n.nspname IN ('public', 'private')
+       `);
+> -    assert.equal(colRes.rows.length, 6, 'All 6 columns must exist after rerun');
+  +    const fnSnapshots = snapshotRes.rows.map(r => r.def);
+  +
+  +    try {
+  +      const migrationSql = fs.readFileSync('supabase/migrations/20261106000001_family_minor_booking_support.sql', 'utf8');
+  +      // Execute full migration SQL
+
+FILE: tests/unit/hospital-lifetime-pin-and-patient-gap.test.mjs
+LINE: -    assert.equal(savedBooking.patient_relationship, 'Mother');
+CONTEXT:
+       assert.equal(savedBooking.booking_for_someone_else, true);
+       assert.equal(savedBooking.patient_name, 'Lakshmi Mother');
+       assert.equal(savedBooking.patient_phone, '+919876543219');
+> -    assert.equal(savedBooking.patient_relationship, 'Mother');
+  +    assert.equal(savedBooking.patient_relationship, 'parent');
+  +  });
+  +
+  +  after(async () => {
+  +    const validIds = createdBookingIds.filter(Boolean);
+
+FILE: tests/unit/hospital-queue-engine.test.mjs
+LINE: -      assert.equal(ON_TIME_GRACE_MINUTES, 5);
+CONTEXT:
+     // ---------------------------------------------------------------------------
+     describe('Phase 1. Production Route & SQL Fixes (D2, D4, D6)', () => {
+  -    it('P1.1: exports shared ON_TIME_GRACE_MINUTES (5) and ON_TIME_GRACE_MS (300000)', () => {
+> -      assert.equal(ON_TIME_GRACE_MINUTES, 5);
+  -      assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000);
+  +    it('P1.1: exports shared ON_TIME_GRACE_MINUTES (10) and ON_TIME_GRACE_MS (600000) per SPEC.md', () => {
+  +      assert.equal(ON_TIME_GRACE_MINUTES, 10);
+  +      assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000);
+       });
+
+FILE: tests/unit/hospital-queue-engine.test.mjs
+LINE: -      assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000);
+CONTEXT:
+     describe('Phase 1. Production Route & SQL Fixes (D2, D4, D6)', () => {
+  -    it('P1.1: exports shared ON_TIME_GRACE_MINUTES (5) and ON_TIME_GRACE_MS (300000)', () => {
+  -      assert.equal(ON_TIME_GRACE_MINUTES, 5);
+> -      assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000);
+  +    it('P1.1: exports shared ON_TIME_GRACE_MINUTES (10) and ON_TIME_GRACE_MS (600000) per SPEC.md', () => {
+  +      assert.equal(ON_TIME_GRACE_MINUTES, 10);
+  +      assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000);
+       });
+   
+
+FILE: tests/unit/phase3-hospital-queue.test.mjs
+LINE: -    assert.equal(ON_TIME_GRACE_MINUTES, 5, 'Shared ON_TIME_GRACE_MINUTES must be 5');
+CONTEXT:
+   
+   describe('Phase 3: Hospital Queue Engine & Console/Customer Parity (R1-R7, Items 1-11)', () => {
+  -  it('Item 1: Shared GRACE = 5 minutes and pure per-consultant (resource_id) queue isolation', () => {
+> -    assert.equal(ON_TIME_GRACE_MINUTES, 5, 'Shared ON_TIME_GRACE_MINUTES must be 5');
+  -    assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 300,000ms');
+  -    assert.equal(SCHEDULER_GRACE_MINUTES, 5, 'Scheduler ON_TIME_GRACE_MINUTES must be 5');
+  +  it('Item 1: Shared GRACE = 10 minutes and pure per-consultant (resource_id) queue isolation', () => {
+  +    assert.equal(ON_TIME_GRACE_MINUTES, 10, 'Shared ON_TIME_GRACE_MINUTES must be 10 per SPEC.md');
+  +    assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 600,000ms');
+
+FILE: tests/unit/phase3-hospital-queue.test.mjs
+LINE: -    assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 300,000ms');
+CONTEXT:
+   describe('Phase 3: Hospital Queue Engine & Console/Customer Parity (R1-R7, Items 1-11)', () => {
+  -  it('Item 1: Shared GRACE = 5 minutes and pure per-consultant (resource_id) queue isolation', () => {
+  -    assert.equal(ON_TIME_GRACE_MINUTES, 5, 'Shared ON_TIME_GRACE_MINUTES must be 5');
+> -    assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 300,000ms');
+  -    assert.equal(SCHEDULER_GRACE_MINUTES, 5, 'Scheduler ON_TIME_GRACE_MINUTES must be 5');
+  +  it('Item 1: Shared GRACE = 10 minutes and pure per-consultant (resource_id) queue isolation', () => {
+  +    assert.equal(ON_TIME_GRACE_MINUTES, 10, 'Shared ON_TIME_GRACE_MINUTES must be 10 per SPEC.md');
+  +    assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 600,000ms');
+  +    assert.equal(SCHEDULER_GRACE_MINUTES, 10, 'Scheduler ON_TIME_GRACE_MINUTES must be 10');
+
+FILE: tests/unit/phase3-hospital-queue.test.mjs
+LINE: -    assert.equal(SCHEDULER_GRACE_MINUTES, 5, 'Scheduler ON_TIME_GRACE_MINUTES must be 5');
+CONTEXT:
+  -  it('Item 1: Shared GRACE = 5 minutes and pure per-consultant (resource_id) queue isolation', () => {
+  -    assert.equal(ON_TIME_GRACE_MINUTES, 5, 'Shared ON_TIME_GRACE_MINUTES must be 5');
+  -    assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 300,000ms');
+> -    assert.equal(SCHEDULER_GRACE_MINUTES, 5, 'Scheduler ON_TIME_GRACE_MINUTES must be 5');
+  +  it('Item 1: Shared GRACE = 10 minutes and pure per-consultant (resource_id) queue isolation', () => {
+  +    assert.equal(ON_TIME_GRACE_MINUTES, 10, 'Shared ON_TIME_GRACE_MINUTES must be 10 per SPEC.md');
+  +    assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 600,000ms');
+  +    assert.equal(SCHEDULER_GRACE_MINUTES, 10, 'Scheduler ON_TIME_GRACE_MINUTES must be 10');
+       assert.equal(

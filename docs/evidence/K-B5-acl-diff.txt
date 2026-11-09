@@ -1,0 +1,647 @@
+=== B5 REOPEN VERIFICATION: FUNCTION PRIVILEGES & ACLs SNAPSHOT ===
+
+Baseline snapshot captured: 154 public/private functions.
+
+--- Running Order-Dependent Sequence: Pass 1 ---
+1. tests/unit/family-booking-qa-lead.test.mjs
+▶ PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking
+  ✔ F-01: Book for self - unchanged behavior, booked_for='self', patient fields null (841.774542ms)
+  ✔ F-02: Book for family adult (age 35, relationship 'spouse') - row saved, token issued, patient name visible (961.041875ms)
+  ✔ F-03: Book for child age 5 - is_minor = true, Minor tag derived (322.569208ms)
+  ✔ F-04: Age boundaries - 0, 1, 17, 18, 19, 120 accepted with correct is_minor boolean (3591.180167ms)
+  ✔ F-05: Age invalid - -1, 121, 1.5, "abc" rejected; null/empty allowed when optional (458.394834ms)
+  ✔ F-06: Name required for family - empty, whitespace-only, missing rejected server-side (66.237375ms)
+  ✔ F-07: Name boundaries - 1 char, 100 chars, 101 chars (rejected), unicode (Telugu, Hindi, Tamil, emoji, accented), spaces trimmed (5023.627166ms)
+  ✔ F-08: Note boundaries - empty, 200 chars, 201 chars (rejected) (629.603375ms)
+  ✔ F-09: Relationship - each allowed value works; arbitrary value mapped to 'other' (2368.621042ms)
+  ✔ F-10: Self booking with stray patient fields sent - patient fields cleared and stored row is clean (364.880875ms)
+  ✔ F-11: Multiple family bookings - back-to-back allowed for different patients; 1-hour gap enforced for same patient (1358.38775ms)
+  ✔ F-12: Cancel family booking - patient data preserved and refund bound to booker (499.990333ms)
+  ✔ F-13: Mobile history - returns patient_name for family and booker name for self (294.369833ms)
+  ✔ F-14: Merchant queue list & detail view - shows patient name, family badge, and search works (16.361375ms)
+  ✔ F-15: Notifications - message names the patient and sends to booker phone only (341.481958ms)
+  ✔ F-16: Payment and refund path - Razorpay order created for booker; refund logic untouched (705.036584ms)
+  ✔ F-17: Backward compatibility - pre-existing rows without family fields load cleanly (66.852584ms)
+  ✔ F-18: Migration idempotency - re-running migration on existing data causes 0 errors (19.427792ms)
+  ✔ F-19: UI states - double-tap submit prevention creates exactly one booking (310.165916ms)
+  ✔ F-20: Accessibility basics - labels and semantic tags present in customer mobile and merchant web UI (1.500459ms)
+✔ PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking (18580.611791ms)
+ℹ tests 20
+ℹ suites 1
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18586.892541
+
+2. tests/unit/cross-tenant-authorization-matrix.test.mjs
+▶ Group 8: Adversarial Cross-Tenant Authorization Matrix
+  ✔ 1. POST /api/prescriptions/signed-url: Customer A vs Customer B cross-tenant file isolation (94.242417ms)
+  ✔ 2. POST /api/bookings/collect-fee: Front Desk 1 vs Consultant 1 & Front Desk 2 isolation (105.150541ms)
+  ✔ 3. POST /api/notifications/push: Customer A vs Customer B cross-tenant push notification (93.999167ms)
+  ✔ 4. POST /api/bookings/emergency-choice: Customer A vs Customer B & unauthenticated caller (81.272958ms)
+  ✔ 5. GET /api/slots/booked vs /api/slots/availability: Staff-only vs Customer PII sanitization (156.3575ms)
+  ✔ 6. POST /api/logs/ingest: Rate-limit & Payload Size abuse mitigation (22.921375ms)
+  ✔ 7. POST /api/account/delete-public-request: Customer A vs Customer B cross-tenant deletion protection (549.644875ms)
+  ✔ 8. /api/cron/release-holds & /api/cron/security-monitor: Timing-safe CRON_SECRET verification (44.333458ms)
+  ✔ 9. GET /api/hospital/context & /api/hospital/audit-logs: Hospital A vs Hospital B isolation (249.777125ms)
+  ✔ 10. POST /api/hospital/departments & /api/hospital/members: Admin only vs Front Desk & Cross Hospital (263.761708ms)
+  ✔ 11. Booking Flow: Check-in, Admit, Start, End, Complete role and cross-hospital isolation (634.579458ms)
+  ✔ 12. POST /api/doctor/emergency-cancel: Doctor 1 & Admin 1 vs Front Desk & Doctor 2 (209.382ms)
+  ✔ 13. POST /api/bookings/override & /api/bookings/reorder: Assigned Staff vs Cross-Hospital (139.822333ms)
+  ✔ 14. POST /api/bookings/reassign: Hospital Admin 1 vs Front Desk & Admin 2 (167.435417ms)
+  ✔ 15. POST /api/bookings/reach & /api/bookings/cancel: Customer A vs Customer B isolation (158.833666ms)
+  ✔ 16. GET /api/customer/queue-and-history: Zero data leakage across customer boundaries (1339.350708ms)
+  ✔ 17. GET /api/ticket/[id]: Full ticket for owner vs Data Masking for unauthenticated caller (133.921333ms)
+  ✔ 18. GET /api/admin/users & /api/admin/merchants: 403 Forbidden for Front Desk and Customer (125.462542ms)
+  ✔ 19. POST /api/bookings/hold: Customer A vs Customer B customer_id tampering (3223.013959ms)
+  ✔ 20. POST /api/payments/create-order: Customer A vs Customer B cross-tenant payment order (572.773958ms)
+  ✔ 21. /api/account/delete & /api/account/export: DPDP Data Principal isolation and export integrity (160.634375ms)
+  ✔ 22. GET /api/bookings: Cross-customer and cross-provider tenancy isolation (196.160083ms)
+  ✔ 23. POST /api/bookings/complete: Consultant 1 vs Consultant 2 & Customer A (109.718209ms)
+  ✔ 24. POST /api/bookings/confirm: Customer A vs Customer B confirmation authorization (158.887125ms)
+  ✔ 25. POST /api/bookings/late-queue: Hospital 1 Staff vs Hospital 2 Staff & Customer A (130.259333ms)
+  ✔ 26. POST /api/bookings/no-show: Hospital 1 Staff vs Hospital 2 Staff & Customer A (104.79025ms)
+  ✔ 27. POST /api/bookings/offline: Hospital 1 Front Desk vs Hospital 2 Front Desk & Customer A (173.194959ms)
+  ✔ 28. POST /api/bookings/reschedule: Customer A vs Customer B & Hospital 2 Admin (106.439917ms)
+  ✔ 29. POST /api/payments/verify: Customer A vs Customer B valid HMAC payment verification (366.450375ms)
+  ✔ 30. POST /api/merchant/doctor-status: Hospital 1 Admin vs Hospital 2 Admin & Customer A (237.7925ms)
+  ✔ 31. POST /api/merchant/onboard: Account takeover prevention via 409 Conflict (108.318375ms)
+  ✔ 32. /api/merchant/provider: Hospital 1 Admin vs Hospital 2 Admin & Customer A (144.281667ms)
+  ✔ 33. POST /api/merchant/register-shop: Foreign userId tamper protection (95.248875ms)
+  ✔ 34. POST /api/merchant/upload-image: Role enforcement (merchant/admin only) (382.800833ms)
+  ✔ 35. POST /api/queue/broadcast: Consultant 1 vs Consultant 2 & Customer A (227.386417ms)
+  ✔ 36. /api/resources & /api/resources/[id]: Provider scoping and resource modification isolation (125.548542ms)
+  ✔ 37. /api/admin/*: Superadmin matrix for all 12 platform management routes (1263.3505ms)
+  ✔ 38. Public / Auth / Webhook / Test: OTP, waitlist, health, expire-hold, and razorpay webhook (1673.854083ms)
+  ✔ 39. Supabase Power Features: pgmq lockdown, push token isolation, edge secrets, idempotency, and DLQ (275.490708ms)
+  ✔ 40. Family & Minor Bookings: Server-side validation, cross-tenant customer & merchant RLS, and minor flag generation (1563.704167ms)
+
+========================================================================================
+### AUTHORIZATION MATRIX VERIFICATION TABLE
+========================================================================================
+
+| Route | Method | Authorized Caller (200/201) | Cross-Tenant / Wrong Role (401/403/404) | Ownership or Role Check (file:line) | Result |
+| :--- | :---: | :--- | :--- | :--- | :---: |
+| `/api/prescriptions/signed-url` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts:90` | PASS |
+| `/api/bookings/collect-fee` | `POST` | Front Desk 1 (proved 200) | Consultant 1 & Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/collect-fee/route.ts:47` | PASS |
+| `/api/notifications/push` | `POST` | Customer A (proved 200) | Customer B & Admin B (proved 403) | `apps/merchant-web/src/app/api/notifications/push/route.ts:94-113` | PASS |
+| `/api/bookings/emergency-choice` | `POST` | Customer A (proved 200) | Customer B (proved 403), Unauth (proved 401) | `apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts:41-65` | PASS |
+| `/api/slots/booked` | `GET` | Front Desk 1 (proved 200) | Customer A & Admin B (proved 403) | `apps/merchant-web/src/app/api/slots/booked/route.ts:54-76` | PASS |
+| `/api/slots/availability` | `GET` | Customer A (proved 200, masked PII) | Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/slots/availability/route.ts:34-40` | PASS |
+| `/api/logs/ingest` | `POST` | Client Browser/App (proved 200) | Oversized Body (proved 413) | `apps/merchant-web/src/app/api/logs/ingest/route.ts:11-30` | PASS |
+| `/api/account/delete-public-request` | `POST` | Customer A (proved 200) | Customer B (proved 403), Unauth (proved 401) | `apps/merchant-web/src/app/api/account/delete-public-request/route.ts:78-95, 127-143` | PASS |
+| `/api/cron/release-holds` | `GET/POST` | Cron Job with Secret (proved 200) | Unauthenticated Caller (proved 401) | `apps/merchant-web/src/app/api/cron/release-holds/route.ts:11-32` | PASS |
+| `/api/cron/security-monitor` | `GET/POST` | Cron Job with Secret (proved 200) | Unauthenticated Caller (proved 401) | `apps/merchant-web/src/app/api/cron/security-monitor/route.ts:5-26` | PASS |
+| `/api/hospital/context` | `GET` | Hospital 1 Admin (proved 200) | Hospital 2 Admin (proved 403) | `apps/merchant-web/src/app/api/hospital/context/route.ts` | PASS |
+| `/api/hospital/audit-logs` | `GET` | Hospital 1 Admin (proved 200) | Hospital 2 Admin (proved 403) | `apps/merchant-web/src/app/api/hospital/audit-logs/route.ts` | PASS |
+| `/api/hospital/departments` | `POST` | Hospital 1 Admin (proved 200) | Front Desk 1 & Admin 2 (proved 403) | `apps/merchant-web/src/app/api/hospital/departments/route.ts` | PASS |
+| `/api/hospital/members` | `POST` | Hospital 1 Admin (proved 200) | Front Desk 1 & Admin 2 (proved 403) | `apps/merchant-web/src/app/api/hospital/members/route.ts` | PASS |
+| `/api/bookings/checkin` | `POST` | Assigned Front Desk 1 (proved 200) | Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/checkin/route.ts` | PASS |
+| `/api/bookings/admit` | `POST` | Assigned Front Desk 1 (proved 200) | Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/admit/route.ts` | PASS |
+| `/api/bookings/start` | `POST` | Consultant 1 (proved 200) | Consultant 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/start/route.ts` | PASS |
+| `/api/bookings/end` | `POST` | Consultant 1 (proved 200) | Consultant 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/end/route.ts` | PASS |
+| `/api/doctor/emergency-cancel` | `POST` | Consultant 1 (proved 200) | Front Desk 1 & Consultant 2 (proved 403) | `apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts:60-82` | PASS |
+| `/api/bookings/override` | `POST` | Assigned Front Desk 1 (proved 200) | Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/override/route.ts` | PASS |
+| `/api/bookings/reorder` | `POST` | Assigned Front Desk 1 (proved 200) | Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/reorder/route.ts` | PASS |
+| `/api/bookings/reassign` | `POST` | Hospital 1 Admin (proved 200) | Front Desk 1 & Admin 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/reassign/route.ts` | PASS |
+| `/api/bookings/reach` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/bookings/reach/route.ts` | PASS |
+| `/api/bookings/cancel` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/bookings/cancel/route.ts` | PASS |
+| `/api/customer/queue-and-history` | `GET` | Customer A (proved 200) | Customer B querying Customer A (proved 403) | `apps/merchant-web/src/app/api/customer/queue-and-history/route.ts:153-158` | PASS |
+| `/api/ticket/[id]` | `GET` | Customer A (proved 200 full pass) | Public Caller (proved 200 masked data) | `apps/merchant-web/src/app/api/ticket/[id]/route.ts:58-85` | PASS |
+| `/api/admin/users` | `GET` | Super Admin (proved 200) | Customer A & Front Desk 1 (proved 403) | `apps/merchant-web/src/app/api/admin/users/route.ts` | PASS |
+| `/api/admin/merchants` | `GET` | Super Admin (proved 200) | Customer A & Front Desk 1 (proved 403) | `apps/merchant-web/src/app/api/admin/merchants/route.ts` | PASS |
+| `/api/bookings/hold` | `POST` | Customer A (proved 201) | Customer A on Customer B ID (proved 403) | `apps/merchant-web/src/app/api/bookings/hold/route.ts:136-154` | PASS |
+| `/api/payments/create-order` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/payments/create-order/route.ts:82-96` | PASS |
+| `/api/account/delete` | `GET` | Customer A (proved 200) | Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/account/delete/route.ts:87` | PASS |
+| `/api/account/export` | `GET` | Customer A (proved 200, strictly own data) | Customer B & Unauthenticated (proved 401/isolated) | `apps/merchant-web/src/app/api/account/export/route.ts:72,80` | PASS |
+| `/api/bookings` | `GET` | Customer A & Hospital 1 Admin (proved 200) | Customer B & Hospital 2 Admin (proved 403) | `apps/merchant-web/src/app/api/bookings/route.ts:34,40` | PASS |
+| `/api/bookings/complete` | `POST` | Consultant 1 (proved 200) | Consultant 2 & Customer A (proved 403) | `apps/merchant-web/src/app/api/bookings/complete/route.ts:44` | PASS |
+| `/api/bookings/confirm` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/bookings/confirm/route.ts:172` | PASS |
+| `/api/bookings/late-queue` | `POST` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/bookings/late-queue/route.ts:60` | PASS |
+| `/api/bookings/no-show` | `POST` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/bookings/no-show/route.ts:57` | PASS |
+| `/api/bookings/offline` | `POST` | Hospital 1 Front Desk (proved 200) | Hospital 2 Front Desk & Customer A (proved 403) | `apps/merchant-web/src/app/api/bookings/offline/route.ts:41` | PASS |
+| `/api/bookings/reschedule` | `POST` | Customer A (proved 200) | Customer B & Hospital 2 Admin (proved 403) | `apps/merchant-web/src/app/api/bookings/reschedule/route.ts:58` | PASS |
+| `/api/payments/verify` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/payments/verify/route.ts:130` | PASS |
+| `/api/merchant/doctor-status` | `POST` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/merchant/doctor-status/route.ts:31` | PASS |
+| `/api/merchant/onboard` | `POST` | Public Registrant (validated rules) | Duplicate Account Hijack (proved 409) | `apps/merchant-web/src/app/api/merchant/onboard/route.ts:183,197` | PASS |
+| `/api/merchant/provider` | `GET` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/merchant/provider/route.ts:51,130` | PASS |
+| `/api/merchant/register-shop` | `POST` | Superadmin (proved 200) | Hospital Admin foreign userId (proved 403) | `apps/merchant-web/src/app/api/merchant/register-shop/route.ts:47` | PASS |
+| `/api/merchant/upload-image` | `POST` | Hospital 1 Admin (proved 200) | Customer A (proved 403) & Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/merchant/upload-image/route.ts:59` | PASS |
+| `/api/queue/broadcast` | `POST` | Consultant 1 (proved 200) | Consultant 2 & Customer A (proved 403) | `apps/merchant-web/src/app/api/queue/broadcast/route.ts:51` | PASS |
+| `/api/resources` | `GET` | Authenticated/Public (proved 200 provider scoped) | Missing provider_id (proved 400) | `apps/merchant-web/src/app/api/resources/route.ts:25-35` | PASS |
+| `/api/resources/[id]` | `PATCH` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/resources/[id]/route.ts:40` | PASS |
+| `/api/admin/analytics` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/analytics/route.ts:11` | PASS |
+| `/api/admin/app-logs` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/app-logs/route.ts:12` | PASS |
+| `/api/admin/app-logs/test-alert` | `POST` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/app-logs/test-alert/route.ts:11` | PASS |
+| `/api/admin/audit-logs` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/audit-logs/route.ts:11` | PASS |
+| `/api/admin/bookings` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/bookings/route.ts:11` | PASS |
+| `/api/admin/cities` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/cities/route.ts:16` | PASS |
+| `/api/admin/doctor-assignments` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts:31` | PASS |
+| `/api/admin/notifications` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/notifications/route.ts:12` | PASS |
+| `/api/admin/refunds` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/refunds/route.ts:12` | PASS |
+| `/api/admin/resources` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/resources/route.ts:26` | PASS |
+| `/api/admin/venues` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/venues/route.ts:11` | PASS |
+| `/api/admin/waitlist` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/waitlist/route.ts:12` | PASS |
+| `/api/auth/otp/send` | `POST` | Authorized Caller (proved 200) | Invalid Phone Format (proved 400) | `apps/merchant-web/src/app/api/auth/otp/send/route.ts:71` | PASS |
+| `/api/auth/otp/verify` | `POST` | Authorized Verification Flow | Invalid OTP Code (proved 400) | `apps/merchant-web/src/app/api/auth/otp/verify/route.ts:98` | PASS |
+| `/api/cities/waitlist` | `POST` | Public Caller (proved 201) | Invalid Phone Format (proved 400) | `apps/merchant-web/src/app/api/cities/waitlist/route.ts:5` | PASS |
+| `/api/health` | `GET` | Public Caller (proved 200) | Unhealthy Dependency (503) | `apps/merchant-web/src/app/api/health/route.ts:40` | PASS |
+| `/api/test/expire-hold` | `POST` | Authorized Admin/Cron (proved 200) | Customer A & Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/test/expire-hold/route.ts:50` | PASS |
+| `/api/webhooks/razorpay` | `POST` | Razorpay Webhook (proved 200 signed) | Unsigned Request (proved 401) | `apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:43` | PASS |
+| `pgmq / vault / pg_net / pg_cron` | `ALL` | Power features & security lockdown verified | Cross-tenant / unauthorized caller blocked | `supabase/migrations/20261105100001_enable_power_extensions.sql` | PASS |
+
+========================================================================================
+
+SUCCESS: Written docs/hospital/AUTHZ_MATRIX.md with 100% matrix ledger coverage.
+
+=== PROGRAMMATIC COMPLETENESS ASSERTION ===
+Discovered routes on disk (66): [
+  '/api/account/delete',
+  '/api/account/delete-public-request',
+  '/api/account/export',
+  '/api/admin/analytics',
+  '/api/admin/app-logs',
+  '/api/admin/app-logs/test-alert',
+  '/api/admin/audit-logs',
+  '/api/admin/bookings',
+  '/api/admin/cities',
+  '/api/admin/doctor-assignments',
+  '/api/admin/merchants',
+  '/api/admin/notifications',
+  '/api/admin/refunds',
+  '/api/admin/resources',
+  '/api/admin/users',
+  '/api/admin/venues',
+  '/api/admin/waitlist',
+  '/api/auth/otp/send',
+  '/api/auth/otp/verify',
+  '/api/bookings',
+  '/api/bookings/admit',
+  '/api/bookings/cancel',
+  '/api/bookings/checkin',
+  '/api/bookings/collect-fee',
+  '/api/bookings/complete',
+  '/api/bookings/confirm',
+  '/api/bookings/emergency-choice',
+  '/api/bookings/end',
+  '/api/bookings/hold',
+  '/api/bookings/late-queue',
+  '/api/bookings/no-show',
+  '/api/bookings/offline',
+  '/api/bookings/override',
+  '/api/bookings/reach',
+  '/api/bookings/reassign',
+  '/api/bookings/reorder',
+  '/api/bookings/reschedule',
+  '/api/bookings/start',
+  '/api/cities/waitlist',
+  '/api/cron/release-holds',
+  '/api/cron/security-monitor',
+  '/api/customer/queue-and-history',
+  '/api/doctor/emergency-cancel',
+  '/api/health',
+  '/api/hospital/audit-logs',
+  '/api/hospital/context',
+  '/api/hospital/departments',
+  '/api/hospital/members',
+  '/api/logs/ingest',
+  '/api/merchant/doctor-status',
+  '/api/merchant/onboard',
+  '/api/merchant/provider',
+  '/api/merchant/register-shop',
+  '/api/merchant/upload-image',
+  '/api/notifications/push',
+  '/api/payments/create-order',
+  '/api/payments/verify',
+  '/api/prescriptions/signed-url',
+  '/api/queue/broadcast',
+  '/api/resources',
+  '/api/resources/[id]',
+  '/api/slots/availability',
+  '/api/slots/booked',
+  '/api/test/expire-hold',
+  '/api/ticket/[id]',
+  '/api/webhooks/razorpay'
+]
+Tested routes in ledger (67): [
+  '/api/account/delete',
+  '/api/account/delete-public-request',
+  '/api/account/export',
+  '/api/admin/analytics',
+  '/api/admin/app-logs',
+  '/api/admin/app-logs/test-alert',
+  '/api/admin/audit-logs',
+  '/api/admin/bookings',
+  '/api/admin/cities',
+  '/api/admin/doctor-assignments',
+  '/api/admin/merchants',
+  '/api/admin/notifications',
+  '/api/admin/refunds',
+  '/api/admin/resources',
+  '/api/admin/users',
+  '/api/admin/venues',
+  '/api/admin/waitlist',
+  '/api/auth/otp/send',
+  '/api/auth/otp/verify',
+  '/api/bookings',
+  '/api/bookings/admit',
+  '/api/bookings/cancel',
+  '/api/bookings/checkin',
+  '/api/bookings/collect-fee',
+  '/api/bookings/complete',
+  '/api/bookings/confirm',
+  '/api/bookings/emergency-choice',
+  '/api/bookings/end',
+  '/api/bookings/hold',
+  '/api/bookings/late-queue',
+  '/api/bookings/no-show',
+  '/api/bookings/offline',
+  '/api/bookings/override',
+  '/api/bookings/reach',
+  '/api/bookings/reassign',
+  '/api/bookings/reorder',
+  '/api/bookings/reschedule',
+  '/api/bookings/start',
+  '/api/cities/waitlist',
+  '/api/cron/release-holds',
+  '/api/cron/security-monitor',
+  '/api/customer/queue-and-history',
+  '/api/doctor/emergency-cancel',
+  '/api/health',
+  '/api/hospital/audit-logs',
+  '/api/hospital/context',
+  '/api/hospital/departments',
+  '/api/hospital/members',
+  '/api/logs/ingest',
+  '/api/merchant/doctor-status',
+  '/api/merchant/onboard',
+  '/api/merchant/provider',
+  '/api/merchant/register-shop',
+  '/api/merchant/upload-image',
+  '/api/notifications/push',
+  '/api/payments/create-order',
+  '/api/payments/verify',
+  '/api/prescriptions/signed-url',
+  '/api/queue/broadcast',
+  '/api/resources',
+  '/api/resources/[id]',
+  '/api/slots/availability',
+  '/api/slots/booked',
+  '/api/test/expire-hold',
+  '/api/ticket/[id]',
+  '/api/webhooks/razorpay',
+  'pgmq / vault / pg_net / pg_cron'
+]
+SUCCESS: 100% of discovered routes (66/66) covered in matrix ledger! 0 uncovered.
+✔ Group 8: Adversarial Cross-Tenant Authorization Matrix (16725.190958ms)
+ℹ tests 40
+ℹ suites 1
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16730.042
+
+3. tests/unit/mantis-track1-database-hardening.test.mjs
+▶ Mantis Track 1 Database Hardening & SPEC Invariant Verification
+  ✔ 1. Privilege Hygiene: public.sync_booking_for_family() must NOT be executable by anon or authenticated (1.612959ms)
+  ✔ 2. SPEC Invariant: Hospital patient arriving +7 minutes after slot_start (within +/-10m window) is NOT late in verify_checkin_code (21.927958ms)
+  ✔ 3. SPEC Invariant: Hospital patient arriving +7 minutes after slot_start (within +/-10m window) is NOT late in mark_present_manually (16.148584ms)
+  ✔ 4. Divergence Guard: SQL stored procedures and TypeScript queue-engine.ts must agree on arrival window / late threshold per SPEC.md (41.938125ms)
+✔ Mantis Track 1 Database Hardening & SPEC Invariant Verification (439.561042ms)
+ℹ tests 4
+ℹ suites 1
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 442.150167
+
+--- Capturing Snapshot After Pass 1 ---
+PASS 1 RESULT: ZERO DIFF! Function privileges, definitions, and ACLs are 100% identical before and after.
+
+--- Running Order-Dependent Sequence: Pass 2 ---
+1. tests/unit/family-booking-qa-lead.test.mjs
+▶ PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking
+  ✔ F-01: Book for self - unchanged behavior, booked_for='self', patient fields null (646.217791ms)
+  ✔ F-02: Book for family adult (age 35, relationship 'spouse') - row saved, token issued, patient name visible (850.09675ms)
+  ✔ F-03: Book for child age 5 - is_minor = true, Minor tag derived (368.330209ms)
+  ✔ F-04: Age boundaries - 0, 1, 17, 18, 19, 120 accepted with correct is_minor boolean (6863.765958ms)
+  ✔ F-05: Age invalid - -1, 121, 1.5, "abc" rejected; null/empty allowed when optional (655.607ms)
+  ✔ F-06: Name required for family - empty, whitespace-only, missing rejected server-side (65.461375ms)
+  ✔ F-07: Name boundaries - 1 char, 100 chars, 101 chars (rejected), unicode (Telugu, Hindi, Tamil, emoji, accented), spaces trimmed (3371.95925ms)
+  ✔ F-08: Note boundaries - empty, 200 chars, 201 chars (rejected) (970.535083ms)
+  ✔ F-09: Relationship - each allowed value works; arbitrary value mapped to 'other' (4218.080625ms)
+  ✔ F-10: Self booking with stray patient fields sent - patient fields cleared and stored row is clean (552.385167ms)
+  ✔ F-11: Multiple family bookings - back-to-back allowed for different patients; 1-hour gap enforced for same patient (1332.392875ms)
+  ✔ F-12: Cancel family booking - patient data preserved and refund bound to booker (595.247958ms)
+  ✔ F-13: Mobile history - returns patient_name for family and booker name for self (204.711ms)
+  ✔ F-14: Merchant queue list & detail view - shows patient name, family badge, and search works (17.896583ms)
+  ✔ F-15: Notifications - message names the patient and sends to booker phone only (519.159542ms)
+  ✔ F-16: Payment and refund path - Razorpay order created for booker; refund logic untouched (668.025125ms)
+  ✔ F-17: Backward compatibility - pre-existing rows without family fields load cleanly (109.681459ms)
+  ✔ F-18: Migration idempotency - re-running migration on existing data causes 0 errors (22.301542ms)
+  ✔ F-19: UI states - double-tap submit prevention creates exactly one booking (375.399542ms)
+  ✔ F-20: Accessibility basics - labels and semantic tags present in customer mobile and merchant web UI (1.89525ms)
+✔ PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking (22714.167292ms)
+ℹ tests 20
+ℹ suites 1
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22720.237875
+
+2. tests/unit/cross-tenant-authorization-matrix.test.mjs
+▶ Group 8: Adversarial Cross-Tenant Authorization Matrix
+  ✔ 1. POST /api/prescriptions/signed-url: Customer A vs Customer B cross-tenant file isolation (103.713542ms)
+  ✔ 2. POST /api/bookings/collect-fee: Front Desk 1 vs Consultant 1 & Front Desk 2 isolation (102.640333ms)
+  ✔ 3. POST /api/notifications/push: Customer A vs Customer B cross-tenant push notification (99.311042ms)
+  ✔ 4. POST /api/bookings/emergency-choice: Customer A vs Customer B & unauthenticated caller (79.224542ms)
+  ✔ 5. GET /api/slots/booked vs /api/slots/availability: Staff-only vs Customer PII sanitization (135.047417ms)
+  ✔ 6. POST /api/logs/ingest: Rate-limit & Payload Size abuse mitigation (20.378ms)
+  ✔ 7. POST /api/account/delete-public-request: Customer A vs Customer B cross-tenant deletion protection (520.768875ms)
+  ✔ 8. /api/cron/release-holds & /api/cron/security-monitor: Timing-safe CRON_SECRET verification (46.786834ms)
+  ✔ 9. GET /api/hospital/context & /api/hospital/audit-logs: Hospital A vs Hospital B isolation (199.112875ms)
+  ✔ 10. POST /api/hospital/departments & /api/hospital/members: Admin only vs Front Desk & Cross Hospital (257.190166ms)
+  ✔ 11. Booking Flow: Check-in, Admit, Start, End, Complete role and cross-hospital isolation (667.721ms)
+  ✔ 12. POST /api/doctor/emergency-cancel: Doctor 1 & Admin 1 vs Front Desk & Doctor 2 (181.018917ms)
+  ✔ 13. POST /api/bookings/override & /api/bookings/reorder: Assigned Staff vs Cross-Hospital (208.737541ms)
+  ✔ 14. POST /api/bookings/reassign: Hospital Admin 1 vs Front Desk & Admin 2 (174.765083ms)
+  ✔ 15. POST /api/bookings/reach & /api/bookings/cancel: Customer A vs Customer B isolation (134.960959ms)
+  ✔ 16. GET /api/customer/queue-and-history: Zero data leakage across customer boundaries (436.520875ms)
+  ✔ 17. GET /api/ticket/[id]: Full ticket for owner vs Data Masking for unauthenticated caller (67.962833ms)
+  ✔ 18. GET /api/admin/users & /api/admin/merchants: 403 Forbidden for Front Desk and Customer (108.408541ms)
+  ✔ 19. POST /api/bookings/hold: Customer A vs Customer B customer_id tampering (1813.938167ms)
+  ✔ 20. POST /api/payments/create-order: Customer A vs Customer B cross-tenant payment order (510.651333ms)
+  ✔ 21. /api/account/delete & /api/account/export: DPDP Data Principal isolation and export integrity (226.715292ms)
+  ✔ 22. GET /api/bookings: Cross-customer and cross-provider tenancy isolation (228.238917ms)
+  ✔ 23. POST /api/bookings/complete: Consultant 1 vs Consultant 2 & Customer A (113.448125ms)
+  ✔ 24. POST /api/bookings/confirm: Customer A vs Customer B confirmation authorization (208.991541ms)
+  ✔ 25. POST /api/bookings/late-queue: Hospital 1 Staff vs Hospital 2 Staff & Customer A (154.791292ms)
+  ✔ 26. POST /api/bookings/no-show: Hospital 1 Staff vs Hospital 2 Staff & Customer A (102.046291ms)
+  ✔ 27. POST /api/bookings/offline: Hospital 1 Front Desk vs Hospital 2 Front Desk & Customer A (189.256667ms)
+  ✔ 28. POST /api/bookings/reschedule: Customer A vs Customer B & Hospital 2 Admin (106.222208ms)
+  ✔ 29. POST /api/payments/verify: Customer A vs Customer B valid HMAC payment verification (466.707791ms)
+  ✔ 30. POST /api/merchant/doctor-status: Hospital 1 Admin vs Hospital 2 Admin & Customer A (220.676375ms)
+  ✔ 31. POST /api/merchant/onboard: Account takeover prevention via 409 Conflict (88.734083ms)
+  ✔ 32. /api/merchant/provider: Hospital 1 Admin vs Hospital 2 Admin & Customer A (143.319833ms)
+  ✔ 33. POST /api/merchant/register-shop: Foreign userId tamper protection (96.22975ms)
+  ✔ 34. POST /api/merchant/upload-image: Role enforcement (merchant/admin only) (169.281667ms)
+  ✔ 35. POST /api/queue/broadcast: Consultant 1 vs Consultant 2 & Customer A (183.007125ms)
+  ✔ 36. /api/resources & /api/resources/[id]: Provider scoping and resource modification isolation (130.144333ms)
+  ✔ 37. /api/admin/*: Superadmin matrix for all 12 platform management routes (1100.602959ms)
+  ✔ 38. Public / Auth / Webhook / Test: OTP, waitlist, health, expire-hold, and razorpay webhook (2724.201375ms)
+  ✔ 39. Supabase Power Features: pgmq lockdown, push token isolation, edge secrets, idempotency, and DLQ (459.315166ms)
+  ✔ 40. Family & Minor Bookings: Server-side validation, cross-tenant customer & merchant RLS, and minor flag generation (2026.149542ms)
+
+========================================================================================
+### AUTHORIZATION MATRIX VERIFICATION TABLE
+========================================================================================
+
+| Route | Method | Authorized Caller (200/201) | Cross-Tenant / Wrong Role (401/403/404) | Ownership or Role Check (file:line) | Result |
+| :--- | :---: | :--- | :--- | :--- | :---: |
+| `/api/prescriptions/signed-url` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts:90` | PASS |
+| `/api/bookings/collect-fee` | `POST` | Front Desk 1 (proved 200) | Consultant 1 & Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/collect-fee/route.ts:47` | PASS |
+| `/api/notifications/push` | `POST` | Customer A (proved 200) | Customer B & Admin B (proved 403) | `apps/merchant-web/src/app/api/notifications/push/route.ts:94-113` | PASS |
+| `/api/bookings/emergency-choice` | `POST` | Customer A (proved 200) | Customer B (proved 403), Unauth (proved 401) | `apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts:41-65` | PASS |
+| `/api/slots/booked` | `GET` | Front Desk 1 (proved 200) | Customer A & Admin B (proved 403) | `apps/merchant-web/src/app/api/slots/booked/route.ts:54-76` | PASS |
+| `/api/slots/availability` | `GET` | Customer A (proved 200, masked PII) | Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/slots/availability/route.ts:34-40` | PASS |
+| `/api/logs/ingest` | `POST` | Client Browser/App (proved 200) | Oversized Body (proved 413) | `apps/merchant-web/src/app/api/logs/ingest/route.ts:11-30` | PASS |
+| `/api/account/delete-public-request` | `POST` | Customer A (proved 200) | Customer B (proved 403), Unauth (proved 401) | `apps/merchant-web/src/app/api/account/delete-public-request/route.ts:78-95, 127-143` | PASS |
+| `/api/cron/release-holds` | `GET/POST` | Cron Job with Secret (proved 200) | Unauthenticated Caller (proved 401) | `apps/merchant-web/src/app/api/cron/release-holds/route.ts:11-32` | PASS |
+| `/api/cron/security-monitor` | `GET/POST` | Cron Job with Secret (proved 200) | Unauthenticated Caller (proved 401) | `apps/merchant-web/src/app/api/cron/security-monitor/route.ts:5-26` | PASS |
+| `/api/hospital/context` | `GET` | Hospital 1 Admin (proved 200) | Hospital 2 Admin (proved 403) | `apps/merchant-web/src/app/api/hospital/context/route.ts` | PASS |
+| `/api/hospital/audit-logs` | `GET` | Hospital 1 Admin (proved 200) | Hospital 2 Admin (proved 403) | `apps/merchant-web/src/app/api/hospital/audit-logs/route.ts` | PASS |
+| `/api/hospital/departments` | `POST` | Hospital 1 Admin (proved 200) | Front Desk 1 & Admin 2 (proved 403) | `apps/merchant-web/src/app/api/hospital/departments/route.ts` | PASS |
+| `/api/hospital/members` | `POST` | Hospital 1 Admin (proved 200) | Front Desk 1 & Admin 2 (proved 403) | `apps/merchant-web/src/app/api/hospital/members/route.ts` | PASS |
+| `/api/bookings/checkin` | `POST` | Assigned Front Desk 1 (proved 200) | Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/checkin/route.ts` | PASS |
+| `/api/bookings/admit` | `POST` | Assigned Front Desk 1 (proved 200) | Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/admit/route.ts` | PASS |
+| `/api/bookings/start` | `POST` | Consultant 1 (proved 200) | Consultant 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/start/route.ts` | PASS |
+| `/api/bookings/end` | `POST` | Consultant 1 (proved 200) | Consultant 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/end/route.ts` | PASS |
+| `/api/doctor/emergency-cancel` | `POST` | Consultant 1 (proved 200) | Front Desk 1 & Consultant 2 (proved 403) | `apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts:60-82` | PASS |
+| `/api/bookings/override` | `POST` | Assigned Front Desk 1 (proved 200) | Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/override/route.ts` | PASS |
+| `/api/bookings/reorder` | `POST` | Assigned Front Desk 1 (proved 200) | Front Desk 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/reorder/route.ts` | PASS |
+| `/api/bookings/reassign` | `POST` | Hospital 1 Admin (proved 200) | Front Desk 1 & Admin 2 (proved 403) | `apps/merchant-web/src/app/api/bookings/reassign/route.ts` | PASS |
+| `/api/bookings/reach` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/bookings/reach/route.ts` | PASS |
+| `/api/bookings/cancel` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/bookings/cancel/route.ts` | PASS |
+| `/api/customer/queue-and-history` | `GET` | Customer A (proved 200) | Customer B querying Customer A (proved 403) | `apps/merchant-web/src/app/api/customer/queue-and-history/route.ts:153-158` | PASS |
+| `/api/ticket/[id]` | `GET` | Customer A (proved 200 full pass) | Public Caller (proved 200 masked data) | `apps/merchant-web/src/app/api/ticket/[id]/route.ts:58-85` | PASS |
+| `/api/admin/users` | `GET` | Super Admin (proved 200) | Customer A & Front Desk 1 (proved 403) | `apps/merchant-web/src/app/api/admin/users/route.ts` | PASS |
+| `/api/admin/merchants` | `GET` | Super Admin (proved 200) | Customer A & Front Desk 1 (proved 403) | `apps/merchant-web/src/app/api/admin/merchants/route.ts` | PASS |
+| `/api/bookings/hold` | `POST` | Customer A (proved 201) | Customer A on Customer B ID (proved 403) | `apps/merchant-web/src/app/api/bookings/hold/route.ts:136-154` | PASS |
+| `/api/payments/create-order` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/payments/create-order/route.ts:82-96` | PASS |
+| `/api/account/delete` | `GET` | Customer A (proved 200) | Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/account/delete/route.ts:87` | PASS |
+| `/api/account/export` | `GET` | Customer A (proved 200, strictly own data) | Customer B & Unauthenticated (proved 401/isolated) | `apps/merchant-web/src/app/api/account/export/route.ts:72,80` | PASS |
+| `/api/bookings` | `GET` | Customer A & Hospital 1 Admin (proved 200) | Customer B & Hospital 2 Admin (proved 403) | `apps/merchant-web/src/app/api/bookings/route.ts:34,40` | PASS |
+| `/api/bookings/complete` | `POST` | Consultant 1 (proved 200) | Consultant 2 & Customer A (proved 403) | `apps/merchant-web/src/app/api/bookings/complete/route.ts:44` | PASS |
+| `/api/bookings/confirm` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/bookings/confirm/route.ts:172` | PASS |
+| `/api/bookings/late-queue` | `POST` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/bookings/late-queue/route.ts:60` | PASS |
+| `/api/bookings/no-show` | `POST` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/bookings/no-show/route.ts:57` | PASS |
+| `/api/bookings/offline` | `POST` | Hospital 1 Front Desk (proved 200) | Hospital 2 Front Desk & Customer A (proved 403) | `apps/merchant-web/src/app/api/bookings/offline/route.ts:41` | PASS |
+| `/api/bookings/reschedule` | `POST` | Customer A (proved 200) | Customer B & Hospital 2 Admin (proved 403) | `apps/merchant-web/src/app/api/bookings/reschedule/route.ts:58` | PASS |
+| `/api/payments/verify` | `POST` | Customer A (proved 200) | Customer B (proved 403) | `apps/merchant-web/src/app/api/payments/verify/route.ts:130` | PASS |
+| `/api/merchant/doctor-status` | `POST` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/merchant/doctor-status/route.ts:31` | PASS |
+| `/api/merchant/onboard` | `POST` | Public Registrant (validated rules) | Duplicate Account Hijack (proved 409) | `apps/merchant-web/src/app/api/merchant/onboard/route.ts:183,197` | PASS |
+| `/api/merchant/provider` | `GET` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/merchant/provider/route.ts:51,130` | PASS |
+| `/api/merchant/register-shop` | `POST` | Superadmin (proved 200) | Hospital Admin foreign userId (proved 403) | `apps/merchant-web/src/app/api/merchant/register-shop/route.ts:47` | PASS |
+| `/api/merchant/upload-image` | `POST` | Hospital 1 Admin (proved 200) | Customer A (proved 403) & Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/merchant/upload-image/route.ts:59` | PASS |
+| `/api/queue/broadcast` | `POST` | Consultant 1 (proved 200) | Consultant 2 & Customer A (proved 403) | `apps/merchant-web/src/app/api/queue/broadcast/route.ts:51` | PASS |
+| `/api/resources` | `GET` | Authenticated/Public (proved 200 provider scoped) | Missing provider_id (proved 400) | `apps/merchant-web/src/app/api/resources/route.ts:25-35` | PASS |
+| `/api/resources/[id]` | `PATCH` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 403) | `apps/merchant-web/src/app/api/resources/[id]/route.ts:40` | PASS |
+| `/api/admin/analytics` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/analytics/route.ts:11` | PASS |
+| `/api/admin/app-logs` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/app-logs/route.ts:12` | PASS |
+| `/api/admin/app-logs/test-alert` | `POST` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/app-logs/test-alert/route.ts:11` | PASS |
+| `/api/admin/audit-logs` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/audit-logs/route.ts:11` | PASS |
+| `/api/admin/bookings` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/bookings/route.ts:11` | PASS |
+| `/api/admin/cities` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/cities/route.ts:16` | PASS |
+| `/api/admin/doctor-assignments` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts:31` | PASS |
+| `/api/admin/notifications` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/notifications/route.ts:12` | PASS |
+| `/api/admin/refunds` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/refunds/route.ts:12` | PASS |
+| `/api/admin/resources` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/resources/route.ts:26` | PASS |
+| `/api/admin/venues` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/venues/route.ts:11` | PASS |
+| `/api/admin/waitlist` | `GET` | Superadmin / Authorized Admin (proved 200) | Customer A & Wrong-Role (proved 403) | `apps/merchant-web/src/app/api/admin/waitlist/route.ts:12` | PASS |
+| `/api/auth/otp/send` | `POST` | Authorized Caller (proved 200) | Invalid Phone Format (proved 400) | `apps/merchant-web/src/app/api/auth/otp/send/route.ts:71` | PASS |
+| `/api/auth/otp/verify` | `POST` | Authorized Verification Flow | Invalid OTP Code (proved 400) | `apps/merchant-web/src/app/api/auth/otp/verify/route.ts:98` | PASS |
+| `/api/cities/waitlist` | `POST` | Public Caller (proved 201) | Invalid Phone Format (proved 400) | `apps/merchant-web/src/app/api/cities/waitlist/route.ts:5` | PASS |
+| `/api/health` | `GET` | Public Caller (proved 200) | Unhealthy Dependency (503) | `apps/merchant-web/src/app/api/health/route.ts:40` | PASS |
+| `/api/test/expire-hold` | `POST` | Authorized Admin/Cron (proved 200) | Customer A & Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/test/expire-hold/route.ts:50` | PASS |
+| `/api/webhooks/razorpay` | `POST` | Razorpay Webhook (proved 200 signed) | Unsigned Request (proved 401) | `apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:43` | PASS |
+| `pgmq / vault / pg_net / pg_cron` | `ALL` | Power features & security lockdown verified | Cross-tenant / unauthorized caller blocked | `supabase/migrations/20261105100001_enable_power_extensions.sql` | PASS |
+
+========================================================================================
+
+SUCCESS: Written docs/hospital/AUTHZ_MATRIX.md with 100% matrix ledger coverage.
+
+=== PROGRAMMATIC COMPLETENESS ASSERTION ===
+Discovered routes on disk (66): [
+  '/api/account/delete',
+  '/api/account/delete-public-request',
+  '/api/account/export',
+  '/api/admin/analytics',
+  '/api/admin/app-logs',
+  '/api/admin/app-logs/test-alert',
+  '/api/admin/audit-logs',
+  '/api/admin/bookings',
+  '/api/admin/cities',
+  '/api/admin/doctor-assignments',
+  '/api/admin/merchants',
+  '/api/admin/notifications',
+  '/api/admin/refunds',
+  '/api/admin/resources',
+  '/api/admin/users',
+  '/api/admin/venues',
+  '/api/admin/waitlist',
+  '/api/auth/otp/send',
+  '/api/auth/otp/verify',
+  '/api/bookings',
+  '/api/bookings/admit',
+  '/api/bookings/cancel',
+  '/api/bookings/checkin',
+  '/api/bookings/collect-fee',
+  '/api/bookings/complete',
+  '/api/bookings/confirm',
+  '/api/bookings/emergency-choice',
+  '/api/bookings/end',
+  '/api/bookings/hold',
+  '/api/bookings/late-queue',
+  '/api/bookings/no-show',
+  '/api/bookings/offline',
+  '/api/bookings/override',
+  '/api/bookings/reach',
+  '/api/bookings/reassign',
+  '/api/bookings/reorder',
+  '/api/bookings/reschedule',
+  '/api/bookings/start',
+  '/api/cities/waitlist',
+  '/api/cron/release-holds',
+  '/api/cron/security-monitor',
+  '/api/customer/queue-and-history',
+  '/api/doctor/emergency-cancel',
+  '/api/health',
+  '/api/hospital/audit-logs',
+  '/api/hospital/context',
+  '/api/hospital/departments',
+  '/api/hospital/members',
+  '/api/logs/ingest',
+  '/api/merchant/doctor-status',
+  '/api/merchant/onboard',
+  '/api/merchant/provider',
+  '/api/merchant/register-shop',
+  '/api/merchant/upload-image',
+  '/api/notifications/push',
+  '/api/payments/create-order',
+  '/api/payments/verify',
+  '/api/prescriptions/signed-url',
+  '/api/queue/broadcast',
+  '/api/resources',
+  '/api/resources/[id]',
+  '/api/slots/availability',
+  '/api/slots/booked',
+  '/api/test/expire-hold',
+  '/api/ticket/[id]',
+  '/api/webhooks/razorpay'
+]
+Tested routes in ledger (67): [
+  '/api/account/delete',
+  '/api/account/delete-public-request',
+  '/api/account/export',
+  '/api/admin/analytics',
+  '/api/admin/app-logs',
+  '/api/admin/app-logs/test-alert',
+  '/api/admin/audit-logs',
+  '/api/admin/bookings',
+  '/api/admin/cities',
+  '/api/admin/doctor-assignments',
+  '/api/admin/merchants',
+  '/api/admin/notifications',
+  '/api/admin/refunds',
+  '/api/admin/resources',
+  '/api/admin/users',
+  '/api/admin/venues',
+  '/api/admin/waitlist',
+  '/api/auth/otp/send',
+  '/api/auth/otp/verify',
+  '/api/bookings',
+  '/api/bookings/admit',
+  '/api/bookings/cancel',
+  '/api/bookings/checkin',
+  '/api/bookings/collect-fee',
+  '/api/bookings/complete',
+  '/api/bookings/confirm',
+  '/api/bookings/emergency-choice',
+  '/api/bookings/end',
+  '/api/bookings/hold',
+  '/api/bookings/late-queue',
+  '/api/bookings/no-show',
+  '/api/bookings/offline',
+  '/api/bookings/override',
+  '/api/bookings/reach',
+  '/api/bookings/reassign',
+  '/api/bookings/reorder',
+  '/api/bookings/reschedule',
+  '/api/bookings/start',
+  '/api/cities/waitlist',
+  '/api/cron/release-holds',
+  '/api/cron/security-monitor',
+  '/api/customer/queue-and-history',
+  '/api/doctor/emergency-cancel',
+  '/api/health',
+  '/api/hospital/audit-logs',
+  '/api/hospital/context',
+  '/api/hospital/departments',
+  '/api/hospital/members',
+  '/api/logs/ingest',
+  '/api/merchant/doctor-status',
+  '/api/merchant/onboard',
+  '/api/merchant/provider',
+  '/api/merchant/register-shop',
+  '/api/merchant/upload-image',
+  '/api/notifications/push',
+  '/api/payments/create-order',
+  '/api/payments/verify',
+  '/api/prescriptions/signed-url',
+  '/api/queue/broadcast',
+  '/api/resources',
+  '/api/resources/[id]',
+  '/api/slots/availability',
+  '/api/slots/booked',
+  '/api/test/expire-hold',
+  '/api/ticket/[id]',
+  '/api/webhooks/razorpay',
+  'pgmq / vault / pg_net / pg_cron'
+]
+SUCCESS: 100% of discovered routes (66/66) covered in matrix ledger! 0 uncovered.
+✔ Group 8: Adversarial Cross-Tenant Authorization Matrix (15826.374416ms)
+ℹ tests 40
+ℹ suites 1
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15830.384583
+
+3. tests/unit/mantis-track1-database-hardening.test.mjs
+▶ Mantis Track 1 Database Hardening & SPEC Invariant Verification
+  ✔ 1. Privilege Hygiene: public.sync_booking_for_family() must NOT be executable by anon or authenticated (2.00975ms)
+  ✔ 2. SPEC Invariant: Hospital patient arriving +7 minutes after slot_start (within +/-10m window) is NOT late in verify_checkin_code (24.271958ms)
+  ✔ 3. SPEC Invariant: Hospital patient arriving +7 minutes after slot_start (within +/-10m window) is NOT late in mark_present_manually (13.056292ms)
+  ✔ 4. Divergence Guard: SQL stored procedures and TypeScript queue-engine.ts must agree on arrival window / late threshold per SPEC.md (45.645209ms)
+✔ Mantis Track 1 Database Hardening & SPEC Invariant Verification (391.823958ms)
+ℹ tests 4
+ℹ suites 1
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 393.736334
+
+--- Capturing Snapshot After Pass 2 ---
+PASS 2 RESULT: ZERO DIFF! Function privileges, definitions, and ACLs remain 100% identical after second pass.

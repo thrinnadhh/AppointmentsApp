@@ -1,0 +1,367 @@
+=== K3 AUDIT: GRACE WINDOW / ARRIVAL WINDOW OCCURRENCES IN REPOSITORY ===
+
+--- Matches for pattern: ON_TIME_GRACE ---
+apps/merchant-web/src/app/api/bookings/checkin/route.ts:7:import { ON_TIME_GRACE_MS } from '@appointments/shared/queue-engine';
+apps/merchant-web/src/app/api/bookings/checkin/route.ts:230:    const isLate = now.getTime() > (new Date(booking.slot_start).getTime() + ON_TIME_GRACE_MS);
+apps/merchant-web/src/app/api/bookings/reach/route.ts:9:  ON_TIME_GRACE_MS,
+apps/merchant-web/src/app/api/bookings/reach/route.ts:87:    const isLateArrival = Boolean(booking.skipped_at) || arrivalTime > slotStartTime + ON_TIME_GRACE_MS;
+apps/merchant-web/src/app/api/customer/queue-and-history/route.ts:15:  ON_TIME_GRACE_MS,
+apps/merchant-web/src/app/api/customer/queue-and-history/route.ts:300:        ? new Date(arrivalIso).getTime() - new Date(b.slot_start).getTime() > ON_TIME_GRACE_MS
+apps/merchant-web/src/app/bookings/page.tsx:4:import { ON_TIME_GRACE_MS } from '@/lib/queue-scheduler';
+apps/merchant-web/src/app/bookings/page.tsx:793:                            {!booking.is_present && booking.status === 'CONFIRMED' && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
+apps/merchant-web/src/app/bookings/page.tsx:946:                      {new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
+apps/merchant-web/src/app/bookings/page.tsx:958:                      {!booking.is_present && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
+apps/merchant-web/src/app/page.tsx:5:import { evaluateConsultantQueue, ON_TIME_GRACE_MS } from '@/lib/queue-scheduler';
+apps/merchant-web/src/app/page.tsx:2656:            const matrixLateCount = baseBookings.filter((b) => standbyIdSet.has(b.id) || Boolean(b.queue_position && new Date(b.checked_in_at || b.customer_arrived_at || b.slot_start).getTime() - new Date(b.slot_start).getTime() > ON_TIME_GRACE_MS)).length;
+apps/merchant-web/src/lib/queue-scheduler.ts:22:  ON_TIME_GRACE_MINUTES,
+apps/merchant-web/src/lib/queue-scheduler.ts:23:  ON_TIME_GRACE_MS,
+apps/merchant-web/src/lib/queue-scheduler.ts:40:  ON_TIME_GRACE_MINUTES,
+apps/merchant-web/src/lib/queue-scheduler.ts:41:  ON_TIME_GRACE_MS,
+packages/shared/src/queue-engine.ts:32:export const ON_TIME_GRACE_MINUTES = 10;
+packages/shared/src/queue-engine.ts:33:export const ON_TIME_GRACE_MS = ON_TIME_GRACE_MINUTES * 60 * 1000;
+packages/shared/src/queue-engine.ts:187:  if (diffMinutes < -ON_TIME_GRACE_MINUTES) return 'Early';
+packages/shared/src/queue-engine.ts:188:  if (diffMinutes >= -ON_TIME_GRACE_MINUTES && diffMinutes <= ON_TIME_GRACE_MINUTES) return 'On Time';
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:12:--   4. Unify SQL late-arrival grace window to 5 minutes (ON_TIME_GRACE_MINUTES = 5)
+tests/unit/hospital-queue-engine.test.mjs:19:  ON_TIME_GRACE_MINUTES,
+tests/unit/hospital-queue-engine.test.mjs:20:  ON_TIME_GRACE_MS,
+tests/unit/hospital-queue-engine.test.mjs:402:    it('P1.1: exports shared ON_TIME_GRACE_MINUTES (10) and ON_TIME_GRACE_MS (600000) per SPEC.md', () => {
+tests/unit/hospital-queue-engine.test.mjs:403:      assert.equal(ON_TIME_GRACE_MINUTES, 10);
+tests/unit/hospital-queue-engine.test.mjs:404:      assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000);
+tests/unit/hospital-queue-engine.test.mjs:413:    it('P1.3: reach/route.ts uses ON_TIME_GRACE_MS (10m) and toClinicDateString instead of 5m and .slice(0, 10)', () => {
+tests/unit/hospital-queue-engine.test.mjs:418:      assert.ok(src.includes('ON_TIME_GRACE_MS'), 'reach/route.ts must use ON_TIME_GRACE_MS');
+tests/unit/mantis-track1-database-hardening.test.mjs:243:    const { ON_TIME_GRACE_MINUTES, ON_TIME_GRACE_MS } = await import('../../packages/shared/src/queue-engine.ts');
+tests/unit/mantis-track1-database-hardening.test.mjs:244:    assert.equal(ON_TIME_GRACE_MINUTES, 10, 'TypeScript ON_TIME_GRACE_MINUTES must be 10 per SPEC.md');
+tests/unit/mantis-track1-database-hardening.test.mjs:245:    assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000, 'TypeScript ON_TIME_GRACE_MS must be 600,000ms');
+tests/unit/mantis-track1-database-hardening.test.mjs:262:        ON_TIME_GRACE_MINUTES,
+tests/unit/mantis-track1-database-hardening.test.mjs:263:        `Divergence detected: ${row.proname} uses ${sqlMinutes}m in SQL, but TypeScript uses ${ON_TIME_GRACE_MINUTES}m! Must match SPEC.md (10m).`
+tests/unit/phase3-hospital-queue.test.mjs:11:  ON_TIME_GRACE_MINUTES as SCHEDULER_GRACE_MINUTES,
+tests/unit/phase3-hospital-queue.test.mjs:16:  ON_TIME_GRACE_MINUTES,
+tests/unit/phase3-hospital-queue.test.mjs:17:  ON_TIME_GRACE_MS,
+tests/unit/phase3-hospital-queue.test.mjs:40:    assert.equal(ON_TIME_GRACE_MINUTES, 10, 'Shared ON_TIME_GRACE_MINUTES must be 10 per SPEC.md');
+tests/unit/phase3-hospital-queue.test.mjs:41:    assert.equal(ON_TIME_GRACE_MS, 10 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 600,000ms');
+tests/unit/phase3-hospital-queue.test.mjs:42:    assert.equal(SCHEDULER_GRACE_MINUTES, 10, 'Scheduler ON_TIME_GRACE_MINUTES must be 10');
+
+--- Matches for pattern: GRACE_MINUTES ---
+apps/merchant-web/src/lib/queue-scheduler.ts:22:  ON_TIME_GRACE_MINUTES,
+apps/merchant-web/src/lib/queue-scheduler.ts:40:  ON_TIME_GRACE_MINUTES,
+packages/shared/src/queue-engine.ts:32:export const ON_TIME_GRACE_MINUTES = 10;
+packages/shared/src/queue-engine.ts:33:export const ON_TIME_GRACE_MS = ON_TIME_GRACE_MINUTES * 60 * 1000;
+packages/shared/src/queue-engine.ts:187:  if (diffMinutes < -ON_TIME_GRACE_MINUTES) return 'Early';
+packages/shared/src/queue-engine.ts:188:  if (diffMinutes >= -ON_TIME_GRACE_MINUTES && diffMinutes <= ON_TIME_GRACE_MINUTES) return 'On Time';
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:12:--   4. Unify SQL late-arrival grace window to 5 minutes (ON_TIME_GRACE_MINUTES = 5)
+tests/unit/hospital-queue-engine.test.mjs:19:  ON_TIME_GRACE_MINUTES,
+tests/unit/hospital-queue-engine.test.mjs:402:    it('P1.1: exports shared ON_TIME_GRACE_MINUTES (10) and ON_TIME_GRACE_MS (600000) per SPEC.md', () => {
+tests/unit/hospital-queue-engine.test.mjs:403:      assert.equal(ON_TIME_GRACE_MINUTES, 10);
+tests/unit/mantis-track1-database-hardening.test.mjs:243:    const { ON_TIME_GRACE_MINUTES, ON_TIME_GRACE_MS } = await import('../../packages/shared/src/queue-engine.ts');
+tests/unit/mantis-track1-database-hardening.test.mjs:244:    assert.equal(ON_TIME_GRACE_MINUTES, 10, 'TypeScript ON_TIME_GRACE_MINUTES must be 10 per SPEC.md');
+tests/unit/mantis-track1-database-hardening.test.mjs:262:        ON_TIME_GRACE_MINUTES,
+tests/unit/mantis-track1-database-hardening.test.mjs:263:        `Divergence detected: ${row.proname} uses ${sqlMinutes}m in SQL, but TypeScript uses ${ON_TIME_GRACE_MINUTES}m! Must match SPEC.md (10m).`
+tests/unit/phase3-hospital-queue.test.mjs:11:  ON_TIME_GRACE_MINUTES as SCHEDULER_GRACE_MINUTES,
+tests/unit/phase3-hospital-queue.test.mjs:16:  ON_TIME_GRACE_MINUTES,
+tests/unit/phase3-hospital-queue.test.mjs:40:    assert.equal(ON_TIME_GRACE_MINUTES, 10, 'Shared ON_TIME_GRACE_MINUTES must be 10 per SPEC.md');
+tests/unit/phase3-hospital-queue.test.mjs:42:    assert.equal(SCHEDULER_GRACE_MINUTES, 10, 'Scheduler ON_TIME_GRACE_MINUTES must be 10');
+
+--- Matches for pattern: arrival_window ---
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:1:-- Migration: 20261108000002_spec_arrival_window_and_trigger_privileges.sql
+
+--- Matches for pattern: late_threshold ---: 0 hits
+
+--- Matches for pattern: interval '5 minute ---
+supabase/migrations/20260908000001_initial_schema.sql:205:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260909000001_security_fixes.sql:319:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260910000001_phase1_power_features.sql:220:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260919000001_platform_fee_breakdown.sql:88:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260922000002_city_director_rbac.sql:211:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:350:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:423:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260929000001_concurrency_and_financial_state_machine.sql:71:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20260929000001_concurrency_and_financial_state_machine.sql:144:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261001000003_cooling_period_followup.sql:82:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261001000003_cooling_period_followup.sql:183:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261002000001_strix_security_hardening.sql:555:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261002000001_strix_security_hardening.sql:654:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261022000003_scope_create_booking_hold_stale_cleanup.sql:59:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261022000003_scope_create_booking_hold_stale_cleanup.sql:162:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261022000005_sargable_daily_booking_limit.sql:64:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261022000005_sargable_daily_booking_limit.sql:170:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261022000007_ignore_expired_holds_in_daily_limit_and_availability.sql:67:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261022000007_ignore_expired_holds_in_daily_limit_and_availability.sql:177:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261022000013_fix_standby_expiry_protect_on_time_patients.sql:52:        OR (b.queue_position IS NOT NULL AND b.customer_arrived_at IS NOT NULL AND b.customer_arrived_at > b.slot_start + INTERVAL '5 minutes')
+supabase/migrations/20261024000001_no_show_tiered_policy_and_account_block.sql:250:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261024000001_no_show_tiered_policy_and_account_block.sql:360:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:659:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:818:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261026190000_split_payment_platform_fee_and_consultation_fee.sql:133:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261026190000_split_payment_platform_fee_and_consultation_fee.sql:289:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:103:        OR COALESCE(b.checked_in_at, b.customer_arrived_at, b.updated_at) > b.slot_start + INTERVAL '5 minutes'
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:228:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:453:    v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:639:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:742:  v_is_late := v_was_skipped OR (v_arrived > (v_booking.slot_start + INTERVAL '5 minutes'));
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:584:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261106000001_family_minor_booking_support.sql:300:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261106000001_family_minor_booking_support.sql:459:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261107000004_db_lint_and_policy_message_remediation.sql:151:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261107000004_db_lint_and_policy_message_remediation.sql:310:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1070:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1229:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1952:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:3218:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+tests/scripts/run-mission-full-verification.mjs:149:       VALUES ($1, $2, $3, $4, $5, 'HELD', 'PENDING', 100, 10, now() + interval '5 minutes') RETURNING *`,
+tests/unit/hospital-queue-engine.test.mjs:466:      assert.ok(sql.includes("> b.slot_start + INTERVAL '5 minutes'"), 'Migration must use strict > 5 minutes');
+
+--- Matches for pattern: interval '10 minute ---
+supabase/migrations/20260912000003_phase4_notifications.sql:270:      AND slot_start >= NOW() + INTERVAL '10 minutes'
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:407:    v_is_late := v_booking.checked_in_at > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:456:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:544:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261018000001_hospital_department_rbac.sql:584:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261018000002_hospital_bug_fixes.sql:238:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:176:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:355:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:479:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:308:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:487:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:612:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:191:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:378:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:501:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261022000013_fix_standby_expiry_protect_on_time_patients.sql:51:        COALESCE(b.checked_in_at, b.customer_arrived_at) >= b.slot_start + INTERVAL '10 minutes'
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:316:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:521:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000001_fix_standby_expiry_and_grace_consistency.sql:8:--      (arrival > slot_start + INTERVAL '10 minutes') matching queue-engine.ts,
+supabase/migrations/20261103000001_fix_standby_expiry_and_grace_consistency.sql:54:      AND COALESCE(b.checked_in_at, b.customer_arrived_at, b.updated_at) > b.slot_start + INTERVAL '10 minutes'
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:69:      AND COALESCE(b.checked_in_at, b.customer_arrived_at, b.updated_at) > b.slot_start + INTERVAL '10 minutes'
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:746:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:960:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:1136:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:410:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:3044:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:77:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '10 minutes'));
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:397:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '10 minutes'));
+supabase/migrations_rollback/20261103000003_rollback.sql:44:      AND COALESCE(b.checked_in_at, b.customer_arrived_at, b.updated_at) > b.slot_start + INTERVAL '10 minutes'
+supabase/migrations_rollback/20261103000003_rollback.sql:717:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations_rollback/20261103000003_rollback.sql:900:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations_rollback/20261103000003_rollback.sql:1043:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+tests/unit/phase1-security-blockers.test.mjs:1166:          NOW() + INTERVAL '10 minutes', 'P1-HOLD-01'
+tests/unit/phase1-security-blockers.test.mjs:1217:          NOW() + INTERVAL '10 minutes', 'P1-PAY-01', 'order_test_p1'
+
+--- Matches for pattern: INTERVAL '5 minute ---
+supabase/migrations/20260908000001_initial_schema.sql:205:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260909000001_security_fixes.sql:319:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260910000001_phase1_power_features.sql:220:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260919000001_platform_fee_breakdown.sql:88:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260922000002_city_director_rbac.sql:211:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:350:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:423:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20260929000001_concurrency_and_financial_state_machine.sql:71:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20260929000001_concurrency_and_financial_state_machine.sql:144:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261001000003_cooling_period_followup.sql:82:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261001000003_cooling_period_followup.sql:183:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261002000001_strix_security_hardening.sql:555:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261002000001_strix_security_hardening.sql:654:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261022000003_scope_create_booking_hold_stale_cleanup.sql:59:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261022000003_scope_create_booking_hold_stale_cleanup.sql:162:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261022000005_sargable_daily_booking_limit.sql:64:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261022000005_sargable_daily_booking_limit.sql:170:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261022000007_ignore_expired_holds_in_daily_limit_and_availability.sql:67:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261022000007_ignore_expired_holds_in_daily_limit_and_availability.sql:177:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261022000013_fix_standby_expiry_protect_on_time_patients.sql:52:        OR (b.queue_position IS NOT NULL AND b.customer_arrived_at IS NOT NULL AND b.customer_arrived_at > b.slot_start + INTERVAL '5 minutes')
+supabase/migrations/20261024000001_no_show_tiered_policy_and_account_block.sql:250:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261024000001_no_show_tiered_policy_and_account_block.sql:360:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:659:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:818:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261026190000_split_payment_platform_fee_and_consultation_fee.sql:133:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261026190000_split_payment_platform_fee_and_consultation_fee.sql:289:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:103:        OR COALESCE(b.checked_in_at, b.customer_arrived_at, b.updated_at) > b.slot_start + INTERVAL '5 minutes'
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:228:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:453:    v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:639:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:742:  v_is_late := v_was_skipped OR (v_arrived > (v_booking.slot_start + INTERVAL '5 minutes'));
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:584:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261106000001_family_minor_booking_support.sql:300:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261106000001_family_minor_booking_support.sql:459:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261107000004_db_lint_and_policy_message_remediation.sql:151:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261107000004_db_lint_and_policy_message_remediation.sql:310:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1070:    IF p_slot_start < (NOW() - INTERVAL '5 minutes') THEN
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1229:    v_hold_expiry := NOW() + INTERVAL '5 minutes';
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1952:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:3218:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+tests/scripts/run-mission-full-verification.mjs:149:       VALUES ($1, $2, $3, $4, $5, 'HELD', 'PENDING', 100, 10, now() + interval '5 minutes') RETURNING *`,
+tests/unit/hospital-queue-engine.test.mjs:466:      assert.ok(sql.includes("> b.slot_start + INTERVAL '5 minutes'"), 'Migration must use strict > 5 minutes');
+
+--- Matches for pattern: INTERVAL '10 minute ---
+supabase/migrations/20260912000003_phase4_notifications.sql:270:      AND slot_start >= NOW() + INTERVAL '10 minutes'
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:407:    v_is_late := v_booking.checked_in_at > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:456:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:544:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261018000001_hospital_department_rbac.sql:584:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261018000002_hospital_bug_fixes.sql:238:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:176:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:355:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:479:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:308:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:487:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:612:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:191:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:378:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:501:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261022000013_fix_standby_expiry_protect_on_time_patients.sql:51:        COALESCE(b.checked_in_at, b.customer_arrived_at) >= b.slot_start + INTERVAL '10 minutes'
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:316:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:521:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000001_fix_standby_expiry_and_grace_consistency.sql:8:--      (arrival > slot_start + INTERVAL '10 minutes') matching queue-engine.ts,
+supabase/migrations/20261103000001_fix_standby_expiry_and_grace_consistency.sql:54:      AND COALESCE(b.checked_in_at, b.customer_arrived_at, b.updated_at) > b.slot_start + INTERVAL '10 minutes'
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:69:      AND COALESCE(b.checked_in_at, b.customer_arrived_at, b.updated_at) > b.slot_start + INTERVAL '10 minutes'
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:746:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:960:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:1136:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:410:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:3044:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:77:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '10 minutes'));
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:397:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '10 minutes'));
+supabase/migrations_rollback/20261103000003_rollback.sql:44:      AND COALESCE(b.checked_in_at, b.customer_arrived_at, b.updated_at) > b.slot_start + INTERVAL '10 minutes'
+supabase/migrations_rollback/20261103000003_rollback.sql:717:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations_rollback/20261103000003_rollback.sql:900:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations_rollback/20261103000003_rollback.sql:1043:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+tests/unit/phase1-security-blockers.test.mjs:1166:          NOW() + INTERVAL '10 minutes', 'P1-HOLD-01'
+tests/unit/phase1-security-blockers.test.mjs:1217:          NOW() + INTERVAL '10 minutes', 'P1-PAY-01', 'order_test_p1'
+
+--- Matches for pattern: is_late ---
+apps/merchant-web/src/app/api/bookings/checkin/route.ts:239:          is_late: isLate,
+apps/merchant-web/src/app/api/bookings/checkin/route.ts:297:      is_late: isLate,
+apps/merchant-web/src/app/api/bookings/reach/route.ts:95:        is_late_arrival: isLateArrival,
+apps/merchant-web/src/app/api/bookings/reach/route.ts:195:      is_late_arrival: isLateArrival,
+apps/merchant-web/src/app/api/customer/queue-and-history/route.ts:316:        is_late_queue: Boolean(standbyIds.has(b.id) || b.skipped_at || arrivedLate),
+apps/merchant-web/src/app/demo/page.tsx:201:    is_late?: boolean;
+apps/merchant-web/src/app/demo/page.tsx:283:          is_late: false,
+apps/merchant-web/src/app/demo/page.tsx:321:      is_late: false,
+apps/merchant-web/src/app/page.tsx:368:    is_late?: boolean;
+apps/merchant-web/src/app/page.tsx:772:            is_late: false,
+apps/merchant-web/src/app/page.tsx:789:      if (res.is_late) arrival_tag = 'Late';
+apps/merchant-web/src/app/page.tsx:798:          is_late: res.is_late,
+apps/merchant-web/src/app/page.tsx:1606:            is_late: false,
+apps/merchant-web/src/app/page.tsx:1622:          is_late: res.is_late,
+apps/merchant-web/src/app/page.tsx:2371:                  {checkinSuccessData.is_late ? (
+apps/merchant-web/src/components/frontdesk/FastPassCheckinPanel.tsx:22:  is_late?: boolean;
+apps/merchant-web/src/components/frontdesk/FastPassCheckinPanel.tsx:244:                {successData.is_late || successData.arrival_tag === 'Late' ? (
+apps/merchant-web/src/lib/queue-scheduler.ts:142:  is_late_queue?: boolean;
+apps/merchant-web/src/lib/queue-scheduler.ts:277:      if (b.is_late_queue || b.skipped_at || b.wasSkipped) return true;
+apps/merchant-web/src/lib/queue-scheduler.ts:611:    const hasLateQueue = dayBookings.some((b) => Boolean(b.queue_position || b.is_late_queue));
+apps/merchant-web/src/lib/queue-scheduler.ts:640:        isLateQueue: Boolean(b.queue_position || b.is_late_queue),
+packages/shared/src/queue-engine.ts:1085:    let wasSkipped = Boolean(r.skipped_at || r.skippedAt || r.wasSkipped || r.is_late_queue);
+packages/shared/src/types.ts:511:  is_late?: boolean;
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:281:  v_is_late BOOLEAN;
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:407:    v_is_late := v_booking.checked_in_at > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:417:      'is_late', COALESCE(v_is_late, false),
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:455:  -- 9. SUCCESS: Mark checked in & calculate is_late (> 10 mins after slot start)
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:456:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:488:    'is_late', v_is_late,
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:512:  v_is_late BOOLEAN;
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:544:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261011000001_reception_checkin_code_system.sql:571:    'is_late', v_is_late,
+supabase/migrations/20261018000001_hospital_department_rbac.sql:410:  v_is_late BOOLEAN;
+supabase/migrations/20261018000001_hospital_department_rbac.sql:584:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261018000001_hospital_department_rbac.sql:617:    'is_late', v_is_late,
+supabase/migrations/20261018000002_hospital_bug_fixes.sql:51:  v_is_late BOOLEAN;
+supabase/migrations/20261018000002_hospital_bug_fixes.sql:238:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261018000002_hospital_bug_fixes.sql:271:    'is_late', v_is_late,
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:39:  v_is_late BOOLEAN;
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:176:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:210:      'is_late', v_is_late,
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:355:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:400:    'is_late', v_is_late,
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:427:  v_is_late BOOLEAN;
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:479:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000006_harden_hospital_checkin_rpcs.sql:514:    'is_late', v_is_late,
+supabase/migrations/20261019000015_test_tenant_clocks.sql:171:  v_is_late BOOLEAN;
+supabase/migrations/20261019000015_test_tenant_clocks.sql:308:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:342:      'is_late', v_is_late,
+supabase/migrations/20261019000015_test_tenant_clocks.sql:487:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:532:    'is_late', v_is_late,
+supabase/migrations/20261019000015_test_tenant_clocks.sql:559:  v_is_late BOOLEAN;
+supabase/migrations/20261019000015_test_tenant_clocks.sql:612:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261019000015_test_tenant_clocks.sql:647:    'is_late', v_is_late,
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:32:  v_is_late BOOLEAN;
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:191:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:233:      'is_late', v_is_late,
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:378:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:423:    'is_late', v_is_late,
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:448:  v_is_late BOOLEAN;
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:501:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261021000002_fix_checkin_rpcs_dropped_overloads.sql:536:    'is_late', v_is_late,
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:200:  v_is_late BOOLEAN;
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:316:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:346:      'is_late', v_is_late,
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:521:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261024000003_permanent_pin_and_one_hour_patient_gap.sql:555:    'is_late', v_is_late,
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:703:  v_is_late BOOLEAN;
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:746:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:780:    'is_late', v_is_late,
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:812:  v_is_late BOOLEAN;
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:960:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:1002:      'is_late', v_is_late,
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:1136:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261103000003_phase1_security_lockdown.sql:1178:    'is_late', v_is_late,
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:175:  v_is_late BOOLEAN;
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:228:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:263:    'is_late', v_is_late,
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:295:  v_is_late BOOLEAN;
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:453:    v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:496:      'is_late', v_is_late,
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:639:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:682:    'is_late', v_is_late,
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:706:  v_is_late BOOLEAN;
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:742:  v_is_late := v_was_skipped OR (v_arrived > (v_booking.slot_start + INTERVAL '5 minutes'));
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:751:      'is_late_arrival', v_is_late,
+supabase/migrations/20261103000004_phase3_queue_grace_and_payment_enum.sql:784:    'is_late_arrival', v_is_late,
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:279:  v_is_late BOOLEAN;
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:410:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:440:      'is_late', v_is_late,
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:584:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261104000001_reconcile_merged_stored_procedures.sql:627:    'is_late', v_is_late,
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1899:  v_is_late BOOLEAN;
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1952:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:1987:    'is_late', v_is_late,
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:2913:  v_is_late BOOLEAN;
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:3044:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:3074:      'is_late', v_is_late,
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:3218:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '5 minutes'));
+supabase/migrations/20261107000008_zero_advisor_private_schema_architecture.sql:3261:    'is_late', v_is_late,
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:23:  v_is_late BOOLEAN;
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:77:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '10 minutes'));
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:112:    'is_late', v_is_late,
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:137:  v_is_late BOOLEAN;
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:284:      'is_late', false,
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:397:  v_is_late := v_was_skipped OR (v_now > (v_booking.slot_start + interval '10 minutes'));
+supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:436:    'is_late', v_is_late,
+supabase/migrations_rollback/20261103000003_rollback.sql:672:  v_is_late BOOLEAN;
+supabase/migrations_rollback/20261103000003_rollback.sql:717:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations_rollback/20261103000003_rollback.sql:751:    'is_late', v_is_late,
+supabase/migrations_rollback/20261103000003_rollback.sql:779:  v_is_late BOOLEAN;
+supabase/migrations_rollback/20261103000003_rollback.sql:900:    v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations_rollback/20261103000003_rollback.sql:938:      'is_late', v_is_late,
+supabase/migrations_rollback/20261103000003_rollback.sql:1043:  v_is_late := v_now > (v_booking.slot_start + interval '10 minutes');
+supabase/migrations_rollback/20261103000003_rollback.sql:1081:    'is_late', v_is_late,
+tests/e2e/test-clock-audit.test.mjs:193:    // Booking 20m in the past -> Arriving now is > slot_start + 10m -> is_late should evaluate to TRUE based on real clock
+tests/e2e/test-clock-audit.test.mjs:224:    assert.equal(markData.is_late, true, 'is_late must be true because 20m > 10m under real clock');
+tests/e2e/workstreams/sa2-checkin-arrival.test.mjs:152:      assert.equal(checkinValidData.is_late, false);
+tests/scripts/test-checkin-code.mjs:334:          is_late: isLate,
+tests/scripts/test-checkin-code.mjs:384:      assert.equal(res.is_late, false);
+tests/scripts/test-checkin-code.mjs:387:    it('succeeds and flags is_late = true when more than 10 mins after slot start', () => {
+tests/scripts/test-checkin-code.mjs:392:      assert.equal(res.is_late, true, 'Check-in 15m after slot start must flag is_late = true');
+tests/unit/hospital-customer-screens.test.mjs:227:      assert.equal(typeof data.is_late_arrival, 'boolean');
+tests/unit/hospital-frontdesk-screens.test.mjs:189:      assert.equal(typeof data.is_late, 'boolean');
+tests/unit/hospital-queue-engine.test.mjs:423:    it('P1.4: queue-and-history/route.ts preserves is_late_queue for checked-in late patients and uses toClinicDateString', () => {
+tests/unit/hospital-queue-engine.test.mjs:430:        'queue-and-history/route.ts must not invert is_late_queue when is_present is true'
+tests/unit/hospital-queue-engine.test.mjs:763:          { id: 'P3', customer_name: 'Patient 3', slot_start: t('09:20'), slot_end: t('09:30'), status: 'CONFIRMED', is_present: true, queue_position: 1, is_late_queue: false },
+tests/unit/hospital-queue-engine.test.mjs:782:            is_late_queue: false,
+tests/unit/hospital-queue-engine.test.mjs:792:            is_late_queue: false,
+tests/unit/mantis-track1-database-hardening.test.mjs:175:      verifyData.is_late,
+tests/unit/mantis-track1-database-hardening.test.mjs:177:      'Patient arriving 7 minutes after slot_start must be tagged as On Time (is_late: false) per SPEC.md'
+tests/unit/mantis-track1-database-hardening.test.mjs:235:      markData.is_late,
+tests/unit/mantis-track1-database-hardening.test.mjs:237:      'Patient marked present 7 minutes after slot_start must be tagged as On Time (is_late: false) per SPEC.md'
+tests/unit/mantis-track1-database-hardening.test.mjs:257:      const match = row.prosrc.match(/v_is_late\s*:=.*?interval\s*'(\d+)\s*minutes'/i);
+tests/unit/queue-scheduler.test.mjs:103:        is_late_queue: true,
+tests/unit/queue-spec-engine.test.mjs:167:          is_late_queue: true,
+tests/unit/queue-spec-engine.test.mjs:235:            is_late_queue: true,
+tests/unit/queue-spec-engine.test.mjs:246:            is_late_queue: true,

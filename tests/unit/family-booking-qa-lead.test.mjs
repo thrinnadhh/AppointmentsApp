@@ -856,39 +856,32 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
 
   // F-18: Migration idempotency
   it('F-18: Migration idempotency - re-running migration on existing data causes 0 errors', async () => {
-    // 1. Robust function snapshot via pg_get_functiondef to preserve latest schema
-    const snapshotRes = await dbPool.query(`
-      SELECT pg_get_functiondef(p.oid) as def
-      FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-      WHERE n.nspname IN ('public', 'private')
-    `);
-    const fnSnapshots = snapshotRes.rows.map(r => r.def);
-
+    const client = await dbPool.connect();
     try {
+      await client.query('BEGIN');
       const migrationSql = fs.readFileSync('supabase/migrations/20261106000001_family_minor_booking_support.sql', 'utf8');
-      // Execute full migration SQL
-      await dbPool.query(migrationSql);
+      // Execute full migration SQL inside transaction
+      await client.query(migrationSql);
 
       // Assert columns and constraints still exist and function
-      const colRes = await dbPool.query(`
+      const colRes = await client.query(`
         SELECT column_name, data_type, is_nullable 
         FROM information_schema.columns 
         WHERE table_name = 'bookings' AND column_name IN ('booked_for', 'patient_name', 'patient_age', 'patient_relationship', 'booking_note', 'is_minor');
       `);
       assert.equal(colRes.rows.length, 6, 'All 6 columns must exist after rerun');
     } finally {
-      // 2. Restore all functions from snapshot so no function definition is downgraded
-      for (const def of fnSnapshots) {
-        await dbPool.query(def);
-      }
+      // Rollback completely to leave database schema, functions, triggers, and ACLs untainted
+      await client.query('ROLLBACK');
+      client.release();
     }
   });
 
   // F-19: UI states & Double-tap protection
   it('F-19: UI states - double-tap submit prevention creates exactly one booking', async () => {
-    const tStart = new Date(Date.now() + 420 * 3600 * 1000).toISOString();
-    const tEnd = new Date(Date.now() + 420 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
+    const uniqueOffset = 500 * 3600 * 1000 + (Date.now() % 10000000);
+    const tStart = new Date(Date.now() + uniqueOffset).toISOString();
+    const tEnd = new Date(Date.now() + uniqueOffset + 15 * 60 * 1000).toISOString();
 
     // Fire 2 concurrent hold calls with identical payload
     const payload = JSON.stringify({
