@@ -92,7 +92,7 @@
 The local Cashfree MCP installation at `/Users/trinadh/projects/cashfree-mcp` was subjected to an operational security review:
 
 1. **Credential Hygiene**:
-   - `cashfree-mcp/.env` contains sandbox credentials only (`TEST...`, `cfsk_ma_test_...`).
+   - `cashfree-mcp/.env` contains sandbox credentials only (`TEST...`, `cfsk_sandbox_secret`).
    - Verified that `.env` is listed in `cashfree-mcp/.gitignore` and is not tracked in git.
    - Credentials in `~/.gemini/config/mcp_config.json` reside in user home configuration, external to repository git trees.
 2. **2FA & IP Whitelisting**:
