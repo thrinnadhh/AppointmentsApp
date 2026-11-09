@@ -371,6 +371,9 @@ export interface CreateRazorpayOrderRequest {
 export interface CreateRazorpayOrderResponse {
   success: boolean;
   order_id?: string;
+  cf_order_id?: string;
+  payment_session_id?: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
   key_id?: string;
   amount?: number; // in paise
   currency?: string;
@@ -385,9 +388,11 @@ export interface CreateRazorpayOrderResponse {
 
 export interface VerifyRazorpayPaymentRequest {
   booking_id: string;
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
+  order_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_order_id?: string;
+  razorpay_signature?: string;
   attachment_url?: string | null;
 }
 

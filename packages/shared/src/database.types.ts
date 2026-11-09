@@ -315,6 +315,8 @@ export type Database = {
           followup_original_booking_id: string | null
           gateway_order_id: string | null
           gateway_payment_id: string | null
+          gateway_provider: string
+          payment_session_id: string | null
           gstin_platform: string | null
           hold_expires_at: string | null
           id: string
@@ -373,6 +375,8 @@ export type Database = {
           followup_original_booking_id?: string | null
           gateway_order_id?: string | null
           gateway_payment_id?: string | null
+          gateway_provider?: string
+          payment_session_id?: string | null
           gstin_platform?: string | null
           hold_expires_at?: string | null
           id?: string
@@ -431,6 +435,8 @@ export type Database = {
           followup_original_booking_id?: string | null
           gateway_order_id?: string | null
           gateway_payment_id?: string | null
+          gateway_provider?: string
+          payment_session_id?: string | null
           gstin_platform?: string | null
           hold_expires_at?: string | null
           id?: string
