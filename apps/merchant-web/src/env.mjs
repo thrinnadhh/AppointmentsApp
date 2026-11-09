@@ -76,6 +76,8 @@ export const APP_KEY_PREFIXES = [
   'NEXT_PUBLIC_',
   'SUPABASE_',
   'RAZORPAY_',
+  'CASHFREE_',
+  'PAYMENT_GATEWAY_PROVIDER',
   'R2_',
   'UPSTASH_',
   'CRON_',
@@ -134,7 +136,12 @@ export function validateEnv(env = process.env, options = {}) {
 
   // 2. Production-specific strict requirements
   if (isProduction) {
-    for (const requiredKey of REQUIRED_PRODUCTION_VARS) {
+    const isCashfree = (env.PAYMENT_GATEWAY_PROVIDER || '').toLowerCase() === 'cashfree';
+    const effectiveRequiredVars = isCashfree
+      ? REQUIRED_PRODUCTION_VARS.filter((k) => !k.startsWith('RAZORPAY_')).concat(['CASHFREE_APP_ID', 'CASHFREE_SECRET_KEY'])
+      : REQUIRED_PRODUCTION_VARS;
+
+    for (const requiredKey of effectiveRequiredVars) {
       const val = env[requiredKey];
       if (!val || typeof val !== 'string' || val.trim().length === 0) {
         errors.push(

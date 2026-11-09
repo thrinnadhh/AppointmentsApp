@@ -796,6 +796,9 @@ export async function confirmBookingPaymentOnSupabase(
 export interface CreateRazorpayOrderResult {
   success: boolean;
   order_id?: string;
+  cf_order_id?: string;
+  payment_session_id?: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
   key_id?: string;
   amount?: number;
   currency?: string;
@@ -836,6 +839,9 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
     return {
       success: true,
       order_id: json.order_id,
+      cf_order_id: json.cf_order_id,
+      payment_session_id: json.payment_session_id,
+      gateway_provider: json.gateway_provider || 'razorpay',
       key_id: json.key_id,
       amount: json.amount,
       currency: json.currency,
@@ -853,7 +859,6 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
   }
 }
 
-
 export interface VerifyPaymentResult {
   success: boolean;
   booking_id?: string;
@@ -868,9 +873,12 @@ export interface VerifyPaymentResult {
 
 export async function verifyRazorpayPayment(params: {
   booking_id: string;
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
+  order_id?: string;
+  payment_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_order_id?: string;
+  razorpay_signature?: string;
   attachment_url?: string | null;
   customerId?: string;
 }): Promise<VerifyPaymentResult> {

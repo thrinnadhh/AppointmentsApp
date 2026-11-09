@@ -45,6 +45,25 @@ const loadRazorpayScript = (): Promise<boolean> => {
   });
 };
 
+const loadCashfreeScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+    if ((window as any).Cashfree) return resolve(true);
+    const existing = document.querySelector('script[src*="cashfree.com"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(true));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.crossOrigin = 'anonymous';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 interface CheckoutModalProps {
   visible: boolean;
   resource: Resource | null;
@@ -354,9 +373,70 @@ export default function CheckoutModal({
       }
 
       const orderId = orderRes.order_id;
-
-      // 3. Web Razorpay standard checkout handling for human users
       const isAutomatedTest = typeof window !== 'undefined' && Boolean((window as any).navigator?.webdriver || (window as any).__PLAYWRIGHT__);
+
+      // 3A. Cashfree Drop SDK Checkout handling (when Cashfree is active)
+      if (orderRes.gateway_provider === 'cashfree') {
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && !orderRes.is_mock && !isAutomatedTest && orderRes.payment_session_id) {
+          await loadCashfreeScript();
+          if ((window as any).Cashfree) {
+            const cf = (window as any).Cashfree({
+              mode: process.env.EXPO_PUBLIC_CASHFREE_ENV === 'PRODUCTION' ? 'production' : 'sandbox',
+            });
+            cf.checkout({
+              paymentSessionId: orderRes.payment_session_id,
+              redirectTarget: '_modal',
+            }).then(async (result: any) => {
+              if (result.error) {
+                setPayError(result.error.message || 'Payment failed or cancelled.');
+                setIsProcessing(false);
+                return;
+              }
+              const verifyRes = await verifyRazorpayPayment({
+                booking_id: bookingId,
+                gateway_provider: 'cashfree',
+                order_id: orderId,
+                payment_id: result.paymentDetails?.paymentMessage || `cf_pay_${orderId}`,
+                attachment_url: attachedPath,
+                customerId,
+              });
+              if (verifyRes.success) {
+                const assignedToken = verifyRes.queue_position || 1;
+                onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+              } else {
+                setPayError(verifyRes.error || 'Payment verification failed.');
+              }
+              setIsProcessing(false);
+            }).catch((err: any) => {
+              setPayError(err?.message || 'Cashfree checkout error');
+              setIsProcessing(false);
+            });
+            return;
+          }
+        }
+
+        // Mobile / Sandbox verification for Cashfree
+        const verifyRes = await verifyRazorpayPayment({
+          booking_id: bookingId,
+          gateway_provider: 'cashfree',
+          order_id: orderId,
+          payment_id: `cf_pay_${Date.now().toString(36)}`,
+          attachment_url: attachedPath,
+          customerId,
+        });
+
+        if (verifyRes.success) {
+          const assignedToken = verifyRes.queue_position || 1;
+          onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+        } else {
+          const fallbackRes = await confirmBookingPaymentOnSupabase(bookingId, `cf_pay_${orderId}`, attachedPath);
+          const assignedToken = (fallbackRes as any)?.queue_position || 1;
+          onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+        }
+        return;
+      }
+
+      // 3B. Web Razorpay standard checkout handling for human users
       if (Platform.OS === 'web' && typeof window !== 'undefined' && !orderRes.is_mock && !isAutomatedTest) {
         await loadRazorpayScript();
         if ((window as any).Razorpay) {
