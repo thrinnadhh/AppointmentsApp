@@ -80,3 +80,4 @@ export interface PaymentGatewayAdapter {
   refundOrder(params: GatewayRefundParams): Promise<GatewayRefundResult>;
   verifyWebhook(params: VerifyWebhookParams): WebhookVerificationResult;
 }
+

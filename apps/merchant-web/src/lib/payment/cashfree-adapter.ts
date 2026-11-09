@@ -36,10 +36,20 @@ export class CashfreeAdapter implements PaymentGatewayAdapter {
     const cfOrderId = formatOrderIdForCashfree(params.bookingId);
     const amountInRupees = this.paiseToRupees(params.amountInPaise);
 
-    // Default expiry to 5 minutes from now if not provided
-    const expiryTime = params.orderExpiryTime || new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    // Cashfree strictly enforces order_expiry_time to be > 15 minutes and < 30 days from now.
+    // If the provided expiry is less than 15 minutes (such as our 5-minute slot hold window),
+    // omit order_expiry_time from the payload so Cashfree creates the order without 400 rejection;
+    // application-level hold expiry (pg_cron + webhook auto-refunds) enforces the 5-minute window.
+    let validExpiryTime: string | undefined = undefined;
+    if (params.orderExpiryTime) {
+      const expiryMs = new Date(params.orderExpiryTime).getTime();
+      const diffMin = (expiryMs - Date.now()) / (60 * 1000);
+      if (diffMin >= 15 && diffMin <= 30 * 24 * 60) {
+        validExpiryTime = new Date(params.orderExpiryTime).toISOString();
+      }
+    }
 
-    const response = await this.client.createOrder({
+    const payload: Parameters<CashfreeClient['createOrder']>[0] = {
       order_id: cfOrderId,
       order_amount: amountInRupees,
       order_currency: params.currency || 'INR',
@@ -49,8 +59,12 @@ export class CashfreeAdapter implements PaymentGatewayAdapter {
         customer_name: params.customerName || 'Hospital Patient',
         customer_email: params.customerEmail,
       },
-      order_expiry_time: expiryTime,
-    });
+    };
+    if (validExpiryTime) {
+      payload.order_expiry_time = validExpiryTime;
+    }
+
+    const response = await this.client.createOrder(payload);
 
     return {
       orderId: params.bookingId,
