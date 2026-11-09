@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { createRazorpayOrder, getRazorpayKeyId } from '@/lib/razorpay';
+import { getRazorpayKeyId } from '@/lib/razorpay';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { checkRateLimit } from '@/lib/redis';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking, getClientIp } from '@/lib/auth-admin';
 import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee } from '@appointments/shared';
@@ -59,12 +60,12 @@ export async function POST(req: NextRequest) {
     // Verify booking exists and is in an active lock / held state
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, status, hold_expires_at, gateway_order_id')
+      .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, status, hold_expires_at, gateway_order_id, gateway_provider, payment_session_id')
       .eq('id', booking_id)
       .maybeSingle();
 
     if (bookingError) {
-      console.error('Error fetching booking for Razorpay order:', bookingError);
+      console.error('Error fetching booking for payment order:', bookingError);
       return NextResponse.json<CreateRazorpayOrderResponse>(
         { success: false, error: 'Failed to retrieve booking' },
         { status: 500 }
@@ -165,16 +166,27 @@ export async function POST(req: NextRequest) {
     const onlineAmountInInr = platformFeeInInr;
     const amountInPaise = Math.round(onlineAmountInInr * 100);
 
+    const activeGateway = getPaymentGateway();
+    const isCashfreeActive = activeGateway.provider === 'cashfree';
+
     // Idempotency: Reuse existing active gateway_order_id if amount matches
-    if (booking.gateway_order_id && (Number(booking.total_amount) === onlineAmountInInr || Number(booking.platform_fee_amount) === onlineAmountInInr)) {
-      return NextResponse.json<CreateRazorpayOrderResponse>(
+    if (
+      booking.gateway_order_id &&
+      (Number(booking.total_amount) === onlineAmountInInr || Number(booking.platform_fee_amount) === onlineAmountInInr) &&
+      (!isCashfreeActive || booking.payment_session_id)
+    ) {
+      const provider = (booking.gateway_provider as 'cashfree' | 'razorpay') || 'razorpay';
+      return NextResponse.json<CreateRazorpayOrderResponse & { payment_session_id?: string; cf_order_id?: string; gateway_provider?: string }>(
         {
           success: true,
           order_id: booking.gateway_order_id,
-          key_id: getRazorpayKeyId(),
+          cf_order_id: booking.gateway_order_id,
+          payment_session_id: booking.payment_session_id || undefined,
+          gateway_provider: provider,
+          key_id: provider === 'cashfree' ? (process.env.CASHFREE_APP_ID || '') : getRazorpayKeyId(),
           amount: amountInPaise,
           currency: 'INR',
-          is_mock: booking.gateway_order_id.startsWith('order_mock_'),
+          is_mock: booking.gateway_order_id.startsWith('order_mock_') || booking.gateway_order_id.startsWith('mock_'),
           deposit_amount: onlineAmountInInr,
           platform_fee: platformFeeInInr,
           total_amount: onlineAmountInInr,
@@ -200,10 +212,31 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', booking.id);
 
-    const order = await createRazorpayOrder({
-      amount: amountInPaise,
+    // Fetch customer profile to populate customer_details for Cashfree / receipt notes
+    let customerPhone = '9999999999';
+    let customerName = 'Hospital Patient';
+    let customerEmail: string | undefined = undefined;
+
+    if (booking.customer_id) {
+      const { data: prof } = await supabaseAdmin
+        .from('profiles')
+        .select('phone, full_name, email')
+        .eq('id', booking.customer_id)
+        .maybeSingle();
+      if (prof?.phone) customerPhone = prof.phone;
+      if (prof?.full_name) customerName = prof.full_name;
+      if (prof?.email) customerEmail = prof.email;
+    }
+
+    const orderResult = await activeGateway.createOrder({
+      bookingId: booking.id,
+      amountInPaise,
       currency: 'INR',
-      receipt: booking.reference_code || booking.id.slice(0, 10),
+      customerId: booking.customer_id,
+      customerPhone,
+      customerName,
+      customerEmail,
+      orderExpiryTime: booking.hold_expires_at || new Date(Date.now() + 5 * 60 * 1000).toISOString(),
       notes: {
         booking_id: booking.id,
         customer_id: booking.customer_id,
@@ -215,22 +248,27 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Persist server-generated Razorpay order ID to booking for safe webhook order matching
+    // Persist server-generated order ID, gateway provider, and session ID to booking
     await supabaseAdmin
       .from('bookings')
       .update({
-        gateway_order_id: order.id,
+        gateway_order_id: orderResult.gatewayOrderId,
+        gateway_provider: orderResult.gatewayProvider,
+        payment_session_id: orderResult.paymentSessionId || null,
       })
       .eq('id', booking.id);
 
-    return NextResponse.json<CreateRazorpayOrderResponse>(
+    return NextResponse.json<CreateRazorpayOrderResponse & { payment_session_id?: string; cf_order_id?: string; gateway_provider?: string }>(
       {
         success: true,
-        order_id: order.id,
-        key_id: getRazorpayKeyId(),
-        amount: order.amount,
-        currency: order.currency,
-        is_mock: order.is_mock,
+        order_id: orderResult.gatewayOrderId,
+        cf_order_id: orderResult.gatewayOrderId,
+        payment_session_id: orderResult.paymentSessionId,
+        gateway_provider: orderResult.gatewayProvider,
+        key_id: orderResult.gatewayProvider === 'cashfree' ? (process.env.CASHFREE_APP_ID || '') : getRazorpayKeyId(),
+        amount: orderResult.amountInPaise,
+        currency: orderResult.currency,
+        is_mock: orderResult.isMock,
         deposit_amount: onlineAmountInInr,
         platform_fee: platformFeeInInr,
         total_amount: onlineAmountInInr,
@@ -240,7 +278,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Internal error creating Razorpay order';
+    const message = err instanceof Error ? err.message : 'Internal error creating payment order';
     console.error('create-order endpoint failure:', err);
     return NextResponse.json<CreateRazorpayOrderResponse>(
       { success: false, error: message },

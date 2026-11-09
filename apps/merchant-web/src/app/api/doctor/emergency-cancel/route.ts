@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { isCallerHospitalAdminForProvider, verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { getAccessContext, isHospitalAdmin } from '@/lib/hospital-access';
 import { initiateRazorpayRefund } from '@/lib/razorpay';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 
 export interface DoctorEmergencyCancelRequest {
   doctor_resource_id: string;
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
     if (Array.isArray(result?.affected_booking_ids) && result.affected_booking_ids.length > 0) {
       const { data: affectedBookings } = await (supabaseAdmin
         .from('bookings') as any)
-        .select('id, payment_status, refund_amount, deposit_amount, total_amount')
+        .select('id, payment_status, refund_amount, deposit_amount, total_amount, gateway_provider, gateway_order_id, gateway_payment_id')
         .in('id', result.affected_booking_ids);
 
       const refundableBookings = (affectedBookings || []).filter(
@@ -110,13 +111,38 @@ export async function POST(req: NextRequest) {
       );
 
       for (const b of refundableBookings) {
-        await initiateRazorpayRefund({
-          supabaseAdmin,
-          bookingId: b.id,
-          refundAmountInr: Number(b.refund_amount ?? b.deposit_amount),
-          reason: reason || 'Doctor Emergency Cancellation',
-          actorId: caller.id,
-        });
+        if (b.gateway_provider === 'cashfree') {
+          const cfAdapter = getPaymentGateway('cashfree');
+          const refundRes = await cfAdapter.refundOrder({
+            orderId: b.gateway_order_id || b.id,
+            paymentId: b.gateway_payment_id || undefined,
+            amountInPaise: Math.round(Number(b.refund_amount ?? b.deposit_amount) * 100),
+            reason: reason || 'Doctor Emergency Cancellation',
+          });
+          await supabaseAdmin
+            .from('bookings')
+            .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
+            .eq('id', b.id);
+          await supabaseAdmin
+            .from('payments')
+            .update({
+              status: 'REFUNDED',
+              updated_at: new Date().toISOString(),
+              metadata: {
+                refund_id: refundRes.refundId,
+                refund_amount: Number(b.refund_amount ?? b.deposit_amount),
+              },
+            })
+            .eq('booking_id', b.id);
+        } else {
+          await initiateRazorpayRefund({
+            supabaseAdmin,
+            bookingId: b.id,
+            refundAmountInr: Number(b.refund_amount ?? b.deposit_amount),
+            reason: reason || 'Doctor Emergency Cancellation',
+            actorId: caller.id,
+          });
+        }
       }
     }
 

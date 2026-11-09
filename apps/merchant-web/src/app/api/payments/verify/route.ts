@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyRazorpaySignature, canMockPayments } from '@/lib/razorpay';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { checkRateLimit } from '@/lib/redis';
 import { VerifyRazorpayPaymentRequest, VerifyRazorpayPaymentResponse, getPlatformFee } from '@appointments/shared';
 import { getClientIp, verifyAuthenticatedUser } from '@/lib/auth-admin';
@@ -68,53 +69,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
-      return NextResponse.json<VerifyRazorpayPaymentResponse>(
-        { success: false, error: 'Missing required payment verification parameters' },
-        { status: 400 }
-      );
-    }
-
-    // Mock payment ID & order guard: strictly reject synthetic mock IDs when mock payments are disabled
-    const isMockPayment =
-      razorpay_payment_id.startsWith('mock_') ||
-      razorpay_payment_id.startsWith('sim_') ||
-      razorpay_payment_id.startsWith('pay_mock_') ||
-      razorpay_payment_id.toLowerCase().includes('mock');
-
-    const isMockOrder =
-      razorpay_order_id.startsWith('order_mock_') ||
-      razorpay_order_id.startsWith('mock_') ||
-      razorpay_order_id.startsWith('sim_') ||
-      razorpay_order_id.toLowerCase().includes('mock');
-
-    if ((isMockPayment || isMockOrder) && !canMockPayments()) {
-      return NextResponse.json<VerifyRazorpayPaymentResponse>(
-        { success: false, error: 'Mock payments and mock orders are disabled in this environment' },
-        { status: 400 }
-      );
-    }
-
-    // 1. Cryptographic HMAC-SHA256 signature verification
-    const isValidSignature = verifyRazorpaySignature({
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      signature: razorpay_signature,
-    });
-
-    if (!isValidSignature) {
-      return NextResponse.json<VerifyRazorpayPaymentResponse>(
-        { success: false, error: 'Invalid payment signature' },
-        { status: 400 }
-      );
-    }
-
     const supabaseAdmin = getSupabaseAdmin();
 
-    // 2. Fetch booking and enforce strict state & order binding
+    // 1. Fetch booking and enforce strict customer authorization
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, expected_payment_amount_paise, platform_payment_status, consultation_payment_status, status, payment_status, gateway_order_id, gateway_payment_id, hold_expires_at')
+      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, expected_payment_amount_paise, platform_payment_status, consultation_payment_status, status, payment_status, gateway_order_id, gateway_payment_id, gateway_provider, hold_expires_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -144,25 +104,272 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Idempotent success if already confirmed with this payment
-    if (booking.status === 'CONFIRMED' && booking.gateway_payment_id === razorpay_payment_id) {
-      return NextResponse.json<VerifyRazorpayPaymentResponse>(
-        {
-          success: true,
-          booking_id,
-          status: 'CONFIRMED',
-          payment_status: 'CAPTURED',
-          platform_payment_status: 'CAPTURED',
-          consultation_payment_status: (booking as any).consultation_payment_status || 'PENDING_OFFLINE',
-        },
-        { status: 200 }
-      );
+    const effectiveGatewayProvider =
+      body.gateway_provider ||
+      (booking.gateway_provider as 'cashfree' | 'razorpay') ||
+      'razorpay';
+
+    // Idempotent success if already confirmed
+    if (booking.status === 'CONFIRMED') {
+      const isMatchingPayment =
+        effectiveGatewayProvider === 'cashfree'
+          ? Boolean(booking.gateway_order_id)
+          : booking.gateway_payment_id === razorpay_payment_id;
+
+      if (isMatchingPayment) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          {
+            success: true,
+            booking_id,
+            status: 'CONFIRMED',
+            payment_status: 'CAPTURED',
+            platform_payment_status: 'CAPTURED',
+            consultation_payment_status: (booking as any).consultation_payment_status || 'PENDING_OFFLINE',
+          },
+          { status: 200 }
+        );
+      }
     }
 
     // Check if slot hold has expired or was cancelled
     const isHoldExpired =
       (booking.status === 'HELD' && booking.hold_expires_at && new Date(booking.hold_expires_at).getTime() < Date.now()) ||
       booking.status === 'CANCELLED';
+
+    // ----------------------------------------------------
+    // BRANCH A: CASHFREE PAYMENT VERIFICATION
+    // ----------------------------------------------------
+    if (effectiveGatewayProvider === 'cashfree') {
+      const cfTargetOrderId = body.order_id || (body as any).cf_order_id || razorpay_order_id || booking.gateway_order_id;
+      if (!cfTargetOrderId) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Missing order_id for Cashfree verification' },
+          { status: 400 }
+        );
+      }
+
+      const effectivePaymentId = razorpay_payment_id || (body as any).payment_id || `cf_pay_${cfTargetOrderId}`;
+
+      if (isHoldExpired) {
+        // Late payment after hold expiry: trigger Cashfree auto-refund
+        const depositInInr = Number(booking.deposit_amount || 0);
+        await supabaseAdmin.from('payments').upsert(
+          {
+            booking_id: booking.id,
+            gateway_payment_id: effectivePaymentId,
+            amount: depositInInr,
+            currency: 'INR',
+            status: 'CAPTURED',
+            metadata: {
+              gateway: 'cashfree',
+              reason: 'Late payment after hold expiry',
+              order_id: cfTargetOrderId,
+              captured_at: new Date().toISOString(),
+            },
+          },
+          { onConflict: 'gateway_payment_id' }
+        );
+
+        await supabaseAdmin
+          .from('bookings')
+          .update({
+            status: 'CANCELLED',
+            payment_status: 'REFUND_PENDING',
+            gateway_payment_id: effectivePaymentId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id);
+
+        try {
+          const cfAdapter = getPaymentGateway('cashfree');
+          const refundResult = await cfAdapter.refundOrder({
+            orderId: cfTargetOrderId,
+            paymentId: effectivePaymentId,
+            amountInPaise: Math.round(depositInInr * 100),
+            reason: 'Hold expired before payment completion',
+          });
+
+          await supabaseAdmin
+            .from('bookings')
+            .update({
+              payment_status: 'REFUNDED',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', booking.id);
+
+          await supabaseAdmin.from('payments').insert({
+            booking_id: booking.id,
+            gateway_payment_id: refundResult.refundId,
+            amount: depositInInr,
+            currency: 'INR',
+            status: 'REFUNDED',
+            metadata: {
+              original_payment_id: effectivePaymentId,
+              reason: 'Hold expired before payment completion',
+            },
+          });
+        } catch (cfRefundErr) {
+          await supabaseAdmin
+            .from('bookings')
+            .update({ payment_status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+            .eq('id', booking.id);
+
+          await supabaseAdmin
+            .from('payments')
+            .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+            .eq('gateway_payment_id', effectivePaymentId);
+        }
+
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          {
+            success: false,
+            error: 'Slot hold has expired and is no longer held. An automatic deposit refund has been initiated to your original payment method.',
+          },
+          { status: 410 }
+        );
+      }
+
+      // Verify status with Cashfree adapter
+      const cfAdapter = getPaymentGateway('cashfree');
+      const orderDetails = await cfAdapter.fetchOrder(cfTargetOrderId);
+
+      // In mock/sandbox mode without live keys, allow mock order if unconfigured
+      const isMockPaymentAllowed = canMockPayments() && (cfTargetOrderId.startsWith('mock_') || cfTargetOrderId.startsWith('cf_mock_'));
+      if (!orderDetails && !isMockPaymentAllowed) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Payment order not found on Cashfree gateway' },
+          { status: 400 }
+        );
+      }
+
+      if (orderDetails && orderDetails.status !== 'PAID' && !isMockPaymentAllowed) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: `Payment not completed on gateway (status: ${orderDetails.status})` },
+          { status: 400 }
+        );
+      }
+
+      const expectedAmountPaise = booking.expected_payment_amount_paise != null
+        ? Number(booking.expected_payment_amount_paise)
+        : Math.round(Number(booking.platform_fee_amount || booking.deposit_amount || 10) * 100);
+
+      if (orderDetails && orderDetails.amountInPaise !== expectedAmountPaise && !isMockPaymentAllowed) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: `Tampered payment amount: expected ${expectedAmountPaise} paise, received ${orderDetails.amountInPaise} paise` },
+          { status: 400 }
+        );
+      }
+
+      // Settle booking payment via Supabase RPC
+      const settleAmount = Number(booking.platform_fee_amount || booking.deposit_amount || 10);
+      const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
+        p_booking_id: booking_id,
+        p_gateway_payment_id: effectivePaymentId,
+        p_deposit_amount: settleAmount,
+      });
+
+      if (rpcError) {
+        console.error('Error in confirm_booking_payment RPC:', rpcError);
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: rpcError.message },
+          { status: 500 }
+        );
+      }
+
+      const result = rpcData as { success: boolean; error?: string };
+      if (!result?.success) {
+        const isNotFound = result?.error === 'Booking not found';
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: result?.error || 'Failed to confirm booking' },
+          { status: isNotFound ? 404 : 400 }
+        );
+      }
+
+      // Document attachment update
+      if (attachment_url && typeof attachment_url === 'string') {
+        const trimmedAttachment = attachment_url.trim();
+        const isHttp = /^https?:\/\//i.test(trimmedAttachment);
+        const isSafeStoragePath = new RegExp(`^${booking.customer_id}/[a-zA-Z0-9._-]+$`).test(trimmedAttachment);
+        if (!isHttp && isSafeStoragePath) {
+          await supabaseAdmin
+            .from('bookings')
+            .update({
+              attachment_url: trimmedAttachment,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', booking_id);
+        }
+      }
+
+      if (booking.resource_id && booking.slot_start) {
+        const { releaseSlotLock } = await import('@/lib/redis');
+        await releaseSlotLock(`${booking.resource_id}:${booking.slot_start}`);
+      }
+
+      const { data: confirmedBkg } = await supabaseAdmin
+        .from('bookings')
+        .select('queue_position, reference_code, platform_payment_status, consultation_payment_status')
+        .eq('id', booking_id)
+        .maybeSingle();
+
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        {
+          success: true,
+          booking_id,
+          reference_code: confirmedBkg?.reference_code ?? undefined,
+          queue_position: confirmedBkg?.queue_position ?? 1,
+          status: 'CONFIRMED',
+          payment_status: 'CAPTURED',
+          platform_payment_status: (confirmedBkg?.platform_payment_status as any) || 'CAPTURED',
+          consultation_payment_status: (confirmedBkg?.consultation_payment_status as any) || 'PENDING_OFFLINE',
+        },
+        { status: 200 }
+      );
+    }
+
+    // ----------------------------------------------------
+    // BRANCH B: RAZORPAY PAYMENT VERIFICATION (LEGACY / CI)
+    // ----------------------------------------------------
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Missing required payment verification parameters' },
+        { status: 400 }
+      );
+    }
+
+    // Mock payment ID & order guard: strictly reject synthetic mock IDs when mock payments are disabled
+    const isMockPayment =
+      razorpay_payment_id.startsWith('mock_') ||
+      razorpay_payment_id.startsWith('sim_') ||
+      razorpay_payment_id.startsWith('pay_mock_') ||
+      razorpay_payment_id.toLowerCase().includes('mock');
+
+    const isMockOrder =
+      razorpay_order_id.startsWith('order_mock_') ||
+      razorpay_order_id.startsWith('mock_') ||
+      razorpay_order_id.startsWith('sim_') ||
+      razorpay_order_id.toLowerCase().includes('mock');
+
+    if ((isMockPayment || isMockOrder) && !canMockPayments()) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Mock payments and mock orders are disabled in this environment' },
+        { status: 400 }
+      );
+    }
+
+    // Cryptographic HMAC-SHA256 signature verification
+    const isValidSignature = verifyRazorpaySignature({
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      signature: razorpay_signature,
+    });
+
+    if (!isValidSignature) {
+      return NextResponse.json<VerifyRazorpayPaymentResponse>(
+        { success: false, error: 'Invalid payment signature' },
+        { status: 400 }
+      );
+    }
 
     if (isHoldExpired) {
       // Late payment arrived after hold expiry:
@@ -333,7 +540,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Settle booking payment via Supabase RPC (online platform fee captured, consultation pending offline)
+    // Settle booking payment via Supabase RPC
     const settleAmount = Number(booking.platform_fee_amount || booking.deposit_amount || 10);
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
@@ -358,7 +565,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. If optional clinical document attachment path was provided, validate and persist to booking
+    // Attachment validation and persist
     if (attachment_url && typeof attachment_url === 'string') {
       const trimmedAttachment = attachment_url.trim();
       const isHttp = /^https?:\/\//i.test(trimmedAttachment);

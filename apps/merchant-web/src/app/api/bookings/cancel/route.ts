@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { initiateRazorpayRefund } from '@/lib/razorpay';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { validateBookingStatusTransition } from '@/lib/hospital-access';
 import { CancelBookingRequest, CancelBookingResponse } from '@appointments/shared';
@@ -122,11 +123,11 @@ export async function POST(req: NextRequest) {
     if (result.refund_eligible && (result.refund_amount ?? 0) > 0) {
       const { data: bkg } = await supabaseAdmin
         .from('bookings')
-        .select('gateway_payment_id')
+        .select('gateway_payment_id, gateway_order_id, gateway_provider')
         .eq('id', booking_id)
         .maybeSingle();
 
-      if (bkg?.gateway_payment_id) {
+      if (bkg?.gateway_payment_id || bkg?.gateway_order_id) {
         // Single-winner atomic claim to prevent concurrent duplicate refunds (TOCTOU)
         const { data: claimed } = await supabaseAdmin
           .from('payments')
@@ -160,14 +161,32 @@ export async function POST(req: NextRequest) {
         }
 
         try {
-          const refundResult = await initiateRazorpayRefund({
-            paymentId: bkg.gateway_payment_id,
-            amount: Math.round(Number(result.refund_amount) * 100),
-            notes: {
-              booking_id,
+          const refundAmountPaise = Math.round(Number(result.refund_amount) * 100);
+          let refundId = '';
+          let refundAmount = refundAmountPaise;
+
+          if (bkg.gateway_provider === 'cashfree') {
+            const cfAdapter = getPaymentGateway('cashfree');
+            const refundResult = await cfAdapter.refundOrder({
+              orderId: bkg.gateway_order_id || booking_id,
+              paymentId: bkg.gateway_payment_id || undefined,
+              amountInPaise: refundAmountPaise,
               reason: reason || 'Policy-eligible cancellation refund',
-            },
-          });
+            });
+            refundId = refundResult.refundId;
+            refundAmount = refundResult.amountInPaise;
+          } else {
+            const refundResult = await initiateRazorpayRefund({
+              paymentId: bkg.gateway_payment_id!,
+              amount: refundAmountPaise,
+              notes: {
+                booking_id,
+                reason: reason || 'Policy-eligible cancellation refund',
+              },
+            });
+            refundId = refundResult.id;
+            refundAmount = refundResult.amount;
+          }
 
           // Refund succeeded -> promote to REFUNDED
           finalPaymentStatus = 'REFUNDED';
@@ -182,8 +201,8 @@ export async function POST(req: NextRequest) {
               status: 'REFUNDED',
               updated_at: new Date().toISOString(),
               metadata: {
-                refund_id: refundResult.id,
-                refund_amount_paise: refundResult.amount,
+                refund_id: refundId,
+                refund_amount_paise: refundAmount,
                 refund_amount: Number(result.refund_amount),
               },
             })

@@ -20,6 +20,7 @@ const PUBLIC_ROUTES = [
 // Strictly public API endpoints (webhook listeners, auth callbacks, customer checkout, and territory endpoints)
 const PUBLIC_API_ROUTES = [
   '/api/webhooks/razorpay',
+  '/api/webhooks/cashfree',
   '/api/auth/',
   '/api/payments/create-order',
   '/api/payments/verify',

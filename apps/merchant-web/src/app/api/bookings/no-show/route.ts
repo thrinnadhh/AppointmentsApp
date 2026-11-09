@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { initiateRazorpayRefund } from '@/lib/razorpay';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { RecordNoShowRequest, RecordNoShowResponse } from '@appointments/shared';
 
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     // Guard: check booking status, start time, and tenant authorization
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, status, slot_start, slot_end, resource_id, is_present, gateway_payment_id, deposit_amount, customer_id, provider_id')
+      .select('id, status, slot_start, slot_end, resource_id, is_present, gateway_payment_id, gateway_order_id, gateway_provider, deposit_amount, customer_id, provider_id')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
       result.payment_status || 'FORFEITED';
 
     // If Strike 1 or Strike 2 (Courtesy Grace Period with refund), initiate gateway refund
-    if (result.payment_status === 'REFUND_PENDING' && booking?.gateway_payment_id) {
+    if (result.payment_status === 'REFUND_PENDING' && (booking?.gateway_payment_id || booking?.gateway_order_id)) {
       // Single-winner atomic claim to prevent concurrent duplicate refunds (TOCTOU)
       const { data: claimed } = await supabaseAdmin
         .from('payments')
@@ -154,14 +155,24 @@ export async function POST(req: NextRequest) {
 
       const refundAmt = Math.round(Number(result.refund_amount ?? booking.deposit_amount ?? 100) * 100);
       try {
-        await initiateRazorpayRefund({
-          paymentId: booking.gateway_payment_id,
-          amount: refundAmt,
-          notes: {
-            booking_id,
+        if (booking.gateway_provider === 'cashfree') {
+          const cfAdapter = getPaymentGateway('cashfree');
+          await cfAdapter.refundOrder({
+            orderId: booking.gateway_order_id || booking_id,
+            paymentId: booking.gateway_payment_id || undefined,
+            amountInPaise: refundAmt,
             reason: `Courtesy no-show grace refund (Strike ${result.no_show_count})`,
-          },
-        });
+          });
+        } else {
+          await initiateRazorpayRefund({
+            paymentId: booking.gateway_payment_id!,
+            amount: refundAmt,
+            notes: {
+              booking_id,
+              reason: `Courtesy no-show grace refund (Strike ${result.no_show_count})`,
+            },
+          });
+        }
 
         // Refund succeeded -> promote to REFUNDED
         finalPaymentStatus = 'REFUNDED';
