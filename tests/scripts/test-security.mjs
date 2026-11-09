@@ -202,7 +202,7 @@ describe('Hardcoded Secrets & Environment Audit', () => {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (!['node_modules', '.next', '.git', 'dist'].includes(entry.name)) {
+        if (!['node_modules', '.next', '.next-dev', '.git', 'dist'].includes(entry.name)) {
           findings = findings.concat(scanDirectory(fullPath));
         }
       } else if (/\.(ts|tsx|js|mjs|sql)$/.test(entry.name) && entry.name !== 'test-security.mjs') {

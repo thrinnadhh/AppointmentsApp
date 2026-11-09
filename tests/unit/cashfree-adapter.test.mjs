@@ -39,7 +39,7 @@ describe('Payment Gateway Abstraction & Cashfree Adapter (Phase 2)', () => {
   });
 
   it('4. CashfreeAdapter.verifyWebhook verifies timing-safe HMAC-SHA256 signature', () => {
-    const secret = 'cfsk_ma_test_secret_for_test';
+    const secret = 'mock_test_secret_for_adapter_test';
     const adapter = new CashfreeAdapter({
       appId: 'TEST_APP_ID',
       secretKey: secret,
@@ -69,7 +69,7 @@ describe('Payment Gateway Abstraction & Cashfree Adapter (Phase 2)', () => {
   });
 
   it('5. CashfreeAdapter.verifyWebhook rejects replay attacks outside 300s window', () => {
-    const secret = 'cfsk_ma_test_secret_for_test';
+    const secret = 'mock_test_secret_for_adapter_test';
     const adapter = new CashfreeAdapter({
       appId: 'TEST_APP_ID',
       secretKey: secret,

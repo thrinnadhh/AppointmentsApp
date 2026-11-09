@@ -72,7 +72,7 @@ describe('Web & Legal Copy Security Claims Veracity Suite', () => {
     function scanDir(dir) {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
-        if (e.name === 'node_modules' || e.name === '.next' || e.name === 'dist' || e.name === '.expo') continue;
+        if (e.name === 'node_modules' || e.name === '.next' || e.name === '.next-dev' || e.name === 'dist' || e.name === '.expo') continue;
         const fullPath = path.join(dir, e.name);
         if (e.isDirectory()) {
           scanDir(fullPath);

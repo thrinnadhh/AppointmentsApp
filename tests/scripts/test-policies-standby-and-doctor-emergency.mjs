@@ -95,9 +95,10 @@ async function runPolicyVerificationSuite() {
   // ─────────────────────────────────────────────────────────────────────────────
   console.log('\n--- TEST 2: Database RPC expire_stale_standby_queue ---');
   const client = await pgPool.connect();
+  let prov;
   try {
     const provRes = await client.query(`SELECT id, name FROM public.providers WHERE name LIKE '%Apex%' OR name LIKE '%SVIMS%' OR name LIKE '%Clinic%' LIMIT 1`);
-    const prov = provRes.rows[0];
+    prov = provRes.rows[0];
     const docRes = await client.query(`SELECT id FROM public.resources WHERE provider_id = $1 LIMIT 1`, [prov.id]);
     const doc = docRes.rows[0];
     const custRes = await client.query(`SELECT id, full_name FROM public.profiles WHERE role = 'customer' LIMIT 3`);
@@ -283,6 +284,9 @@ async function runPolicyVerificationSuite() {
     console.log('✅ PASS: cancel_doctor_emergency cancelled 3 bookings, issued 100% refunds, levied 0 merchant strikes, and notified customers');
 
   } finally {
+    if (prov?.id) {
+      await client.query('DELETE FROM public.test_provider_clock_links WHERE provider_id = $1', [prov.id]);
+    }
     client.release();
     await pgPool.end();
   }

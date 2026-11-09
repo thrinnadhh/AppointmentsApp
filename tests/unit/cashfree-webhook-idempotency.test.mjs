@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { CashfreeAdapter } from '../../apps/merchant-web/src/lib/payment/cashfree-adapter.ts';
 
 describe('Cashfree Webhook Ingestion & Idempotency Lifecycle (Phase 3)', () => {
-  const testSecret = 'cfsk_ma_test_secret_for_webhook_tests_12345';
+  const testSecret = 'mock_test_secret_for_webhook_tests_12345';
   const adapter = new CashfreeAdapter({
     appId: 'TEST_APP_ID',
     secretKey: testSecret,

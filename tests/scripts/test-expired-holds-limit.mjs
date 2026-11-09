@@ -44,8 +44,9 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
   let newHoldBookingId;
 
   before(async () => {
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    todayStr = tomorrow.toISOString().slice(0, 10);
+    // Use a date 3 days ahead to isolate from current-day seed bookings and match IST boundaries
+    const targetDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    todayStr = targetDate.toISOString().slice(0, 10);
 
     // 1. Pick a provider and resource
     const res = await pgPool.query(
@@ -82,10 +83,13 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
       [providerId]
     );
 
-    // Clean up any existing bookings for today on this provider
+    // Clean up any existing bookings for today on this provider (using IST day boundaries)
     await pgPool.query(
-      `DELETE FROM bookings WHERE provider_id = $1 AND slot_start >= $2 AND slot_start <= $3`,
-      [providerId, `${todayStr}T00:00:00Z`, `${todayStr}T23:59:59Z`]
+      `DELETE FROM bookings 
+       WHERE provider_id = $1 
+         AND slot_start >= ($2::date::timestamp AT TIME ZONE 'Asia/Kolkata') 
+         AND slot_start < (($2::date::timestamp AT TIME ZONE 'Asia/Kolkata') + INTERVAL '1 day')`,
+      [providerId, todayStr]
     );
 
     // 2. Slot 1: Create an EXPIRED hold on slot 09:00 - 09:15
@@ -116,8 +120,11 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
     if (providerId) {
       await pgPool.query(`UPDATE providers SET daily_booking_limit = 0 WHERE id = $1`, [providerId]);
       await pgPool.query(
-        `DELETE FROM bookings WHERE provider_id = $1 AND slot_start >= $2 AND slot_start <= $3`,
-        [providerId, `${todayStr}T00:00:00Z`, `${todayStr}T23:59:59Z`]
+        `DELETE FROM bookings 
+         WHERE provider_id = $1 
+           AND slot_start >= ($2::date::timestamp AT TIME ZONE 'Asia/Kolkata') 
+           AND slot_start < (($2::date::timestamp AT TIME ZONE 'Asia/Kolkata') + INTERVAL '1 day')`,
+        [providerId, todayStr]
       );
     }
     await pgPool.end();

@@ -165,7 +165,7 @@ describe('Phase 5c: Hospital Front Desk Reception Screens & Security Suite', () 
             provider_id: hospA.id,
             customer_id: targetBooking.customer_id,
             code: validCode,
-            appointment_date: new Date().toISOString().split('T')[0],
+            appointment_date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
           }),
         });
       }

@@ -68,8 +68,9 @@ describe('Mantis Track 1 Database Hardening & SPEC Invariant Verification', () =
     doc1Id = docs.find((d) => d.name.includes('Sharma'))?.id || docs[0].id;
     doc2Id = docs.find((d) => d.name.includes('Patel'))?.id || docs[1].id;
 
-    // Ensure neuroDesk is assigned to both doc1Id and doc2Id
+    // Ensure neuroDesk is assigned to both doc1Id and doc2Id and clear any previous rate limits
     await client.query(`
+      DELETE FROM public.staff_checkin_rate_limits WHERE user_id = '${tokens.neuroDesk.user.id}';
       INSERT INTO public.doctor_front_desk_assignments (user_id, doctor_id, provider_id)
       VALUES 
         ('${tokens.neuroDesk.user.id}', '${doc1Id}', '${hospA.id}'),

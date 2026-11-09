@@ -75,7 +75,7 @@ async function main() {
       resultsByCategory[group.category].push(res);
       console.log(`[${res.status}] pass: ${res.pass}, fail: ${res.fail}, skip: ${res.skip} (${res.duration})`);
       if (res.status === 'FAIL') {
-        console.error(`ERROR IN ${f}:\n${res.out.slice(0, 500)}...\n`);
+        console.error(`ERROR IN ${f}:\n${res.out.slice(-2000)}\n`);
       }
     }
   }

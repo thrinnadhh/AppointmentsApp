@@ -559,12 +559,33 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     }
     console.log('\n========================================================================================\n');
 
+    // Programmatic Completeness Assertion: walks disk and asserts 100% of discovered routes exist in matrixLedger
+    const apiDir = path.resolve('apps/merchant-web/src/app/api');
+    function findRouteFiles(dir, fileList = []) {
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const filePath = path.join(dir, file);
+        if (fs.statSync(filePath).isDirectory()) {
+          findRouteFiles(filePath, fileList);
+        } else if (file === 'route.ts') {
+          const rel = path.relative(apiDir, path.dirname(filePath));
+          const routePath = rel === '' ? '/api' : `/api/${rel.split(path.sep).join('/')}`;
+          fileList.push(routePath);
+        }
+      }
+      return fileList;
+    }
+
+    const diskRoutes = findRouteFiles(apiDir).sort();
+    const ledgerRoutes = new Set(matrixLedger.map((e) => e.route));
+    const missingFromLedger = diskRoutes.filter((r) => !ledgerRoutes.has(r));
+
     // Author/Update docs/hospital/AUTHZ_MATRIX.md
     const matrixDocLines = [
       '# Hospital & Platform API Authorization Matrix',
       '',
       '> **Verification Protocol**: Generated and programmatically validated by `tests/unit/cross-tenant-authorization-matrix.test.mjs`.',
-      `> 100% Coverage of all API endpoints on disk (${matrixLedger.length} tested entries across all 66 routes + database extensions).`,
+      `> 100% Coverage of all API endpoints on disk (${matrixLedger.length} tested entries across all ${diskRoutes.length} routes + database extensions).`,
       '',
       '## End-to-End Route Authorization Ledger',
       '',
@@ -597,27 +618,6 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     } catch (writeErr) {
       console.error('Failed to write docs/hospital/AUTHZ_MATRIX.md:', writeErr);
     }
-
-    // Programmatic Completeness Assertion: walks disk and asserts 100% of discovered routes exist in matrixLedger
-    const apiDir = path.resolve('apps/merchant-web/src/app/api');
-    function findRouteFiles(dir, fileList = []) {
-      const files = fs.readdirSync(dir);
-      for (const file of files) {
-        const filePath = path.join(dir, file);
-        if (fs.statSync(filePath).isDirectory()) {
-          findRouteFiles(filePath, fileList);
-        } else if (file === 'route.ts') {
-          const rel = path.relative(apiDir, path.dirname(filePath));
-          const routePath = rel === '' ? '/api' : `/api/${rel.split(path.sep).join('/')}`;
-          fileList.push(routePath);
-        }
-      }
-      return fileList;
-    }
-
-    const diskRoutes = findRouteFiles(apiDir).sort();
-    const ledgerRoutes = new Set(matrixLedger.map((e) => e.route));
-    const missingFromLedger = diskRoutes.filter((r) => !ledgerRoutes.has(r));
 
     console.log('\n=== PROGRAMMATIC COMPLETENESS ASSERTION ===');
     console.log(`Discovered routes on disk (${diskRoutes.length}):`, diskRoutes);
@@ -2514,6 +2514,46 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       'Razorpay Webhook (proved 200 signed)',
       'Unsigned Request (proved 401)',
       'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:43',
+      'PASS'
+    );
+
+    // 38.7 /api/webhooks/cashfree
+    const envFileLocal = fs.existsSync('apps/merchant-web/.env.local') ? fs.readFileSync('apps/merchant-web/.env.local', 'utf8') : '';
+    const envKeyMatch = envFileLocal.match(/CASHFREE_SECRET_KEY="?([^"\n]+)"?/);
+    const cfWebhookSecret = process.env.CASHFREE_SECRET_KEY || envKeyMatch?.[1] || 'mock_cfsk_test_secret_for_matrix_tests_12345';
+    const cfPayload = JSON.stringify({
+      type: 'TEST_WEBHOOK',
+      data: {},
+    });
+    const cfTimestamp = Math.floor(Date.now() / 1000).toString();
+    const cfSig = crypto.createHmac('sha256', cfWebhookSecret).update(cfTimestamp + cfPayload).digest('base64');
+
+    // Unsigned webhook request -> 400
+    const unauthCf = await fetch(`${appBaseUrl}/api/webhooks/cashfree`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: cfPayload,
+    });
+    assert.equal(unauthCf.status, 400, 'Unsigned Cashfree webhook must receive 400');
+
+    // Signed webhook request -> 200
+    const signedCf = await fetch(`${appBaseUrl}/api/webhooks/cashfree`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-signature': cfSig,
+        'x-webhook-timestamp': cfTimestamp,
+      },
+      body: cfPayload,
+    });
+    assert.equal(signedCf.status, 200, 'Valid HMAC signed Cashfree webhook must receive 200');
+
+    recordResult(
+      '/api/webhooks/cashfree',
+      'POST',
+      'Cashfree Webhook (proved 200 signed)',
+      'Unsigned Request (proved 400)',
+      'apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:16',
       'PASS'
     );
   });
