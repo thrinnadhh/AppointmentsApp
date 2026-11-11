@@ -11,13 +11,17 @@ import { seedHospitalTestData } from '../../scripts/seed-hospital-test-data.mjs'
 
 const { Pool, Client } = pg;
 
-// 1. Load environment variables from apps/merchant-web/.env.local before importing route modules
-const envPath = path.resolve('apps/merchant-web/.env.local');
-const envContent = fs.readFileSync(envPath, 'utf8');
-for (const line of envContent.split('\n')) {
-  const m = line.match(/^([A-Z0-9_]+)="?([^"]*)"?$/);
-  if (m && !process.env[m[1]]) {
-    process.env[m[1]] = m[2];
+// 1. Load environment variables from apps/merchant-web/.env.local or .env.local before importing route modules
+const envPaths = [path.resolve('apps/merchant-web/.env.local'), path.resolve('.env.local')];
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    for (const line of envContent.split('\n')) {
+      const m = line.match(/^([A-Z0-9_]+)="?([^"]*)"?$/);
+      if (m && !process.env[m[1]]) {
+        process.env[m[1]] = m[2];
+      }
+    }
   }
 }
 

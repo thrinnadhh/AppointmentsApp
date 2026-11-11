@@ -1,18 +1,26 @@
 import fs from 'fs';
 
 async function seedE2EData() {
-  const envPath = 'apps/merchant-web/.env.local';
-  const envContent = fs.readFileSync(envPath, 'utf8');
-  const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/);
-  const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/);
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  let key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!urlMatch || !keyMatch) {
-    console.error('Missing Supabase credentials in .env.local');
-    process.exit(1);
+  if (!url || !key) {
+    const envPaths = ['apps/merchant-web/.env.local', '.env.local'];
+    for (const envPath of envPaths) {
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\n]+)/);
+        const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\n]+)/);
+        if (!url && urlMatch) url = urlMatch[1];
+        if (!key && keyMatch) key = keyMatch[1];
+      }
+    }
   }
 
-  const url = urlMatch[1];
-  const key = keyMatch[1];
+  if (!url || !key) {
+    console.error('Missing Supabase credentials in process.env or .env.local');
+    process.exit(1);
+  }
 
   const headers = {
     'apikey': key,
@@ -78,15 +86,19 @@ async function seedE2EData() {
       userIds[acc.email] = existing.id;
     } else {
       console.log(`Creating user ${acc.email}...`);
+      const createBody = {
+        email: acc.email,
+        password: acc.password,
+        email_confirm: true,
+        user_metadata: { role: acc.role, full_name: acc.fullName, phone: acc.phone }
+      };
+      if (acc.id) {
+        createBody.id = acc.id;
+      }
       const createRes = await fetch(`${url}/auth/v1/admin/users`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          email: acc.email,
-          password: acc.password,
-          email_confirm: true,
-          user_metadata: { role: acc.role, full_name: acc.fullName, phone: acc.phone }
-        })
+        body: JSON.stringify(createBody)
       });
       const created = await createRes.json();
       if (!createRes.ok) {

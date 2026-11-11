@@ -26,6 +26,7 @@ paths = [
   '''(^|/)\.env\.production\.local$''',
   '''^tests/e2e/stories/story-manifest\.json$''',
   '''^tests/scripts/demo-live-logs\.mjs$''',
+  '''^scripts/generate-ci-env\.mjs$''',
   '''^pnpm-lock\.yaml$''',
   '''^package-lock\.json$''',
 ]
@@ -61,6 +62,7 @@ regexes = [
   '''rzp_test_FreshRefundKey''',
   '''rzp_test_RecoveryKey123''',
   '''mock_secret_key_1234567890''',
+  '''cfsk_test_MockCashfreeSecretKeyForE2e9999''',
   '''placeholder_production_''',
   '''tirupati_e2e_secure_bypass_key_2026_x9k2''',
   '''d24831bb6c322697ea855e7464e8e9767191d1f4d340548e400bab603f927cfe''',

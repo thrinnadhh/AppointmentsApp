@@ -3,9 +3,17 @@ import assert from 'node:assert/strict';
 import { execSync } from 'child_process';
 
 describe('Layer 1: Database Advisor & Stored Procedure Integrity (DEF-RC-04)', () => {
+  let supabaseCmd;
+  try {
+    execSync('supabase --version', { stdio: 'ignore' });
+    supabaseCmd = 'supabase';
+  } catch {
+    supabaseCmd = 'npx --yes supabase@latest';
+  }
+
   function runSql(query) {
     const raw = execSync(
-      `supabase db query --output json "${query.replace(/"/g, '\\"')}"`,
+      `${supabaseCmd} db query --output json "${query.replace(/"/g, '\\"')}"`,
       {
         encoding: 'utf8',
         env: {

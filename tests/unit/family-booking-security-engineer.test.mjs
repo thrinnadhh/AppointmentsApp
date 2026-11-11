@@ -36,12 +36,17 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
   }
 
   before(async () => {
-    const envFile = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-    anonKey = envFile.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=\"?([^\"\n]+)/)?.[1];
-    serviceKey = envFile.match(/SUPABASE_SERVICE_ROLE_KEY=\"?([^\"\n]+)/)?.[1];
+    let envFile = '';
+    if (fs.existsSync('apps/merchant-web/.env.local')) {
+      envFile = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
+    } else if (fs.existsSync('.env.local')) {
+      envFile = fs.readFileSync('.env.local', 'utf8');
+    }
+    anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || envFile.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=\"?([^\"\n]+)/)?.[1];
+    serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || envFile.match(/SUPABASE_SERVICE_ROLE_KEY=\"?([^\"\n]+)/)?.[1];
 
     if (!anonKey || !serviceKey) {
-      throw new Error('Missing Supabase credentials in apps/merchant-web/.env.local');
+      throw new Error('Missing Supabase credentials in process.env or apps/merchant-web/.env.local');
     }
 
     serviceHeaders = {

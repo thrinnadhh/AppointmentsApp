@@ -3,9 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const manifest = JSON.parse(fs.readFileSync('scripts/test-seed-manifest.json', 'utf8'));
-const envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-const supabaseUrl = envContent.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/)?.[1] || 'http://127.0.0.1:54321';
-const serviceRoleKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/)?.[1] ||
+let envContent = '';
+if (fs.existsSync('apps/merchant-web/.env.local')) {
+  envContent = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
+} else if (fs.existsSync('.env.local')) {
+  envContent = fs.readFileSync('.env.local', 'utf8');
+}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || envContent.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\n]+)/)?.[1] || 'http://127.0.0.1:54321';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || envContent.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\n]+)/)?.[1] ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4Mzg3NTYwMH0.ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5';
 
 const serviceHeaders = {

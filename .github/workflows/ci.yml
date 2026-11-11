@@ -190,8 +190,14 @@ jobs:
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset
 
-      - name: Provision production env templates for security audit tests
+      - name: Provision local and production env templates
         run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
+
           if [ ! -f .env.production ]; then
             printf "NODE_ENV=production\nALLOW_MOCK_PAYMENTS=false\nNEXT_PUBLIC_SUPABASE_URL=https://tirupati-appointments.supabase.co\nNEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder_production_anon_key\nSUPABASE_SERVICE_ROLE_KEY=placeholder_production_service_role_key\nRAZORPAY_KEY_ID=rzp_live_placeholder\nRAZORPAY_KEY_SECRET=placeholder_live_razorpay_secret\nRAZORPAY_WEBHOOK_SECRET=placeholder_live_webhook_secret\nADMIN_SECRET=placeholder_secure_admin_secret\nSUPERADMIN_E2E_TOKEN=placeholder_secure_superadmin_token\nCRON_SECRET=placeholder_secure_cron_secret\n" > .env.production
           fi
@@ -205,6 +211,7 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
           node scripts/seed-hospital-test-data.mjs
 
       - name: Start merchant-web server and run all unit & script suites
@@ -294,6 +301,11 @@ jobs:
         run: |
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
         run: |
@@ -301,6 +313,7 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
           node scripts/seed-hospital-test-data.mjs
 
       - name: Run Admin E2E — Core auth & RBAC
@@ -362,6 +375,11 @@ jobs:
         run: |
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
         run: |
@@ -369,6 +387,7 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
           node scripts/seed-hospital-test-data.mjs
 
       - name: Run Merchant E2E — Tenancy isolation
@@ -430,6 +449,11 @@ jobs:
         run: |
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
         run: |
@@ -437,6 +461,7 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
           node scripts/seed-hospital-test-data.mjs
 
       - name: Run Customer E2E — App flows
@@ -493,6 +518,11 @@ jobs:
         run: |
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
         run: |
@@ -500,6 +530,7 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
           node scripts/seed-hospital-test-data.mjs
 
       - name: Run Customer ↔ Merchant Integration
@@ -563,6 +594,11 @@ jobs:
         run: |
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
         run: |
@@ -570,6 +606,7 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
           node scripts/seed-hospital-test-data.mjs
 
       - name: "Run stress: 50-concurrent-hold (EC-INT-05) in isolation"
