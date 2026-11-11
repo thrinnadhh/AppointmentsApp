@@ -5,7 +5,7 @@ import { DepartmentMember } from '@appointments/shared';
 
 export const dynamic = 'force-dynamic';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63}$/;
 
 export async function GET(req: NextRequest) {
   try {
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     const cleanRole = role === 'front_desk' ? 'front_desk' : 'consultant';
 
     const cleanEmail = email.toLowerCase().trim();
-    if (!EMAIL_REGEX.test(cleanEmail)) {
+    if (cleanEmail.length > 254 || !EMAIL_REGEX.test(cleanEmail)) {
       return NextResponse.json({ success: false, error: 'Invalid email address format' }, { status: 400 });
     }
 
