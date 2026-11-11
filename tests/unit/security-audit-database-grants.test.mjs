@@ -17,7 +17,7 @@ describe('Security Audit: Database Grants & Function Overload Resolution', () =>
       { encoding: 'utf8' }
     );
     const parsed = JSON.parse(raw);
-    return parsed.rows || [];
+    return Array.isArray(parsed) ? parsed : (parsed.rows || []);
   }
 
   it('1. service_role has SELECT, INSERT, UPDATE grants on public.payments', () => {

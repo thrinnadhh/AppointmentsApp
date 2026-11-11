@@ -45,6 +45,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const { booking_id } = await holdRes.json();
 
     await request.post(`${BASE}/api/bookings/confirm`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, gateway_payment_id: `pay_cancel_then_complete_${Date.now()}` },
     });
     await request.post(`${BASE}/api/bookings/cancel`, {
@@ -87,6 +88,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const { booking_id } = await holdRes.json();
 
     await request.post(`${BASE}/api/bookings/confirm`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, gateway_payment_id: `pay_complete_then_noshow_${Date.now()}` },
     });
     await request.post(`${BASE}/api/bookings/complete`, {
@@ -136,6 +138,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const { booking_id } = await holdRes.json();
 
     await request.post(`${BASE}/api/bookings/confirm`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, gateway_payment_id: `pay_future_noshow_${Date.now()}` },
     });
 
@@ -282,6 +285,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       expect(holdRes.status()).toBe(201);
       const { booking_id } = await holdRes.json();
       await request.post(`${BASE}/api/bookings/confirm`, {
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: { booking_id, gateway_payment_id: `pay_deactivate_${Date.now()}` },
       });
 

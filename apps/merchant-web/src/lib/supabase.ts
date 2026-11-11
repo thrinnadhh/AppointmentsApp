@@ -1311,7 +1311,7 @@ export async function fetchAdminAppLogs(
     const supabaseAdmin = getSupabaseAdmin();
     let query = supabaseAdmin
       .from('app_logs' as any)
-      .select('id, created_at, platform, level, severity, category, source, component, message, stack_trace, error_code, metadata, device_info, user_id, session_id, role, city_id, vertical, appointment_id, app_version, platform_os, device_model, environment, fingerprint, duplicate_count')
+      .select('id, created_at, platform, level, severity, category, source, component, message, stack_trace, error_code, metadata, device_info, user_id, session_id, role, city_id, vertical, appointment_id, app_version, platform_os, device_model, environment, fingerprint')
       .order('created_at', { ascending: false });
 
     if (filter.severity && filter.severity !== 'all') {

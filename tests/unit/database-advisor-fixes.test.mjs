@@ -24,7 +24,7 @@ describe('Layer 1: Database Advisor & Stored Procedure Integrity (DEF-RC-04)', (
       }
     );
     const parsed = JSON.parse(raw);
-    return parsed.rows || [];
+    return Array.isArray(parsed) ? parsed : (parsed.rows || []);
   }
 
   it('1. cancel_doctor_emergency must not reference non-existent table hospital_department_members', () => {

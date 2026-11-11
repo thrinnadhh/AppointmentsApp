@@ -127,7 +127,8 @@ export async function PATCH(request: NextRequest) {
     const result = await updateAdminCityStatus(
       cityId,
       status,
-      target !== undefined ? Number(target) : null
+      target !== undefined ? Number(target) : null,
+      adminBypassToken || undefined
     );
 
     if (!result.success) {

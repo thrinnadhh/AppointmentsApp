@@ -74,6 +74,8 @@ export class CashfreeClient {
       !this.secretKey.includes('your-') &&
       !this.appId.startsWith('TEST_') &&
       !this.secretKey.startsWith('TEST_') &&
+      !this.appId.toLowerCase().includes('mock') &&
+      !this.secretKey.toLowerCase().includes('mock') &&
       this.appId.trim().length > 0 &&
       this.secretKey.trim().length > 0
     );
