@@ -343,6 +343,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Ensure customer profile row exists in public.profiles before creating hold to prevent foreign key violation
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', customer_id)
+      .maybeSingle();
+
+    if (!existingProfile) {
+      const fallbackName = body.patient_name?.trim() || (caller.email ? caller.email.split('@')[0] : 'Verified Customer');
+      await supabaseAdmin.from('profiles').upsert(
+        {
+          id: customer_id,
+          role: 'customer',
+          full_name: fallbackName,
+          phone: body.patient_phone || null,
+          email: caller.email || null,
+        },
+        { onConflict: 'id' }
+      );
+    }
+
     const { data, error } = await supabaseAdmin.rpc('create_booking_hold', {
       p_resource_id: resource_id,
       p_slot_start: slot_start,

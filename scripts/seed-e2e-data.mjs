@@ -59,6 +59,14 @@ async function seedE2EData() {
       role: 'customer',
       fullName: 'Kalyan Chakravarthy',
       phone: '+919999999991'
+    },
+    {
+      id: '99999999-9999-9999-9999-999999999992',
+      email: 'customer-e2e@example.com',
+      password: 'CustomerSecure2026!',
+      role: 'customer',
+      fullName: 'Verified Test Customer',
+      phone: '+919999900001'
     }
   ];
 
