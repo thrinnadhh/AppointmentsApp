@@ -266,10 +266,14 @@ export default function BookingsManagementPage() {
     return t >= startOfWeek && t <= (now.getTime() + 48 * 60 * 60 * 1000);
   }).length;
 
-  const todayPresentCount = bookings.filter((b) => Boolean(b.is_present) && b.status === 'CONFIRMED').length;
+  const todayPresentCount = bookings.filter((b) => Boolean(b.is_present) && (b.status === 'CONFIRMED' || b.status === 'CHECKED_IN')).length;
 
   const filteredBookings = bookings.filter((b) => {
-    const matchesFilter = selectedFilter === 'ALL' || b.status === selectedFilter;
+    const matchesFilter =
+      selectedFilter === 'ALL' ||
+      (selectedFilter === 'CONFIRMED'
+        ? (b.status === 'CONFIRMED' || b.status === 'CHECKED_IN')
+        : b.status === selectedFilter);
     const matchesSearch = 
       (b.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.patient_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||

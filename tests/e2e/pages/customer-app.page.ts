@@ -405,11 +405,28 @@ export class CustomerAppPage {
     return loc.first();
   }
 
+  async selectBookingsSubTab(tab: 'upcoming' | 'history') {
+    const tabBtn = tab === 'upcoming'
+      ? this.page.getByTestId('tab-upcoming-appointments').or(this.page.getByText(/Upcoming \(/i)).first()
+      : this.page.getByTestId('tab-history-appointments').or(this.page.getByText(/History \(/i)).first();
+    if (await tabBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await tabBtn.click();
+      await this.page.waitForTimeout(300);
+    }
+  }
+
   async expectBookingInList(identifier?: string, expectedStatus: string = 'CONFIRMED') {
     if (['CONFIRMED', 'COMPLETED', 'CANCELLED', 'HELD', 'NO_SHOW'].includes(identifier || '')) {
       expectedStatus = identifier!;
       identifier = undefined;
     }
+
+    if (['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(expectedStatus)) {
+      await this.selectBookingsSubTab('history');
+    } else {
+      await this.selectBookingsSubTab('upcoming');
+    }
+
     const card = this.getBookingCard(identifier, expectedStatus);
     await expect(card).toBeVisible({ timeout: 15000 });
     await card.scrollIntoViewIfNeeded();

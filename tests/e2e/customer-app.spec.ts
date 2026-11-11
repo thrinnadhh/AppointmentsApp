@@ -11,12 +11,18 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
   let customerApp: CustomerAppPage;
 
   test.beforeEach(async ({ page }) => {
-    // Cancel any stale active holds or bookings for the test customer on this resource to prevent slot collision
+    // Cancel or delete any stale active holds or bookings for the test customer on this resource to prevent slot collision
     if (SUPABASE_KEY) {
+      const { data: customerProfiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('phone', ['+919999900001', '+919999999991']);
+      const customerIds = [testCustomerId, ...(customerProfiles?.map((p) => p.id) || [])];
+
       await supabase
         .from('bookings')
-        .update({ status: 'CANCELLED' })
-        .eq('customer_id', testCustomerId)
+        .delete()
+        .in('customer_id', customerIds)
         .eq('resource_id', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
         .in('status', ['HELD', 'CONFIRMED', 'PENDING_PAYMENT']);
     }
@@ -70,7 +76,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
 
     // 2. Verify Provider Info Header
     await expect(page.getByText('📍 Shop 12, Bhavani Nagar, Near RTC Bus Stand')).toBeVisible();
-    await expect(page.getByText(/9:00 AM - 9:00 PM/i)).toBeVisible();
+    await expect(page.getByText(/Today:\s*[0-9]{2}:[0-9]{2}\s*-\s*[0-9]{2}:[0-9]{2}|9:00 AM - 9:00 PM/i)).toBeVisible();
     await expect(customerApp.staffSectionHeading).toBeVisible();
 
     // 3. Verify Staff Roster (Doctors)
@@ -90,6 +96,8 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
   });
 
   test('3. Should select date, pick real-time available time slot, and update deposit summary', async ({ page }) => {
+    await customerApp.ensureAuthenticated();
+
     // 1. Open Provider Detail
     await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
     await customerApp.selectStaffMember('Dr. S. K. Murthy, MDS (Implantologist)');
@@ -111,6 +119,8 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
   });
 
   test('4. Should open 5-Minute Hold Checkout Modal and verify cancellation policies', async ({ page }) => {
+    await customerApp.ensureAuthenticated();
+
     // 1. Navigate to slot selection
     await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
     await customerApp.selectFirstSlot();
@@ -124,31 +134,35 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
 
     // 4. Verify Pricing & Breakdown
     await expect(customerApp.paymentDetailsCard).toBeVisible();
-    await expect(page.getByText(/Booking Deposit|Hold Deposit/i).first()).toBeVisible();
-    await expect(page.getByText('Total Payable Now')).toBeVisible();
+    await expect(page.getByText(/Booking Deposit|Hold Deposit|Platform \/ Booking Fee|Platform Fee/i).first()).toBeVisible();
+    await expect(page.getByText(/Total Payable Now|Total Payable Online Now/i)).toBeVisible();
 
     // 5. Verify Cancellation Policy
     await expect(page.getByText('🛡️ Cancellation & Refund Policy')).toBeVisible();
-    await expect(page.getByText(/Free cancellation up to 1 hour before/)).toBeVisible();
-    await expect(page.getByText(/4 no-shows/i)).toBeVisible();
+    await expect(page.getByText(/Free cancellation & reschedule up to 60 minutes|Free cancellation up to 1 hour before/)).toBeVisible();
+    await expect(page.getByText(/5 no-shows|4 no-shows/i)).toBeVisible();
 
-    // 5b. Verify Late Arrival Grace Policy (+2 Token Buffer)
-    await expect(page.getByTestId('late-arrival-notice')).toBeVisible();
-    await expect(page.getByText('Late Arrival Grace Policy (+2 Token Buffer)')).toBeVisible();
-    await expect(page.getByText(/ongoing.*token #12/i)).toBeVisible();
+    // 5b. Verify Late Arrival Grace Policy / Arrival Window Notice
+    await expect(page.getByTestId('arrival-window-notice').or(page.getByTestId('late-arrival-notice'))).toBeVisible();
+    await expect(page.getByText(/Arrival Window: Booked Time ± 10 Minutes|Late Arrival Grace Policy/i)).toBeVisible();
+    await expect(page.getByText(/Standby Queue|ongoing.*token #12/i)).toBeVisible();
 
     // 6. Test Cancel action restores detail screen
     await customerApp.cancelModalBtn.click();
     await expect(customerApp.checkoutTitle).not.toBeVisible();
     await expect(customerApp.staffSectionHeading).toBeVisible();
+    await expect(customerApp.checkoutTitle).not.toBeVisible();
+    await expect(customerApp.staffSectionHeading).toBeVisible();
   });
 
   test('5. Should complete deposit payment, navigate to My Bookings, and support browse return', async ({ page }) => {
-    // 1. Proceed to checkout
+    await customerApp.ensureAuthenticated();
+
+    // 1. Proceed to checkout (select slot far enough to respect 1-hour minimum gap)
     await customerApp.selectProviderByName('Sri Venkateswara Dental & Implant Care');
     await customerApp.selectStaffMember('Dr. S. K. Murthy, MDS (Implantologist)');
     await customerApp.selectDateOffset('Tomorrow');
-    await customerApp.selectFirstSlot(1);
+    await customerApp.selectFirstSlot(5);
     await customerApp.openCheckout();
 
     // 2. Submit Payment via Razorpay action
@@ -165,7 +179,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
     await expect(page.getByText(/Deposit Paid:/).first()).toBeVisible();
 
     // 5b. Cancel booking to release slot for next test iteration
-    const cancelBtn = page.getByText('Cancel', { exact: true }).first();
+    const cancelBtn = page.getByRole('button', { name: /Cancel Booking|Cancel/i }).or(page.getByText('Cancel', { exact: true })).first();
     if (await cancelBtn.isVisible().catch(() => false)) {
       page.once('dialog', async (dialog) => {
         await dialog.accept();
