@@ -140,7 +140,12 @@ export async function POST(req: NextRequest) {
     // BRANCH A: CASHFREE PAYMENT VERIFICATION
     // ----------------------------------------------------
     if (effectiveGatewayProvider === 'cashfree') {
-      const cfTargetOrderId = body.order_id || (body as any).cf_order_id || razorpay_order_id || booking.gateway_order_id;
+      const cfTargetOrderId =
+        body.order_id ||
+        (body as any).cf_order_id ||
+        razorpay_order_id ||
+        booking.gateway_order_id;
+
       if (!cfTargetOrderId) {
         return NextResponse.json<VerifyRazorpayPaymentResponse>(
           { success: false, error: 'Missing order_id for Cashfree verification' },
@@ -148,7 +153,104 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const effectivePaymentId = razorpay_payment_id || (body as any).payment_id || `cf_pay_${cfTargetOrderId}`;
+      const incomingPaymentId =
+        (body as any).payment_id ||
+        (body as any).gateway_payment_id ||
+        razorpay_payment_id;
+
+      // Mock payment ID & order guard: strictly reject synthetic mock IDs when mock payments are disabled
+      const isMockPayment = Boolean(
+        incomingPaymentId &&
+        (incomingPaymentId.startsWith('mock_') ||
+          incomingPaymentId.startsWith('sim_') ||
+          incomingPaymentId.startsWith('pay_mock_') ||
+          incomingPaymentId.startsWith('cf_pay_') ||
+          incomingPaymentId.startsWith('cf_mock_') ||
+          incomingPaymentId.startsWith('pay_test_') ||
+          incomingPaymentId.toLowerCase().includes('mock'))
+      );
+
+      const isMockOrder = Boolean(
+        cfTargetOrderId.startsWith('order_mock_') ||
+        cfTargetOrderId.startsWith('mock_') ||
+        cfTargetOrderId.startsWith('cf_mock_') ||
+        cfTargetOrderId.startsWith('sim_') ||
+        cfTargetOrderId.toLowerCase().includes('mock')
+      );
+
+      if ((isMockPayment || isMockOrder) && !canMockPayments()) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Mock payments and mock orders are disabled in this environment' },
+          { status: 400 }
+        );
+      }
+
+      // Strictly assert booking.gateway_order_id is non-null and strictly equals the incoming cfTargetOrderId
+      const allowMockCfOrder = canMockPayments() && isMockOrder;
+      if (!booking.gateway_order_id || booking.gateway_order_id !== cfTargetOrderId) {
+        if (!allowMockCfOrder || !booking.gateway_order_id) {
+          return NextResponse.json<VerifyRazorpayPaymentResponse>(
+            { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
+            { status: 400 }
+          );
+        }
+      }
+
+      const isMockPaymentAllowed = canMockPayments() && (isMockPayment || isMockOrder);
+
+      // Verify status with Cashfree adapter
+      const cfAdapter = getPaymentGateway('cashfree');
+      const orderDetails = await cfAdapter.fetchOrder(cfTargetOrderId);
+
+      if (!orderDetails && !isMockPaymentAllowed) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Payment order not found on Cashfree gateway' },
+          { status: 400 }
+        );
+      }
+
+      if (orderDetails && orderDetails.status !== 'PAID' && !isMockPaymentAllowed) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: `Payment not completed on gateway (status: ${orderDetails.status})` },
+          { status: 400 }
+        );
+      }
+
+      const expectedAmountPaise = booking.expected_payment_amount_paise != null
+        ? Number(booking.expected_payment_amount_paise)
+        : Math.round(Number(booking.platform_fee_amount || booking.deposit_amount || 10) * 100);
+
+      if (orderDetails && orderDetails.amountInPaise !== expectedAmountPaise && !isMockPaymentAllowed) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: `Tampered payment amount: expected ${expectedAmountPaise} paise, received ${orderDetails.amountInPaise} paise` },
+          { status: 400 }
+        );
+      }
+
+      const effectivePaymentId =
+        incomingPaymentId ||
+        (orderDetails?.paymentId ? String(orderDetails.paymentId) : (canMockPayments() ? `cf_pay_${cfTargetOrderId}` : ''));
+
+      if (!effectivePaymentId) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Payment identifier missing from gateway order' },
+          { status: 400 }
+        );
+      }
+
+      // Anti-Replay: prevent reusing the same payment ID across different bookings
+      const { data: existingPayment } = await supabaseAdmin
+        .from('payments')
+        .select('id, booking_id')
+        .eq('gateway_payment_id', effectivePaymentId)
+        .maybeSingle();
+
+      if (existingPayment && existingPayment.booking_id !== booking_id) {
+        return NextResponse.json<VerifyRazorpayPaymentResponse>(
+          { success: false, error: 'Payment identifier has already been used for another booking' },
+          { status: 409 }
+        );
+      }
 
       if (isHoldExpired) {
         // Late payment after hold expiry: trigger Cashfree auto-refund
@@ -181,7 +283,6 @@ export async function POST(req: NextRequest) {
           .eq('id', booking.id);
 
         try {
-          const cfAdapter = getPaymentGateway('cashfree');
           const refundResult = await cfAdapter.refundOrder({
             orderId: cfTargetOrderId,
             paymentId: effectivePaymentId,
@@ -209,6 +310,7 @@ export async function POST(req: NextRequest) {
             },
           });
         } catch (cfRefundErr) {
+          const errorMsg = cfRefundErr instanceof Error ? cfRefundErr.message : String(cfRefundErr);
           await supabaseAdmin
             .from('bookings')
             .update({ payment_status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
@@ -218,6 +320,34 @@ export async function POST(req: NextRequest) {
             .from('payments')
             .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
             .eq('gateway_payment_id', effectivePaymentId);
+
+          console.error(
+            '\n====================================================================\n' +
+            '[CRITICAL CASHFREE REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
+            `Booking ID: ${booking.id}\n` +
+            `Order ID: ${cfTargetOrderId}\n` +
+            `Payment ID: ${effectivePaymentId}\n` +
+            `Refund Amount: ₹${depositInInr}\n` +
+            `Error: ${errorMsg}\n` +
+            'Action: Manual investigation required in Cashfree Dashboard.\n' +
+            '====================================================================\n'
+          );
+
+          await supabaseAdmin.from('admin_audit_logs').insert({
+            admin_id: null,
+            action: 'REFUND_MANUAL_INTERVENTION_REQUIRED',
+            target_type: 'bookings',
+            target_id: booking.id,
+            details: {
+              error: errorMsg,
+              gateway: 'cashfree',
+              gateway_order_id: cfTargetOrderId,
+              gateway_payment_id: effectivePaymentId,
+              refund_amount: depositInInr,
+              reason: 'Hold expired before payment completion',
+              failed_at: new Date().toISOString(),
+            },
+          });
         }
 
         return NextResponse.json<VerifyRazorpayPaymentResponse>(
@@ -226,37 +356,6 @@ export async function POST(req: NextRequest) {
             error: 'Slot hold has expired and is no longer held. An automatic deposit refund has been initiated to your original payment method.',
           },
           { status: 410 }
-        );
-      }
-
-      // Verify status with Cashfree adapter
-      const cfAdapter = getPaymentGateway('cashfree');
-      const orderDetails = await cfAdapter.fetchOrder(cfTargetOrderId);
-
-      // In mock/sandbox mode without live keys, allow mock order if unconfigured
-      const isMockPaymentAllowed = canMockPayments() && (cfTargetOrderId.startsWith('mock_') || cfTargetOrderId.startsWith('cf_mock_'));
-      if (!orderDetails && !isMockPaymentAllowed) {
-        return NextResponse.json<VerifyRazorpayPaymentResponse>(
-          { success: false, error: 'Payment order not found on Cashfree gateway' },
-          { status: 400 }
-        );
-      }
-
-      if (orderDetails && orderDetails.status !== 'PAID' && !isMockPaymentAllowed) {
-        return NextResponse.json<VerifyRazorpayPaymentResponse>(
-          { success: false, error: `Payment not completed on gateway (status: ${orderDetails.status})` },
-          { status: 400 }
-        );
-      }
-
-      const expectedAmountPaise = booking.expected_payment_amount_paise != null
-        ? Number(booking.expected_payment_amount_paise)
-        : Math.round(Number(booking.platform_fee_amount || booking.deposit_amount || 10) * 100);
-
-      if (orderDetails && orderDetails.amountInPaise !== expectedAmountPaise && !isMockPaymentAllowed) {
-        return NextResponse.json<VerifyRazorpayPaymentResponse>(
-          { success: false, error: `Tampered payment amount: expected ${expectedAmountPaise} paise, received ${orderDetails.amountInPaise} paise` },
-          { status: 400 }
         );
       }
 
@@ -342,11 +441,14 @@ export async function POST(req: NextRequest) {
       razorpay_payment_id.startsWith('mock_') ||
       razorpay_payment_id.startsWith('sim_') ||
       razorpay_payment_id.startsWith('pay_mock_') ||
+      razorpay_payment_id.startsWith('cf_pay_') ||
+      razorpay_payment_id.startsWith('cf_mock_') ||
       razorpay_payment_id.toLowerCase().includes('mock');
 
     const isMockOrder =
       razorpay_order_id.startsWith('order_mock_') ||
       razorpay_order_id.startsWith('mock_') ||
+      razorpay_order_id.startsWith('cf_mock_') ||
       razorpay_order_id.startsWith('sim_') ||
       razorpay_order_id.toLowerCase().includes('mock');
 

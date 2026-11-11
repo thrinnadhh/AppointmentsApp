@@ -198,6 +198,8 @@ export async function POST(req: NextRequest) {
     const isMockPayment =
       gateway_payment_id.startsWith('mock_') ||
       gateway_payment_id.startsWith('sim_') ||
+      gateway_payment_id.startsWith('cf_pay_') ||
+      gateway_payment_id.startsWith('cf_mock_') ||
       gateway_payment_id.startsWith('pay_mock_') ||
       gateway_payment_id.startsWith('pay_test_') ||
       gateway_payment_id.toLowerCase().includes('mock');
@@ -205,6 +207,9 @@ export async function POST(req: NextRequest) {
     const isMockOrder = Boolean(
       razorpay_order_id &&
         (razorpay_order_id.startsWith('order_mock_') ||
+          razorpay_order_id.startsWith('mock_') ||
+          razorpay_order_id.startsWith('cf_mock_') ||
+          razorpay_order_id.startsWith('sim_') ||
           razorpay_order_id.startsWith('order_test_') ||
           razorpay_order_id.toLowerCase().includes('mock'))
     );
