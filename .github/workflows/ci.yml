@@ -68,10 +68,11 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -135,10 +136,11 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -174,10 +176,11 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -256,10 +259,11 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -288,16 +292,69 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
 
       - name: Start local Supabase and apply migrations
         run: |
@@ -364,16 +421,69 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
 
       - name: Start local Supabase and apply migrations
         run: |
@@ -440,16 +550,69 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
 
       - name: Start local Supabase and apply migrations
         run: |
@@ -511,16 +674,69 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
 
       - name: Start local Supabase and apply migrations
         run: |
@@ -589,16 +805,69 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@1a44f77d37367c7e5cf6e1657c91353594896796 # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
 
       - name: Start local Supabase and apply migrations
         run: |
