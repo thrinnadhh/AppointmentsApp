@@ -91,14 +91,19 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
   }
 
   before(async () => {
-    const envFile = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
-    supabaseUrl = envFile.match(/NEXT_PUBLIC_SUPABASE_URL=\"?([^\"\n]+)/)[1];
-    serviceKey = envFile.match(/SUPABASE_SERVICE_ROLE_KEY=\"?([^\"\n]+)/)[1];
-    anonKey = envFile.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=\"?([^\"\n]+)/)[1];
-    cronSecret = envFile.match(/CRON_SECRET=\"?([^\"\n]+)/)?.[1] || 'tirupati-cron-secret-2026';
-    webhookSecret = envFile.match(/RAZORPAY_WEBHOOK_SECRET=\"?([^\"\n]+)/)?.[1] || 'mock_webhook_secret';
-    rzpKeySecret = envFile.match(/RAZORPAY_KEY_SECRET=\"?([^\"\n]+)/)?.[1] || 'mock_secret_key_1234567890';
-    superadminE2eToken = envFile.match(/SUPERADMIN_E2E_TOKEN=\"?([^\"\n]+)/)?.[1] || 'tirupati-superadmin-e2e-2026';
+    let envFile = '';
+    if (fs.existsSync('apps/merchant-web/.env.local')) {
+      envFile = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
+    } else if (fs.existsSync('.env.local')) {
+      envFile = fs.readFileSync('.env.local', 'utf8');
+    }
+    supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || envFile.match(/NEXT_PUBLIC_SUPABASE_URL=\"?([^\"\n]+)/)?.[1] || 'http://127.0.0.1:54321';
+    serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || envFile.match(/SUPABASE_SERVICE_ROLE_KEY=\"?([^\"\n]+)/)?.[1];
+    anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || envFile.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=\"?([^\"\n]+)/)?.[1];
+    cronSecret = process.env.CRON_SECRET || envFile.match(/CRON_SECRET=\"?([^\"\n]+)/)?.[1] || 'tirupati-cron-secret-2026';
+    webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || envFile.match(/RAZORPAY_WEBHOOK_SECRET=\"?([^\"\n]+)/)?.[1] || 'mock_webhook_secret';
+    rzpKeySecret = process.env.RAZORPAY_KEY_SECRET || envFile.match(/RAZORPAY_KEY_SECRET=\"?([^\"\n]+)/)?.[1] || 'mock_secret_key_1234567890';
+    superadminE2eToken = process.env.SUPERADMIN_E2E_TOKEN || envFile.match(/SUPERADMIN_E2E_TOKEN=\"?([^\"\n]+)/)?.[1] || 'tirupati-superadmin-e2e-2026';
 
     serviceHeaders = {
       apikey: serviceKey,

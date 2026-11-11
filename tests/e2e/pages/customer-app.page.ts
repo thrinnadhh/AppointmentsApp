@@ -230,10 +230,7 @@ export class CustomerAppPage {
       await this.selectCategory('Hospitals & Clinics');
     }
 
-    const isDental = name.includes('Dental') || name.includes('Sri Venkateswara');
-    const card = isDental
-      ? this.page.getByTestId('provider-card').filter({ hasText: /Dental|Sri Venkateswara/i }).first()
-      : this.page.getByTestId('provider-card').filter({ hasText: name }).first();
+    const card = this.page.getByTestId('provider-card').filter({ hasText: name }).first();
 
     // Wait for the specific provider card with an extended timeout to account for Supabase latency
     await expect(card).toBeVisible({ timeout: 25000 });

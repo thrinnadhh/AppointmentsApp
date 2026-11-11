@@ -304,8 +304,8 @@ export class AdminDashboardPage {
   }
 
   async clickCityAction(cityName: string, actionButtonText: 'Launch Active' | 'Start Expansion' | 'Pause' | 'Resume') {
-    const row = this.territoryTable.locator('tr', { hasText: cityName });
-    const actionBtn = row.getByRole('button', { name: new RegExp(actionButtonText, 'i') });
+    const row = this.territoryTable.locator('tr', { hasText: cityName }).first();
+    const actionBtn = row.getByRole('button', { name: new RegExp(actionButtonText, 'i') }).first();
     await expect(actionBtn).toBeVisible();
     await actionBtn.click();
   }

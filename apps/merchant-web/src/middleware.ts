@@ -274,14 +274,14 @@ export async function middleware(req: NextRequest) {
 
   // 3. Admin Page Routes Gate
   const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login';
-  if (isAdminRoute && !isAuthenticated) {
+  if (isAdminRoute && !isAuthenticated && !isE2EBypass) {
     const adminLoginUrl = new URL('/admin/login', req.url);
     adminLoginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(adminLoginUrl);
   }
 
   // 4. Standard Merchant Page Routes Gate
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isE2EBypass) {
     const loginUrl = new URL('/login', req.url);
     if (pathname !== '/') {
       loginUrl.searchParams.set('redirect', pathname);

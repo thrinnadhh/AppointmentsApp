@@ -88,7 +88,7 @@ describe('Layer 1: Database Advisor & Stored Procedure Integrity (DEF-RC-04)', (
   });
 
   it('5. supabase db lint must report zero errors in the public schema', () => {
-    const raw = execSync('supabase db lint', {
+    const raw = execSync('npx supabase db lint', {
       encoding: 'utf8',
       env: {
         ...process.env,
