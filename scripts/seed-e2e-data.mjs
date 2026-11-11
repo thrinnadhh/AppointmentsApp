@@ -43,6 +43,14 @@ async function seedE2EData() {
       role: 'merchant',
       fullName: 'Vikram Stylist (Naturals Salon)',
       phone: '+919876543213'
+    },
+    {
+      id: '99999999-9999-9999-9999-999999999991',
+      email: 'customer1@example.com',
+      password: 'CustomerSecure2026!',
+      role: 'customer',
+      fullName: 'Kalyan Chakravarthy',
+      phone: '+919999999991'
     }
   ];
 
@@ -91,16 +99,22 @@ async function seedE2EData() {
     // Ensure profile row exists
     const uid = userIds[acc.email];
     if (uid) {
+      const profileBody = {
+        id: uid,
+        email: acc.email,
+        full_name: acc.fullName,
+        role: acc.role,
+        phone: acc.phone
+      };
+      if (acc.email === 'svims.clinic@tirupati-appointments.com') {
+        profileBody.default_provider_id = '11111111-1111-1111-1111-111111111111';
+      } else if (acc.email === 'naturals.salon@tirupati-appointments.com') {
+        profileBody.default_provider_id = '44444444-4444-4444-4444-444444444444';
+      }
       await fetch(`${url}/rest/v1/profiles`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          id: uid,
-          email: acc.email,
-          full_name: acc.fullName,
-          role: acc.role,
-          phone: acc.phone
-        })
+        body: JSON.stringify(profileBody)
       });
     }
   }

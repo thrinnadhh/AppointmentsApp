@@ -5,27 +5,100 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
-const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || ['tirupati', 'superadmin', 'e2e', '2026'].join('-');
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 
 test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () => {
   const testCustomerEmail = 'customer.integration@tirupati.care';
   const testCustomerId = '99999999-9999-9999-9999-999999999991'; // Kalyan Chakravarthy seed account
   const testResourceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // Dr. S. K. Murthy
+  const svimsMerchantEmail = 'svims.clinic@tirupati-appointments.com';
+  const svimsMerchantPassword = 'SvimsClinic2026!';
 
-  test.beforeAll(async () => {
-    // Clean up test customer slots for Dr Murthy to ensure idempotent test runs
+  const cleanUpTestBookings = async () => {
+    // Clean up test customer slots for Dr Murthy across both test phone profiles to ensure idempotent test runs
+    const { data: customerProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .or(`phone.in.(+919999900001,+919999999991),email.eq.${testCustomerEmail}`);
+    const customerIds = [testCustomerId, ...(customerProfiles?.map((p) => p.id) || [])];
+
     const { data: oldBookings } = await supabase
       .from('bookings')
       .select('id')
-      .eq('customer_id', testCustomerId)
+      .in('customer_id', customerIds)
       .eq('resource_id', testResourceId);
     if (oldBookings && oldBookings.length > 0) {
       const ids = oldBookings.map((b) => b.id);
-      await supabase.from('payments').delete().in('booking_id', ids);
-      await supabase.from('bookings').delete().in('id', ids);
+      const { error: payErr } = await supabase.from('payments').delete().in('booking_id', ids);
+      if (payErr) console.warn('[E2E Cleanup] payments delete warning:', payErr.message);
+      const { error: bkgErr } = await supabase.from('bookings').delete().in('id', ids);
+      if (bkgErr) console.warn('[E2E Cleanup] bookings delete warning:', bkgErr.message);
     }
+  };
+
+  const createAndConfirmApiBooking = async (
+    request: any,
+    slotStart: string,
+    slotEnd: string
+  ) => {
+    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      headers: {
+        'x-customer-id': testCustomerId,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
+      data: {
+        customer_id: testCustomerId,
+        resource_id: testResourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+      },
+    });
+    expect(holdRes.status()).toBe(201);
+    const { booking_id } = await holdRes.json();
+
+    const orderRes = await request.post('http://localhost:3000/api/payments/create-order', {
+      headers: {
+        'x-customer-id': testCustomerId,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
+      data: { booking_id },
+    });
+    expect(orderRes.status()).toBe(200);
+    const orderData = await orderRes.json();
+    const orderId = orderData.order_id || orderData.cf_order_id;
+    expect(orderId).toBeTruthy();
+
+    const confirmRes = await request.post('http://localhost:3000/api/payments/verify', {
+      headers: {
+        'x-customer-id': testCustomerId,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
+      data: {
+        booking_id,
+        order_id: orderId,
+        payment_id: `cf_pay_${Date.now()}`,
+        gateway_provider: 'cashfree',
+      },
+    });
+    expect(confirmRes.status()).toBe(200);
+    const confirmData = await confirmRes.json();
+    expect(confirmData.success).toBe(true);
+
+    return booking_id;
+  };
+
+  test.beforeAll(async () => {
+    await cleanUpTestBookings();
+  });
+
+  test.beforeEach(async () => {
+    await cleanUpTestBookings();
+  });
+
+  test.afterAll(async () => {
+    await cleanUpTestBookings();
   });
 
   test('1. [Customer Booking -> Merchant Live Queue] Customer books appointment on mobile app; Merchant sees it live on bookings dashboard', async ({ browser }) => {
@@ -35,6 +108,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const customerApp = new CustomerAppPage(customerPage);
 
     await customerApp.goto();
+    await customerApp.ensureAuthenticated();
 
     // 1. Customer browses to Clinics and selects Sri Venkateswara Dental
     await customerApp.selectCategory('Hospitals & Clinics');
@@ -57,7 +131,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const merchantPage = await merchantContext.newPage();
     const merchantPortal = new MerchantPortalPage(merchantPage);
 
-    await merchantPortal.gotoBookings();
+    await merchantPortal.gotoBookings(svimsMerchantEmail, svimsMerchantPassword);
     await merchantPortal.filterByStatus('CONFIRMED');
 
     // 3. Verify that the merchant sees the confirmed booking for Sri Venkateswara Dental in the queue
@@ -72,28 +146,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // 1. Create and confirm a booking
     const slotStart = new Date(Date.now() + 86400000).toISOString();
     const slotEnd = new Date(Date.now() + 86400000 + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      headers: {
-        'x-customer-id': testCustomerId,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
-
-    await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_complete_${Date.now()}`,
-      },
-    });
+    const booking_id = await createAndConfirmApiBooking(request, slotStart, slotEnd);
 
     const { data: booking } = await supabase
       .from('bookings')
@@ -107,15 +160,20 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const merchantPage = await merchantContext.newPage();
     const merchantPortal = new MerchantPortalPage(merchantPage);
 
-    await merchantPortal.gotoBookings();
+    await merchantPortal.gotoBookings(svimsMerchantEmail, svimsMerchantPassword);
     await merchantPortal.filterByStatus('CONFIRMED');
     await merchantPortal.searchBookings(refCode);
 
     const card = merchantPortal.getBookingCard(refCode);
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    const completeBtn = card.getByRole('button', { name: /Complete/i });
-    await expect(completeBtn).toBeVisible();
+    const admitBtn = card.getByRole('button', { name: /Admit Patient/i });
+    if (await admitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await admitBtn.click();
+    }
+
+    const completeBtn = card.getByRole('button', { name: /Complete|Done \/ Complete/i });
+    await expect(completeBtn).toBeVisible({ timeout: 10000 });
     await completeBtn.click();
 
     // Merchant UI reflects COMPLETED under COMPLETED queue
@@ -141,28 +199,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // 1. Create and confirm a booking
     const slotStart = new Date(Date.now() + 172800000).toISOString(); // +2 days
     const slotEnd = new Date(Date.now() + 172800000 + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      headers: {
-        'x-customer-id': testCustomerId,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    const { booking_id } = await holdRes.json();
-
-    const confirmRes = await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_resched_${Date.now()}`,
-      },
-    });
-    expect(confirmRes.status()).toBe(200);
+    const booking_id = await createAndConfirmApiBooking(request, slotStart, slotEnd);
 
     const { data: booking } = await supabase
       .from('bookings')
@@ -196,7 +233,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const merchantPage = await merchantContext.newPage();
     const merchantPortal = new MerchantPortalPage(merchantPage);
 
-    await merchantPortal.gotoBookings();
+    await merchantPortal.gotoBookings(svimsMerchantEmail, svimsMerchantPassword);
     await merchantPortal.searchBookings(refCode);
     await expect(merchantPortal.getBookingCard(refCode)).toBeVisible({ timeout: 10000 });
 
@@ -208,31 +245,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // 1. Create a fresh booking via Backend API
     const slotStart = new Date(Date.now() + 86400000).toISOString(); // Tomorrow
     const slotEnd = new Date(Date.now() + 86400000 + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      headers: {
-        'x-customer-id': testCustomerId,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
-    expect(booking_id).toBeDefined();
-
-    // 2. Confirm payment
-    const confirmRes = await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_test_${Date.now()}`,
-      },
-    });
-    expect(confirmRes.status()).toBe(200);
+    const booking_id = await createAndConfirmApiBooking(request, slotStart, slotEnd);
 
     // 3. Merchant triggers reschedule to a new window (+2 hours)
     const newSlotStart = new Date(Date.now() + 86400000 + 7200000).toISOString();
@@ -267,27 +280,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // 1. Create and confirm a booking for +3 days in advance
     const slotStart = new Date(Date.now() + 259200000).toISOString();
     const slotEnd = new Date(Date.now() + 259200000 + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      headers: {
-        'x-customer-id': testCustomerId,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    const { booking_id } = await holdRes.json();
-
-    await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_mock_cust_cancel_${Date.now()}`,
-      },
-    });
+    const booking_id = await createAndConfirmApiBooking(request, slotStart, slotEnd);
 
     const { data: booking } = await supabase
       .from('bookings')
@@ -337,7 +330,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const merchantPage = await merchantContext.newPage();
     const merchantPortal = new MerchantPortalPage(merchantPage);
 
-    await merchantPortal.gotoBookings();
+    await merchantPortal.gotoBookings(svimsMerchantEmail, svimsMerchantPassword);
     await merchantPortal.filterByStatus('CANCELLED');
     await merchantPortal.searchBookings(refCode);
     await expect(merchantPortal.getBookingCard(refCode)).toBeVisible({ timeout: 10000 });
@@ -350,27 +343,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // 1. Create and confirm booking
     const slotStart = new Date(Date.now() + 259200000).toISOString();
     const slotEnd = new Date(Date.now() + 259200000 + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      headers: {
-        'x-customer-id': testCustomerId,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    const { booking_id } = await holdRes.json();
-
-    await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_mock_cancel_${Date.now()}`,
-      },
-    });
+    const booking_id = await createAndConfirmApiBooking(request, slotStart, slotEnd);
 
     // 2. Merchant cancels booking
     const cancelRes = await request.post('http://localhost:3000/api/bookings/cancel', {
@@ -407,27 +380,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     // 2. Create and confirm a booking
     const slotStart = new Date(Date.now() + 172800000).toISOString();
     const slotEnd = new Date(Date.now() + 172800000 + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      headers: {
-        'x-customer-id': testCustomerId,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    const { booking_id } = await holdRes.json();
-
-    await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_noshow_${Date.now()}`,
-      },
-    });
+    const booking_id = await createAndConfirmApiBooking(request, slotStart, slotEnd);
 
     // Backdate slot_start and slot_end to past so premature no-show check passes
     await supabase
@@ -541,27 +494,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const offset = 345600000 + Math.floor(Math.random() * 5000) * 60000;
     const slotStart = new Date(Date.now() + offset).toISOString();
     const slotEnd = new Date(Date.now() + offset + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      headers: {
-        'x-customer-id': testCustomerId,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    const { booking_id } = await holdRes.json();
-
-    await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id,
-        gateway_payment_id: `pay_pass_${Date.now()}`,
-      },
-    });
+    const booking_id = await createAndConfirmApiBooking(request, slotStart, slotEnd);
 
     // Fetch the reference code assigned to this booking
     const { data: booking } = await supabase
@@ -590,7 +523,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const merchantPage = await merchantContext.newPage();
     const merchantPortal = new MerchantPortalPage(merchantPage);
 
-    await merchantPortal.gotoBookings();
+    await merchantPortal.gotoBookings(svimsMerchantEmail, svimsMerchantPassword);
     await merchantPortal.searchBookings(referenceCode);
 
     // Exact booking is isolated
@@ -646,35 +579,9 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
 
   test('11. [Customer Arrival "Say Reached" -> Merchant Realtime "Present" Card Styling] Customer marks reached; Merchant dashboard displays emerald Present card with arrival badge', async ({ browser, request }) => {
     // 1. Create a confirmed booking for today so it appears in Live Appointments
-    const now = new Date();
-    // Schedule for today in IST
     const slotStart = new Date(Date.now() + 3600000).toISOString();
     const slotEnd = new Date(Date.now() + 3600000 + 1800000).toISOString();
-
-    const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
-      headers: {
-        'x-customer-id': testCustomerId,
-        'x-admin-bypass-key': ADMIN_BYPASS,
-      },
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const holdJson = await holdRes.json();
-    const bookingId = holdJson.booking_id;
-    expect(bookingId).toBeTruthy();
-
-    const confirmRes = await request.post('http://localhost:3000/api/bookings/confirm', {
-      data: {
-        booking_id: bookingId,
-        gateway_payment_id: `pay_test_${Date.now()}`,
-      },
-    });
-    expect(confirmRes.ok()).toBeTruthy();
+    const bookingId = await createAndConfirmApiBooking(request, slotStart, slotEnd);
 
     // 2. Customer reaches hospital/venue and says reached via API
     const reachRes = await request.post('http://localhost:3000/api/bookings/reach', {
@@ -699,7 +606,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     const merchantPage = await merchantContext.newPage();
     const merchantPortal = new MerchantPortalPage(merchantPage);
 
-    await merchantPortal.gotoBookings();
+    await merchantPortal.gotoBookings(svimsMerchantEmail, svimsMerchantPassword);
     await merchantPortal.filterByStatus('CONFIRMED');
     await merchantPortal.searchBookings(refCode);
 

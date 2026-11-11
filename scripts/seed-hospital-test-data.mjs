@@ -24,7 +24,7 @@ const TEST_PASSWORD = 'HospitalTest2026!';
 export async function seedHospitalTestData() {
   const envPath = 'apps/merchant-web/.env.local';
   let url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-  let key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJFUzI1NiIsImtpZCI6ImY4NjVkNGZlLWMxZDItNGY2Zi1iZDVmLWMxOGM1MzVhYjI2MiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MjEwOTUwMzM2NX0.BDT0gXGQ9sgytDhmzV29c1y-NN-vw-cS-hEfGxMjGCF0LBFtxYTOE7Pz38p92N_P47F-muq8KgVEdR0pvA_C3g';
+  let key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 
   if (fs.existsSync(envPath)) {
     const envContent = fs.readFileSync(envPath, 'utf8');
@@ -115,6 +115,35 @@ export async function seedHospitalTestData() {
     const num = i < 10 ? `0${i}` : `${i}`;
     const pId = await ensureUser(`test.patient.${num}@test-tirupati.local`, 'customer', `Test Patient ${num}`);
     patientIds.push({ id: pId, name: `Test Patient ${num}`, num });
+  }
+
+  // 1b. Clean up previous test hospital entities if re-running
+  const cleanupClient = await pgPool.connect();
+  try {
+    await cleanupClient.query('BEGIN');
+    await cleanupClient.query("SET LOCAL app.trusted_write = 'true'");
+    const existingTestProviders = await cleanupClient.query(
+      `SELECT id FROM public.providers WHERE name IN ($1, $2, $3)`,
+      ['[TEST-HOSP-A] Tirupati Apex Hospital', '[TEST-HOSP-B] Balaji Care Clinic', '[TEST-SALON] Tirupati Royal Salon & Spa']
+    );
+    if (existingTestProviders.rows.length > 0) {
+      const pIds = existingTestProviders.rows.map(r => r.id);
+      await cleanupClient.query(`DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE provider_id = ANY($1))`, [pIds]);
+      await cleanupClient.query(`DELETE FROM public.bookings WHERE provider_id = ANY($1)`, [pIds]);
+      await cleanupClient.query(`DELETE FROM public.doctor_front_desk_assignments WHERE provider_id = ANY($1)`, [pIds]);
+      await cleanupClient.query(`DELETE FROM public.department_members WHERE department_id IN (SELECT id FROM public.departments WHERE merchant_id = ANY($1))`, [pIds]);
+      await cleanupClient.query(`DELETE FROM public.resource_availability WHERE resource_id IN (SELECT id FROM public.resources WHERE provider_id = ANY($1))`, [pIds]);
+      await cleanupClient.query(`DELETE FROM public.resources WHERE provider_id = ANY($1)`, [pIds]);
+      await cleanupClient.query(`DELETE FROM public.departments WHERE merchant_id = ANY($1)`, [pIds]);
+      await cleanupClient.query(`DELETE FROM public.merchant_memberships WHERE provider_id = ANY($1)`, [pIds]);
+      await cleanupClient.query(`DELETE FROM public.providers WHERE id = ANY($1)`, [pIds]);
+    }
+    await cleanupClient.query('COMMIT');
+  } catch (err) {
+    await cleanupClient.query('ROLLBACK');
+    console.warn('Cleanup warning:', err);
+  } finally {
+    cleanupClient.release();
   }
 
   // 2. Create Providers
