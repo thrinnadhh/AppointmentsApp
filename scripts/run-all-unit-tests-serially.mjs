@@ -26,6 +26,8 @@ const testFiles = [
   'tests/unit/security-audit-production-env.test.mjs',
   'tests/unit/build-secret-safety.test.mjs',
   'tests/unit/database-advisor-fixes.test.mjs',
+  'tests/unit/google-auth-guard.test.mjs',
+  'tests/unit/cashfree-payment-verification.test.mjs',
 ];
 
 let totalTests = 0;

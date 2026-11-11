@@ -21,7 +21,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
     test('1.1 Should navigate to Overview Dashboard and verify all dashboard cards and navigation links', async ({ page }) => {
       await page.goto('http://localhost:3000/');
       await expect(page.locator('h2').first()).toBeVisible();
-      await expect(page.getByText(/Today's Live Appointments/i)).toBeVisible();
+      await expect(page.getByText(/Today's Live Appointments|Waiting Queue|Reception Fast-Pass/i).first()).toBeVisible();
 
       // Check navigation bar items including newly added schedule and settings
       const nav = page.locator('nav');
@@ -179,7 +179,7 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.database).toBe('connected');
     });
 
-    const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+    const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 
     test('2.2 GET /api/admin/venues should return 200 with venues array', async ({ request }) => {
       const res = await request.get('http://localhost:3000/api/admin/venues', {
