@@ -10,7 +10,7 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
   const BASE_URL = 'http://localhost:3000';
   const testResourceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const testCustomerId = '99999999-9999-9999-9999-999999999991'; // Valid seed user in auth.users
-  const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+  const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
   const CUSTOMER_HEADERS = { 'x-customer-id': testCustomerId };
   const ADMIN_HEADERS = { 'x-admin-bypass-key': adminBypassToken };
   const testProviderId = '11111111-1111-1111-1111-111111111111';

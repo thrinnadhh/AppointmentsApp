@@ -21,15 +21,15 @@ AS $$
 BEGIN
   -- When public.profiles exists, ensure auth.users and profiles exist
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles') THEN
-    INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+    INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
     VALUES
-      ('88888888-8888-8888-8888-888888888881', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@appointments.tirupati', '', now(), '{"provider":"email"}', '{"role":"admin"}', now(), now()),
-      ('88888888-8888-8888-8888-888888888882', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'svims.clinic@tirupati.com', '', now(), '{"provider":"email"}', '{"role":"merchant"}', now(), now()),
-      ('88888888-8888-8888-8888-888888888883', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'naturals.salon@tirupati.com', '', now(), '{"provider":"email"}', '{"role":"merchant"}', now(), now()),
-      ('6be12bfd-f10b-4b60-bf52-31c09b952398', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'dental.owner@example.com', '', now(), '{"provider":"email"}', '{"role":"merchant"}', now(), now()),
-      ('a6fea022-2a8c-45a2-a97c-756111935d43', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'salon.manager@example.com', '', now(), '{"provider":"email"}', '{"role":"merchant"}', now(), now()),
-      ('99999999-9999-9999-9999-999999999991', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'customer1@example.com', '', now(), '{"provider":"email"}', '{"role":"customer"}', now(), now()),
-      ('99999999-9999-9999-9999-999999999992', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'customer2@example.com', '', now(), '{"provider":"email"}', '{"role":"customer"}', now(), now())
+      ('88888888-8888-8888-8888-888888888881', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@appointments.tirupati', '', now(), '{"provider":"email"}', '{"role":"admin"}', now(), now(), '', '', '', ''),
+      ('88888888-8888-8888-8888-888888888882', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'svims.clinic@tirupati.com', '', now(), '{"provider":"email"}', '{"role":"merchant"}', now(), now(), '', '', '', ''),
+      ('88888888-8888-8888-8888-888888888883', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'naturals.salon@tirupati.com', '', now(), '{"provider":"email"}', '{"role":"merchant"}', now(), now(), '', '', '', ''),
+      ('6be12bfd-f10b-4b60-bf52-31c09b952398', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'dental.owner@example.com', '', now(), '{"provider":"email"}', '{"role":"merchant"}', now(), now(), '', '', '', ''),
+      ('a6fea022-2a8c-45a2-a97c-756111935d43', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'salon.manager@example.com', '', now(), '{"provider":"email"}', '{"role":"merchant"}', now(), now(), '', '', '', ''),
+      ('99999999-9999-9999-9999-999999999991', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'customer1@example.com', '', now(), '{"provider":"email"}', '{"role":"customer"}', now(), now(), '', '', '', ''),
+      ('99999999-9999-9999-9999-999999999992', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'customer2@example.com', '', now(), '{"provider":"email"}', '{"role":"customer"}', now(), now(), '', '', '', '')
     ON CONFLICT (id) DO NOTHING;
 
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'email') THEN

@@ -144,7 +144,7 @@ export default function ProviderDetailScreen({
       setSlotsError(null);
       setSlotsLoading(false);
     }
-  }, [selectedResource?.id, selectedDateIndex, slotsReloadTick]);
+  }, [selectedResource?.id, selectedDateIndex, slotsReloadTick, customerId, isGuest]);
 
   useEffect(() => {
     // If opening venue when today has zero slots left, automatically select Tomorrow
@@ -166,12 +166,11 @@ export default function ProviderDetailScreen({
 
   const isToday = selectedDateIndex === 0;
   const isAuthError = Boolean(
-    isGuest ||
-    (slotsError &&
+    slotsError &&
       (slotsError.toLowerCase().includes('unauthorized') ||
         slotsError.toLowerCase().includes('authentication') ||
         slotsError.toLowerCase().includes('auth') ||
-        slotsError.includes('401')))
+        slotsError.includes('401'))
   );
   // For today, only display slots that haven't passed yet, so user immediately sees upcoming bookable slots!
   const availableSlots = isToday
@@ -407,7 +406,7 @@ export default function ProviderDetailScreen({
                 Checking live slot availability...
               </Text>
             </View>
-          ) : (slotsError || isGuest) && isAuthError ? (
+          ) : isAuthError ? (
             <View style={styles.signInPromptBanner} testID="customer-slots-signin-prompt">
               <Text style={styles.signInPromptTitle}>Sign In to View Available Slots</Text>
               <Text style={styles.signInPromptSub}>

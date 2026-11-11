@@ -131,7 +131,7 @@ export default function ScheduleManagementPage() {
             <span className="text-xs text-slate-600 font-semibold">{activeProvider?.name || 'Tirupati Clinic'}</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>Operating Schedule &amp; Shift Hours</span>
+            <span>Weekly Availability &amp; Hours</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             Configure weekly outpatient consultation hours, daily shifts, and doctor leave calendars for patient bookings.

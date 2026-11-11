@@ -103,7 +103,7 @@ export default function App() {
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
-    name: '',
+    name: 'Ravi Teja',
     phone: '',
     email: '',
     city: '',
@@ -767,7 +767,7 @@ export default function App() {
             )}
           </View>
           <Text style={[styles.bottomTabLabel, currentScreen === 'MY_BOOKINGS' && styles.bottomTabLabelActive]}>
-            My Appointments
+            Appointments
           </Text>
         </TouchableOpacity>
 

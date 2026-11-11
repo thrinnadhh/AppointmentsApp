@@ -76,7 +76,7 @@ function TeamManagementContent() {
       } else if (activeProvider?.id) {
         const { data, error } = await supabase
           .from('merchant_memberships' as any)
-          .select('user_id, role, profile:profiles(*)')
+          .select('user_id, role, profile:profiles(id, full_name, email, phone, created_at)')
           .eq('provider_id', activeProvider.id);
         if (!error && data) {
           const mapped = data

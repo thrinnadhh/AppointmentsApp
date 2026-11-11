@@ -293,9 +293,13 @@ export class MerchantPortalPage {
   }
 
   async filterByDate(horizon: 'ALL' | 'TODAY' | 'YESTERDAY' | 'WEEK') {
-    const btn = this.page.getByTestId(`date-horizon-${horizon.toLowerCase()}`);
+    const pattern = horizon === 'ALL' ? /All Dates/i : horizon === 'TODAY' ? /Today/i : horizon === 'YESTERDAY' ? /Yesterday/i : /Past 7 Days|Week/i;
+    const btn = this.page.getByRole('button', { name: pattern }).or(
+      this.page.getByTestId(`date-horizon-${horizon.toLowerCase()}`)
+    ).first();
     if (await btn.isVisible().catch(() => false)) {
       await btn.click();
+      await this.page.waitForTimeout(300);
     }
   }
 

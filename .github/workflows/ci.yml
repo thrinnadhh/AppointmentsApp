@@ -76,7 +76,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Audit for high/critical vulnerabilities
+      - name: Audit for high/critical vulnerabilities (pnpm audit)
         run: node scripts/audit-dependencies.mjs --audit-level=high
         continue-on-error: false
 
@@ -146,6 +146,13 @@ jobs:
       - name: Lint (all workspaces)
         run: pnpm lint
 
+      - name: Verify environment configuration (check:env)
+        run: pnpm run check:env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key-ci
+          SUPABASE_SERVICE_ROLE_KEY: stub-service-role-key-ci
+
       - name: Typecheck (all workspaces)
         run: pnpm -r exec tsc --noEmit
 
@@ -180,8 +187,8 @@ jobs:
 
       - name: Start local Supabase and apply migrations
         run: |
-          npx --yes supabase@2.20.5 start
-          npx --yes supabase@2.20.5 db reset
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
 
       - name: Provision production env templates for security audit tests
         run: |
@@ -194,7 +201,7 @@ jobs:
 
       - name: Seed hospital and tenant test data
         run: |
-          eval "$(npx --yes supabase@2.20.5 status -o env)"
+          eval "$(npx --yes supabase@latest status -o env)"
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
@@ -202,7 +209,7 @@ jobs:
 
       - name: Start merchant-web server and run all unit & script suites
         run: |
-          eval "$(npx --yes supabase@2.20.5 status -o env)"
+          eval "$(npx --yes supabase@latest status -o env)"
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"

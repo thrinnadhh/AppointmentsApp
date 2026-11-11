@@ -13,6 +13,8 @@ import {
   User
 } from 'lucide-react';
 import { supabase, fetchTenantContextData } from '@/lib/supabase';
+import { isGoogleAuthConfigured, getMissingGoogleAuthVars } from '@/lib/env';
+import { GoogleAuthSection } from '@/components/GoogleAuthSection';
 
 /**
  * Validates return URLs to prevent Open Redirect attacks.
@@ -241,39 +243,51 @@ export default function LoginPage() {
     }
   };
 
+  // Google OAuth configuration & state
+  // Do not rename these variables without updating env.ts, .env.example and tests.
+  const isGoogleFlagEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_AUTH === 'true';
+  const isDev = process.env.NODE_ENV === 'development';
+  const [supabaseGoogleActive, setSupabaseGoogleActive] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (isGoogleFlagEnabled && typeof window !== 'undefined') {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+      fetch(`${supabaseUrl}/auth/v1/settings`, {
+        headers: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY } : {},
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          setSupabaseGoogleActive(Boolean(data?.external?.google));
+        })
+        .catch(() => {
+          setSupabaseGoogleActive(false);
+        });
+    }
+  }, [isGoogleFlagEnabled]);
+
+  const isGoogleFullyConfigured =
+    isGoogleFlagEnabled &&
+    isGoogleAuthConfigured(undefined, {
+      supabaseSettingsGoogle: supabaseGoogleActive === true,
+    });
+  const missingGoogleVars = getMissingGoogleAuthVars();
+
   const handleGoogleSignIn = async () => {
+    if (!isGoogleFullyConfigured) {
+      const reason =
+        supabaseGoogleActive === false
+          ? 'NEXT_PUBLIC_ENABLE_GOOGLE_AUTH=true, but Supabase /auth/v1/settings reports external.google=false.'
+          : `Missing: ${missingGoogleVars.join(', ') || 'NEXT_PUBLIC_GOOGLE_CLIENT_ID'} in apps/merchant-web/.env.local`;
+      setErrorMsg(`Google OAuth is not configured in this environment. ${reason}`);
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     try {
-      const redirectOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-      const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-      // Check if Google OAuth provider is enabled in local Supabase
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-      let isGoogleEnabled = true;
-      try {
-        const settingsRes = await fetch(`${supabaseUrl}/auth/v1/settings`, {
-          headers: { apikey: supabaseAnonKey },
-        });
-        if (settingsRes.ok) {
-          const settings = await settingsRes.json();
-          isGoogleEnabled = Boolean(settings?.external?.google);
-        }
-      } catch {
-        // Fallback to standard flow if settings cannot be checked
-      }
-
-      if (!isGoogleEnabled) {
-        setErrorMsg(
-          authMode === 'register'
-            ? 'Google OAuth is not configured in this environment. Please register your account directly below using your email and password.'
-            : 'Google OAuth is not configured in this environment. Please sign in below using your registered email and password.'
-        );
-        setLoading(false);
-        return;
-      }
+      const redirectOrigin = typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : '';
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -292,11 +306,7 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google OAuth authentication failed.';
-      if (msg.toLowerCase().includes('provider is not enabled') || msg.toLowerCase().includes('validation_failed')) {
-        setErrorMsg('Google OAuth is not enabled yet in your Supabase project (Authentication → Providers → Google). You can sign in immediately below using your registered email and password.');
-      } else {
-        setErrorMsg(msg);
-      }
+      setErrorMsg(msg);
       setLoading(false);
     }
   };
@@ -426,68 +436,21 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Google Auth Section */}
-          <div style={{
-            background: 'var(--color-surface-raised)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '20px',
-            textAlign: 'center',
-            marginBottom: 20,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-              <ShieldCheck style={{ width: 14, height: 14, color: 'var(--color-primary)' }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                Google Verified Authentication
-              </span>
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--color-ink-tertiary)', lineHeight: 1.6, maxWidth: 300, margin: '0 auto 16px' }}>
-              {authMode === 'register'
-                ? 'Verify your business email via Google. After signing in, configure your shop profile in Step 2.'
-                : 'Sign in with Google. Returning merchants enter their workspace directly.'}
-            </p>
-            <button
-              type="button"
-              data-testid="google-auth-btn"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="btn btn-secondary"
-              style={{ width: '100%', justifyContent: 'center', padding: '11px 16px', fontSize: 14 }}
-            >
-              <svg style={{ width: 16, height: 16, flexShrink: 0 }} viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.35 24 12 24z" />
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
-              </svg>
-              {authMode === 'register' ? 'Register with Google' : 'Continue with Google'}
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10, fontSize: 11, color: 'var(--color-ink-tertiary)' }}>
-              <span>✓ Verified Email</span>
-              <span style={{ opacity: 0.4 }}>·</span>
-              <span>✓ Storefront Photo Sync</span>
-              <span style={{ opacity: 0.4 }}>·</span>
-              <span>✓ Secure Workspace</span>
-            </div>
-
-            {/* Divider */}
-            <div style={{ position: 'relative', marginTop: 16 }}>
-              <div style={{ borderTop: '1px solid var(--color-border)', position: 'absolute', left: 0, right: 0, top: '50%' }} />
-              <span style={{
-                position: 'relative',
-                display: 'inline-block',
-                padding: '0 10px',
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: 'var(--color-ink-tertiary)',
-                background: 'var(--color-surface-raised)',
-              }}>
-                {authMode === 'signin' ? 'Or sign in with password' : 'Or register with email & password'}
-              </span>
-            </div>
-          </div>
+          {/* Google Auth Section: Strict 3-state guard */}
+          <GoogleAuthSection
+            authMode={authMode}
+            loading={loading}
+            onGoogleSignIn={handleGoogleSignIn}
+            isGoogleFlagEnabled={isGoogleFlagEnabled}
+            isGoogleFullyConfigured={isGoogleFullyConfigured}
+            isDev={isDev}
+            missingReason={
+              supabaseGoogleActive === false
+                ? 'NEXT_PUBLIC_ENABLE_GOOGLE_AUTH=true, but Supabase /auth/v1/settings reports external.google=false.'
+                : undefined
+            }
+            missingVars={missingGoogleVars}
+          />
 
           {/* Sign In Form */}
           {authMode === 'signin' && (

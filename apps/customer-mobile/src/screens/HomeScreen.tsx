@@ -599,7 +599,7 @@ export default function HomeScreen({
           <View style={styles.hubHeader}>
             <Text style={styles.hubTitle}>Choose a Service</Text>
             <Text style={styles.hubSubtitle}>
-              Select a category to view verified venues with guaranteed zero-wait booking
+              Select a category — guarantees your slot with zero waiting at verified venues
             </Text>
           </View>
 

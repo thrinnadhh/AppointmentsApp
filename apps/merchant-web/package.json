@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node ../../scripts/check-env.mjs .",
+    "check:env": "node ../../scripts/check-env.mjs .",
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",

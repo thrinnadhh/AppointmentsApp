@@ -148,6 +148,7 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
     await expect(page.getByText(/Standby Queue|ongoing.*token #12/i)).toBeVisible();
 
     // 6. Test Cancel action restores detail screen
+    await customerApp.dismissStrikeWarningIfNeeded();
     await customerApp.cancelModalBtn.click();
     await expect(customerApp.checkoutTitle).not.toBeVisible();
     await expect(customerApp.staffSectionHeading).toBeVisible();

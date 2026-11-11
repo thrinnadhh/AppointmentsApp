@@ -346,6 +346,18 @@ export class CustomerAppPage {
     }
 
     await expect(this.checkoutTitle).toBeVisible();
+    await this.dismissStrikeWarningIfNeeded();
+  }
+
+  async dismissStrikeWarningIfNeeded() {
+    const ackBtn = this.page
+      .getByTestId('btn-acknowledge-third-strike')
+      .or(this.page.getByText('I Understand & Accept'))
+      .first();
+    if (await ackBtn.isVisible({ timeout: 2500 }).catch(() => false)) {
+      await ackBtn.click().catch(() => {});
+      await ackBtn.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
   }
 
   async ensureAuthenticated(phone: string = '+919999900001', otp: string = '123456') {
@@ -359,6 +371,7 @@ export class CustomerAppPage {
   }
 
   async submitPayment() {
+    await this.dismissStrikeWarningIfNeeded();
     await expect(this.payDepositBtn).toBeVisible();
     await this.payDepositBtn.click();
 

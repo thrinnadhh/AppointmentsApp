@@ -11,6 +11,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
+    "check:env": "node scripts/check-env.mjs",
     "check:agents": "python3 .agents/scripts/validate_kit.py",
     "check:legal": "node scripts/check-legal-placeholders.js",
     "check:antigravity": "python3 .agents/scripts/checklist.py .",

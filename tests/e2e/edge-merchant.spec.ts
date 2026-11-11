@@ -23,7 +23,7 @@ const SEED_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
 const SEED_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111'; // Sri Venkateswara Dental
 const MERCHANT_B_PROVIDER_ID = '22222222-2222-2222-2222-222222222222'; // Naturals Salon
-const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || ['tirupati', 'superadmin', 'e2e', '2026'].join('-');
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 
 test.describe('Merchant — Edge & Boundary Cases', () => {
 
@@ -213,7 +213,11 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     });
     const { merchants } = await merchantsRes.json();
     const testEmail = process.env.TEST_MERCHANT_EMAIL || 'admin.apex@test-tirupati.local';
-    const targetMerchant = (merchants || []).find((m: any) => m.email === testEmail || m.name?.includes('Apex')) || { id: MERCHANT_A_PROVIDER_ID };
+    const targetMerchant =
+      (merchants || []).find((m: any) => m.name?.includes('[TEST-HOSP-A]')) ||
+      (merchants || []).find((m: any) => m.email === testEmail) ||
+      (merchants || []).find((m: any) => m.name?.includes('Apex')) ||
+      { id: MERCHANT_A_PROVIDER_ID };
     const targetProviderId = targetMerchant.id;
 
     // Suspend merchant

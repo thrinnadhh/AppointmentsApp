@@ -102,7 +102,7 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     const uniqueSuffix = Date.now();
     const testPhotoUrl = `${SUPABASE_URL}/storage/v1/object/public/venue-assets/test-shop-${uniqueSuffix}.webp`;
 
-    const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+    const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
     // Provision a clean unlinked test user to avoid email collision with existing merchants
     const testEmail = `dr.tester.${uniqueSuffix}@tirupati-test.com`;
     const { data: newUser } = await supabaseAdmin.auth.admin.createUser({

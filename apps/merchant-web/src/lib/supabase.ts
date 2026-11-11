@@ -30,6 +30,7 @@ import {
   INITIAL_RESOURCES,
 } from './mock-data';
 
+import { authEnv } from './env';
 export type {
   Provider,
   DaySchedule,
@@ -51,8 +52,8 @@ export type {
   VerifyCheckinCodeResult,
 };
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || authEnv.supabaseUrl;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || authEnv.supabaseAnonKey;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
@@ -573,16 +574,22 @@ export async function recordMerchantNoShow(bookingId: string) {
 }
 
 export async function fetchAllProfiles() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching profiles:', error);
-    return [];
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  try {
+    const res = await fetch('/api/admin/users', {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.users || [];
+    }
+  } catch (e) {
+    console.error('Error fetching profiles via /api/admin/users:', e);
   }
-  return data || [];
+  return [];
 }
 
 export async function adminCreateStaffUser(params: {
@@ -668,11 +675,30 @@ export async function getCurrentUserProfile() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return null;
 
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      if (res.ok) {
+        const payload = await res.json();
+        return {
+          user: session.user,
+          profile: payload.profile || null,
+        };
+      }
+    } catch {
+      // Fall through to direct query fallback
+    }
+  }
+
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, full_name, email, phone, created_at, updated_at')
     .eq('id', session.user.id)
-    .single();
+    .maybeSingle();
 
   return {
     user: session.user,
@@ -694,7 +720,7 @@ export async function fetchUserMemberships(userId?: string): Promise<MerchantMem
     if (!targetUserId) return [];
 
     const { data, error } = await (supabase.from('merchant_memberships' as any) as any)
-      .select('*, provider:providers(*)')
+      .select(`*, provider:providers(${PROVIDER_SELECT_COLUMNS})`)
       .eq('user_id', targetUserId);
 
     if (error) {

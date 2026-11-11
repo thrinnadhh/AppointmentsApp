@@ -2431,7 +2431,7 @@ export default function MerchantOverviewPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Today&apos;s {venueLabel} Live Queue</span>
+                  <span>Today&apos;s Live Appointments &amp; {venueLabel} Queue</span>
                   <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                     Tokens #1 to #{todaysBookings.length || 0}
                   </span>

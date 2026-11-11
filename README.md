@@ -40,13 +40,64 @@ appointments-monorepo/
 - pnpm ≥ 9
 - Supabase CLI & Docker (for local Supabase dev instance)
 
+## Local Setup & Environment Rules
+
+> **CRITICAL ENVIRONMENT FILE RULE**: Next.js loads environment variables strictly from within its application folder (`apps/merchant-web/.env.local`), NOT from the monorepo root `.env.local`. Variables placed solely in the repository root will not be picked up by Next.js. Customer mobile configuration resides in `apps/customer-mobile/.env`.
+
+Follow these steps for reliable local development setup:
+
+```bash
+# 1. Install dependencies
+pnpm install
+
+# 2. Copy environment templates to their exact application folders
+cp apps/merchant-web/.env.example apps/merchant-web/.env.local
+cp apps/customer-mobile/.env.example apps/customer-mobile/.env
+
+# 3. Configure values in apps/merchant-web/.env.local
+# - Set NEXT_PUBLIC_SUPABASE_URL (default: http://127.0.0.1:54321)
+# - Set NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY
+# - Default: Google OAuth is OFF. Email and password authentication is primary and fully operational.
+# - (Optional) To enable Google OAuth:
+#   1. Set NEXT_PUBLIC_ENABLE_GOOGLE_AUTH=true and NEXT_PUBLIC_GOOGLE_CLIENT_ID in apps/merchant-web/.env.local
+#   2. In supabase/config.toml, set [auth.external.google] enabled = true
+#   3. Put SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID & SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET in supabase/.env (or shell environment)
+#   4. Restart Supabase: supabase stop && supabase start
+#
+# 4. Verify all environment variables
+pnpm run check:env
+
+# 5. Start development servers
+pnpm dev:merchant
+# Note: Whenever you add or change NEXT_PUBLIC_* variables, restart the dev server
+# and clear .next (rm -rf apps/merchant-web/.next) because Next.js inlines them at bundle time.
+```
+
+### Supabase GoTrue External Google OAuth Configuration
+
+In `supabase/config.toml`:
+```toml
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+skip_nonce_check = true
+email_optional = false
+```
+
+**Environment Variable Resolution:**
+- Supabase CLI substitutes `env(...)` variables by loading `supabase/.env` when starting local containers (`supabase start`).
+- Host shell exports (`export SUPABASE_AUTH_EXTERNAL_GOOGLE_...`) also provide or override these values.
+- `check:env` audits live Supabase settings (`http://127.0.0.1:54321/auth/v1/settings`) to ensure `external.google` matches `NEXT_PUBLIC_ENABLE_GOOGLE_AUTH`.
+
 ## Setup
 
 ```bash
 # 1. Install dependencies
 pnpm install
 
-# 2. Configure environment variables
+# 2. Configure environment variables (see Local Setup above)
 cp apps/merchant-web/.env.example apps/merchant-web/.env.local
 cp apps/customer-mobile/.env.example apps/customer-mobile/.env
 # Fill in your Supabase URL and anon key
@@ -80,6 +131,10 @@ pnpm dev:mobile
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase publishable (anon) key |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | ❌ (Optional) | Google OAuth 2.0 Client ID for Google Sign-In |
+| `NEXT_PUBLIC_ENABLE_GOOGLE_AUTH` | ❌ (Optional) | Flag to enable Google Sign-In (default: false / OFF) |
+| `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` | ❌ (Optional) | Server-side Google Client ID for Supabase CLI |
+| `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` | ❌ (Optional) | Server-side Google Client Secret for Supabase CLI |
 | `RAZORPAY_WEBHOOK_SECRET` | ✅ (production) | HMAC secret for webhook verification |
 
 ### Customer Mobile (`apps/customer-mobile/.env`)

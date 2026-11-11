@@ -1,16 +1,10 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import Navigation from '@/components/Navigation';
 import { MerchantTenantProvider } from '@/contexts/MerchantTenantContext';
 
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-inter',
-  display: 'swap',
-});
+const inter = { variable: 'font-sans' };
 
 export const metadata: Metadata = {
   title: 'Merchant Dashboard | Tirupati Appointments',

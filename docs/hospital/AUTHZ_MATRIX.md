@@ -1,7 +1,7 @@
 # Hospital & Platform API Authorization Matrix
 
 > **Verification Protocol**: Generated and programmatically validated by `tests/unit/cross-tenant-authorization-matrix.test.mjs`.
-> 100% Coverage of all API endpoints on disk (68 tested entries across all 67 routes + database extensions).
+> 100% Coverage of all API endpoints on disk (69 tested entries across all 68 routes + database extensions).
 
 ## End-to-End Route Authorization Ledger
 
@@ -74,6 +74,7 @@
 | `/api/test/expire-hold` | `POST` | Authorized Admin/Cron (proved 200) | Customer A & Unauthenticated (proved 401) | `apps/merchant-web/src/app/api/test/expire-hold/route.ts:50` | PASS |
 | `/api/webhooks/razorpay` | `POST` | Razorpay Webhook (proved 200 signed) | Unsigned Request (proved 401) | `apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:43` | PASS |
 | `/api/webhooks/cashfree` | `POST` | Cashfree Webhook (proved 200 signed) | Unsigned Request (proved 400) | `apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:16` | PASS |
+| `/api/auth/me` | `GET` | Authenticated User (proved 200) | Unauthenticated Caller (proved 401) | `apps/merchant-web/src/app/api/auth/me/route.ts:7` | PASS |
 | `pgmq / vault / pg_net / pg_cron` | `ALL` | Power features & security lockdown verified | Cross-tenant / unauthorized caller blocked | `supabase/migrations/20261105100001_enable_power_extensions.sql` | PASS |
 
 ---

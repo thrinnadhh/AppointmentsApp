@@ -92,13 +92,20 @@ export default function AdminLogsDedicatedPage() {
           return;
         }
 
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('id, email, full_name, role')
-          .eq('id', session.user.id)
-          .maybeSingle();
+        let profile: { id: string; email?: string | null; full_name?: string | null; role?: string | null } | null = null;
+        try {
+          const meRes = await fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            profile = meData.profile;
+          }
+        } catch (e) {
+          console.warn('[Admin Logs] Failed to fetch /api/auth/me:', e);
+        }
 
-        if (error || !profile || profile.role !== 'admin') {
+        if (!profile || profile.role !== 'admin') {
           if (
             session.user.id === '88888888-8888-8888-8888-888888888881' ||
             session.user.email === 'admin@appointments-tirupati.com'

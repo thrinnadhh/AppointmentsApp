@@ -288,7 +288,7 @@ export class AdminDashboardPage {
   }
 
   async expectCityInMatrix(cityName: string, statusText?: string) {
-    const row = this.territoryTable.locator('tr', { hasText: cityName });
+    const row = this.territoryTable.locator('tr', { hasText: cityName }).first();
     await expect(row).toBeVisible();
     if (statusText) {
       if (statusText === 'ACTIVE') {

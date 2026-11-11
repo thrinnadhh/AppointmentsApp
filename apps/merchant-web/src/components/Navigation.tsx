@@ -178,6 +178,7 @@ export default function Navigation() {
 
     navItems = [
       { href: '/', label: 'Overview', icon: LayoutDashboard },
+      ...(isSuperAdmin ? [{ href: '/admin', label: 'Platform Admin', icon: ShieldCheck }] : []),
       ...(canSeeHospitalAdmin ? [{ href: '/departments', label: 'Departments', icon: Layers }] : []),
       ...(isHospitalVenue ? [{ href: '/consultation', label: 'Consultation', icon: Stethoscope }] : []),
       { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },

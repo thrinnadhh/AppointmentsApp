@@ -2556,6 +2556,28 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       'apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:16',
       'PASS'
     );
+
+    // 38.8 /api/auth/me
+    // Unauthenticated request -> 401
+    const unauthMe = await fetch(`${appBaseUrl}/api/auth/me`);
+    assert.equal(unauthMe.status, 401, 'Unauthenticated request to /api/auth/me must receive 401');
+
+    // Authenticated request -> 200
+    const authMe = await fetch(`${appBaseUrl}/api/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${custA.token}`,
+      },
+    });
+    assert.equal(authMe.status, 200, 'Authenticated user must receive 200');
+
+    recordResult(
+      '/api/auth/me',
+      'GET',
+      'Authenticated User (proved 200)',
+      'Unauthenticated Caller (proved 401)',
+      'apps/merchant-web/src/app/api/auth/me/route.ts:7',
+      'PASS'
+    );
   });
 
   it('39. Supabase Power Features: pgmq lockdown, push token isolation, edge secrets, idempotency, and DLQ', async () => {

@@ -111,18 +111,23 @@ function AdminLoginForm() {
 
       // Query with retry to accommodate @supabase/ssr cookie/session propagation
       for (let attempt = 0; attempt < 3; attempt++) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role, full_name')
-          .eq('id', authData.user.id)
-          .maybeSingle();
-
-        if (data) {
-          profile = data;
-          profileError = null;
-          break;
+        try {
+          const res = await fetch('/api/auth/me', {
+            headers: authData.session?.access_token
+              ? { Authorization: `Bearer ${authData.session.access_token}` }
+              : {},
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.profile) {
+              profile = data.profile;
+              profileError = null;
+              break;
+            }
+          }
+        } catch (err) {
+          profileError = err;
         }
-        profileError = error;
         if (attempt < 2) {
           await new Promise((resolve) => setTimeout(resolve, 200));
         }
