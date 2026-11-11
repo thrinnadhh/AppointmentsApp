@@ -164,3 +164,20 @@ SELECT r.id, d.day, '10:00:00'::TIME, '19:00:00'::TIME, r.duration_minutes
 FROM public.resources r
 CROSS JOIN (VALUES (1), (2), (3), (4), (5), (6)) AS d(day)
 ON CONFLICT DO NOTHING;
+
+-- 6. Insert Test Customer Profiles & Auth Users for E2E Testing
+INSERT INTO auth.users (
+  id, instance_id, aud, role, email, phone, encrypted_password, email_confirmed_at, phone_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token,
+  email_change_token_new, email_change
+) VALUES
+  ('2410b495-a238-49ff-a37c-56cfc52654f1', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'customer.e2e@tirupati.local', '+919999900001', '', now(), now(), '{"provider":"phone"}', '{"role":"customer","phone":"+919999900001"}', now(), now(), '', '', '', ''),
+  ('99999999-9999-9999-9999-999999999995', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'customer-e2e@example.com', '+919999999995', '', now(), now(), '{"provider":"email"}', '{"role":"customer"}', now(), now(), '', '', '', '')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.profiles (id, full_name, role, phone)
+VALUES
+  ('2410b495-a238-49ff-a37c-56cfc52654f1', 'Verified Test Customer', 'customer', '+919999900001'),
+  ('99999999-9999-9999-9999-999999999995', 'Customer E2E', 'customer', '+919999999995')
+ON CONFLICT (id) DO UPDATE SET phone = EXCLUDED.phone;
+

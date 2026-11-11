@@ -61,7 +61,7 @@ async function seedE2EData() {
       phone: '+919999999991'
     },
     {
-      id: '99999999-9999-9999-9999-999999999992',
+      id: '99999999-9999-9999-9999-999999999995',
       email: 'customer-e2e@example.com',
       password: 'CustomerSecure2026!',
       role: 'customer',
@@ -78,7 +78,11 @@ async function seedE2EData() {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
     });
     const listData = await listRes.json();
-    const existing = (listData.users || []).find(u => u.email?.toLowerCase() === acc.email.toLowerCase());
+    const existing = (listData.users || []).find(u => 
+      u.email?.toLowerCase() === acc.email.toLowerCase() ||
+      (acc.id && u.id === acc.id) ||
+      (acc.phone && (u.phone === acc.phone || u.user_metadata?.phone === acc.phone))
+    );
 
     if (existing) {
       console.log(`User ${acc.email} exists (${existing.id}). Updating password and metadata...`);
