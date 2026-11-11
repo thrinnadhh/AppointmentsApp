@@ -171,7 +171,9 @@ export default function AdminDashboardPage() {
 
       if (citiesRes.ok) {
         const data = await citiesRes.json();
-        setCities(data.cities || []);
+        if (Array.isArray(data.cities) && data.cities.length > 0) {
+          setCities(data.cities);
+        }
       }
       if (velocityRes.ok) {
         const data = await velocityRes.json();
@@ -384,6 +386,10 @@ export default function AdminDashboardPage() {
       }
 
       setActionFeedback(`✓ City ${cityId.toUpperCase()} transitioned to ${newStatus}`);
+      // Re-affirm optimistic state to ensure it doesn't revert before reload
+      setCities((prev) =>
+        prev.map((c) => (c.city_id === cityId ? { ...c, status: newStatus } : c))
+      );
       await loadDashboardData();
       setTimeout(() => setActionFeedback(null), 3500);
     } catch (err: unknown) {
