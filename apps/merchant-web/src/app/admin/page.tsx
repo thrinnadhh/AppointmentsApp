@@ -366,6 +366,11 @@ export default function AdminDashboardPage() {
   const handleUpdateCityStatus = async (cityId: string, newStatus: CityStatus) => {
     try {
       setActionFeedback(`Updating ${cityId} status to ${newStatus}...`);
+      // Optimistic update so UI immediately reflects the new status
+      setCities((prev) =>
+        prev.map((c) => (c.city_id === cityId ? { ...c, status: newStatus } : c))
+      );
+
       const headers = await getAdminAuthHeaders(true);
       const res = await fetch('/api/admin/cities', {
         method: 'PATCH',

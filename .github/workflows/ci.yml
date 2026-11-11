@@ -23,12 +23,12 @@ concurrency:
 env:
   NODE_VERSION: '22'
   PNPM_VERSION: '8.15.0'
-  # Supabase — populated from repo secrets; fall back to stubs for build-only jobs
-  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-  EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+  # Supabase — populated from repo secrets; fall back to local dev/test defaults for CI
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321' }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' }}
+  EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321' }}
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU' }}
   RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID || 'rzp_test_51MockAppPlatform' }}
   RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET || 'mock_secret_key_1234567890' }}
   RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET || 'mock_webhook_secret' }}
@@ -37,10 +37,10 @@ env:
   TEST_SALON_EMAIL: ${{ secrets.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com' }}
   TEST_SALON_PASSWORD: ${{ secrets.TEST_SALON_PASSWORD || 'NaturalsSalon2026!' }}
   TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com' }}
-  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || '' }}
-  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || '' }}
-  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || '' }}
-  ALLOW_MOCK_PAYMENTS: 'false'
+  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'AdminSecure2026!' }}
+  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2' }}
+  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || 'tirupati_e2e_secure_bypass_key_2026_x9k2' }}
+  ALLOW_MOCK_PAYMENTS: 'true'
   CRON_SECRET: ${{ secrets.CRON_SECRET || 'test_cron_secret_2026' }}
   NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME || 'Dr. K. S. Rao' }}
   NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL || 'grievance-officer@tirupati-appointments.org' }}
@@ -290,6 +290,19 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Start local Supabase and apply migrations
+        run: |
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-hospital-test-data.mjs
+
       - name: Run Admin E2E — Core auth & RBAC
         run: pnpm exec playwright test tests/e2e/admin-auth-guard.spec.ts --reporter=github,list,html
         env:
@@ -344,6 +357,19 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-hospital-test-data.mjs
 
       - name: Run Merchant E2E — Tenancy isolation
         run: pnpm exec playwright test tests/e2e/merchant-tenancy-isolation.spec.ts --reporter=github,list,html
@@ -400,6 +426,19 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Start local Supabase and apply migrations
+        run: |
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-hospital-test-data.mjs
+
       - name: Run Customer E2E — App flows
         run: pnpm exec playwright test tests/e2e/customer-app.spec.ts --project=mobile-chrome --reporter=github,list,html
         env:
@@ -449,6 +488,19 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-hospital-test-data.mjs
 
       - name: Run Customer ↔ Merchant Integration
         run: pnpm exec playwright test tests/e2e/customer-merchant-integration.spec.ts --reporter=github,list,html
@@ -506,6 +558,19 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-hospital-test-data.mjs
 
       - name: "Run stress: 50-concurrent-hold (EC-INT-05) in isolation"
         run: >

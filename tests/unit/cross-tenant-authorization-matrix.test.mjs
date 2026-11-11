@@ -103,7 +103,7 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     cronSecret = process.env.CRON_SECRET || envFile.match(/CRON_SECRET=\"?([^\"\n]+)/)?.[1] || 'tirupati-cron-secret-2026';
     webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || envFile.match(/RAZORPAY_WEBHOOK_SECRET=\"?([^\"\n]+)/)?.[1] || 'mock_webhook_secret';
     rzpKeySecret = process.env.RAZORPAY_KEY_SECRET || envFile.match(/RAZORPAY_KEY_SECRET=\"?([^\"\n]+)/)?.[1] || 'mock_secret_key_1234567890';
-    superadminE2eToken = process.env.SUPERADMIN_E2E_TOKEN || envFile.match(/SUPERADMIN_E2E_TOKEN=\"?([^\"\n]+)/)?.[1] || 'tirupati-superadmin-e2e-2026';
+    superadminE2eToken = process.env.SUPERADMIN_E2E_TOKEN || envFile.match(/SUPERADMIN_E2E_TOKEN=\"?([^\"\n]+)/)?.[1] || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 
     serviceHeaders = {
       apikey: serviceKey,
