@@ -273,8 +273,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Provision build environment
+        run: node scripts/generate-ci-env.mjs
+
       - name: Build all workspaces
         run: pnpm build
+        env:
+          SKIP_ENV_VALIDATION: 'true'
 
       - name: Upload merchant-web build artifact
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3

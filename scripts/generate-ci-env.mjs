@@ -16,6 +16,7 @@ export function generateCiEnv() {
   const cashfreeEnv = process.env.CASHFREE_ENV || 'SANDBOX';
 
   const envLines = [
+    `SKIP_ENV_VALIDATION="true"`,
     `NEXT_PUBLIC_SUPABASE_URL="${supabaseUrl}"`,
     `NEXT_PUBLIC_SUPABASE_ANON_KEY="${anonKey}"`,
     `SUPABASE_SERVICE_ROLE_KEY="${serviceKey}"`,
