@@ -40,7 +40,7 @@ env:
   TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'AdminSecure2026!' }}
   ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2' }}
   SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || 'tirupati_e2e_secure_bypass_key_2026_x9k2' }}
-  ALLOW_MOCK_PAYMENTS: 'true'
+  ALLOW_MOCK_PAYMENTS: 'false'
   CRON_SECRET: ${{ secrets.CRON_SECRET || 'test_cron_secret_2026' }}
   NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME || 'Dr. K. S. Rao' }}
   NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL || 'grievance-officer@tirupati-appointments.org' }}
