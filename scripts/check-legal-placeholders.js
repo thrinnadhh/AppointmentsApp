@@ -11,6 +11,36 @@
 const fs = require('fs');
 const path = require('path');
 
+// Attempt to load .env.local or .env if present
+const envFiles = [
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), 'apps/merchant-web/.env.local'),
+  path.resolve(process.cwd(), 'apps/customer-mobile/.env.local'),
+  path.resolve(process.cwd(), 'apps/customer-mobile/.env'),
+];
+for (const envFile of envFiles) {
+  if (fs.existsSync(envFile)) {
+    try {
+      if (typeof process.loadEnvFile === 'function') {
+        process.loadEnvFile(envFile);
+      } else {
+        const lines = fs.readFileSync(envFile, 'utf8').split('\n');
+        for (const line of lines) {
+          const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+          if (match && !process.env[match[1]]) {
+            let val = match[2] || '';
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+              val = val.slice(1, -1);
+            }
+            process.env[match[1]] = val;
+          }
+        }
+      }
+    } catch {}
+  }
+}
+
 const targetFiles = [
   'apps/merchant-web/src/app/privacy/page.tsx',
   'apps/merchant-web/src/app/terms/page.tsx',

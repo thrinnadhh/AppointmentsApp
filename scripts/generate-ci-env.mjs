@@ -36,6 +36,11 @@ export function generateCiEnv() {
     `NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL="grievance-officer@tirupati-appointments.org"`,
     `NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE="+91-877-2244888"`,
     `NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS="Balaji Colony, Tirupati, AP 517502"`,
+    `EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME="Dr. K. S. Rao"`,
+    `EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL="grievance-officer@tirupati-appointments.org"`,
+    `EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE="+91-877-2244888"`,
+    `EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS="Balaji Colony, Tirupati, AP 517502"`,
+    `EXPO_PUBLIC_EAS_PROJECT_ID="27a9b4e1-8c3d-4f6a-9b2e-1d5c7a8f9e0b"`,
     `EXPO_PUBLIC_SUPABASE_URL="${supabaseUrl}"`,
     `EXPO_PUBLIC_SUPABASE_ANON_KEY="${anonKey}"`,
   ].join('\n') + '\n';
