@@ -307,6 +307,14 @@ test.describe('Cross-System Integration — Edge Cases', () => {
       const slotStart = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       const slotEnd   = new Date(Date.now() + 10 * 60 * 1000 + 1800000).toISOString();
 
+      // Clear any leftover HELD/CONFIRMED booking in this window from prior runs
+      await supabase
+        .from('bookings')
+        .delete()
+        .eq('resource_id', CLINIC_RESOURCE_ID)
+        .gte('slot_start', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+        .lte('slot_start', new Date(Date.now() + 60 * 60 * 1000).toISOString());
+
       const { booking_id, confirmRes } = await createAndConfirmBooking(request, {
         customerId: SEED_CUSTOMER_ID,
         resourceId: CLINIC_RESOURCE_ID,

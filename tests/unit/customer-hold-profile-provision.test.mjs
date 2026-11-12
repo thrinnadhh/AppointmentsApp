@@ -23,8 +23,26 @@ describe('Customer Hold Profile Auto-Provisioning & Seed Invariant', () => {
       'Hold route must check public.profiles for customer existence'
     );
     assert.ok(
+      content.includes("auth.admin.getUserById") && content.includes("auth.admin.createUser"),
+      'Hold route must ensure auth.users entry exists before upserting public.profiles to satisfy profiles_id_fkey'
+    );
+    assert.ok(
       content.includes(".from('profiles').upsert") || content.includes('.from("profiles").upsert') || content.includes(".from('profiles').insert"),
       'Hold route must auto-provision customer profile in public.profiles to prevent foreign key violation'
+    );
+  });
+
+  it('supabase/seed.sql and scripts/seed-e2e-data.mjs must seed canonical GoTrue phone 919999900001 and phone_confirm', () => {
+    const seedSql = fs.readFileSync(path.resolve('supabase/seed.sql'), 'utf8');
+    const seedScript = fs.readFileSync(path.resolve('scripts/seed-e2e-data.mjs'), 'utf8');
+
+    assert.ok(
+      seedSql.includes("'919999900001'") && seedSql.includes('auth.identities'),
+      'supabase/seed.sql must seed auth.users.phone without leading + (919999900001) and auth.identities so GoTrue OTP login resolves the same user ID'
+    );
+    assert.ok(
+      seedScript.includes('phone_confirm: true'),
+      'scripts/seed-e2e-data.mjs must pass phone_confirm: true to GoTrue Admin API'
     );
   });
 });

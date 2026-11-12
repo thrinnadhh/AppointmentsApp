@@ -352,6 +352,19 @@ export async function POST(req: NextRequest) {
 
     if (!existingProfile) {
       const fallbackName = body.patient_name?.trim() || (caller.email ? caller.email.split('@')[0] : 'Verified Customer');
+      // public.profiles.id references auth.users(id); ensure auth.users row exists before upserting profile
+      const { data: existingAuthUser } = await supabaseAdmin.auth.admin.getUserById(customer_id);
+      if (!existingAuthUser?.user) {
+        const syntheticEmail = caller.email && !caller.email.startsWith('e2e-bypass')
+          ? caller.email
+          : `customer-${customer_id.slice(0, 8)}@tirupati.local`;
+        await supabaseAdmin.auth.admin.createUser({
+          id: customer_id,
+          email: syntheticEmail,
+          email_confirm: true,
+          user_metadata: { role: 'customer', full_name: fallbackName },
+        });
+      }
       await supabaseAdmin.from('profiles').upsert(
         {
           id: customer_id,

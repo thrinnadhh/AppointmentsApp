@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     // 2. RETRIEVE BOOKING TO VERIFY OWNERSHIP & DETAILS
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, status, payment_status, gateway_order_id, hold_expires_at, reference_code, is_followup')
+      .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, platform_fee_amount, expected_payment_amount_paise, total_amount, status, payment_status, gateway_order_id, hold_expires_at, reference_code, is_followup')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -267,8 +267,18 @@ export async function POST(req: NextRequest) {
 
       const expectedDepositPaise = Math.round(Number(booking.deposit_amount || 0) * 100);
       const expectedTotalPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 0) * 100);
+      const expectedPlatformFeePaise = Math.round(Number((booking as any).platform_fee_amount || booking.platform_fee || 10) * 100);
+      const expectedPaymentPaise =
+        (booking as any).expected_payment_amount_paise != null
+          ? Number((booking as any).expected_payment_amount_paise)
+          : expectedPlatformFeePaise;
 
-      if (razorpayOrder.amount !== expectedDepositPaise && razorpayOrder.amount !== expectedTotalPaise) {
+      if (
+        razorpayOrder.amount !== expectedDepositPaise &&
+        razorpayOrder.amount !== expectedTotalPaise &&
+        razorpayOrder.amount !== expectedPlatformFeePaise &&
+        razorpayOrder.amount !== expectedPaymentPaise
+      ) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: 'Tampered payment amount' },
           { status: 400 }

@@ -61,12 +61,20 @@ async function seedE2EData() {
       phone: '+919999999991'
     },
     {
-      id: '99999999-9999-9999-9999-999999999995',
-      email: 'customer-e2e@example.com',
+      id: '2410b495-a238-49ff-a37c-56cfc52654f1',
+      email: 'customer.e2e@tirupati.local',
       password: 'CustomerSecure2026!',
       role: 'customer',
       fullName: 'Verified Test Customer',
       phone: '+919999900001'
+    },
+    {
+      id: '99999999-9999-9999-9999-999999999995',
+      email: 'customer-e2e@example.com',
+      password: 'CustomerSecure2026!',
+      role: 'customer',
+      fullName: 'Customer E2E',
+      phone: '+919999999995'
     }
   ];
 
@@ -78,10 +86,11 @@ async function seedE2EData() {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
     });
     const listData = await listRes.json();
+    const normalizedPhone = acc.phone ? acc.phone.replace(/^\+/, '') : null;
     const existing = (listData.users || []).find(u => 
-      u.email?.toLowerCase() === acc.email.toLowerCase() ||
       (acc.id && u.id === acc.id) ||
-      (acc.phone && (u.phone === acc.phone || u.user_metadata?.phone === acc.phone))
+      u.email?.toLowerCase() === acc.email.toLowerCase() ||
+      (acc.phone && (u.phone === acc.phone || u.phone === normalizedPhone || u.user_metadata?.phone === acc.phone))
     );
 
     if (existing) {
@@ -92,6 +101,7 @@ async function seedE2EData() {
         body: JSON.stringify({
           password: acc.password,
           email_confirm: true,
+          ...(acc.phone ? { phone: acc.phone, phone_confirm: true } : {}),
           user_metadata: { role: acc.role, full_name: acc.fullName, phone: acc.phone }
         })
       });
@@ -102,6 +112,7 @@ async function seedE2EData() {
         email: acc.email,
         password: acc.password,
         email_confirm: true,
+        ...(acc.phone ? { phone: acc.phone, phone_confirm: true } : {}),
         user_metadata: { role: acc.role, full_name: acc.fullName, phone: acc.phone }
       };
       if (acc.id) {

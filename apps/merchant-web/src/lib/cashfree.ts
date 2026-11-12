@@ -91,6 +91,13 @@ export class CashfreeClient {
     };
   }
 
+  private shouldMock(): boolean {
+    if (process.env.NODE_ENV === 'production') {
+      return false;
+    }
+    return !this.isConfigured() || process.env.ALLOW_MOCK_PAYMENTS === 'true';
+  }
+
   async createOrder(payload: {
     order_id: string;
     order_amount: number;
@@ -108,19 +115,23 @@ export class CashfreeClient {
     order_expiry_time?: string;
     order_note?: string;
   }): Promise<CashfreeOrderResponse> {
-    if (!this.isConfigured()) {
+    if (this.shouldMock()) {
       if (process.env.NODE_ENV === 'production') {
         throw new Error('CRITICAL SECURITY ERROR: Cashfree credentials missing in production.');
       }
-      // Deterministic mock order for non-production development if unconfigured
+      // Deterministic mock order for non-production development if unconfigured or mock payments enabled
+      const amountPaise = Math.round(Number(payload.order_amount || 0) * 100);
       return {
-        cf_order_id: `mock_cf_${Date.now()}`,
+        cf_order_id: `mock_cf_${amountPaise}_${Date.now()}`,
         order_id: payload.order_id,
         payment_session_id: `session_mock_${Date.now()}`,
         order_status: 'ACTIVE',
         order_amount: payload.order_amount,
         order_currency: payload.order_currency || 'INR',
       };
+    }
+    if (!this.isConfigured() && process.env.NODE_ENV === 'production') {
+      throw new Error('CRITICAL SECURITY ERROR: Cashfree credentials missing in production.');
     }
 
     const res = await fetch(`${this.baseUrl}/orders`, {
@@ -138,7 +149,7 @@ export class CashfreeClient {
   }
 
   async getOrder(orderId: string): Promise<CashfreeOrderResponse | null> {
-    if (!this.isConfigured()) {
+    if (this.shouldMock() || orderId.startsWith('mock_') || orderId.startsWith('order_mock_')) {
       return null;
     }
 
@@ -165,7 +176,7 @@ export class CashfreeClient {
     refund_note?: string;
     refund_speed?: 'STANDARD' | 'INSTANT';
   }): Promise<CashfreeRefundResponse> {
-    if (!this.isConfigured()) {
+    if (this.shouldMock() || orderId.startsWith('mock_') || orderId.startsWith('order_mock_')) {
       return {
         cf_refund_id: `mock_cfr_${Date.now()}`,
         refund_id: payload.refund_id,

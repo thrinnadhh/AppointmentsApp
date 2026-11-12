@@ -211,10 +211,10 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
   }
 
   // 3. Mock verification ONLY when explicitly enabled in non-production environments
-  // AND the order was specifically created in mock mode (starts with order_mock_)
+  // AND the order was specifically created in mock mode (starts with order_mock_ or mock_cf_)
   if (
     canMockPayments() &&
-    orderId.startsWith('order_mock_') &&
+    (orderId.startsWith('order_mock_') || orderId.startsWith('mock_cf_') || orderId.startsWith('cf_mock_')) &&
     (signature.startsWith('mock_sig_') ||
       signature === 'mock_verified' ||
       signature === 'sim_signature' ||
@@ -340,7 +340,7 @@ export async function fetchRazorpayOrder(orderId: string): Promise<RazorpayOrder
         is_mock: true,
       };
     }
-    const mockAmountMatch = orderId.match(/^order_mock_(\d+)_/);
+    const mockAmountMatch = orderId.match(/^(?:order_mock|mock_cf)_(\d+)_/);
     const mockAmount = mockAmountMatch ? parseInt(mockAmountMatch[1], 10) : 11000;
     return {
       id: orderId,

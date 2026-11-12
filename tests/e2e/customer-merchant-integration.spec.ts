@@ -13,7 +13,7 @@ const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRE
 
 test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () => {
   const testCustomerEmail = 'customer.integration@tirupati.care';
-  let testCustomerId = '5a260a06-041c-4f7f-afc0-d35ef3a9703b'; // Ravi Teja (+919999900001) authenticated profile
+  let testCustomerId = '2410b495-a238-49ff-a37c-56cfc52654f1'; // Ravi Teja (+919999900001) authenticated profile
   const testResourceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // Dr. S. K. Murthy
   const svimsMerchantEmail = 'svims.clinic@tirupati-appointments.com';
   const svimsMerchantPassword = 'SvimsClinic2026!';
@@ -58,7 +58,8 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
       },
     });
     expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await holdRes.json();
+    const { booking_id } = holdData;
 
     const orderRes = await request.post('http://localhost:3000/api/payments/create-order', {
       headers: {
@@ -93,13 +94,14 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
   };
 
   test.beforeAll(async () => {
-    const { data: p } = await supabase
+    const { data: profiles } = await supabase
       .from('profiles')
       .select('id')
       .eq('phone', '+919999900001')
-      .maybeSingle();
-    if (p?.id) {
-      testCustomerId = p.id;
+      .order('created_at', { ascending: true })
+      .limit(1);
+    if (profiles?.[0]?.id) {
+      testCustomerId = profiles[0].id;
     }
     await cleanUpTestBookings();
   });
