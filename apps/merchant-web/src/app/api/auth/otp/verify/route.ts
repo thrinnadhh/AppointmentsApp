@@ -40,6 +40,19 @@ export async function POST(req: NextRequest) {
 
     const e164 = parsedPhone.format('E.164');
 
+    const ip = getClientIp(req);
+    if (ip) {
+      const ipLimit = await checkRateLimit(`otp-verify-ip:${ip}`, 15, 600);
+      if (!ipLimit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many verification attempts from this network. Please wait 10 minutes.' },
+          { status: 429, headers: { 'Retry-After': String(ipLimit.reset - Math.floor(Date.now() / 1000)) } }
+        );
+      }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/auth/otp/verify' });
+    }
+
     // Rate limit: 5 OTP verification attempts per phone per 10 minutes (prevents brute forcing)
     const { allowed, reset } = await checkRateLimit(`otp-verify:${e164}`, 5, 600);
     if (!allowed) {
@@ -53,17 +66,6 @@ export async function POST(req: NextRequest) {
           },
         }
       );
-    }
-
-    const ip = getClientIp(req);
-    if (ip) {
-      const ipLimit = await checkRateLimit(`otp-verify-ip:${ip}`, 15, 600);
-      if (!ipLimit.allowed) {
-        return NextResponse.json(
-          { error: 'Too many verification attempts from this network. Please wait 10 minutes.' },
-          { status: 429, headers: { 'Retry-After': String(ipLimit.reset - Math.floor(Date.now() / 1000)) } }
-        );
-      }
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

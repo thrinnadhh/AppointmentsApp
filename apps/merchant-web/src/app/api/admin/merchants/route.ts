@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAdminMerchants, updateAdminMerchantStatus } from '@/lib/supabase';
-import { verifyAdminRequest } from '@/lib/auth-admin';
+import { verifyAdminOrCityDirectorRequest } from '@/lib/auth-admin';
 import { Database } from '@appointments/shared';
 
 type ProviderStatus = Database['public']['Enums']['provider_status'];
@@ -9,15 +9,33 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await verifyAdminRequest(request);
+    const authResult = await verifyAdminOrCityDirectorRequest(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const cityId = searchParams.get('cityId') || undefined;
+    const requestedCityId = searchParams.get('cityId') || undefined;
 
-    const merchants = await fetchAdminMerchants(cityId);
+    let effectiveCityId = requestedCityId;
+    if (authResult.profile.role === 'city_director') {
+      const assignedCity = authResult.profile.assigned_city_id;
+      if (!assignedCity) {
+        return NextResponse.json(
+          { error: 'Forbidden: City Director profile has no assigned city' },
+          { status: 403 }
+        );
+      }
+      if (requestedCityId && requestedCityId !== 'all' && requestedCityId !== assignedCity) {
+        return NextResponse.json(
+          { error: 'Forbidden: City Director access restricted to assigned city' },
+          { status: 403 }
+        );
+      }
+      effectiveCityId = assignedCity;
+    }
+
+    const merchants = await fetchAdminMerchants(effectiveCityId);
     return NextResponse.json({ merchants });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch merchants';
@@ -27,7 +45,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const authResult = await verifyAdminRequest(request);
+    const authResult = await verifyAdminOrCityDirectorRequest(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -48,6 +66,28 @@ export async function PATCH(request: NextRequest) {
         { error: 'Invalid providerId format' },
         { status: 400 }
       );
+    }
+
+    // Verify City Director authorization scope
+    if (authResult.profile.role === 'city_director') {
+      const assignedCity = authResult.profile.assigned_city_id;
+      const { getSupabaseAdmin } = await import('@/lib/supabase');
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data: targetProv } = await supabaseAdmin
+        .from('providers')
+        .select('id, city_id')
+        .eq('id', providerId)
+        .maybeSingle();
+
+      if (!targetProv) {
+        return NextResponse.json({ error: 'Merchant provider not found' }, { status: 404 });
+      }
+      if (targetProv.city_id !== assignedCity) {
+        return NextResponse.json(
+          { error: 'Forbidden: City Directors cannot manage merchants outside their assigned city' },
+          { status: 403 }
+        );
+      }
     }
 
     if (daily_booking_limit !== undefined && daily_booking_limit !== null) {

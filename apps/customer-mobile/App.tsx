@@ -23,12 +23,16 @@ import { Resource, Slot, Booking, getPlatformFee } from '@appointments/shared';
 
 import HomeScreen from './src/screens/HomeScreen';
 import ProviderDetailScreen from './src/screens/ProviderDetailScreen';
+import CustomerDetailsModal, { CustomerBookingDetails } from './src/screens/CustomerDetailsModal';
 import CheckoutModal from './src/screens/CheckoutModal';
+import BookingPassModal from './src/screens/BookingPassModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import DoctorEmergencyModal from './src/components/DoctorEmergencyModal';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import {
   fetchCustomerBookingsFromSupabase,
+  fetchSingleCustomerBookingFromSupabase,
   cancelBookingOnSupabase,
   rescheduleBookingOnSupabase,
   markBookingReached,
@@ -41,6 +45,10 @@ import {
   signOutCustomer,
   supabase,
 } from './src/services/api';
+import {
+  registerForPushNotificationsAsync,
+  setupNotificationListeners,
+} from './src/services/notifications';
 
 type ScreenType = 'HOME' | 'PROVIDER_DETAIL' | 'MY_BOOKINGS';
 
@@ -50,14 +58,21 @@ export interface NavigationEntry {
   categoryId?: string | null;
 }
 
-const DEMO_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
-
 export default function App() {
   // Navigation History Stack ensures returning from booking goes to exactly where the user left off
   const [history, setHistory] = useState<NavigationEntry[]>([
     { screen: 'HOME', categoryId: null },
   ]);
   const [checkoutVisible, setCheckoutVisible] = useState<boolean>(false);
+  const [detailsModalVisible, setDetailsModalVisible] = useState<boolean>(false);
+  const [patientBookingDetails, setPatientBookingDetails] = useState<CustomerBookingDetails>({
+    fullName: '',
+    phone: '',
+    email: '',
+  });
+  const [assignedTokenNumber, setAssignedTokenNumber] = useState<number | undefined>(undefined);
+  const [passModalVisible, setPassModalVisible] = useState<boolean>(false);
+  const [selectedBookingForPass, setSelectedBookingForPass] = useState<(Booking & { provider_name?: string; resource_name?: string }) | null>(null);
   const [profileVisible, setProfileVisible] = useState<boolean>(false);
   const [accountVisible, setAccountVisible] = useState<boolean>(false);
   const [activeResource, setActiveResource] = useState<Resource | null>(null);
@@ -67,14 +82,14 @@ export default function App() {
   const [activeProviderId, setActiveProviderId] = useState<string | undefined>(undefined);
 
   // Authentication & Active Customer State
-  const [activeCustomerId, setActiveCustomerId] = useState<string>(DEMO_CUSTOMER_ID);
+  const [activeCustomerId, setActiveCustomerId] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [isEmailVerified, setIsEmailVerified] = useState<boolean>(false);
-  const [authPhone, setAuthPhone] = useState<string>('+919999999991');
+  const [authPhone, setAuthPhone] = useState<string>('');
   const [authOtp, setAuthOtp] = useState<string>('');
   const [otpSent, setOtpSent] = useState<boolean>(false);
-  const [authEmail, setAuthEmail] = useState<string>('trinadh.patient@appointments4u.in');
+  const [authEmail, setAuthEmail] = useState<string>('');
   const [authEmailOtp, setAuthEmailOtp] = useState<string>('');
   const [emailOtpSent, setEmailOtpSent] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState<boolean>(false);
@@ -88,10 +103,10 @@ export default function App() {
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
-    name: 'Trinadh Test Patient',
-    phone: '+91 98765 43210',
-    email: 'trinadh.patient@appointments4u.in',
-    city: 'Tirupati, AP',
+    name: 'Ravi Teja',
+    phone: '',
+    email: '',
+    city: '',
   });
 
   // Check existing Supabase session on app startup
@@ -123,6 +138,22 @@ export default function App() {
     checkSession();
   }, []);
 
+  // Deep-linking listener for push notifications: opens ticket / booking pass on notification tap
+  useEffect(() => {
+    const unsubscribe = setupNotificationListeners(async (bookingId) => {
+      try {
+        const booking = await fetchSingleCustomerBookingFromSupabase(bookingId);
+        if (booking) {
+          setSelectedBookingForPass(booking);
+          setPassModalVisible(true);
+        }
+      } catch (err) {
+        console.warn('Failed to load booking from push notification tap:', err);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
   // Stored customer bookings (seeded from Supabase)
   const [customerBookings, setCustomerBookings] = useState<
     (Booking & { provider_name?: string; resource_name?: string })[]
@@ -130,20 +161,55 @@ export default function App() {
 
   const [confirmationToast, setConfirmationToast] = useState<string | null>(null);
 
+  const [hasMoreBookings, setHasMoreBookings] = useState(false);
+  const [isLoadingMoreBookings, setIsLoadingMoreBookings] = useState(false);
+
   const loadBookings = useCallback(async () => {
+    if (!activeCustomerId) {
+      setCustomerBookings([]);
+      setHasMoreBookings(false);
+      return;
+    }
     try {
-      const data = await fetchCustomerBookingsFromSupabase(activeCustomerId);
+      const data = await fetchCustomerBookingsFromSupabase(activeCustomerId, 20, 0);
       if (data && data.length > 0) {
         setCustomerBookings((prev) => {
           const remoteIds = new Set(data.map((d) => d.id));
           const localOnly = prev.filter((p) => !remoteIds.has(p.id));
           return [...data, ...localOnly];
         });
+        setHasMoreBookings(data.length === 20);
+      } else {
+        setCustomerBookings([]);
+        setHasMoreBookings(false);
       }
     } catch (e) {
       console.warn('Error loading customer bookings from Supabase:', e);
     }
   }, [activeCustomerId]);
+
+  const handleLoadMoreBookings = useCallback(async () => {
+    if (isLoadingMoreBookings || !activeCustomerId) return;
+    setIsLoadingMoreBookings(true);
+    try {
+      const offset = customerBookings.length;
+      const data = await fetchCustomerBookingsFromSupabase(activeCustomerId, 20, offset);
+      if (data && data.length > 0) {
+        setCustomerBookings((prev) => {
+          const remoteIds = new Set(prev.map((d) => d.id));
+          const newUnique = data.filter((d) => !remoteIds.has(d.id));
+          return [...prev, ...newUnique];
+        });
+        setHasMoreBookings(data.length === 20);
+      } else {
+        setHasMoreBookings(false);
+      }
+    } catch (e) {
+      console.warn('Error loading more customer bookings:', e);
+    } finally {
+      setIsLoadingMoreBookings(false);
+    }
+  }, [activeCustomerId, customerBookings.length, isLoadingMoreBookings]);
 
   useEffect(() => {
     if (currentScreen === 'MY_BOOKINGS') {
@@ -152,6 +218,11 @@ export default function App() {
   }, [currentScreen, loadBookings]);
 
   useEffect(() => {
+    if (!activeCustomerId) {
+      setCustomerBookings([]);
+      return;
+    }
+
     loadBookings();
 
     const channel = supabase
@@ -164,9 +235,10 @@ export default function App() {
           table: 'bookings',
           filter: `customer_id=eq.${activeCustomerId}`,
         },
-        (payload) => {
+        async (payload) => {
           const newStatus = (payload.new as { status?: string })?.status;
-          const newRec = payload.new as { status?: string; reminder_1h_sent_at?: string };
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
           if (newStatus === 'COMPLETED') {
             setConfirmationToast('🎉 Consultation Complete! Status changed to COMPLETED. In-app & email notification delivered.');
             setTimeout(() => setConfirmationToast(null), 12000);
@@ -177,7 +249,35 @@ export default function App() {
             setConfirmationToast('Appointment Confirmed on Supabase! Status is now CONFIRMED.');
             setTimeout(() => setConfirmationToast(null), 10000);
           }
-          loadBookings();
+
+          if (payload.eventType === 'DELETE' && oldRec?.id) {
+            setCustomerBookings((prev) => prev.filter((b) => b.id !== oldRec.id));
+          } else if (newRec?.id) {
+            // If fields are missing (e.g. INSERT or partial payload), fetch only the one changed row by id
+            const hasJoinedFields = Boolean(newRec.provider_name && newRec.resource_name);
+            if (!hasJoinedFields) {
+              const fullRow = await fetchSingleCustomerBookingFromSupabase(newRec.id);
+              if (fullRow) {
+                setCustomerBookings((prev) => {
+                  const exists = prev.some((b) => b.id === fullRow.id);
+                  return exists
+                    ? prev.map((b) => (b.id === fullRow.id ? { ...b, ...fullRow } : b))
+                    : [fullRow, ...prev];
+                });
+              } else {
+                setCustomerBookings((prev) =>
+                  prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                );
+              }
+            } else {
+              setCustomerBookings((prev) => {
+                const exists = prev.some((b) => b.id === newRec.id);
+                return exists
+                  ? prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                  : [newRec, ...prev];
+              });
+            }
+          }
         }
       )
       .subscribe();
@@ -198,13 +298,15 @@ export default function App() {
       const res = await sendPhoneOtp(authPhone);
       if (res.success) {
         setOtpSent(true);
-        setConfirmationToast('OTP sent! Test OTP is 123456');
+        setConfirmationToast('Code sent on WhatsApp! Test OTP is 123456');
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {
-        setAuthError(res.error || 'Failed to send OTP');
+        setAuthError(
+          res.error || "We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again."
+        );
       }
-    } catch (err: unknown) {
-      setAuthError(err instanceof Error ? err.message : 'Error sending OTP');
+    } catch {
+      setAuthError("We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again.");
     } finally {
       setAuthLoading(false);
     }
@@ -229,10 +331,14 @@ export default function App() {
         setIsPhoneVerified(true);
         setOtpSent(false);
         setAuthOtp('');
+        setProfileVisible(false);
         setCustomerProfile((prev) => ({
           ...prev,
           phone: formattedPhone,
         }));
+        if (activeResource && activeSlot) {
+          setCheckoutVisible(true);
+        }
         setConfirmationToast('Phone verified! Signed in with Supabase.');
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {
@@ -299,15 +405,16 @@ export default function App() {
     setAuthLoading(true);
     try {
       await signOutCustomer();
-      setActiveCustomerId(DEMO_CUSTOMER_ID);
+      setActiveCustomerId('');
       setIsAuthenticated(false);
+      setCustomerBookings([]);
       setOtpSent(false);
       setAuthOtp('');
       setCustomerProfile({
-        name: 'Ravi Teja',
-        phone: '+91 98765 43210',
-        email: 'ravi.teja@customer.tirupati.in',
-        city: 'Tirupati, AP',
+        name: '',
+        phone: '',
+        email: '',
+        city: '',
       });
       setConfirmationToast('Signed out. Switched to Guest mode.');
       setTimeout(() => setConfirmationToast(null), 4000);
@@ -414,11 +521,33 @@ export default function App() {
     if (providerName) setActiveProviderName(providerName);
     setActiveProviderCoolingDays(coolingPeriodDays);
     setActiveProviderId(providerId || selectedProviderId);
+    setDetailsModalVisible(true);
+  };
+
+  const handleProceedFromDetails = (details: CustomerBookingDetails) => {
+    setPatientBookingDetails(details);
+    setCustomerProfile((prev) => ({
+      ...prev,
+      name: details.fullName,
+      phone: details.phone,
+      email: details.email || prev.email,
+    }));
+    if (!isAuthenticated) {
+      setIsAuthenticated(true);
+    }
+    setDetailsModalVisible(false);
     setCheckoutVisible(true);
   };
 
-  const handlePaymentSuccess = (bookingId: string, referenceCode?: string, isFollowup?: boolean) => {
+  const handlePaymentSuccess = (
+    bookingId: string,
+    referenceCode?: string,
+    isFollowup?: boolean,
+    tokenNumber?: number
+  ) => {
     setCheckoutVisible(false);
+    const token = tokenNumber || 1;
+    setAssignedTokenNumber(token);
     const fee = isFollowup ? 0 : getPlatformFee(activeCategoryId);
     const deposit = isFollowup ? 0 : (Number(activeResource?.deposit_amount) || 100);
     const total = deposit + fee;
@@ -428,11 +557,9 @@ export default function App() {
     const hospitalName = activeProviderName || 'Hospital';
     const refCode = referenceCode || `TPT-${bookingId.slice(0, 6).toUpperCase()}`;
 
-    if (isFollowup) {
-      setConfirmationToast(`Booking Confirmed! Appointment Confirmed at ${hospitalName}! Time: ${slotTimeFormatted}. Ref: ${refCode}. Expected arrival: 10 mins prior (Zero-wait queue).`);
-    } else {
-      setConfirmationToast(`Booking Confirmed! Appointment Confirmed at ${hospitalName}! Time: ${slotTimeFormatted}. Ref: ${refCode}. Expected arrival: 10 mins prior. Paid ₹${total}.`);
-    }
+    setConfirmationToast(
+      `🎉 Token #${token} Assigned & Registered! Ref: ${refCode}. Appointment at ${hospitalName} (${slotTimeFormatted}).`
+    );
 
     const newBooking: Booking & { provider_name?: string; resource_name?: string } = {
       id: bookingId,
@@ -447,7 +574,8 @@ export default function App() {
       platform_fee: fee,
       total_amount: total,
       is_followup: Boolean(isFollowup),
-      reference_code: referenceCode || `TPT-${bookingId.slice(0, 6).toUpperCase()}`,
+      reference_code: refCode,
+      queue_position: token,
       provider_name: activeProviderName || 'Sri Venkateswara Dental & Implant Care',
       resource_name: activeResource?.name || 'Assigned Staff / Unit',
       created_at: new Date().toISOString(),
@@ -455,11 +583,21 @@ export default function App() {
     };
     setCustomerBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== bookingId)]);
 
-    // Push MY_BOOKINGS onto history so clicking back returns to where the user left off (Provider Detail)
+    // Push MY_BOOKINGS onto history so navigation state transitions to My Bookings
     setHistory((prev) => [
       ...prev,
       { screen: 'MY_BOOKINGS', providerId: selectedProviderId, categoryId: activeCategoryId },
     ]);
+
+    // Present appointment pass with assigned token directly in-app!
+    setSelectedBookingForPass(newBooking);
+    setPassModalVisible(true);
+
+    // Prompt for push notification permission at this sensible moment (right after booking confirmation)
+    if (activeCustomerId) {
+      registerForPushNotificationsAsync(activeCustomerId).catch(() => null);
+    }
+
     loadBookings();
 
     setTimeout(() => {
@@ -535,42 +673,138 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, [handleGoBack]);
 
+  const upcomingBooking = customerBookings.find(
+    (b) =>
+      (b.status === 'CONFIRMED' || b.status === 'CHECKED_IN' || b.status === 'HELD') &&
+      new Date(b.slot_end).getTime() > Date.now() - 30 * 60 * 1000
+  );
+
+  const upcomingCount = customerBookings.filter(
+    (b) => b.status === 'CONFIRMED' || b.status === 'CHECKED_IN' || b.status === 'HELD'
+  ).length;
+
+  const emergencyBooking = customerBookings.find(
+    (b) => b.emergency_cancelled === true && !b.emergency_patient_choice
+  );
+
   return (
     <ErrorBoundary>
       <View style={styles.container}>
         <StatusBar style="dark" />
 
       {/* Screen Router */}
-      {currentScreen === 'HOME' && (
-        <HomeScreen
-          selectedCategory={activeCategoryId}
-          onSelectCategory={handleSelectCategory}
-          onSelectProvider={handleSelectProvider}
-          onOpenMyBookings={handleOpenMyBookings}
-          onOpenProfile={() => setProfileVisible(true)}
-        />
-      )}
+      <View style={{ flex: 1 }}>
+        {currentScreen === 'HOME' && (
+          <HomeScreen
+            selectedCategory={activeCategoryId}
+            onSelectCategory={handleSelectCategory}
+            onSelectProvider={handleSelectProvider}
+            onOpenMyBookings={handleOpenMyBookings}
+            onOpenProfile={() => setProfileVisible(true)}
+            upcomingBooking={upcomingBooking}
+            onOpenPassModal={(booking) => {
+              setSelectedBookingForPass(booking);
+              setPassModalVisible(true);
+            }}
+            onMarkReached={handleMarkReached}
+          />
+        )}
 
       {currentScreen === 'PROVIDER_DETAIL' && (
         <ProviderDetailScreen
           providerId={selectedProviderId}
           customerId={activeCustomerId}
+          isGuest={!isAuthenticated}
           onBack={handleGoBack}
           onProceedToHold={handleProceedToHold}
+          onOpenSignIn={() => setProfileVisible(true)}
         />
       )}
 
-      {currentScreen === 'MY_BOOKINGS' && (
-        <MyBookingsScreen
-          onBack={handleGoBack}
-          bookings={customerBookings}
-          onCancelBooking={handleCancelBooking}
-          onRescheduleBooking={handleRescheduleBooking}
-          onMarkReached={handleMarkReached}
-        />
-      )}
+        {currentScreen === 'MY_BOOKINGS' && (
+          <MyBookingsScreen
+            onBack={handleGoBack}
+            bookings={customerBookings}
+            customerId={activeCustomerId}
+            onCancelBooking={handleCancelBooking}
+            onRescheduleBooking={handleRescheduleBooking}
+            onMarkReached={handleMarkReached}
+            onLoadMore={handleLoadMoreBookings}
+            hasMore={hasMoreBookings}
+            isLoadingMore={isLoadingMoreBookings}
+          />
+        )}
+      </View>
 
-      {/* Checkout Modal with 5-min Hold Timer */}
+      {/* Persistent Bottom Navigation Bar */}
+      <View style={styles.bottomTabBar} testID="customer-bottom-tab-bar">
+        <TouchableOpacity
+          style={[styles.bottomTabItem, currentScreen === 'HOME' && styles.bottomTabItemActive]}
+          onPress={() => {
+            setHistory([{ screen: 'HOME', categoryId: null }]);
+          }}
+          testID="tab-nav-explore"
+          accessibilityLabel="Explore Home"
+        >
+          <Text style={styles.bottomTabIcon}>🏠</Text>
+          <Text style={[styles.bottomTabLabel, currentScreen === 'HOME' && styles.bottomTabLabelActive]}>
+            Explore
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.bottomTabItem, currentScreen === 'MY_BOOKINGS' && styles.bottomTabItemActive]}
+          onPress={handleOpenMyBookings}
+          testID="tab-nav-my-appointments"
+          accessibilityLabel="My Appointments"
+        >
+          <View style={{ position: 'relative' }}>
+            <Text style={styles.bottomTabIcon}>📅</Text>
+            {upcomingCount > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{upcomingCount}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.bottomTabLabel, currentScreen === 'MY_BOOKINGS' && styles.bottomTabLabelActive]}>
+            Appointments
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.bottomTabItem}
+          onPress={() => setProfileVisible(true)}
+          testID="tab-nav-account"
+          accessibilityLabel="My Profile"
+        >
+          <Text style={styles.bottomTabIcon}>👤</Text>
+          <Text style={styles.bottomTabLabel}>Account</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 1. Pre-Booking Patient Details & Google Sign-In Modal */}
+      <CustomerDetailsModal
+        visible={detailsModalVisible}
+        initialName={customerProfile.name}
+        initialPhone={customerProfile.phone}
+        initialEmail={customerProfile.email}
+        doctorName={activeResource?.name}
+        slotTime={activeSlot?.start_time ? new Date(activeSlot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+        isAuthenticated={isAuthenticated}
+        onClose={() => setDetailsModalVisible(false)}
+        onProceedToPayment={handleProceedFromDetails}
+        onAuthSuccess={(user) => {
+          setIsAuthenticated(true);
+          setActiveCustomerId(user.id);
+          if (user.phone) setIsPhoneVerified(true);
+          if (user.email) {
+            setIsEmailVerified(true);
+            setAuthEmail(user.email);
+          }
+        }}
+      />
+
+      {/* 2. Checkout Modal with 5-min Hold Timer */}
       <CheckoutModal
         visible={checkoutVisible}
         resource={activeResource}
@@ -579,8 +813,52 @@ export default function App() {
         customerId={activeCustomerId}
         providerId={activeProviderId || selectedProviderId}
         coolingPeriodDays={activeProviderCoolingDays}
+        patientDetails={patientBookingDetails}
+        isAuthenticated={isAuthenticated}
+        onRequireAuth={() => {
+          setAuthError('Please verify your phone number to reserve an appointment.');
+          setProfileVisible(true);
+        }}
         onClose={() => setCheckoutVisible(false)}
         onPaymentSuccess={handlePaymentSuccess}
+      />
+
+      {/* 3. In-App Appointment Pass & Queue Token Modal */}
+      <BookingPassModal
+        visible={passModalVisible}
+        booking={selectedBookingForPass}
+        patientDetails={patientBookingDetails}
+        assignedTokenNumber={assignedTokenNumber}
+        onClose={() => setPassModalVisible(false)}
+        onMarkReached={handleMarkReached}
+      />
+
+      {/* 4. Doctor Emergency Notice & Choice Modal */}
+      <DoctorEmergencyModal
+        visible={Boolean(emergencyBooking)}
+        booking={emergencyBooking || null}
+        onChoiceResolved={(choice, bookingId) => {
+          setCustomerBookings((prev) =>
+            prev.map((b) =>
+              b.id === bookingId
+                ? {
+                    ...b,
+                    emergency_patient_choice: choice,
+                    status: choice === 'WAIT' ? 'CONFIRMED' : 'CANCELLED',
+                    payment_status: choice === 'REFUND' ? 'REFUNDED' : b.payment_status,
+                  }
+                : b
+            )
+          );
+          loadBookings();
+        }}
+        onRequestReschedule={(b) => {
+          setHistory((prev) => [
+            ...prev,
+            { screen: 'PROVIDER_DETAIL', providerId: b.provider_id },
+          ]);
+        }}
+        onClose={() => {}}
       />
 
 
@@ -649,7 +927,7 @@ export default function App() {
               {/* Phone OTP Authentication Card */}
               <View style={styles.authCard}>
                 <View style={styles.authCardHeader}>
-                  <Text style={styles.authCardTitle}>2. Phone Verification (SMS OTP)</Text>
+                  <Text style={styles.authCardTitle}>2. Phone Verification (WhatsApp Code)</Text>
                 </View>
                 <Text style={styles.authCardSubtitle}>
                   {isAuthenticated
@@ -779,7 +1057,7 @@ export default function App() {
                           style={styles.authTextInput}
                           value={authEmail}
                           onChangeText={setAuthEmail}
-                          placeholder="trinadh.patient@appointments4u.in"
+                          placeholder="patient@example.com"
                           placeholderTextColor="#94a3b8"
                           keyboardType="email-address"
                           autoCapitalize="none"
@@ -930,6 +1208,61 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  bottomTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  bottomTabItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  bottomTabItemActive: {
+    backgroundColor: '#ecfdf5',
+  },
+  bottomTabIcon: {
+    fontSize: 20,
+    marginBottom: 2,
+  },
+  bottomTabLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  bottomTabLabelActive: {
+    color: '#047857',
+    fontWeight: '800',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#047857',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
   },
   screenContainer: {
     flex: 1,

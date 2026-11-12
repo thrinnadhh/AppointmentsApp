@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAdminRequest } from '@/lib/auth-admin';
+import { verifyAdminOrCityDirectorRequest } from '@/lib/auth-admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await verifyAdminRequest(request);
+    const authResult = await verifyAdminOrCityDirectorRequest(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
@@ -16,14 +16,44 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const paymentStatus = searchParams.get('payment_status');
     const needsReconciliation = searchParams.get('needs_reconciliation') === 'true';
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const rawLimit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const rawOffset = parseInt(searchParams.get('offset') || '0', 10);
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    // Enforce City Director assigned city boundary
+    if (authResult.profile.role === 'city_director') {
+      const assignedCity = authResult.profile.assigned_city_id;
+      if (!assignedCity) {
+        return NextResponse.json(
+          { error: 'Forbidden: City Director has no assigned city' },
+          { status: 403 }
+        );
+      }
+      if (providerId) {
+        const { data: prov } = await supabaseAdmin
+          .from('providers')
+          .select('id, city_id')
+          .eq('id', providerId)
+          .maybeSingle();
+        if (!prov || prov.city_id !== assignedCity) {
+          return NextResponse.json(
+            { error: 'Forbidden: City Directors cannot access bookings outside their assigned city' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     let query = supabaseAdmin
       .from('bookings')
       .select(`
-        *,
+        id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
+        status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
+        checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
+        created_at, updated_at,
         resources (
           id,
           name,
@@ -37,13 +67,21 @@ export async function GET(request: NextRequest) {
           name,
           category_id,
           city,
+          city_id,
           address
         )
       `)
       .order('slot_start', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (providerId) {
+    if (authResult.profile.role === 'city_director' && !providerId) {
+      const { data: cityProviders } = await supabaseAdmin
+        .from('providers')
+        .select('id')
+        .eq('city_id', authResult.profile.assigned_city_id!);
+      const cityProviderIds = cityProviders?.map((p) => p.id) || [];
+      query = query.in('provider_id', cityProviderIds);
+    } else if (providerId) {
       query = query.eq('provider_id', providerId);
     }
 

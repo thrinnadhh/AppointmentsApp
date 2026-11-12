@@ -16,10 +16,10 @@ This Incident Response Plan establishes standard operating procedures for identi
 
 | Role | Primary Responsibilities | Contact Token |
 |---|---|---|
-| **Incident Commander (IC)** | Leads technical containment and forensic investigation | `{{INCIDENT_COMMANDER_EMAIL}}` |
-| **Data Protection / Grievance Officer** | Assesses regulatory obligations, interfaces with DPBI & users | `{{GRIEVANCE_OFFICER_EMAIL}}` |
-| **Lead Backend / Infrastructure Engineer** | Executes session revocations, token invalidations, and DB isolation | `{{INFRA_LEAD_EMAIL}}` |
-| **Legal Counsel** | Drafts regulatory submissions and coordinates statutory communications | `{{LEGAL_COUNSEL_EMAIL}}` |
+| **Incident Commander (IC)** | Leads technical containment and forensic investigation | `security@appointments4u.in` |
+| **Data Protection / Grievance Officer** | Assesses regulatory obligations, interfaces with DPBI & users | Configured via `NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME`, `NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL`, `NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE`, `NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS` |
+| **Lead Backend / Infrastructure Engineer** | Executes session revocations, token invalidations, and DB isolation | `infra@appointments4u.in` |
+| **Legal Counsel** | Drafts regulatory submissions and coordinates statutory communications | `legal@appointments4u.in` |
 
 ---
 
@@ -40,7 +40,7 @@ This Incident Response Plan establishes standard operating procedures for identi
 1. **Trigger Sources:**
    - Database anomalous reveal velocity alerts via `contact_reveal_anomalies` view.
    - WAF / Gateway rate-limiting violations.
-   - User or merchant security vulnerability report received at `{{SECURITY_REPORT_EMAIL}}`.
+   - User or merchant security vulnerability report received at `security@appointments4u.in`.
 2. **Immediate Action:** The person discovering the anomaly creates an emergency ticket in the internal incident channel and pages the Incident Commander.
 
 ### Stage 2: Immediate Containment
@@ -103,8 +103,11 @@ While your financial data was not involved, we recommend remaining cautious of a
 
 For More Information:
 If you have any questions or concerns, please contact our Data Protection & Grievance Officer at:
-- Email: {{GRIEVANCE_OFFICER_EMAIL}}
-- Address: {{GRIEVANCE_OFFICER_ADDRESS}}
+- Name: ${NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME}
+- Designation: ${NEXT_PUBLIC_GRIEVANCE_OFFICER_DESIGNATION}
+- Email: ${NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL}
+- Phone: ${NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE}
+- Address: ${NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS}
 
 Sincerely,
 The Appointments4u Team

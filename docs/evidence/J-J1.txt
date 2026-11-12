@@ -1,0 +1,71 @@
+=== TRACKED FILES AUDIT: PROJECT REF OCCURRENCES ===
+[REF FOUND] 2026-11-08_DRIFT_REPORT.md:211
+[REF FOUND] docs/PRODUCTION_READINESS_ROADMAP.md:198
+[REF FOUND] docs/SECRETS_OPERATOR_CHECKLIST.md:15
+[REF FOUND] docs/SECRETS_OPERATOR_CHECKLIST.md:27
+[REF FOUND] docs/SECRETS_OPERATOR_CHECKLIST.md:30
+[REF FOUND] docs/SECRETS_OPERATOR_CHECKLIST.md:94
+[REF FOUND] docs/architecture/hospital-manual-testing-checklist.md:5
+[REF FOUND] docs/architecture/test-report-hospital.md:6
+[REF FOUND] docs/security/advisor-resolution.md:6
+[REF FOUND] docs/security/advisor-resolution.md:170
+[REF FOUND] docs/security/perf-advisor-resolution.md:7
+[REF FOUND] docs/security/perf-advisor-resolution.md:125
+[REF FOUND] scripts/e2e-trinadh-hospital-test.mjs:17
+[REF FOUND] scripts/generate-advisor-report.mjs:10
+[REF FOUND] scripts/generate-advisor-report.mjs:141
+[REF FOUND] tests/e2e/admin-auth-guard.spec.ts:121
+[REF FOUND] tests/e2e/customer-app.spec.ts:5
+[REF FOUND] tests/e2e/customer-hospital-full-lifecycle.spec.ts:5
+[REF FOUND] tests/e2e/customer-merchant-integration.spec.ts:6
+[REF FOUND] tests/e2e/customer-reflection.spec.ts:6
+[REF FOUND] tests/e2e/google-auth-and-shop-registration.spec.ts:4
+[REF FOUND] tests/e2e/google-auth-and-shop-registration.spec.ts:103
+[REF FOUND] tests/e2e/merchant-operations.spec.ts:5
+[REF FOUND] tests/e2e/merchant-strike-and-reassignment.spec.ts:4
+[REF FOUND] tests/e2e/navigation.spec.ts:5
+[REF FOUND] tests/e2e/strike-policy-and-cancellation.spec.ts:4
+
+=== TRACKED FILES AUDIT: JWT TOKEN CLAIMS ===
+[JWT] playwright.config.ts:28 | iss: supabase-demo | ref: N/A | role: anon | exp: 2109503365 (2036-11-05T13:09:25.000Z) | isHostedTargetRef: false
+[JWT] playwright.config.ts:29 | iss: supabase-demo | ref: N/A | role: service_role | exp: 2109503365 (2036-11-05T13:09:25.000Z) | isHostedTargetRef: false
+[JWT] scripts/generate-full-test-table.mjs:12 | iss: supabase-demo | ref: N/A | role: service_role | exp: 2109404156 (2036-11-04T09:35:56.000Z) | isHostedTargetRef: false
+[JWT] scripts/seed-hospital-test-data.mjs:27 | iss: supabase-demo | ref: N/A | role: service_role | exp: 2109503365 (2036-11-05T13:09:25.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/edge-customer.spec.ts:30 | iss: supabase-demo | ref: N/A | role: service_role | exp: 2109503365 (2036-11-05T13:09:25.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/edge-integrations.spec.ts:24 | iss: supabase-demo | ref: N/A | role: anon | exp: 2109503365 (2036-11-05T13:09:25.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/edge-integrations.spec.ts:25 | iss: supabase-demo | ref: N/A | role: service_role | exp: 2109503365 (2036-11-05T13:09:25.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/stories/seed.mjs:17 | iss: supabase-demo | ref: N/A | role: service_role | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/stories/seed.mjs:18 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/stories/story-helpers.mjs:16 | iss: supabase-demo | ref: N/A | role: service_role | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/stories/story-helpers.mjs:17 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/test-clock-audit.test.mjs:24 | iss: supabase-demo | ref: N/A | role: service_role | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/test-clock-audit.test.mjs:25 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/workstreams/sa2-checkin-arrival.test.mjs:52 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/workstreams/sa4-consultation-flow.test.mjs:53 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/workstreams/sa6-consultant-isolation.test.mjs:26 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/e2e/workstreams/sa7-admin-governance.test.mjs:27 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/k6/load-test-config.json:3 | iss: N/A | ref: N/A | role: authenticated | exp: 1793887041 (2026-11-05T13:57:21.000Z) | isHostedTargetRef: false
+[JWT] tests/k6/load-test-config.json:5 | iss: N/A | ref: N/A | role: authenticated | exp: 1793887041 (2026-11-05T13:57:21.000Z) | isHostedTargetRef: false
+[JWT] tests/k6/load-test-config.json:7 | iss: N/A | ref: N/A | role: authenticated | exp: 1793887041 (2026-11-05T13:57:21.000Z) | isHostedTargetRef: false
+[JWT] tests/k6/load-test-config.json:9 | iss: N/A | ref: N/A | role: authenticated | exp: 1793887041 (2026-11-05T13:57:21.000Z) | isHostedTargetRef: false
+[JWT] tests/k6/load-test-config.json:13 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/demo-live-logs.mjs:69 | iss: N/A | ref: N/A | role: N/A | exp: N/A | isHostedTargetRef: false
+[JWT] tests/scripts/generate-load-test-tokens.mjs:101 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/run-mission-full-verification.mjs:27 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/seed-mission-e2e.mjs:31 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-admin-logs.mjs:12 | iss: N/A | ref: N/A | role: N/A | exp: N/A | isHostedTargetRef: false
+[JWT] tests/scripts/test-customer-pagination-and-admin-dashboards.mjs:15 | iss: supabase-demo | ref: N/A | role: service_role | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-e2e-logging-and-alerts.mjs:4 | iss: supabase-demo | ref: N/A | role: service_role | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-expired-holds-limit.mjs:34 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-logging-baseline.mjs:4 | iss: supabase-demo | ref: N/A | role: service_role | exp: 1944344000 (2031-08-12T23:33:20.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-profiles-security.mjs:5 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-realtime-fanout.mjs:21 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-ticket-freshness.mjs:37 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-ticket-freshness.mjs:38 | iss: supabase-demo | ref: N/A | role: service_role | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/scripts/test-waitlist-security.mjs:12 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+[JWT] tests/unit/hospital-hardened-rpcs.test.mjs:40 | iss: supabase-demo | ref: N/A | role: service_role | exp: 2109503365 (2036-11-05T13:09:25.000Z) | isHostedTargetRef: false
+[JWT] tests/unit/hospital-split-payment.test.mjs:9 | iss: supabase-demo | ref: N/A | role: service_role | exp: 1983875600 (2032-11-12T12:33:20.000Z) | isHostedTargetRef: false
+[JWT] tests/unit/mantis-track1-database-hardening.test.mjs:28 | iss: supabase-demo | ref: N/A | role: service_role | exp: 2109503365 (2036-11-05T13:09:25.000Z) | isHostedTargetRef: false
+[JWT] tests/unit/phase1-security-blockers.test.mjs:445 | iss: supabase-demo | ref: N/A | role: anon | exp: 1983812996 (2032-11-11T19:09:56.000Z) | isHostedTargetRef: false
+
+Total JWT tokens detected in tracked files: 40

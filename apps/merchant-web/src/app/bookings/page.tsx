@@ -1,24 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { ON_TIME_GRACE_MS } from '@/lib/queue-scheduler';
 import { 
   CheckCircle2, 
   Clock, 
-  Phone, 
   AlertTriangle,
   RotateCcw,
-  Check,
   Search,
   RefreshCw,
   Building2,
   Sparkles,
   FileText,
   MessageSquare,
-  Send,
-  Bell,
   Calendar,
-  History,
-  UserCheck
+  UserCheck,
+  Info
 } from 'lucide-react';
 import { 
   supabase, 
@@ -33,7 +30,9 @@ import {
   fetchBookingNotifications,
   manageLateQueueBooking,
   MerchantBookingWithDetails,
-  NotificationLog
+  fetchMerchantBookingById,
+  NotificationLog,
+  admitPatient
 } from '@/lib/supabase';
 import Link from 'next/link';
 import { BookingStatus, Provider, PaymentStatus, maskPhoneNumber } from '@appointments/shared';
@@ -61,26 +60,26 @@ export default function BookingsManagementPage() {
   const [reassignReason, setReassignReason] = useState('Emergency specialist change');
   const [isReassigning, setIsReassigning] = useState(false);
   const [notificationModalBooking, setNotificationModalBooking] = useState<MerchantBookingWithDetails | null>(null);
+  const [detailModalBooking, setDetailModalBooking] = useState<MerchantBookingWithDetails | null>(null);
   const [bookingNotificationLogs, setBookingNotificationLogs] = useState<NotificationLog[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [doctorLeftMap, setDoctorLeftMap] = useState<Record<string, boolean>>({});
 
-  // Late Arrival & Buffer Queue State
+  // Late Arrival & Standby Queue State
   const [lateCheckinBooking, setLateCheckinBooking] = useState<MerchantBookingWithDetails | null>(null);
-  const [lateBufferOffset, setLateBufferOffset] = useState<number>(2);
   const [isProcessingLateQueue, setIsProcessingLateQueue] = useState(false);
 
   const handleOpenLateCheckin = (booking: MerchantBookingWithDetails) => {
     setLateCheckinBooking(booking);
-    setLateBufferOffset(2);
   };
 
   const handleConfirmLateCheckin = async () => {
     if (!lateCheckinBooking) return;
     setIsProcessingLateQueue(true);
     try {
-      const res = await manageLateQueueBooking(lateCheckinBooking.id, 'CHECKIN_LATE', lateBufferOffset);
+      const res = await manageLateQueueBooking(lateCheckinBooking.id, 'CHECKIN_LATE');
       if (res.success) {
-        setFeedbackToast(`✓ ${lateCheckinBooking.customer_name} accommodated after ${lateBufferOffset} appointments. Token #${res.queue_position}.`);
+        setFeedbackToast(`✓ ${lateCheckinBooking.customer_name} placed in Standby Queue in original booking order (Token #${res.queue_position}).`);
         setLateCheckinBooking(null);
         await loadData();
       } else {
@@ -110,6 +109,32 @@ export default function BookingsManagementPage() {
     }
   };
 
+  const handleExpireStaleStandby = async () => {
+    try {
+      const targetProvider = selectedProviderId !== 'ALL' ? selectedProviderId : undefined;
+      const response = await fetch('/api/bookings/late-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'EXPIRE_STALE_STANDBY',
+          threshold_minutes: 45,
+          provider_id: targetProvider,
+        }),
+      });
+      const res = await response.json();
+      if (!response.ok || !res.success) {
+        setFeedbackToast(`⚠️ ${res.error || 'Failed to run standby sweep'}`);
+      } else {
+        setFeedbackToast(`🧹 Standby Sweep: Expired ${res.expired_count ?? 0} overdue patients (>45m wait).`);
+        await loadData();
+      }
+    } catch {
+      setFeedbackToast('⚠️ Error running standby sweep.');
+    } finally {
+      setTimeout(() => setFeedbackToast(null), 4000);
+    }
+  };
+
   // Sync selected provider when active provider changes
   useEffect(() => {
     if (activeProvider?.id && !isSuperAdmin) {
@@ -125,15 +150,23 @@ export default function BookingsManagementPage() {
         ? activeProvider?.id 
         : (selectedProviderId === 'ALL' ? undefined : selectedProviderId);
 
-      const [fetchedProviders, fetchedBookings] = await Promise.all([
+      const [fetchedProviders, fetchedBookings, fetchedResources] = await Promise.all([
         isSuperAdmin ? fetchAllProviders() : Promise.resolve(activeProvider ? [activeProvider] : []),
-        targetProviderId ? fetchMerchantBookings(targetProviderId) : Promise.resolve([])
+        targetProviderId ? fetchMerchantBookings(targetProviderId) : Promise.resolve([]),
+        targetProviderId ? fetchProviderResources(targetProviderId) : Promise.resolve([])
       ]);
 
       if (fetchedProviders) {
         setProviders(fetchedProviders);
       }
       setBookings(fetchedBookings || []);
+      if (fetchedResources) {
+        const leftMap: Record<string, boolean> = {};
+        for (const r of fetchedResources) {
+          leftMap[r.id] = Boolean((r.attributes as Record<string, unknown> | null)?.doctor_left);
+        }
+        setDoctorLeftMap(leftMap);
+      }
     } catch (err) {
       console.warn('Error loading bookings:', err);
       setBookings([]);
@@ -145,20 +178,57 @@ export default function BookingsManagementPage() {
   useEffect(() => {
     loadData();
 
+    if (!selectedProviderId) return;
+
     const channel = supabase
-      .channel(`bookings-mgmt-realtime-${selectedProviderId || 'all'}`)
+      .channel(`bookings-mgmt-realtime-${selectedProviderId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'bookings',
-          filter: selectedProviderId ? `provider_id=eq.${selectedProviderId}` : undefined,
+          filter: `provider_id=eq.${selectedProviderId}`,
         },
-        (payload) => {
-          const newStatus = (payload.new as { status?: string })?.status;
+        async (payload) => {
+          const eventType = payload.eventType;
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
+          const newStatus = newRec?.status;
           setFeedbackToast((current) => current || `Realtime Sync: Slot ${newStatus || 'updated'}`);
-          loadData();
+
+          if (eventType === 'DELETE' && oldRec?.id) {
+            setBookings((prev) => prev.filter((b) => b.id !== oldRec.id));
+          } else if (newRec?.id) {
+            // If joined fields are missing, fetch only the one changed row by id instead of reloading the list
+            const hasJoinedFields = Boolean(newRec.customer_name && newRec.resource_name);
+            if (!hasJoinedFields) {
+              const fullRow = await fetchMerchantBookingById(newRec.id);
+              if (fullRow) {
+                setBookings((prev) => {
+                  const exists = prev.some((b) => b.id === fullRow.id);
+                  return exists
+                    ? prev.map((b) => (b.id === fullRow.id ? { ...b, ...fullRow } : b))
+                    : [fullRow, ...prev];
+                });
+              } else {
+                setBookings((prev) => {
+                  const exists = prev.some((b) => b.id === newRec.id);
+                  return exists
+                    ? prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                    : [newRec, ...prev];
+                });
+              }
+            } else {
+              setBookings((prev) => {
+                const exists = prev.some((b) => b.id === newRec.id);
+                return exists
+                  ? prev.map((b) => (b.id === newRec.id ? { ...b, ...newRec } : b))
+                  : [newRec, ...prev];
+              });
+            }
+          }
+
           setTimeout(() => setFeedbackToast(null), 4000);
         }
       )
@@ -191,12 +261,17 @@ export default function BookingsManagementPage() {
     return t >= startOfWeek && t <= (now.getTime() + 48 * 60 * 60 * 1000);
   }).length;
 
-  const todayPresentCount = bookings.filter((b) => Boolean(b.is_present) && b.status === 'CONFIRMED').length;
+  const todayPresentCount = bookings.filter((b) => Boolean(b.is_present) && (b.status === 'CONFIRMED' || b.status === 'CHECKED_IN')).length;
 
   const filteredBookings = bookings.filter((b) => {
-    const matchesFilter = selectedFilter === 'ALL' || b.status === selectedFilter;
+    const matchesFilter =
+      selectedFilter === 'ALL' ||
+      (selectedFilter === 'CONFIRMED'
+        ? (b.status === 'CONFIRMED' || b.status === 'CHECKED_IN')
+        : b.status === selectedFilter);
     const matchesSearch = 
       (b.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.patient_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.reference_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.resource_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.provider_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -248,21 +323,27 @@ export default function BookingsManagementPage() {
         setFeedbackToast(`Booking updated to ${newStatus} on Supabase`);
       }
       await loadData();
-    } catch (err) {
-      console.error('Supabase error, updating locally:', err);
-      setBookings((prev) =>
-        prev.map((b) => {
-          if (b.id === bookingId) {
-            return {
-              ...b,
-              status: newStatus,
-              payment_status: paymentStatus || (newStatus === 'NO_SHOW' ? 'FORFEITED' : (newStatus === 'CANCELLED' ? 'REFUNDED' : b.payment_status)),
-              updated_at: new Date().toISOString(),
-            };
-          }
-          return b;
-        })
-      );
+    } catch (err: unknown) {
+      console.error('Error changing status:', err);
+      const msg = err instanceof Error ? err.message : 'Error updating booking status.';
+      setFeedbackToast(`⚠️ ${msg}`);
+    } finally {
+      setTimeout(() => setFeedbackToast(null), 4000);
+    }
+  };
+
+  const handleAdmitPatient = async (bookingId: string) => {
+    try {
+      const res = await admitPatient(bookingId);
+      if (res.success) {
+        setFeedbackToast('✓ Patient admitted and marked Present in OPD.');
+        await loadData();
+      } else {
+        setFeedbackToast(`⚠️ ${res.error || 'Failed to admit patient'}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error admitting patient.';
+      setFeedbackToast(`⚠️ ${msg}`);
     } finally {
       setTimeout(() => setFeedbackToast(null), 4000);
     }
@@ -490,6 +571,16 @@ export default function BookingsManagementPage() {
           )}
 
           <button
+            onClick={handleExpireStaleStandby}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+            title="Auto-expire patients in Standby Queue waiting longer than 45 minutes"
+          >
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
+            <span>Sweep Standby (&gt;45m)</span>
+          </button>
+
+          <button
             onClick={() => loadData()}
             disabled={loading}
             className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition shadow-sm"
@@ -619,6 +710,10 @@ export default function BookingsManagementPage() {
             const slotDate = new Date(booking.slot_start);
             const formattedTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const formattedDate = slotDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', weekday: 'short' });
+            const isPresent = Boolean(booking.is_present || booking.status === 'CHECKED_IN');
+            const isDoctorLeft = Boolean(doctorLeftMap[booking.resource_id]);
+            const isSlotTimeUp = new Date(booking.slot_end).getTime() <= Date.now();
+            const canShowNoShow = isSlotTimeUp && isDoctorLeft && !isPresent && booking.status === 'CONFIRMED';
 
             return (
               <div 
@@ -646,61 +741,100 @@ export default function BookingsManagementPage() {
                   </div>
 
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="font-bold text-slate-900 text-sm">{booking.customer_name || 'Customer'}</h2>
-                      {booking.reference_code && (
-                        <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                          {booking.reference_code}
-                        </span>
-                      )}
-                      {booking.is_present && (
-                        <span 
-                          data-testid={`queue-present-badge-${booking.id}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                          <span>📍 PRESENT</span>
-                        </span>
-                      )}
-                      {booking.queue_position && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
-                          Token #{booking.queue_position}
-                        </span>
-                      )}
-                      {booking.estimated_wait_minutes && booking.estimated_wait_minutes > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                          Wait: ~{booking.estimated_wait_minutes}m
-                        </span>
-                      ) : null}
-                      {!booking.is_present && booking.status === 'CONFIRMED' && new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-                          ⏳ NOT ARRIVED (STANDBY)
-                        </span>
-                      )}
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        booking.status === 'CONFIRMED'
-                          ? (booking.is_present ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800')
-                          : booking.status === 'HELD'
-                          ? 'bg-amber-100 text-amber-800'
-                          : booking.status === 'COMPLETED'
-                          ? 'bg-slate-100 text-slate-700'
-                          : booking.status === 'NO_SHOW'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {booking.status.replace('_', ' ')}
-                      </span>
-                      {booking.is_followup && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
-                          🔄 Free Follow-up
-                        </span>
-                      )}
-                      {(booking.no_show_count ?? 0) >= 3 && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                          ⚠️ {booking.no_show_count} Strikes
-                        </span>
-                      )}
-                    </div>
+                    {(() => {
+                      const isFamily = booking.booked_for === 'family' || (Boolean(booking.booking_for_someone_else) && Boolean(booking.patient_name));
+                      const isMinor = booking.is_minor || (booking.patient_age !== undefined && booking.patient_age !== null && Number(booking.patient_age) < 18);
+                      const displayPatientName = isFamily && booking.patient_name ? booking.patient_name : (booking.customer_name || 'Customer');
+                      return (
+                        <>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="font-bold text-slate-900 text-sm">{displayPatientName}</h2>
+                            {isFamily && (
+                              <span 
+                                data-testid={`family-booking-badge-${booking.id}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                              >
+                                👥 Family booking
+                              </span>
+                            )}
+                            {isMinor && (
+                              <span 
+                                data-testid={`minor-badge-${booking.id}`}
+                                className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300"
+                              >
+                                Minor
+                              </span>
+                            )}
+                            {booking.reference_code && (
+                              <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {booking.reference_code}
+                              </span>
+                            )}
+                            {booking.is_present && (
+                              <span 
+                                data-testid={`queue-present-badge-${booking.id}`}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                <span>📍 PRESENT</span>
+                              </span>
+                            )}
+                            {booking.queue_position && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                                Token #{booking.queue_position}
+                              </span>
+                            )}
+                            {booking.estimated_wait_minutes && booking.estimated_wait_minutes > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Wait: ~{booking.estimated_wait_minutes}m
+                              </span>
+                            ) : null}
+                            {!booking.is_present && booking.status === 'CONFIRMED' && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                                ⏳ NOT ARRIVED (STANDBY)
+                              </span>
+                            )}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              booking.status === 'CONFIRMED'
+                                ? (booking.is_present ? 'bg-emerald-200 text-emerald-900 font-extrabold' : 'bg-emerald-100 text-emerald-800')
+                                : booking.status === 'HELD'
+                                ? 'bg-amber-100 text-amber-800'
+                                : booking.status === 'COMPLETED'
+                                ? 'bg-slate-100 text-slate-700'
+                                : booking.status === 'NO_SHOW'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {booking.status.replace('_', ' ')}
+                            </span>
+                            {booking.is_followup && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
+                                🔄 Free Follow-up
+                              </span>
+                            )}
+                            {(booking.no_show_count ?? 0) >= 3 && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                ⚠️ {booking.no_show_count} Strikes
+                              </span>
+                            )}
+                          </div>
+
+                          {isFamily && (
+                            <p className="text-xs text-slate-500 mt-1" data-testid={`booked-by-${booking.id}`}>
+                              Booked by <strong className="text-slate-700">{booking.customer_name || 'Account Holder'}</strong> ({booking.customer_phone || 'Contact not provided'})
+                              {booking.patient_relationship ? ` • Relationship: ${booking.patient_relationship}` : ''}
+                              {booking.patient_age !== undefined && booking.patient_age !== null ? ` • Age: ${booking.patient_age}` : ''}
+                            </p>
+                          )}
+                          {booking.booking_note && (
+                            <div className="mt-1 px-2.5 py-1 rounded bg-amber-50/90 border border-amber-200 text-[11px] text-amber-900 flex items-center gap-1.5 max-w-xl">
+                              <span className="font-bold text-amber-800">📝 Note:</span>
+                              <span className="italic">{booking.booking_note}</span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     <p className="text-xs text-slate-600 mt-1">
                       Venue: <strong className="text-slate-800">{booking.provider_name}</strong> • {verticalConfig.resourceLabelSingular}: <strong className="text-slate-800">{booking.resource_name}</strong>
@@ -720,7 +854,9 @@ export default function BookingsManagementPage() {
                         />
                       )}
                       <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
-                        {booking.is_followup ? 'Deposit: ₹0 (Free Follow-up Consultation)' : `Deposit: ₹${booking.deposit_amount} (${booking.payment_status})`}
+                        {booking.is_followup
+                          ? 'Free Follow-up (₹0)'
+                          : `Platform Fee: ₹${(booking as any).platform_fee_amount ?? (booking as any).platform_fee ?? 10} (${(booking as any).platform_payment_status || booking.payment_status || 'CAPTURED'}) • Consultation: ₹${(booking as any).consultation_fee_amount ?? 500} (${(booking as any).consultation_payment_status === 'COLLECTED_AT_DESK' ? 'PAID AT DESK' : 'PAY AT RECEPTION'})`}
                       </span>
                       {booking.customer_arrived_at && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
@@ -740,14 +876,23 @@ export default function BookingsManagementPage() {
                       <button
                         onClick={() => handleOpenNotifications(booking)}
                         className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded transition cursor-pointer"
-                        title="View WhatsApp & SMS delivery logs"
+                        title="View WhatsApp delivery logs"
                       >
                         <MessageSquare className="w-3 h-3 text-emerald-600" />
-                        WA/SMS Logs
+                        WhatsApp Logs
+                      </button>
+                      <button
+                        onClick={() => setDetailModalBooking(booking)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded transition cursor-pointer"
+                        title="View full booking & patient details"
+                        data-testid={`view-detail-btn-${booking.id}`}
+                      >
+                        <Info className="w-3 h-3 text-slate-500" />
+                        Details
                       </button>
                       {booking.status === 'CONFIRMED' && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200/60 px-1.5 py-0.5 rounded">
-                          📱 WA/SMS Active
+                          📱 WhatsApp Active
                         </span>
                       )}
                       {booking.reminder_1h_sent_at && (
@@ -755,9 +900,19 @@ export default function BookingsManagementPage() {
                           ⏰ 1h Sent
                         </span>
                       )}
-                      {booking.reminder_30m_sent_at && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-800 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded">
-                          🔔 30m Sent
+                      {booking.payment_status === 'REFUND_PENDING' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                          ⏳ Refund Pending
+                        </span>
+                      )}
+                      {booking.payment_status === 'REFUNDED' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
+                          ✓ Refund Processed
+                        </span>
+                      )}
+                      {booking.payment_status === 'REFUND_FAILED' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                          ⚠️ Refund Failed
                         </span>
                       )}
                     </div>
@@ -766,34 +921,40 @@ export default function BookingsManagementPage() {
 
                 {/* Status Action Buttons */}
                 <div className="flex items-center gap-2 self-end md:self-center flex-wrap">
-                  {booking.status === 'CONFIRMED' && (
+                  {(booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN') && (
                     <>
-                      <button
-                        onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
-                        className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs transition ${
-                          booking.is_present
-                            ? 'font-bold bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400/40 shadow-xs'
-                            : 'font-semibold bg-emerald-600 text-white hover:bg-emerald-700'
-                        }`}
-                      >
-                        <Check className="w-3.5 h-3.5 mr-1" />
-                        {booking.is_present ? 'Admit & Complete' : 'Check-In On-Time'}
-                      </button>
-
-                      {/* Late Arrival +2 Buffer Action when slot has started */}
-                      {new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                      {booking.is_present || booking.status === 'CHECKED_IN' ? (
                         <button
-                          onClick={() => handleOpenLateCheckin(booking)}
-                          className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 transition shadow-2xs cursor-pointer"
-                          title="Patient arrived after slot time: Place after 2 member appointments and send SMS/WhatsApp notification"
-                          data-testid={`late-checkin-btn-${booking.id}`}
+                          onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400/40 shadow-xs cursor-pointer"
                         >
-                          <Clock className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                          Arrived Late (+2 Queue)
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                          Done / Complete
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleAdmitPatient(booking.id)}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs cursor-pointer"
+                        >
+                          <UserCheck className="w-3.5 h-3.5 mr-1" />
+                          Admit Patient
                         </button>
                       )}
 
-                      {!booking.is_present && new Date(booking.slot_start).getTime() < Date.now() - 5 * 60 * 1000 && (
+                      {/* Late Arrival Check-In Action when grace window has elapsed */}
+                      {new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
+                        <button
+                          onClick={() => handleOpenLateCheckin(booking)}
+                          className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 transition shadow-2xs cursor-pointer"
+                          title="Patient arrived after grace window: Check in to Standby Queue in booking order (FIFO)"
+                          data-testid={`late-checkin-btn-${booking.id}`}
+                        >
+                          <Clock className="w-3.5 h-3.5 mr-1 text-amber-600" />
+                          Arrived Late (Standby Queue)
+                        </button>
+                      )}
+
+                      {!booking.is_present && new Date(booking.slot_start).getTime() < Date.now() - ON_TIME_GRACE_MS && (
                         <button
                           onClick={() => handleMoveToStandby(booking)}
                           className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition border border-slate-200 cursor-pointer"
@@ -820,14 +981,25 @@ export default function BookingsManagementPage() {
                         Substitute
                       </button>
 
-                      <button
-                        onClick={() => handleStatusChange(booking.id, 'NO_SHOW', 'FORFEITED')}
-                        className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
-                        title="Customer didn't arrive. First 2 misses receive courtesy refund; 3rd miss forfeits deposit to your shop."
-                      >
-                        <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-500" />
-                        No-Show
-                      </button>
+                      {!isPresent && (
+                        <span 
+                          className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200"
+                          title="Patient must provide reception PIN to be marked present"
+                        >
+                          Awaiting PIN
+                        </span>
+                      )}
+
+                      {canShowNoShow && (
+                        <button
+                          onClick={() => handleStatusChange(booking.id, 'NO_SHOW', 'FORFEITED')}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
+                          title="Slot time is up and assigned doctor has departed hospital. Customer didn't arrive."
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-500" />
+                          No-Show
+                        </button>
+                      )}
 
                       <button
                         onClick={() => handleStatusChange(booking.id, 'CANCELLED', 'REFUNDED')}
@@ -1031,30 +1203,16 @@ export default function BookingsManagementPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-                  Dynamic Queue Accommodation Rule:
+                  Standby Queue Placement Rule (SPEC):
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[1, 2, 3].map((offset) => (
-                    <button
-                      key={offset}
-                      type="button"
-                      onClick={() => setLateBufferOffset(offset)}
-                      className={`p-2.5 rounded-xl border text-center transition ${
-                        lateBufferOffset === offset
-                          ? 'bg-amber-600 text-white border-amber-700 font-bold shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 font-medium'
-                      }`}
-                    >
-                      <div className="text-sm">+{offset} Member{offset > 1 ? 's' : ''}</div>
-                      <div className={`text-[10px] ${lateBufferOffset === offset ? 'text-amber-100' : 'text-slate-500'}`}>
-                        {offset === 2 ? 'Standard Buffer' : `~${offset * 15}m wait`}
-                      </div>
-                    </button>
-                  ))}
+                <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-xs text-amber-950 space-y-1.5">
+                  <p className="font-semibold text-amber-900">
+                    Priority: Standby Queue in Original Booking Order (FIFO)
+                  </p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Patient will be accommodated in available gaps when consultation finishes before the next scheduled patient, or at the end of the day when all booked patients conclude. On-time patients are guaranteed undisturbed.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1.5">
-                  Patient will be positioned after {lateBufferOffset} active consultations to ensure zero delay for punctual patients.
-                </p>
               </div>
 
               {/* Live Patient Message Preview */}
@@ -1064,7 +1222,7 @@ export default function BookingsManagementPage() {
                   <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Auto-dispatched</span>
                 </div>
                 <p className="text-xs text-slate-700 font-mono bg-white p-2.5 rounded-lg border border-slate-200/80 leading-relaxed">
-                  &ldquo;Hello {lateCheckinBooking.customer_name}, you arrived after your scheduled slot. You will be accommodated after {lateBufferOffset} member appointments (Estimated wait: ~{lateBufferOffset * 15} mins). Queue Token will be assigned.&rdquo;
+                  &ldquo;Hello {lateCheckinBooking.customer_name}, you arrived after your scheduled slot. You have been placed in the Standby Queue in original booking order. Queue Token will be assigned.&rdquo;
                 </p>
               </div>
             </div>
@@ -1089,7 +1247,7 @@ export default function BookingsManagementPage() {
                 ) : (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Accommodate After {lateBufferOffset} Appointments
+                    Confirm Standby Queue Placement
                   </>
                 )}
               </button>
@@ -1098,7 +1256,7 @@ export default function BookingsManagementPage() {
         </div>
       )}
 
-      {/* WhatsApp & SMS Notification Logs Modal */}
+      {/* WhatsApp Notification Logs Modal */}
       {notificationModalBooking && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[85vh] flex flex-col">
@@ -1106,7 +1264,7 @@ export default function BookingsManagementPage() {
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-emerald-600" />
-                  WhatsApp & SMS Communications
+                  WhatsApp Notifications
                 </h3>
                 <div className="text-xs text-slate-500 mt-1 font-mono flex items-center gap-1.5 flex-wrap">
                   <span>Ref: {notificationModalBooking.reference_code || notificationModalBooking.id.slice(0, 8)}</span>
@@ -1143,12 +1301,6 @@ export default function BookingsManagementPage() {
               >
                 Send 1-Hour Reminder
               </button>
-              <button
-                onClick={() => handleTriggerNotification(notificationModalBooking.id, 'BOOKING_REMINDER_30M')}
-                className="px-2.5 py-1 text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 rounded-lg transition"
-              >
-                Send 30-Min Reminder
-              </button>
             </div>
 
             {/* Delivery History */}
@@ -1182,7 +1334,7 @@ export default function BookingsManagementPage() {
                         <span className="font-semibold text-slate-800">{log.event_type.replace(/_/g, ' ')}</span>
                       </div>
                       <span className="text-[10px] text-slate-500">
-                        {new Date(log.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        {new Date(log.sent_at || log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 font-sans leading-relaxed">
@@ -1201,6 +1353,137 @@ export default function BookingsManagementPage() {
               <button
                 onClick={() => setNotificationModalBooking(null)}
                 className="px-4 py-1.5 text-xs font-semibold bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Detail Modal */}
+      {detailModalBooking && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+          data-testid="appointment-detail-modal"
+        >
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-base">Appointment Details</h3>
+                {detailModalBooking.reference_code && (
+                  <span className="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                    {detailModalBooking.reference_code}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setDetailModalBooking(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* Patient Info */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold uppercase tracking-wider text-slate-500 text-[10px]">Patient Information</span>
+                  <div className="flex items-center gap-1.5">
+                    {(detailModalBooking.booked_for === 'family' || detailModalBooking.booking_for_someone_else) && (
+                      <span 
+                        data-testid="detail-family-badge"
+                        className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                      >
+                        👥 Family booking
+                      </span>
+                    )}
+                    {(detailModalBooking.is_minor || (detailModalBooking.patient_age !== undefined && detailModalBooking.patient_age !== null && Number(detailModalBooking.patient_age) < 18)) && (
+                      <span 
+                        data-testid="detail-minor-badge"
+                        className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300"
+                      >
+                        Minor
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Patient Name</span>
+                    <strong className="text-slate-900 text-sm" data-testid="detail-patient-name">
+                      {(detailModalBooking.booked_for === 'family' && detailModalBooking.patient_name)
+                        ? detailModalBooking.patient_name
+                        : (detailModalBooking.customer_name || 'Customer')}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Relationship</span>
+                    <span className="text-slate-700 font-medium" data-testid="detail-patient-relationship">
+                      {detailModalBooking.patient_relationship || (detailModalBooking.booked_for === 'family' ? 'Family Member' : 'Self')}
+                    </span>
+                  </div>
+
+                  {detailModalBooking.patient_age !== undefined && detailModalBooking.patient_age !== null && (
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Age</span>
+                      <strong className="text-slate-900" data-testid="detail-patient-age">
+                        {detailModalBooking.patient_age} years old
+                      </strong>
+                    </div>
+                  )}
+
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Booked By (Account Holder)</span>
+                    <span className="text-slate-700 font-medium" data-testid="detail-booker-name">
+                      {detailModalBooking.customer_name || 'Account Holder'}
+                    </span>
+                  </div>
+                </div>
+
+                {detailModalBooking.booking_note && (
+                  <div className="mt-2 pt-2 border-t border-slate-200/60" data-testid="detail-booking-note">
+                    <span className="text-slate-500 font-bold block text-[10px] uppercase">Booking Note / Symptoms</span>
+                    <p className="text-slate-800 italic mt-0.5 bg-white p-2.5 rounded-lg border border-slate-200 leading-relaxed">
+                      &ldquo;{detailModalBooking.booking_note}&rdquo;
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Consultation & Schedule Info */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/60 space-y-1.5">
+                <span className="font-bold uppercase tracking-wider text-slate-500 text-[10px]">Appointment & Venue</span>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Venue</span>
+                    <span className="text-slate-800 font-semibold">{detailModalBooking.provider_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Specialist / Doctor</span>
+                    <span className="text-slate-800 font-semibold">{detailModalBooking.resource_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Slot Time</span>
+                    <span className="text-slate-800 font-medium">
+                      {new Date(detailModalBooking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({new Date(detailModalBooking.slot_start).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', weekday: 'short' })})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Status</span>
+                    <span className="font-bold text-slate-800">{detailModalBooking.status}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setDetailModalBooking(null)}
+                className="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
               >
                 Close
               </button>

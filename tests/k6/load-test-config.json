@@ -1,0 +1,14 @@
+{
+  "customerId": "fa4ba337-4e8e-4cf0-a0b7-7b42a1d7b106",
+  "customerToken": "PLACEHOLDER_RUN_GENERATE_LOAD_TEST_TOKENS",
+  "merchantId": "3a36a9b2-6344-4be4-8dc0-aa6b55c47d48",
+  "merchantToken": "PLACEHOLDER_RUN_GENERATE_LOAD_TEST_TOKENS",
+  "frontDeskUserId": "93522c8d-385e-4a7e-97ab-a5dccb453645",
+  "frontDeskToken": "PLACEHOLDER_RUN_GENERATE_LOAD_TEST_TOKENS",
+  "consultantUserId": "adc08d0f-e2db-4da9-acee-5e126814e3ca",
+  "consultantToken": "PLACEHOLDER_RUN_GENERATE_LOAD_TEST_TOKENS",
+  "providerId": "a77572b1-f2c2-46bc-9bd0-81041cdc3648",
+  "resourceId": "21bd8025-5be0-4eb5-8c7e-84d542bb960f",
+  "dateStr": "2026-11-28",
+  "anonKey": "PLACEHOLDER_SUPABASE_ANON_KEY"
+}

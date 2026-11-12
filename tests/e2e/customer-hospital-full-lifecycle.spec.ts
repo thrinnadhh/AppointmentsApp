@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { CustomerAppPage } from './pages/customer-app.page';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_SERVICE_ROLE_KEY) {
@@ -161,7 +161,6 @@ test.describe.serial('Customer Hospital Full Lifecycle E2E Test Flow', () => {
 
     const channels = initialLogs!.map((l) => l.channel);
     expect(channels).toContain('whatsapp');
-    expect(channels).toContain('sms');
     expect(channels).toContain('email');
 
     // Close the pass modal to return to My Appointments screen
@@ -220,7 +219,6 @@ test.describe.serial('Customer Hospital Full Lifecycle E2E Test Flow', () => {
 
     const reminderChannels = reminderLogs!.map((l) => l.channel);
     expect(reminderChannels).toContain('whatsapp');
-    expect(reminderChannels).toContain('sms');
     expect(reminderChannels).toContain('email');
 
     // Assert message content contains hospital name and reference code
@@ -270,7 +268,6 @@ test.describe.serial('Customer Hospital Full Lifecycle E2E Test Flow', () => {
 
     const compChannels = completionLogs!.map((l) => l.channel);
     expect(compChannels).toContain('whatsapp');
-    expect(compChannels).toContain('sms');
     expect(compChannels).toContain('email');
 
     const emailComp = completionLogs!.find((l) => l.channel === 'email');

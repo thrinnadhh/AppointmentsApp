@@ -1,7 +1,16 @@
 import { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseAdmin } from './supabase';
+import { AsyncLocalStorage } from 'async_hooks';
+import './env-check';
+import { getSupabaseAdmin, registerLocalCheckFn } from './supabase';
+
+
+
+export const localDbStore = new AsyncLocalStorage<boolean>();
+if (process.env.NODE_ENV !== 'production') {
+  registerLocalCheckFn(() => localDbStore.getStore() === true);
+}
 
 export interface AdminAuthSuccess {
   user: {
@@ -14,6 +23,7 @@ export interface AdminAuthSuccess {
     email: string | null;
     full_name: string | null;
     role: string;
+    assigned_city_id?: string | null;
   };
 }
 
@@ -58,37 +68,65 @@ if (process.env.NODE_ENV === 'production' && !isBuildPhase && !process.env.ADMIN
 
 /**
  * Safely extracts client IP to prevent rate-limiter spoofing via forged X-Forwarded-For headers.
- * Prioritizes socket/platform IP, trusted proxy headers, and the rightmost trusted hop in X-Forwarded-For.
- * In direct-connect or untrusted environments, ignores client-controlled header spoofing.
+ *
+ * Note: Next.js 15 (`NextRequest`) does not expose `req.ip` on the standard Web Request object.
+ * Trusted header order by deployment host:
+ *   1. Vercel (`process.env.VERCEL === '1'` with `x-vercel-id` present):
+ *      - `x-vercel-forwarded-for` (rightmost hop overwritten by Vercel Edge)
+ *      - `x-real-ip` (single client IP injected by Vercel Edge)
+ *      - `x-forwarded-for` (rightmost hop appended by Vercel Edge)
+ *   2. Self-hosted reverse proxy (`process.env.TRUSTED_PROXY === 'true'`):
+ *      - `x-vercel-forwarded-for` (rightmost hop, if present)
+ *      - `x-real-ip`
+ *      - `x-forwarded-for` (rightmost hop appended by the trusted proxy)
+ *   3. Cloudflare proxy (`process.env.CLOUDFLARE_PROXY === 'true' && process.env.TRUSTED_PROXY === 'true'` with `cf-ray`):
+ *      - `cf-connecting-ip`
+ *
+ * In direct-connect or untrusted environments, returns `undefined` so callers log the missing-IP
+ * event and fall back strictly to per-phone / per-user rate limits (never a shared IP bucket).
  */
 export function getClientIp(req: Request | NextRequest): string | undefined {
-  const platformIp = (req as any).ip;
-  if (typeof platformIp === 'string' && platformIp.trim()) return platformIp.trim();
+  const isVercelOrTrustedProxy =
+    process.env.VERCEL === '1' || process.env.TRUSTED_PROXY === 'true';
+  const vercelId = req.headers.get('x-vercel-id');
+  const hasTrustedVercelEdge =
+    isVercelOrTrustedProxy && (Boolean(vercelId) || process.env.TRUSTED_PROXY === 'true');
 
-  // In direct-connect environments, ignore client-controlled header spoofing unless TRUSTED_PROXY is enabled.
+  // Cloudflare headers (cf-ray / cf-connecting-ip) are client-spoofable when deployed
+  // on Vercel without Cloudflare in front, so they never decide the client IP unless
+  // CLOUDFLARE_PROXY=true and TRUSTED_PROXY=true are both explicitly configured.
   const cfRay = req.headers.get('cf-ray');
   const cfConnectingIp = req.headers.get('cf-connecting-ip');
   if (cfConnectingIp && (cfRay || process.env.TRUSTED_PROXY === 'true')) {
-    if (process.env.TRUSTED_PROXY === 'true') return cfConnectingIp.trim();
+    if (process.env.CLOUDFLARE_PROXY === 'true' && process.env.TRUSTED_PROXY === 'true') {
+      return cfConnectingIp.trim();
+    }
   }
 
-  const vercelId = req.headers.get('x-vercel-id');
+  // 2. Vercel edge header: x-vercel-forwarded-for (overwritten by Vercel edge)
+  const vercelForwardedFor = req.headers.get('x-vercel-forwarded-for');
+  if (hasTrustedVercelEdge && vercelForwardedFor) {
+    const vParts = vercelForwardedFor.split(',').map((p) => p.trim()).filter(Boolean);
+    if (vParts.length > 0) return vParts[vParts.length - 1];
+  }
+
+  // 3. Vercel edge header: x-real-ip (overwritten by Vercel edge)
   const xRealIp = req.headers.get('x-real-ip');
   if (xRealIp && (vercelId || process.env.TRUSTED_PROXY === 'true')) {
-    if (process.env.TRUSTED_PROXY === 'true') return xRealIp.trim();
+    if (hasTrustedVercelEdge) return xRealIp.trim();
   }
 
+  // 4. Rightmost hop of x-forwarded-for (appended/overwritten by Vercel edge)
   const xff = req.headers.get('x-forwarded-for');
   if (xff && (cfRay || vercelId || process.env.TRUSTED_PROXY === 'true')) {
-    if (process.env.TRUSTED_PROXY === 'true') {
+    if (hasTrustedVercelEdge) {
       const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
       if (parts.length > 0) return parts[parts.length - 1];
     }
   }
 
   // No trustworthy client identity is available: return undefined so callers
-  // skip IP-scoped throttling instead of collapsing every client into one
-  // shared bucket (which let a single attacker lock out logins for everyone).
+  // can fail closed in production or skip IP-scoped throttling in local dev.
   return undefined;
 }
 
@@ -97,7 +135,7 @@ export function getClientIp(req: Request | NextRequest): string | undefined {
  */
 export async function verifyAuthenticatedUser(
   request: NextRequest
-): Promise<{ id: string; email?: string; isTestCustomer?: boolean } | null> {
+): Promise<{ id: string; email?: string; isTestCustomer?: boolean; isLocalTestCaller?: boolean } | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -110,19 +148,14 @@ export async function verifyAuthenticatedUser(
     if (isE2EBypassEnabled()) {
       const adminBypass = request.headers.get('x-admin-bypass-key');
       const merchantBypass = request.headers.get('x-merchant-bypass-key');
-      if (adminBypass === E2E_ADMIN_BYPASS_SECRET || merchantBypass === E2E_ADMIN_BYPASS_SECRET) {
-        return {
-          id: '88888888-8888-8888-8888-888888888881',
-          email: 'admin@appointments-tirupati.com',
-        };
-      }
+      const isValidBypass = (val: string | null) => Boolean(val && val === E2E_ADMIN_BYPASS_SECRET);
 
       // Only allow customer header override in non-production environments when explicitly opted-in for E2E testing
       // Strictly prevent privilege escalation: test customer header can NEVER impersonate admin UUID or live users
       if (process.env.ENABLE_E2E_BYPASS === 'true') {
         const testCustomerId = request.headers.get('x-customer-id') || request.headers.get('x-test-customer-id');
-        const bypassSecret = request.headers.get('x-admin-bypass-key') || request.headers.get('x-merchant-bypass-key') || request.headers.get('x-e2e-secret');
-        const isAuthorizedSecret = Boolean(E2E_ADMIN_BYPASS_SECRET && bypassSecret === E2E_ADMIN_BYPASS_SECRET);
+        const bypassSecret = adminBypass || merchantBypass || request.headers.get('x-e2e-secret');
+        const isAuthorizedSecret = isValidBypass(bypassSecret);
 
         if (
           testCustomerId &&
@@ -136,6 +169,13 @@ export async function verifyAuthenticatedUser(
           };
         }
       }
+
+      if (isValidBypass(adminBypass) || isValidBypass(merchantBypass)) {
+        return {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+        };
+      }
     }
   }
 
@@ -144,11 +184,40 @@ export async function verifyAuthenticatedUser(
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (token) {
+      if (process.env.NODE_ENV !== 'production' && (request.headers.get('x-test-local-db') === 'true' || request.headers.get('X-Test-Local-Db') === 'true')) {
+        localDbStore.enterWith(true);
+        (request as any).isLocalTestCaller = true;
+        try {
+          const localClient = createClient(
+            'http://127.0.0.1:54321',
+            supabaseAnonKey
+          );
+          const localRes = await localClient.auth.getUser(token);
+          if (!localRes.error && localRes.data?.user) {
+            return { id: localRes.data.user.id, email: localRes.data.user.email, isLocalTestCaller: true };
+          }
+        } catch {}
+      }
+
       try {
         const directClient = createClient(supabaseUrl, supabaseAnonKey);
         const { data, error } = await directClient.auth.getUser(token);
         if (!error && data?.user) {
           return { id: data.user.id, email: data.user.email };
+        }
+        if (error && process.env.NODE_ENV !== 'production' && !supabaseUrl.includes('127.0.0.1')) {
+          try {
+            const localClient = createClient(
+              'http://127.0.0.1:54321',
+              supabaseAnonKey
+            );
+            const localRes = await localClient.auth.getUser(token);
+            if (!localRes.error && localRes.data?.user) {
+              localDbStore.enterWith(true);
+              (request as any).isLocalTestCaller = true;
+              return { id: localRes.data.user.id, email: localRes.data.user.email, isLocalTestCaller: true };
+            }
+          } catch {}
         }
       } catch (err) {
         console.warn('[auth] Bearer token verification failed:', err);
@@ -184,21 +253,87 @@ export async function verifyAuthenticatedUser(
  * Verifies whether a given caller is authorized for a specific booking.
  * Returns true if caller is:
  * 1. The booking's customer (if allowCustomer is true)
- * 2. An authorized staff/owner of the booking's provider
- * 3. A platform Super Administrator
+ * 2. A platform Super Administrator
+ * 3. For hospital providers:
+ *    - Hospital Admin: full hospital access
+ *    - Front Desk: assigned doctor in doctor_front_desk_assignments
+ *    - Consultant: own resource
+ * 4. For non-hospital providers: authorized staff/owner of provider
  */
 export async function isCallerAuthorizedForBooking(
   callerId: string,
-  booking: { customer_id: string; provider_id: string },
+  booking: { id?: string; customer_id: string; provider_id: string; resource_id?: string | null },
   allowCustomer: boolean = true
 ): Promise<boolean> {
+  if (!callerId || !booking) return false;
+
   if (allowCustomer && callerId === booking.customer_id) {
     return true;
   }
+
+  // Non-production test bypass check
+  if (process.env.NODE_ENV !== 'production' && callerId === '88888888-8888-8888-8888-888888888881') {
+    return true;
+  }
+
   const supabaseAdmin = getSupabaseAdmin();
   const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: callerId });
   if (isAdmin) return true;
 
+  // Check if provider is a hospital/clinic provider
+  const { data: prov } = await supabaseAdmin
+    .from('providers')
+    .select('id, category_id, owner_id')
+    .eq('id', booking.provider_id)
+    .maybeSingle();
+
+  if (!prov) return false;
+
+  const isHospital =
+    prov.category_id === 'clinics' ||
+    prov.category_id === 'hospital' ||
+    Boolean(prov.category_id?.includes('clinic')) ||
+    Boolean(prov.category_id?.includes('hospital'));
+
+  if (isHospital) {
+    // Resolve resource_id if not provided
+    let resourceId = booking.resource_id;
+    if (!resourceId && booking.id) {
+      const { data: bRow } = await supabaseAdmin
+        .from('bookings')
+        .select('resource_id')
+        .eq('id', booking.id)
+        .maybeSingle();
+      if (bRow) resourceId = bRow.resource_id;
+    }
+
+    const { data: role } = await (supabaseAdmin.rpc as any)('hospital_role', {
+      p_provider_id: booking.provider_id,
+      p_user_id: callerId,
+    });
+
+    if (role === 'admin') {
+      return true;
+    }
+
+    if (role === 'front_desk' || role === 'consultant') {
+      if (!resourceId) return false;
+      const { data: accessibleResources } = await (supabaseAdmin.rpc as any)(
+        'hospital_accessible_resource_ids',
+        {
+          p_provider_id: booking.provider_id,
+          p_user_id: callerId,
+        }
+      );
+      if (Array.isArray(accessibleResources)) {
+        return accessibleResources.includes(resourceId);
+      }
+    }
+
+    return false;
+  }
+
+  // Non-hospital providers (salons, turf, dining)
   const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
     p_user_id: callerId,
   });
@@ -206,13 +341,18 @@ export async function isCallerAuthorizedForBooking(
     return true;
   }
 
-  const { data: prov } = await supabaseAdmin
-    .from('providers')
-    .select('owner_id')
-    .eq('id', booking.provider_id)
+  if (prov.owner_id === callerId) {
+    return true;
+  }
+
+  const { data: membership } = await supabaseAdmin
+    .from('merchant_memberships')
+    .select('role')
+    .eq('user_id', callerId)
+    .eq('provider_id', booking.provider_id)
     .maybeSingle();
 
-  if (prov && prov.owner_id === callerId) {
+  if (membership) {
     return true;
   }
 
@@ -278,6 +418,68 @@ export async function isCallerAuthorizedForProvider(
 }
 
 /**
+ * Verifies whether a given caller is a Hospital Administrator for a specific provider.
+ * Strictly checks that caller is:
+ * 1. A platform Super Administrator
+ * 2. The registered primary owner of the provider (providers.owner_id)
+ * 3. An authorized manager/admin with role 'admin' or 'owner' in merchant_memberships.
+ * Staff / front desk managers (role: 'staff') will return FALSE.
+ */
+export async function isCallerHospitalAdminForProvider(
+  callerId: string,
+  providerId: string
+): Promise<boolean> {
+  if (!callerId || !providerId) return false;
+
+  // Non-production test bypass check
+  if (process.env.NODE_ENV !== 'production' && callerId === '88888888-8888-8888-8888-888888888881') {
+    return true;
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+
+  // 1. Check if caller is platform super administrator
+  const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: callerId });
+  if (isAdmin) return true;
+
+  // 2. Check direct ownership on providers table (Primary Hospital Administrator)
+  const { data: prov } = await supabaseAdmin
+    .from('providers')
+    .select('owner_id')
+    .eq('id', providerId)
+    .maybeSingle();
+
+  if (prov && prov.owner_id === callerId) {
+    return true;
+  }
+
+  // 3. Check merchant_memberships for admin/owner role (strictly not 'staff')
+  const { data: membership } = await supabaseAdmin
+    .from('merchant_memberships')
+    .select('role')
+    .eq('user_id', callerId)
+    .eq('provider_id', providerId)
+    .maybeSingle();
+
+  if (membership && (membership.role === 'admin' || membership.role === 'owner')) {
+    return true;
+  }
+
+  // 4. Check hospital_role RPC
+  try {
+    const { data: hRole } = await (supabaseAdmin.rpc as any)('hospital_role', {
+      p_provider_id: providerId,
+      p_user_id: callerId,
+    });
+    if (hRole === 'admin' || hRole === 'owner') {
+      return true;
+    }
+  } catch {}
+
+  return false;
+}
+
+/**
  * Verifies that an incoming NextRequest originates from an authenticated session
  * with 'admin' role in public.profiles.
  * 
@@ -336,7 +538,7 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
     const supabaseAdmin = getSupabaseAdmin();
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, email, full_name, role')
+      .select('id, email, full_name, role, assigned_city_id')
       .eq('id', user.id)
       .single();
 
@@ -361,10 +563,127 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
         email: profile.email,
         full_name: profile.full_name,
         role: profile.role,
+        assigned_city_id: profile.assigned_city_id || null,
       },
     };
   } catch (err) {
     console.error('[auth-admin] Role check exception:', err);
+    return {
+      error: 'Internal authorization error.',
+      status: 403,
+    };
+  }
+}
+
+/**
+ * Verifies that an incoming NextRequest originates from an authenticated session
+ * with 'admin' (super admin) or 'city_director' role in public.profiles.
+ * 
+ * If the user is a 'city_director', their profile must have an 'assigned_city_id'.
+ */
+export async function verifyAdminOrCityDirectorRequest(request: NextRequest): Promise<AdminAuthResult> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { error: 'Server configuration error: Supabase credentials missing', status: 401 };
+  }
+
+  // 1. Non-production E2E test bypass header check
+  if (isE2EBypassEnabled()) {
+    const bypassHeader = request.headers.get('x-admin-bypass-key');
+    if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
+      const cityDirectorId = request.headers.get('x-city-director-id');
+      if (cityDirectorId) {
+        const supabaseAdmin = getSupabaseAdmin();
+        const { data: directorProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id, email, full_name, role, assigned_city_id')
+          .eq('id', cityDirectorId)
+          .single();
+        if (directorProfile) {
+          return {
+            user: {
+              id: directorProfile.id,
+              email: directorProfile.email || undefined,
+            },
+            profile: directorProfile,
+          };
+        }
+      }
+      return {
+        user: {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+        },
+        profile: {
+          id: '88888888-8888-8888-8888-888888888881',
+          email: 'admin@appointments-tirupati.com',
+          full_name: 'Platform Owner (Super Admin)',
+          role: 'admin',
+          assigned_city_id: null,
+        },
+      };
+    }
+  }
+
+  const user = await verifyAuthenticatedUser(request);
+
+  if (!user) {
+    return {
+      error: 'Unauthorized: Authentication required to access administrative resources.',
+      status: 401,
+    };
+  }
+
+  if ((user as any)?.isTestCustomer) {
+    return {
+      error: 'Forbidden: Test customer header cannot access administrative resources.',
+      status: 403,
+    };
+  }
+
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: profile, error } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, full_name, role, assigned_city_id')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !profile) {
+      return {
+        error: 'Forbidden: Unable to verify user profile.',
+        status: 403,
+      };
+    }
+
+    if (profile.role !== 'admin' && profile.role !== 'city_director') {
+      return {
+        error: 'Forbidden: Platform Administrator or City Director authority required. Access denied.',
+        status: 403,
+      };
+    }
+
+    if (profile.role === 'city_director' && !profile.assigned_city_id) {
+      return {
+        error: 'Forbidden: City Director has no assigned city. Contact your administrator.',
+        status: 403,
+      };
+    }
+
+    return {
+      user,
+      profile: {
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.full_name,
+        role: profile.role,
+        assigned_city_id: profile.assigned_city_id || null,
+      },
+    };
+  } catch (err) {
+    console.error('[auth-admin] Admin / City Director role check exception:', err);
     return {
       error: 'Internal authorization error.',
       status: 403,
@@ -440,6 +759,18 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
         const { data, error } = await directClient.auth.getUser(token);
         if (!error && data?.user) {
           user = { id: data.user.id, email: data.user.email };
+        }
+        if (error && process.env.NODE_ENV !== 'production' && !supabaseUrl.includes('127.0.0.1')) {
+          try {
+            const localClient = createClient(
+              'http://127.0.0.1:54321',
+              supabaseAnonKey
+            );
+            const localRes = await localClient.auth.getUser(token);
+            if (!localRes.error && localRes.data?.user) {
+              user = { id: localRes.data.user.id, email: localRes.data.user.email };
+            }
+          } catch {}
         }
       } catch (err) {
         console.warn('[auth-admin] Bearer token verification failed:', err);

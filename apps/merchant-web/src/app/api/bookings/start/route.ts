@@ -1,0 +1,135 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { validateBookingStatusTransition } from '@/lib/hospital-access';
+import { toClinicDateString } from '@appointments/shared/queue-engine';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: NextRequest) {
+  try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required to start consultation' },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+    const { booking_id, expected_version, expected_updated_at } = body;
+
+    if (!booking_id) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required parameter: booking_id' },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: booking, error: fetchError } = await supabaseAdmin
+      .from('bookings')
+      .select('id, customer_id, provider_id, resource_id, slot_start, status, version, updated_at')
+      .eq('id', booking_id)
+      .maybeSingle();
+
+    if (fetchError || !booking) {
+      return NextResponse.json(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
+
+    const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, false);
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Caller is not authorized for this booking' },
+        { status: 403 }
+      );
+    }
+
+    // Optimistic concurrency control check
+    if (expected_version !== undefined && booking.version !== expected_version) {
+      return NextResponse.json(
+        { success: false, error: 'Updated by someone else, please refresh', code: 'STALE_VERSION' },
+        { status: 409 }
+      );
+    }
+    if (expected_updated_at !== undefined && booking.updated_at && new Date(booking.updated_at).getTime() !== new Date(expected_updated_at).getTime()) {
+      return NextResponse.json(
+        { success: false, error: 'Updated by someone else, please refresh', code: 'STALE_VERSION' },
+        { status: 409 }
+      );
+    }
+
+    const transitionCheck = validateBookingStatusTransition(booking.status, 'IN_CONSULTATION');
+    if (!transitionCheck.valid) {
+      return NextResponse.json(
+        { success: false, error: transitionCheck.error },
+        { status: 409 }
+      );
+    }
+
+    const now = new Date().toISOString();
+    let updateQuery = supabaseAdmin
+      .from('bookings')
+      .update({
+        status: 'IN_CONSULTATION',
+        updated_at: now,
+      })
+      .eq('id', booking_id)
+      .eq('status', 'CHECKED_IN');
+
+    if (expected_version !== undefined) {
+      updateQuery = updateQuery.eq('version', expected_version);
+    }
+
+    const { data: updatedRows, error: updateError } = await updateQuery.select('id, status, version');
+
+    if (updateError) {
+      // Postgres error code 23505 = unique violation (from idx_single_in_consultation_per_doctor)
+      const isUniqueViolation = updateError.code === '23505';
+      return NextResponse.json(
+        {
+          success: false,
+          error: isUniqueViolation
+            ? 'Doctor already has an active consultation in progress'
+            : updateError.message,
+        },
+        { status: isUniqueViolation ? 409 : 500 }
+      );
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Updated by someone else, please refresh', code: 'CONCURRENT_UPDATE' },
+        { status: 409 }
+      );
+    }
+
+    // Phase 3 Item 3 (R7 persistence): mark any absent earlier bookings for this consultant today as skipped
+    if (booking.resource_id && booking.slot_start) {
+      const slotDate = toClinicDateString(booking.slot_start);
+      await supabaseAdmin
+        .from('bookings')
+        .update({ skipped_at: now })
+        .eq('resource_id', booking.resource_id)
+        .eq('is_present', false)
+        .is('skipped_at', null)
+        .in('status', ['CONFIRMED', 'CHECKED_IN'])
+        .gte('slot_start', `${slotDate}T00:00:00+05:30`)
+        .lt('slot_start', booking.slot_start);
+    }
+
+    return NextResponse.json({
+      success: true,
+      booking_id,
+      status: 'IN_CONSULTATION',
+      version: updatedRows[0].version,
+      started_at: now,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal error';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}

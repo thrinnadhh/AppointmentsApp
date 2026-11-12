@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Provider, Resource, MerchantMembership, VerticalConfig } from '@appointments/shared';
-import { supabase, fetchTenantContextData } from '@/lib/supabase';
+import { supabase, fetchTenantContextData, PROVIDER_SELECT_COLUMNS } from '@/lib/supabase';
 import { getVerticalConfig } from '@/lib/vertical-config';
 
 export interface MerchantTenantContextType {
@@ -10,6 +10,8 @@ export interface MerchantTenantContextType {
   verticalConfig: VerticalConfig;
   memberships: MerchantMembership[];
   isSuperAdmin: boolean;
+  isHospitalAdmin: boolean;
+  isDeskManager: boolean;
   isLocked: boolean; // True if merchant is locked to their single venue
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -25,6 +27,8 @@ const MerchantTenantContext = createContext<MerchantTenantContextType>({
   verticalConfig: defaultVerticalConfig,
   memberships: [],
   isSuperAdmin: false,
+  isHospitalAdmin: true,
+  isDeskManager: false,
   isLocked: true,
   isLoading: true,
   isAuthenticated: false,
@@ -37,6 +41,8 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
   const [activeProvider, setActiveProvider] = useState<(Provider & { resources?: Resource[] }) | null>(null);
   const [memberships, setMemberships] = useState<MerchantMembership[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isHospitalAdmin, setIsHospitalAdmin] = useState(true);
+  const [isDeskManager, setIsDeskManager] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +56,43 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
       setMemberships(data.memberships);
       setIsAuthenticated(Boolean(data.user));
 
+      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+
+      // Calculate Hospital Admin vs Desk Manager status
+      const isOwner = Boolean(data.user && data.activeProvider && data.activeProvider.owner_id === data.user.id);
+      const hasAdminMembership = data.memberships.some((m) => 
+        m.provider_id === data.activeProvider?.id && ((m.role as string) === 'admin' || m.role === 'owner' || m.role === 'manager')
+      );
+      const isStaffMember = data.memberships.some((m) =>
+        m.provider_id === data.activeProvider?.id && m.role === 'staff'
+      );
+      const adminFlag = Boolean(isDemoMode || data.isSuperAdmin || isOwner || hasAdminMembership || (!isStaffMember && data.profile?.role === 'merchant'));
+      setIsHospitalAdmin(adminFlag);
+      setIsDeskManager(Boolean(isStaffMember || (!adminFlag && !data.isSuperAdmin && !isDemoMode)));
+
       if (data.activeProvider) {
         setActiveProvider(data.activeProvider);
+      } else if (isDemoMode) {
+        setActiveProvider({
+          id: 'demo-provider-id',
+          name: 'Tirupati Apex Hospital (Demo)',
+          owner_id: 'demo-owner',
+          category_id: 'clinics',
+          status: 'ACTIVE',
+          is_active: true,
+          address: 'Test Medical Road, Tirupati, AP',
+          phone: '+919999900000',
+          city: 'Tirupati',
+          latitude: 13.6288,
+          longitude: 79.4192,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          category: { id: 'clinics', name: 'Clinics & Hospitals', slug: 'clinics', icon: 'hospital', is_active: true },
+          resources: [
+            { id: 'demo-res-1', provider_id: 'demo-provider-id', name: 'Dr. A. Sharma (Neurologist)', type: 'doctor', is_active: true, capacity: 1, duration_minutes: 30, price: 500, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+            { id: 'demo-res-2', provider_id: 'demo-provider-id', name: 'Dr. B. Verma (Neurosurgery)', type: 'doctor', is_active: true, capacity: 1, duration_minutes: 30, price: 600, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          ]
+        } as any);
       } else {
         setActiveProvider(null);
       }
@@ -96,7 +137,7 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
     try {
       const { data, error: provError } = await supabase
         .from('providers')
-        .select('*, resources(*)')
+        .select(`${PROVIDER_SELECT_COLUMNS}, resources(*)`)
         .eq('id', providerId)
         .single();
 
@@ -121,6 +162,8 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
         verticalConfig,
         memberships,
         isSuperAdmin,
+        isHospitalAdmin,
+        isDeskManager,
         isLocked,
         isLoading,
         isAuthenticated,

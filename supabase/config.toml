@@ -159,9 +159,18 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "http://localhost:3000/auth/callback",
+  "http://127.0.0.1:3000/auth/callback",
+  "http://localhost:3001/auth/callback",
+  "http://127.0.0.1:3001/auth/callback",
+  "http://localhost:8081/auth/callback",
+  "http://127.0.0.1:8081/auth/callback",
+  "appointments://auth/callback"
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
-jwt_expiry = 3600
+jwt_expiry = 86400
 # JWT issuer URL. If not set, defaults to auth.external_url.
 # jwt_issuer = ""
 # Path to JWT signing key. DO NOT commit your signing keys file to git.
@@ -255,17 +264,30 @@ otp_expiry = 3600
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
-enable_signup = false
+enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
 enable_confirmations = false
 # Template for sending OTP to users
-template = "Your code is {{ `{{ .Code }}` }}"
+template = "Your code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
-max_frequency = "5s"
+max_frequency = "1s"
 
 # Use pre-defined map of phone number to OTP for testing.
-# [auth.sms.test_otp]
-# 4152127777 = "123456"
+[auth.sms.test_otp]
+"919848011101" = "123456"
+"919848011102" = "123456"
+"919848011103" = "123456"
+"919848011104" = "123456"
+"919848011105" = "123456"
+"919848011106" = "123456"
+"919999900001" = "123456"
+"919999900002" = "123456"
+"919999900003" = "123456"
+"919999900004" = "123456"
+"919999900005" = "123456"
+"919999900006" = "123456"
+"919999999991" = "123456"
+"4152127777" = "123456"
 
 # Configure logged in session timeouts.
 # [auth.sessions]
@@ -286,10 +308,10 @@ max_frequency = "5s"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
 [auth.sms.twilio]
-enabled = false
-account_sid = ""
-# DO NOT commit your Twilio auth token to git:
-auth_token = ""
+enabled = true
+account_sid = "AC_local_mock_test_sid_0000000000"
+auth_token = "local_mock_test_token_00000000000"
+message_service_sid = "MG_local_mock_service_sid_00000"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]
@@ -298,8 +320,8 @@ max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]
@@ -330,6 +352,14 @@ url = ""
 # If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
+email_optional = false
+
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+skip_nonce_check = true
 email_optional = false
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
@@ -410,3 +440,29 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+[functions.whatsapp-webhook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/whatsapp-webhook/index.ts"
+
+[functions.whatsapp-sender]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/whatsapp-sender/index.ts"
+
+[functions.whatsapp-auth-hook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/whatsapp-auth-hook/index.ts"
+
+[functions.process-notification-queue]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/process-notification-queue/index.ts"
+
+[functions.process-refund-queue]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/process-refund-queue/index.ts"
+

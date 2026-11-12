@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
 
-    // 1. RATE LIMITING: Maximum 5 registration attempts per 5 minutes per IP
+    // 1. RATE LIMITING: Maximum 5 registration attempts per 5 minutes per IP (falls back to per-email/phone when IP is absent)
     if (ip) {
       const rateLimit = await checkRateLimit(`merchant_onboard:${ip}`, 5, 300);
       if (!rateLimit.allowed) {
@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
           }
         );
       }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/merchant/onboard' });
     }
 
     const body: OnboardRequestBody = await request.json().catch(() => ({}));
@@ -107,6 +109,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Please provide full name, email, shop name, category, and phone number.' },
         { status: 400 }
+      );
+    }
+
+    const accountRateLimit = await checkRateLimit(
+      `merchant_onboard_account:${email.trim().toLowerCase()}`,
+      3,
+      300
+    );
+    if (!accountRateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many registration attempts for this email. Please try again in 5 minutes.' },
+        { status: 429 }
       );
     }
 

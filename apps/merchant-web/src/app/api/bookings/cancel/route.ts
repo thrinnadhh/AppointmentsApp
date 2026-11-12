@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { initiateRazorpayRefund } from '@/lib/razorpay';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { validateBookingStatusTransition } from '@/lib/hospital-access';
 import { CancelBookingRequest, CancelBookingResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as Partial<CancelBookingRequest>;
-    const { booking_id, reason, initiated_by = 'CUSTOMER' } = body;
-
-    if (!booking_id) {
-      return NextResponse.json<CancelBookingResponse>(
-        { success: false, error: 'Missing required parameter: booking_id' },
-        { status: 400 }
-      );
-    }
-
     const caller = await verifyAuthenticatedUser(req);
     if (!caller) {
       return NextResponse.json<CancelBookingResponse>(
@@ -24,11 +16,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const body = (await req.json()) as Partial<CancelBookingRequest>;
+    const { booking_id, reason, initiated_by = 'CUSTOMER', expected_version, expected_updated_at } = body as any;
+
+    if (!booking_id) {
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: 'Missing required parameter: booking_id' },
+        { status: 400 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
 
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, status, gateway_payment_id')
+      .select('id, customer_id, provider_id, resource_id, status, gateway_payment_id, version, updated_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -39,11 +41,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (expected_version !== undefined && booking.version !== expected_version) {
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: 'Updated by someone else, please refresh' },
+        { status: 409 }
+      );
+    }
+    if (expected_updated_at !== undefined && booking.updated_at && new Date(booking.updated_at).getTime() !== new Date(expected_updated_at).getTime()) {
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: 'Updated by someone else, please refresh' },
+        { status: 409 }
+      );
+    }
+
     const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
     if (!isAuthorized) {
       return NextResponse.json<CancelBookingResponse>(
         { success: false, error: 'Unauthorized: Caller is not authorized to cancel this booking' },
         { status: 403 }
+      );
+    }
+
+    const transitionCheck = validateBookingStatusTransition(booking.status, 'CANCELLED');
+    if (!transitionCheck.valid) {
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: transitionCheck.error },
+        { status: 409 }
       );
     }
 
@@ -100,11 +123,11 @@ export async function POST(req: NextRequest) {
     if (result.refund_eligible && (result.refund_amount ?? 0) > 0) {
       const { data: bkg } = await supabaseAdmin
         .from('bookings')
-        .select('gateway_payment_id')
+        .select('gateway_payment_id, gateway_order_id, gateway_provider')
         .eq('id', booking_id)
         .maybeSingle();
 
-      if (bkg?.gateway_payment_id) {
+      if (bkg?.gateway_payment_id || bkg?.gateway_order_id) {
         // Single-winner atomic claim to prevent concurrent duplicate refunds (TOCTOU)
         const { data: claimed } = await supabaseAdmin
           .from('payments')
@@ -138,14 +161,32 @@ export async function POST(req: NextRequest) {
         }
 
         try {
-          const refundResult = await initiateRazorpayRefund({
-            paymentId: bkg.gateway_payment_id,
-            amount: Math.round(Number(result.refund_amount) * 100),
-            notes: {
-              booking_id,
+          const refundAmountPaise = Math.round(Number(result.refund_amount) * 100);
+          let refundId = '';
+          let refundAmount: number;
+
+          if (bkg.gateway_provider === 'cashfree') {
+            const cfAdapter = getPaymentGateway('cashfree');
+            const refundResult = await cfAdapter.refundOrder({
+              orderId: bkg.gateway_order_id || booking_id,
+              paymentId: bkg.gateway_payment_id || undefined,
+              amountInPaise: refundAmountPaise,
               reason: reason || 'Policy-eligible cancellation refund',
-            },
-          });
+            });
+            refundId = refundResult.refundId;
+            refundAmount = refundResult.amountInPaise;
+          } else {
+            const refundResult = await initiateRazorpayRefund({
+              paymentId: bkg.gateway_payment_id!,
+              amount: refundAmountPaise,
+              notes: {
+                booking_id,
+                reason: reason || 'Policy-eligible cancellation refund',
+              },
+            });
+            refundId = refundResult.id;
+            refundAmount = refundResult.amount;
+          }
 
           // Refund succeeded -> promote to REFUNDED
           finalPaymentStatus = 'REFUNDED';
@@ -160,8 +201,8 @@ export async function POST(req: NextRequest) {
               status: 'REFUNDED',
               updated_at: new Date().toISOString(),
               metadata: {
-                refund_id: refundResult.id,
-                refund_amount_paise: refundResult.amount,
+                refund_id: refundId,
+                refund_amount_paise: refundAmount,
                 refund_amount: Number(result.refund_amount),
               },
             })
@@ -186,13 +227,15 @@ export async function POST(req: NextRequest) {
             .eq('booking_id', booking_id);
 
           // Log prominently to console for monitoring & on-call alerts
+          const safeBookingId = String(booking_id).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
+          const safeErrorMsg = String(errorMsg).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
           console.error(
             '\n====================================================================\n' +
             '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
-            `Booking ID: ${booking_id}\n` +
+            `Booking ID: ${safeBookingId}\n` +
             `Payment ID: ${bkg.gateway_payment_id}\n` +
             `Refund Amount: ₹${result.refund_amount}\n` +
-            `Error: ${errorMsg}\n` +
+            `Error: ${safeErrorMsg}\n` +
             'Action: Manual investigation required in Razorpay Dashboard.\n' +
             '====================================================================\n'
           );

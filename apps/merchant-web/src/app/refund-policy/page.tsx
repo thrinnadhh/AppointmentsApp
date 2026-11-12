@@ -90,7 +90,7 @@ export default function RefundPolicyPage() {
 
         <Section title="3. Customer Cancellation — Late or No-Show">
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-5">
-            <p className="font-semibold text-amber-900 text-sm mb-3">⚠️ Cancel inside the 1-hour window, or do not attend</p>
+            <p className="font-semibold text-amber-900 text-sm mb-3">⚠️ Cancel inside the 60-minute window, or do not attend</p>
             <ul className="space-y-2">
               {[
                 'Your booking deposit is forfeited and transferred to the merchant (minus the platform fee).',
@@ -113,7 +113,7 @@ export default function RefundPolicyPage() {
             <ul className="space-y-2">
               {[
                 'You always receive a full refund of both the deposit and the platform fee.',
-                'This applies regardless of timing — even if the merchant cancels within the 1-hour window.',
+                'This applies regardless of timing — even if the merchant cancels within the 60-minute window.',
                 'Refund is processed automatically within 5–7 business days.',
                 'If the refund does not appear after 7 business days, contact support@appointments4u.in.',
               ].map((item, i) => (

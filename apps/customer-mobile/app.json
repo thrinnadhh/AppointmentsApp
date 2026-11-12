@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Appointments Tirupati",
-    "slug": "appointments-tirupati",
+    "name": "Appointments",
+    "slug": "appointments-customer",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,15 +13,80 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.appointments.tirupati"
+      "bundleIdentifier": "com.appointments.tirupati",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Appointments4U uses your location to display nearby hospitals, clinics, salons, and service providers in your city.",
+        "NSCameraUsageDescription": "Appointments4U uses your camera so you can photograph medical prescriptions or service attachments for your appointment.",
+        "NSPhotoLibraryUsageDescription": "Appointments4U accesses your photo library so you can attach medical prescriptions or documents to your appointment.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "35F9.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "E174.1"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#059669"
       },
-      "package": "com.appointments.tirupati"
+      "package": "com.appointments.tirupati",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS"
+      ]
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#059669"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#059669"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ec19baed-cfbd-49dc-abd9-90524229673b"
+      }
+    }
   }
 }

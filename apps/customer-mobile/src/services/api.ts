@@ -1,16 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { 
-  Category, 
   Provider, 
   Resource, 
   ResourceType,
   Slot, 
   Booking, 
-  CreateHoldResult, 
-  VERTICALS,
   Database,
   resolveCategoryId,
-  normCategory,
   City,
   WeeklyHours,
   DayOfWeek,
@@ -37,13 +33,46 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   );
 }
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { encryptedSessionStorage } from './secureStorage';
+
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storage: encryptedSessionStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
 
 export function getApiBaseUrl(): string {
+  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  const isRelease = (typeof __DEV__ !== 'undefined' && !__DEV__) || process.env.NODE_ENV === 'production';
+
+  if (isRelease) {
+    if (!envUrl) {
+      throw new Error(
+        'Missing EXPO_PUBLIC_API_BASE_URL: Release and production mobile builds must have EXPO_PUBLIC_API_BASE_URL explicitly configured. LAN and cleartext fallbacks are strictly prohibited.'
+      );
+    }
+    if (!envUrl.startsWith('https://')) {
+      throw new Error(
+        `Insecure EXPO_PUBLIC_API_BASE_URL: Release builds require HTTPS, got "${envUrl}". Cleartext and LAN endpoints are prohibited in production.`
+      );
+    }
+    return envUrl;
+  }
+
+  // Development environment: use environment variable if set, otherwise local development server
+  if (envUrl) {
+    return envUrl;
+  }
+
   if (typeof window !== 'undefined' && window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:3000';
   }
-  return process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.31.112:3000';
+
+  // Prohibit hardcoded LAN IPs; default strictly to localhost in development
+  return 'http://localhost:3000';
 }
 
 
@@ -118,7 +147,7 @@ export function clearProvidersCache(): void {
 }
 
 export const PUBLIC_PROVIDER_FIELDS =
-  'id, owner_id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, cooling_period_days, weekly_hours, created_at, updated_at, resources(*)';
+  'id, category_id, sub_category_id, name, description, address, city, latitude, longitude, opening_time, closing_time, photos, status, is_active, cooling_period_days, weekly_hours, created_at, updated_at, resources(*)';
 
 // Enhanced Supabase Service for Customer Mobile Application
 export async function fetchProvidersByCategory(categoryId?: string): Promise<ProviderWithDetails[]> {
@@ -170,9 +199,10 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
         updated_at: r.updated_at,
       }));
 
+      const provRecord = prov as Record<string, unknown>;
       return {
         id: prov.id,
-        owner_id: prov.owner_id,
+        owner_id: (provRecord.owner_id as string) ?? '',
         category_id: prov.category_id,
         sub_category_id: prov.sub_category_id,
         name: prov.name,
@@ -181,8 +211,8 @@ export async function fetchProvidersByCategory(categoryId?: string): Promise<Pro
         city: prov.city,
         latitude: Number(prov.latitude),
         longitude: Number(prov.longitude),
-        phone: prov.phone,
-        email: prov.email,
+        phone: (provRecord.phone as string) ?? '',
+        email: (provRecord.email as string) ?? '',
         opening_time: prov.opening_time,
         closing_time: prov.closing_time,
         photos: prov.photos,
@@ -224,7 +254,7 @@ export async function fetchNearbyProviders(
     const { data, error } = await supabase.rpc('get_nearby_providers', {
       p_lat: lat,
       p_lng: lng,
-      p_category: categoryId && categoryId !== 'all' ? resolveCategoryId(categoryId) : null,
+      p_category: categoryId && categoryId !== 'all' ? resolveCategoryId(categoryId) : undefined,
       p_radius_meters: radiusMeters,
     });
 
@@ -334,9 +364,10 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
       updated_at: r.updated_at,
     }));
 
+    const dataRecord = data as Record<string, unknown>;
     const result: ProviderWithDetails = {
       id: data.id,
-      owner_id: data.owner_id,
+      owner_id: (dataRecord.owner_id as string) ?? '',
       category_id: data.category_id,
       sub_category_id: data.sub_category_id,
       name: data.name,
@@ -345,8 +376,8 @@ export async function fetchProviderById(providerId: string): Promise<ProviderWit
       city: data.city,
       latitude: Number(data.latitude),
       longitude: Number(data.longitude),
-      phone: data.phone,
-      email: data.email,
+      phone: (dataRecord.phone as string) ?? '',
+      email: (dataRecord.email as string) ?? '',
       opening_time: data.opening_time,
       closing_time: data.closing_time,
       photos: data.photos,
@@ -372,20 +403,32 @@ interface CustomerBookingRow extends Booking {
   resources?: { name: string } | null;
 }
 
-export async function fetchCustomerBookingsFromSupabase(customerId: string = '99999999-9999-9999-9999-999999999991') {
+export async function fetchCustomerBookingsFromSupabase(
+  customerId: string,
+  limit: number = 20,
+  offset: number = 0
+) {
+  if (!customerId) return [];
   try {
-    // Fast direct query to Supabase (50ms response)
+    // Fast direct query to Supabase (50ms response, paginated with explicit columns)
     const { data, error } = await supabase
       .from('bookings')
       .select(`
-        *,
+        id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
+        status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
+        checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
+        queue_position, estimated_wait_minutes, emergency_cancelled, emergency_doctor_arrived,
+        emergency_patient_choice, booking_for_someone_else, booked_for, patient_name, patient_phone,
+        patient_relationship, patient_age, is_minor, booking_note, total_charged,
+        created_at, updated_at,
         providers ( name ),
         resources ( name )
       `)
       .eq('customer_id', customerId)
-      .order('slot_start', { ascending: false });
+      .order('slot_start', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
       const rows = data as unknown as CustomerBookingRow[];
       return rows.map((b) => ({
         ...b,
@@ -429,6 +472,40 @@ export async function fetchCustomerBookingsFromSupabase(customerId: string = '99
     console.warn('Failed to query bookings:', err);
     return [];
   }
+}
+
+export async function fetchSingleCustomerBookingFromSupabase(
+  bookingId: string
+): Promise<(Booking & { provider_name?: string; resource_name?: string }) | null> {
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(`
+        id, reference_code, customer_id, provider_id, resource_id, slot_start, slot_end,
+        status, payment_status, deposit_amount, platform_fee, total_amount, is_present,
+        checked_in_at, checked_in_method, is_followup, followup_original_booking_id,
+        queue_position, estimated_wait_minutes, emergency_cancelled, emergency_doctor_arrived,
+        emergency_patient_choice, booking_for_someone_else, booked_for, patient_name, patient_phone,
+        patient_relationship, patient_age, is_minor, booking_note, total_charged,
+        created_at, updated_at,
+        providers ( name ),
+        resources ( name )
+      `)
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (!error && data) {
+      const b = data as unknown as CustomerBookingRow;
+      return {
+        ...b,
+        provider_name: b.providers?.name || 'Tirupati Business',
+        resource_name: b.resources?.name || 'Assigned Staff / Unit',
+      };
+    }
+  } catch (err) {
+    console.warn('Failed to query single booking:', err);
+  }
+  return null;
 }
 
 export async function searchDirectoryOnSupabase(query: string): Promise<ProviderWithDetails[]> {
@@ -499,8 +576,17 @@ export interface CreateHoldSupabaseResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_age?: number | null;
+  is_minor?: boolean;
+  booking_note?: string | null;
   error?: string;
 }
 
@@ -508,7 +594,14 @@ export async function createHoldOnSupabase(
   customerId: string,
   resourceId: string,
   slotStart: string,
-  slotEnd: string
+  slotEnd: string,
+  bookingForSomeoneElse?: boolean,
+  patientName?: string,
+  patientPhone?: string,
+  patientRelationship?: string,
+  bookedFor?: 'self' | 'family',
+  patientAge?: number | null,
+  bookingNote?: string | null
 ): Promise<CreateHoldSupabaseResult> {
   // Route all resource hold operations strictly through backend API routes.
   // Direct client-side unmetered RPC access is disallowed to enforce Redis concurrency locks, rate limits, and business logic.
@@ -518,8 +611,12 @@ export async function createHoldOnSupabase(
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id;
+    if (!resolvedCustomerId) {
+      return { success: false, error: 'Authentication required to create a booking hold' };
+    }
     headers['x-customer-id'] = resolvedCustomerId;
+    const isFamily = bookedFor === 'family' || Boolean(bookingForSomeoneElse);
     const resp = await fetch(`${API_BASE_URL}/api/bookings/hold`, {
       method: 'POST',
       headers,
@@ -528,6 +625,13 @@ export async function createHoldOnSupabase(
         resource_id: resourceId,
         slot_start: slotStart,
         slot_end: slotEnd,
+        booking_for_someone_else: isFamily,
+        booked_for: isFamily ? 'family' : 'self',
+        patient_name: patientName || null,
+        patient_phone: patientPhone || null,
+        patient_relationship: patientRelationship || null,
+        patient_age: patientAge !== undefined ? patientAge : null,
+        booking_note: bookingNote || null,
       }),
     });
 
@@ -541,8 +645,17 @@ export async function createHoldOnSupabase(
         deposit_amount: json.deposit_amount,
         platform_fee: json.platform_fee,
         total_amount: json.total_amount,
+        platform_fee_amount: json.platform_fee_amount ?? json.platform_fee,
+        consultation_fee_amount: json.consultation_fee_amount,
+        platform_payment_status: json.platform_payment_status,
+        consultation_payment_status: json.consultation_payment_status,
         is_followup: json.is_followup,
         followup_original_booking_id: json.followup_original_booking_id,
+        booked_for: json.booked_for,
+        patient_name: json.patient_name,
+        patient_age: json.patient_age,
+        is_minor: json.is_minor,
+        booking_note: json.booking_note,
       };
     }
 
@@ -557,6 +670,53 @@ export async function createHoldOnSupabase(
     return {
       success: false,
       error: `Unable to reserve slot: ${msg}`,
+    };
+  }
+}
+
+export async function chooseEmergencyOption(
+  bookingId: string,
+  choice: 'WAIT' | 'RESCHEDULE' | 'REFUND',
+  rescheduleSlotStart?: string,
+  rescheduleSlotEnd?: string
+): Promise<{ success: boolean; choice?: string; refund_amount?: number; message?: string; error?: string }> {
+  try {
+    const session = (await supabase.auth.getSession()).data?.session;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
+    const resp = await fetch(`${API_BASE_URL}/api/bookings/emergency-choice`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        booking_id: bookingId,
+        choice,
+        reschedule_slot_start: rescheduleSlotStart || null,
+        reschedule_slot_end: rescheduleSlotEnd || null,
+      }),
+    });
+
+    const json = await resp.json().catch(() => ({}));
+    if (resp.ok && json.success) {
+      return {
+        success: true,
+        choice: json.choice,
+        refund_amount: json.refund_amount,
+        message: json.message,
+      };
+    }
+
+    return {
+      success: false,
+      error: json.error || `Emergency option selection failed (${resp.status})`,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error';
+    return {
+      success: false,
+      error: msg,
     };
   }
 }
@@ -598,8 +758,10 @@ export async function confirmBookingPaymentOnSupabase(
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
-      const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-      headers['x-customer-id'] = customerId;
+      const customerId = (await supabase.auth.getUser()).data?.user?.id;
+      if (customerId) {
+        headers['x-customer-id'] = customerId;
+      }
 
       const resp = await fetch(`${API_BASE_URL}/api/bookings/confirm`, {
         method: 'POST',
@@ -618,51 +780,21 @@ export async function confirmBookingPaymentOnSupabase(
     }
   }
 
-  try {
-    const updatePayload: {
-      status: 'CONFIRMED';
-      payment_status: 'CAPTURED';
-      gateway_payment_id: string;
-      updated_at: string;
-      attachment_url?: string | null;
-    } = {
-      status: 'CONFIRMED',
-      payment_status: 'CAPTURED',
-      gateway_payment_id: paymentGatewayId,
-      updated_at: new Date().toISOString(),
-    };
-    if (attachmentUrl) {
-      updatePayload.attachment_url = attachmentUrl;
-    }
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .update(updatePayload)
-      .eq('id', bookingId)
-      .select();
-
-    if (error) {
-      if (isDev) {
-        console.warn('Direct confirmation bypassed or fell back in dev mode:', error.message);
-        return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED' }];
-      }
-      throw error;
-    }
-    return data;
-  } catch (err) {
-    if (isDev) {
-      console.warn('Confirm booking dev fallback:', err);
-      return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED' }];
-    }
-    console.error('Error confirming booking in Supabase:', err);
-    mobileLogger.forComponent('MobileApi').error('Booking confirmation failed', err, { bookingId });
-    throw err;
+  if (isDev) {
+    console.warn('Confirm booking dev fallback for booking:', bookingId);
+    return [{ id: bookingId, status: 'CONFIRMED', payment_status: 'CAPTURED', attachment_url: attachmentUrl ?? null }];
   }
+  const err = new Error('Booking confirmation requires server API /api/bookings/confirm or /api/payments/verify');
+  mobileLogger.forComponent('MobileApi').error('Booking confirmation failed', err, { bookingId });
+  throw err;
 }
 
 export interface CreateRazorpayOrderResult {
   success: boolean;
   order_id?: string;
+  cf_order_id?: string;
+  payment_session_id?: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
   key_id?: string;
   amount?: number;
   currency?: string;
@@ -670,6 +802,8 @@ export interface CreateRazorpayOrderResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
   error?: string;
 }
 
@@ -681,7 +815,10 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
+    const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id;
+    if (!resolvedCustomerId) {
+      return { success: false, error: 'Authentication required to initiate payment' };
+    }
     headers['x-customer-id'] = resolvedCustomerId;
 
     const resp = await fetch(`${baseUrl}/api/payments/create-order`, {
@@ -698,6 +835,9 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
     return {
       success: true,
       order_id: json.order_id,
+      cf_order_id: json.cf_order_id,
+      payment_session_id: json.payment_session_id,
+      gateway_provider: json.gateway_provider || 'razorpay',
       key_id: json.key_id,
       amount: json.amount,
       currency: json.currency,
@@ -705,6 +845,8 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
       deposit_amount: json.deposit_amount,
       platform_fee: json.platform_fee,
       total_amount: json.total_amount,
+      platform_fee_amount: json.platform_fee_amount,
+      consultation_fee_amount: json.consultation_fee_amount,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Network error initiating payment';
@@ -713,20 +855,26 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
   }
 }
 
-
 export interface VerifyPaymentResult {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
+  queue_position?: number;
   status?: string;
   payment_status?: string;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   error?: string;
 }
 
 export async function verifyRazorpayPayment(params: {
   booking_id: string;
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
+  order_id?: string;
+  payment_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_order_id?: string;
+  razorpay_signature?: string;
   attachment_url?: string | null;
   customerId?: string;
 }): Promise<VerifyPaymentResult> {
@@ -737,8 +885,10 @@ export async function verifyRazorpayPayment(params: {
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const resolvedCustomerId = params.customerId || (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-    headers['x-customer-id'] = resolvedCustomerId;
+    const resolvedCustomerId = params.customerId || (await supabase.auth.getUser()).data?.user?.id;
+    if (resolvedCustomerId) {
+      headers['x-customer-id'] = resolvedCustomerId;
+    }
 
     const resp = await fetch(`${baseUrl}/api/payments/verify`, {
       method: 'POST',
@@ -754,8 +904,12 @@ export async function verifyRazorpayPayment(params: {
     return {
       success: true,
       booking_id: json.booking_id,
+      reference_code: json.reference_code,
+      queue_position: json.queue_position,
       status: json.status,
       payment_status: json.payment_status,
+      platform_payment_status: json.platform_payment_status,
+      consultation_payment_status: json.consultation_payment_status,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Network error verifying payment';
@@ -766,7 +920,7 @@ export async function verifyRazorpayPayment(params: {
 
 export async function cancelBookingOnSupabase(bookingId: string, slotStart: string) {
   const diffMinutes = Math.round((new Date(slotStart).getTime() - Date.now()) / (1000 * 60));
-  const isLate = diffMinutes <= 30;
+  const isLate = diffMinutes <= 60;
 
   try {
     if (API_BASE_URL) {
@@ -776,15 +930,17 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
-        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-        headers['x-customer-id'] = customerId;
+        const customerId = (await supabase.auth.getUser()).data?.user?.id;
+        if (customerId) {
+          headers['x-customer-id'] = customerId;
+        }
 
         const resp = await fetch(`${API_BASE_URL}/api/bookings/cancel`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
             booking_id: bookingId,
-            reason: isLate ? 'Customer cancelled (<30 min)' : 'Customer cancelled (>30 min)',
+            reason: isLate ? 'Customer cancelled (<60 min)' : 'Customer cancelled (>=60 min)',
           }),
         });
         if (resp.ok) {
@@ -792,30 +948,16 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
           return { data: json, isLate };
         }
       } catch {
-        // Fall through to RPC or direct update
+        // Fall through to RPC
       }
     }
 
     const { data: rpcData, error: rpcError } = await supabase.rpc('cancel_booking', {
       p_booking_id: bookingId,
-      p_reason: isLate ? 'Customer cancelled (<30 min)' : 'Customer cancelled (>30 min)',
+      p_reason: isLate ? 'Customer cancelled (<60 min)' : 'Customer cancelled (>=60 min)',
     });
-    if (!rpcError) {
-      return { data: rpcData, isLate };
-    }
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .update({
-        status: 'CANCELLED',
-        payment_status: isLate ? 'FORFEITED' : 'REFUNDED',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId)
-      .select();
-
-    if (error) throw error;
-    return { data, isLate };
+    if (rpcError) throw rpcError;
+    return { data: rpcData, isLate };
   } catch (err) {
     console.error('Error cancelling booking on Supabase:', err);
     mobileLogger.forComponent('MobileApi').error('Booking cancellation failed', err, { bookingId });
@@ -824,51 +966,43 @@ export async function cancelBookingOnSupabase(bookingId: string, slotStart: stri
 }
 
 export async function fetchBookedSlots(resourceId: string, date: Date): Promise<string[]> {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    throw new Error('Slot availability API base URL is not configured');
+  }
+
+  const session = (await supabase.auth.getSession()).data?.session;
+  const headers: Record<string, string> = {};
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
   try {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const resp = await fetch(
+      `${baseUrl}/api/slots/availability?resource_id=${encodeURIComponent(resourceId)}&date=${encodeURIComponent(date.toISOString())}`,
+      { headers, signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
 
-    // Fast direct database query (50ms response, zero dependency on local IP)
-    const { data, error } = await supabase
-      .from('bookings')
-      .select('slot_start')
-      .eq('resource_id', resourceId)
-      .in('status', ['HELD', 'CONFIRMED', 'PENDING_PAYMENT'])
-      .gte('slot_start', startOfDay.toISOString())
-      .lte('slot_start', endOfDay.toISOString());
-
-    if (!error && data) {
-      return data.map((b) => new Date(b.slot_start).toISOString());
+    if (!resp.ok) {
+      const errBody = await resp.json().catch(() => ({}));
+      throw new Error(
+        errBody?.error || `Failed to load slot availability (HTTP ${resp.status})`
+      );
     }
 
-    // Fall back to server API endpoint with 2s timeout
-    const baseUrl = getApiBaseUrl();
-    if (baseUrl) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      try {
-        const resp = await fetch(
-          `${baseUrl}/api/slots/booked?resource_id=${encodeURIComponent(resourceId)}&date=${encodeURIComponent(date.toISOString())}`,
-          { signal: controller.signal }
-        );
-        clearTimeout(timeoutId);
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json.success && Array.isArray(json.booked_slots)) {
-            return json.booked_slots;
-          }
-        }
-      } catch {
-        clearTimeout(timeoutId);
-      }
+    const json = await resp.json();
+    if (!json?.success || !Array.isArray(json.booked_slots)) {
+      throw new Error('Invalid slot availability response from server');
     }
 
-    return [];
+    return json.booked_slots;
   } catch (err) {
+    clearTimeout(timeoutId);
     console.warn('fetchBookedSlots error:', err);
-    return [];
+    throw err instanceof Error ? err : new Error('Unable to load slot availability');
   }
 }
 
@@ -917,7 +1051,7 @@ export function generateAvailableSlots(
           const start = new Date(selectedDate);
           start.setHours(hour, min, 0, 0);
           const end = new Date(start.getTime() + (slotDuration > 0 ? slotDuration : slotStep) * 60000);
-          const isBusy = (hour === 13 && min === 0);
+          const isBusy = false;
           const isPast = isSelectedDateToday && start.getTime() <= (now.getTime() + 5 * 60 * 1000);
           const isBooked = bookedSlotStarts.some(
             (bs) => Math.abs(new Date(bs).getTime() - start.getTime()) < 60000
@@ -954,9 +1088,7 @@ export function generateAvailableSlots(
       const start = new Date(selectedDate);
       start.setHours(hour, min, 0, 0);
       const end = new Date(start.getTime() + (defaultSlotDuration > 0 ? defaultSlotDuration : defaultSlotStep) * 60000);
-      
-      // Mark one slot as busy for demonstration
-      const isBusy = (hour === 12 && min === 0) || (hour === 15 && min === 30);
+      const isBusy = false;
       const isPast = isSelectedDateToday && start.getTime() <= (now.getTime() + 5 * 60 * 1000);
       const isBooked = bookedSlotStarts.some(
         (bs) => Math.abs(new Date(bs).getTime() - start.getTime()) < 60000
@@ -988,8 +1120,10 @@ export async function rescheduleBookingOnSupabase(
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
-        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-        headers['x-customer-id'] = customerId;
+        const customerId = (await supabase.auth.getUser()).data?.user?.id;
+        if (customerId) {
+          headers['x-customer-id'] = customerId;
+        }
 
         const resp = await fetch(`${API_BASE_URL}/api/bookings/reschedule`, {
           method: 'POST',
@@ -1014,23 +1148,8 @@ export async function rescheduleBookingOnSupabase(
       p_new_slot_start: newSlotStart,
       p_new_slot_end: newSlotEnd,
     });
-    if (!rpcError) {
-      return { success: true, data: rpcData };
-    }
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .update({
-        slot_start: newSlotStart,
-        slot_end: newSlotEnd,
-        status: 'CONFIRMED',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId)
-      .select();
-
-    if (error) throw error;
-    return { success: true, data };
+    if (rpcError) throw rpcError;
+    return { success: true, data: rpcData };
   } catch (err) {
     console.error('Error rescheduling booking:', err);
     throw err;
@@ -1049,8 +1168,10 @@ export async function markBookingReached(bookingId: string): Promise<{ success: 
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
-        const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-        headers['x-customer-id'] = customerId;
+        const customerId = (await supabase.auth.getUser()).data?.user?.id;
+        if (customerId) {
+          headers['x-customer-id'] = customerId;
+        }
 
         const resp = await fetch(`${API_BASE_URL}/api/bookings/reach`, {
           method: 'POST',
@@ -1062,28 +1183,15 @@ export async function markBookingReached(bookingId: string): Promise<{ success: 
           if (json.success) return json;
         }
       } catch {
-        // Fallback directly to RPC or Supabase update
+        // Fallback directly to RPC
       }
     }
 
     const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('mark_customer_reached', {
       p_booking_id: bookingId,
     });
-    if (!rpcError && rpcData) {
-      return { success: true };
-    }
-
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
-        is_present: true,
-        customer_arrived_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId);
-
-    if (updateError) throw updateError;
-    return { success: true };
+    if (rpcError) throw rpcError;
+    return { success: Boolean(rpcData ?? true) };
   } catch (err) {
     console.error('Error marking booking as reached:', err);
     throw err;
@@ -1230,12 +1338,17 @@ export async function sendPhoneOtp(rawPhone: string): Promise<{ success: boolean
     const { error } = await supabase.auth.signInWithOtp({ phone });
     if (error) {
       console.warn('Supabase signInWithOtp error:', error.message);
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        error: "We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again.",
+      };
     }
     return { success: true };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to send OTP';
-    return { success: false, error: msg };
+  } catch {
+    return {
+      success: false,
+      error: "We couldn't send the code on WhatsApp. Make sure this number has WhatsApp and try again.",
+    };
   }
 }
 
@@ -1291,7 +1404,7 @@ export async function sendEmailOtp(email: string): Promise<{ success: boolean; e
     const { error } = await supabase.auth.signInWithOtp({ email: trimmed });
     if (error) {
       console.warn('Supabase email signInWithOtp error:', error.message);
-      if (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient')) {
+if (isDev && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('patient'))) {
         return { success: true };
       }
       return { success: false, error: error.message };
@@ -1312,7 +1425,7 @@ export async function verifyEmailOtp(
 ): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
   try {
     const trimmed = email.trim();
-    if (token.trim() === '123456' && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('trinadh') || trimmed.includes('patient'))) {
+if (isDev && token.trim() === '123456' && (trimmed.includes('test') || trimmed.includes('tirupati') || trimmed.includes('patient'))) {
       return { success: true };
     }
     const { data, error } = await supabase.auth.verifyOtp({
@@ -1321,7 +1434,7 @@ export async function verifyEmailOtp(
       type: 'email',
     });
     if (error) {
-      if (token.trim() === '123456') return { success: true };
+      if (isDev && token.trim() === '123456') return { success: true };
       console.warn('Supabase email verifyOtp error:', error.message);
       return { success: false, error: error.message };
     }
@@ -1331,7 +1444,7 @@ export async function verifyEmailOtp(
       session: data?.session,
     };
   } catch (err: unknown) {
-    if (token.trim() === '123456') return { success: true };
+    if (isDev && token.trim() === '123456') return { success: true };
     const msg = err instanceof Error ? err.message : 'Failed to verify email OTP';
     return { success: false, error: msg };
   }
@@ -1347,9 +1460,9 @@ export async function syncCustomerProfile(
 ): Promise<{ success: boolean; profile?: unknown; error?: string }> {
   try {
     const { data, error } = await supabase.rpc('sync_customer_profile', {
-      p_full_name: fullName || null,
-      p_phone: phone || null,
-      p_email: email || null,
+      p_full_name: fullName || undefined,
+      p_phone: phone || undefined,
+      p_email: email || undefined,
     });
 
     if (error) {
@@ -1385,6 +1498,76 @@ export async function signOutCustomer() {
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Sign out failed';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Sign in using Google OAuth via Supabase.
+ * In Web environments, initiates OAuth redirect.
+ * In React Native / Expo, opens the authorization URL using Linking.
+ */
+export async function signInWithGoogle(): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const isWeb = typeof window !== 'undefined' && typeof window.location !== 'undefined';
+    const redirectUrl = isWeb && window.location
+      ? window.location.origin
+      : 'appointments://auth/callback';
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: !isWeb,
+      },
+    });
+
+    if (error) {
+      console.warn('Supabase Google OAuth error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    if (data?.url) {
+      if (isWeb && window.location) {
+        window.location.href = data.url;
+      } else {
+        const { Linking } = await import('react-native');
+        await Linking.openURL(data.url);
+      }
+      return { success: true, url: data.url };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Google authentication failed';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Fast development/demo Google Sign-In helper.
+ * Generates or signs into an authenticated customer session for local development
+ * without requiring third-party OAuth configuration in the Supabase Dashboard.
+ */
+export async function signInWithGoogleDev(
+  email: string = 'patient@gmail.com',
+  name: string = 'Google Patient'
+): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
+  try {
+    const testPhone = '+919999999991';
+    const otpRes = await verifyPhoneOtp(testPhone, '123456');
+    if (otpRes.success && otpRes.user) {
+      await syncCustomerProfile(name, testPhone, email);
+      return {
+        success: true,
+        user: { ...otpRes.user, email, user_metadata: { full_name: name, avatar_url: 'https://lh3.googleusercontent.com/a/default-user' } },
+        session: otpRes.session,
+      };
+    }
+
+    return { success: false, error: 'Could not initialize Google dev session' };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Google dev sign-in error';
     return { success: false, error: msg };
   }
 }
@@ -1436,7 +1619,7 @@ export async function fetchActiveCities(includeExpanding: boolean = true): Promi
       return fallback;
     }
 
-    const result = (data as unknown as City[]) || [];
+    const result = data as unknown as City[];
     activeCitiesCache = { data: result, timestamp: Date.now() };
     return result;
   } catch (err) {
@@ -1456,59 +1639,80 @@ export async function joinCityWaitlist(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const cityName = cityId.charAt(0).toUpperCase() + cityId.slice(1).toLowerCase();
-    const { error } = await supabase.from('city_waitlist').insert({
-      city_id: cityId,
-      contact_info: contactInfo.trim(),
-      role_interest: roleInterest,
-      notes: notes || null,
+
+    // 1. Invoke SECURITY DEFINER RPC with input validation & deduplication
+    const { data, error } = await (supabase.rpc as any)('submit_city_waitlist', {
+      p_city_name: cityName,
+      p_phone: contactInfo.trim(),
+      p_vertical_interest: roleInterest,
+      p_notes: notes || null,
     });
 
-    if (error) {
-      console.warn('Supabase waitlist insert error:', error.message);
-      if (API_BASE_URL) {
-        try {
-          const res = await fetch(`${API_BASE_URL}/api/admin/waitlist`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
-          });
-          if (res.ok) return { success: true };
-        } catch (fErr) {
-          console.warn('Waitlist fallback fetch failed:', fErr);
-        }
-      }
+    if (!error && data?.success) {
       return { success: true };
+    }
+
+    // 2. Server API route fallback
+    if (API_BASE_URL) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/waitlist`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
+        });
+        if (res.ok) return { success: true };
+      } catch (fErr) {
+        console.warn('Waitlist fallback fetch failed:', fErr);
+      }
+    }
+
+    if (error) {
+      return { success: false, error: error.message };
     }
     return { success: true };
   } catch (err: unknown) {
-    console.warn('Waitlist exception:', err);
-    return { success: true };
+    const msg = err instanceof Error ? err.message : 'Waitlist submission error';
+    return { success: false, error: msg };
   }
 }
 
 /**
  * Fetch customer no-show strikes count and flagged status from public.profiles
  */
+export interface CustomerStrikesResult {
+  strikes: number;
+  isFlagged: boolean;
+  isBlocked: boolean;
+  blockedUntil: string | null;
+}
+
 export async function fetchCustomerStrikes(
   customerId: string
-): Promise<{ strikes: number; isFlagged: boolean }> {
+): Promise<CustomerStrikesResult> {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('no_show_count, is_flagged')
+      .select('no_show_count, is_flagged, blocked_until')
       .eq('id', customerId)
       .maybeSingle();
 
     if (error || !data) {
-      return { strikes: 0, isFlagged: false };
+      return { strikes: 0, isFlagged: false, isBlocked: false, blockedUntil: null };
     }
+
+    const blockedUntilStr = data.blocked_until ? String(data.blocked_until) : null;
+    const isBlocked = Boolean(
+      blockedUntilStr && new Date(blockedUntilStr).getTime() > Date.now()
+    );
 
     return {
       strikes: Number(data.no_show_count) || 0,
       isFlagged: Boolean(data.is_flagged),
+      isBlocked,
+      blockedUntil: blockedUntilStr,
     };
   } catch {
-    return { strikes: 0, isFlagged: false };
+    return { strikes: 0, isFlagged: false, isBlocked: false, blockedUntil: null };
   }
 }
 
@@ -1526,8 +1730,10 @@ export async function reassignBookingResourceApi(
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
-    const customerId = (await supabase.auth.getUser()).data?.user?.id || '99999999-9999-9999-9999-999999999991';
-    headers['x-customer-id'] = customerId;
+    const customerId = (await supabase.auth.getUser()).data?.user?.id;
+    if (customerId) {
+      headers['x-customer-id'] = customerId;
+    }
 
     const resp = await fetch(`${API_BASE_URL}/api/bookings/reassign`, {
       method: 'POST',
@@ -1544,3 +1750,46 @@ export async function reassignBookingResourceApi(
     return { success: false, error: 'Reassignment failed' };
   }
 }
+
+/**
+ * Fetch reception check-in code for a booking (protected by customer RLS)
+ */
+export async function fetchBookingCheckinCode(bookingId: string): Promise<string | null> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from('appointment_checkin_codes')
+      .select('code')
+      .eq('booking_id', bookingId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Error fetching checkin code from Supabase:', error);
+      return null;
+    }
+    return data?.code || null;
+  } catch (err) {
+    console.warn('Network error fetching checkin code:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch permanent lifetime 4-digit check-in PIN for customer
+ */
+export async function fetchCustomerLifetimePin(customerId: string): Promise<string | null> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from('customer_checkin_pins')
+      .select('pin')
+      .eq('customer_id', customerId)
+      .maybeSingle();
+
+    if (!error && data?.pin) {
+      return data.pin;
+    }
+  } catch (err) {
+    console.warn('Network error fetching customer lifetime pin:', err);
+  }
+  return null;
+}
+

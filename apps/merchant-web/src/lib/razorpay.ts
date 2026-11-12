@@ -23,26 +23,40 @@ export interface VerifySignatureParams {
 }
 
 export interface RefundParams {
-  paymentId: string;
+  paymentId?: string;
   amount?: number; // in paise
   notes?: Record<string, string>;
+  supabaseAdmin?: any;
+  bookingId?: string;
+  refundAmountInr?: number;
+  reason?: string;
+  actorId?: string;
+  idempotencyKey?: string;
+  speed?: 'normal' | 'optimum' | 'instant';
+  stuckThresholdMs?: number;
 }
+
+export const STUCK_REFUND_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface RazorpayRefundResult {
   id: string;
   amount: number;
   status: string;
   is_mock: boolean;
+  success?: boolean;
+  booking_id?: string;
+  error?: string;
 }
 
-const KEY_ID = process.env.RAZORPAY_KEY_ID;
-const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
-const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
-
-// Fail-fast production guard: Ensure critical payment secrets are configured
-if (process.env.NODE_ENV === 'production') {
-  if (!process.env.RAZORPAY_KEY_SECRET) {
-    throw new Error('CRITICAL SECURITY CONFIGURATION ERROR: RAZORPAY_KEY_SECRET environment variable is required in production.');
+/**
+ * Fail-fast runtime assertion: Ensure critical payment secrets are configured before executing live operations.
+ * Deferring check from top-level module load prevents build crashes during Next.js SSG / page data collection.
+ */
+export function assertRazorpayConfigured(): void {
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      throw new Error('CRITICAL SECURITY CONFIGURATION ERROR: RAZORPAY_KEY_SECRET environment variable is required in production.');
+    }
   }
 }
 
@@ -77,6 +91,10 @@ export function getRazorpayKeyId(): string {
 export async function createRazorpayOrder(params: CreateOrderParams): Promise<RazorpayOrderResult> {
   const { amount, currency = 'INR', receipt, notes } = params;
 
+  if (process.env.NODE_ENV === 'production') {
+    assertRazorpayConfigured();
+  }
+
   // Sandbox / Mock mode — generate deterministic synthetic mock order when explicitly opted in non-production
   if (canMockPayments()) {
     const sanitizedReceipt = (receipt || 'rcpt').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
@@ -107,6 +125,7 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<Ra
         receipt,
         notes,
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
@@ -141,6 +160,9 @@ export function isTestMode(): boolean {
  * Strictly forbidden in production; requires explicit opt-in via ALLOW_MOCK_PAYMENTS.
  */
 export function canMockPayments(): boolean {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
+    throw new Error('FATAL SECURITY VIOLATION: ALLOW_MOCK_PAYMENTS cannot be set to "true" in production environments.');
+  }
   return process.env.ALLOW_MOCK_PAYMENTS === 'true' && process.env.NODE_ENV !== 'production';
 }
 
@@ -185,10 +207,10 @@ export function verifyRazorpaySignature(params: VerifySignatureParams): boolean 
   }
 
   // 3. Mock verification ONLY when explicitly enabled in non-production environments
-  // AND the order was specifically created in mock mode (starts with order_mock_)
+  // AND the order was specifically created in mock mode (starts with order_mock_ or mock_cf_)
   if (
     canMockPayments() &&
-    orderId.startsWith('order_mock_') &&
+    (orderId.startsWith('order_mock_') || orderId.startsWith('mock_cf_') || orderId.startsWith('cf_mock_')) &&
     (signature.startsWith('mock_sig_') ||
       signature === 'mock_verified' ||
       signature === 'sim_signature' ||
@@ -257,6 +279,7 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
           Authorization: authHeader,
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) {
         return null;
@@ -313,7 +336,7 @@ export async function fetchRazorpayOrder(orderId: string): Promise<RazorpayOrder
         is_mock: true,
       };
     }
-    const mockAmountMatch = orderId.match(/^order_mock_(\d+)_/);
+    const mockAmountMatch = orderId.match(/^(?:order_mock|mock_cf)_(\d+)_/);
     const mockAmount = mockAmountMatch ? parseInt(mockAmountMatch[1], 10) : 11000;
     return {
       id: orderId,
@@ -336,6 +359,7 @@ export async function fetchRazorpayOrder(orderId: string): Promise<RazorpayOrder
           Authorization: authHeader,
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) {
         return null;
@@ -360,37 +384,379 @@ export async function fetchRazorpayOrder(orderId: string): Promise<RazorpayOrder
   return null;
 }
 
+const inFlightRefundBookingIds = new Set<string>();
+
+/**
+ * Queries Razorpay Refunds API for a payment (`GET /v1/payments/:id/refunds`)
+ * to reconcile whether a stuck `REFUND_IN_PROGRESS` row was already refunded at the gateway.
+ */
+export async function fetchRazorpayRefundsForPayment(
+  paymentId: string
+): Promise<Array<{ id: string; amount: number; status: string }>> {
+  if (!paymentId || !paymentId.trim()) return [];
+  const isSyntheticMock =
+    canMockPayments() &&
+    (paymentId.startsWith('sim_') || paymentId.startsWith('mock_'));
+
+  if (isSyntheticMock) {
+    if (paymentId.includes('reconciled')) {
+      return [{ id: `rfnd_reconciled_${paymentId.slice(-6)}`, amount: 11000, status: 'processed' }];
+    }
+    return [];
+  }
+
+  if (!isRazorpayConfigured()) return [];
+
+  try {
+    const keyId = process.env.RAZORPAY_KEY_ID!;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET!;
+    const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+    const res = await fetch(
+      `https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}/refunds`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => ({}));
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return items.filter(
+      (item: any) =>
+        item &&
+        typeof item.id === 'string' &&
+        ['processed', 'pending', 'created'].includes(String(item.status || '').toLowerCase())
+    );
+  } catch (err) {
+    console.error('[Razorpay] fetchRazorpayRefundsForPayment failed:', err);
+    return [];
+  }
+}
+
+/**
+ * Resolves or generates a compliant Razorpay refund idempotency key.
+ * Official Razorpay spec: Must be at least 10 chars, containing only [a-zA-Z0-9_-].
+ */
+export function resolveRefundIdempotencyKey(candidate?: string, fallbackSeed?: string): string {
+  if (candidate && typeof candidate === 'string') {
+    const trimmed = candidate.trim();
+    if (trimmed.length >= 10 && /^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+  return crypto
+    .createHash('sha256')
+    .update(fallbackSeed || `refund:${Date.now()}:${Math.random()}`)
+    .digest('hex')
+    .slice(0, 36);
+}
+
 /**
  * Initiates a refund for a payment via Razorpay.
+ * Supports both direct paymentId refunds and booking-scoped refunds ({ supabaseAdmin, bookingId, refundAmountInr, reason, actorId }).
+ * Includes recovery (reconciliation + retry) for rows stuck in REFUND_IN_PROGRESS longer than STUCK_REFUND_THRESHOLD_MS.
  */
 export async function initiateRazorpayRefund(params: RefundParams): Promise<RazorpayRefundResult> {
-  const { paymentId, amount, notes } = params;
+  const {
+    supabaseAdmin,
+    bookingId,
+    refundAmountInr,
+    reason,
+    actorId,
+    speed = 'optimum',
+    stuckThresholdMs = STUCK_REFUND_THRESHOLD_MS,
+  } = params;
+  let paymentId = params.paymentId || '';
+  let amount = params.amount;
+  const notes: Record<string, string> = {
+    ...(params.notes || {}),
+    ...(bookingId ? { booking_id: bookingId } : {}),
+    ...(reason ? { reason } : {}),
+    ...(actorId ? { actor_id: actorId } : {}),
+  };
+
+  if (bookingId && supabaseAdmin) {
+    if (inFlightRefundBookingIds.has(bookingId)) {
+      return {
+        id: '',
+        amount: amount || 0,
+        status: 'already_claimed',
+        is_mock: false,
+        success: false,
+        booking_id: bookingId,
+        error: 'Refund already in progress for this booking',
+      };
+    }
+    inFlightRefundBookingIds.add(bookingId);
+
+    try {
+      const nowMs = Date.now();
+      const claimNowIso = new Date(nowMs).toISOString();
+
+      // Check whether a payment row exists for this booking and atomically claim it if present
+      const { data: existingPayment } = await supabaseAdmin
+        .from('payments')
+        .select('id, gateway_payment_id, status, amount, updated_at')
+        .eq('booking_id', bookingId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingPayment) {
+        const isStuckInProgress =
+          existingPayment.status === 'REFUND_IN_PROGRESS' &&
+          existingPayment.updated_at &&
+          nowMs - new Date(existingPayment.updated_at).getTime() >= stuckThresholdMs;
+
+        if (isStuckInProgress) {
+          // 1. Reconcile against Razorpay Refunds API first to see if refund already succeeded at gateway
+          const gwPaymentId = paymentId || existingPayment.gateway_payment_id || '';
+          if (gwPaymentId) {
+            const gatewayRefunds = await fetchRazorpayRefundsForPayment(gwPaymentId);
+            if (gatewayRefunds.length > 0) {
+              const reconciledRefund = gatewayRefunds[0];
+              await supabaseAdmin
+                .from('bookings')
+                .update({ payment_status: 'REFUNDED', updated_at: claimNowIso })
+                .eq('id', bookingId);
+              await supabaseAdmin
+                .from('payments')
+                .update({ status: 'REFUNDED', updated_at: claimNowIso })
+                .eq('id', existingPayment.id);
+
+              return {
+                id: reconciledRefund.id,
+                amount: reconciledRefund.amount,
+                status: 'reconciled',
+                is_mock: false,
+                success: true,
+                booking_id: bookingId,
+              };
+            }
+          }
+
+          // 2. Not refunded at gateway yet — atomically re-claim the stuck REFUND_IN_PROGRESS row for retry
+          const { data: reclaimedPayment } = await supabaseAdmin
+            .from('payments')
+            .update({ status: 'REFUND_IN_PROGRESS', updated_at: claimNowIso })
+            .eq('id', existingPayment.id)
+            .eq('status', 'REFUND_IN_PROGRESS')
+            .eq('updated_at', existingPayment.updated_at)
+            .select('id, gateway_payment_id, status')
+            .maybeSingle();
+
+          if (!reclaimedPayment) {
+            return {
+              id: '',
+              amount: amount || 0,
+              status: 'already_claimed',
+              is_mock: false,
+              success: false,
+              booking_id: bookingId,
+              error: 'Stuck refund is already being recovered by another worker',
+            };
+          }
+          if (!paymentId && reclaimedPayment.gateway_payment_id) {
+            paymentId = reclaimedPayment.gateway_payment_id;
+          }
+        } else {
+          // Normal atomic claim: UPDATE payments SET status = 'REFUND_IN_PROGRESS' WHERE id = ... AND status IN ('CAPTURED', 'REFUND_PENDING', 'REFUND_FAILED')
+          const { data: claimedPayment } = await supabaseAdmin
+            .from('payments')
+            .update({ status: 'REFUND_IN_PROGRESS', updated_at: claimNowIso })
+            .eq('id', existingPayment.id)
+            .in('status', ['CAPTURED', 'REFUND_PENDING', 'REFUND_FAILED'])
+            .select('id, gateway_payment_id, status')
+            .maybeSingle();
+
+          if (!claimedPayment) {
+            return {
+              id: '',
+              amount: amount || 0,
+              status: 'already_claimed',
+              is_mock: false,
+              success: false,
+              booking_id: bookingId,
+              error: 'Refund already claimed or completed for this payment',
+            };
+          }
+          if (!paymentId && claimedPayment.gateway_payment_id) {
+            paymentId = claimedPayment.gateway_payment_id;
+          }
+        }
+      }
+
+      // Atomic claim on bookings row (allow REFUND_IN_PROGRESS when recovering a stuck payment)
+      const { data: currentBooking } = await supabaseAdmin
+        .from('bookings')
+        .select('id, gateway_payment_id, deposit_amount, total_amount, payment_status, updated_at')
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      const bookingStuckInProgress =
+        currentBooking?.payment_status === 'REFUND_IN_PROGRESS' &&
+        ((existingPayment && existingPayment.status === 'REFUND_IN_PROGRESS') ||
+          (currentBooking.updated_at &&
+            nowMs - new Date(currentBooking.updated_at).getTime() >= stuckThresholdMs));
+
+      const allowedBookingStatuses = bookingStuckInProgress
+        ? ['CAPTURED', 'REFUND_PENDING', 'REFUND_FAILED', 'REFUND_IN_PROGRESS']
+        : ['CAPTURED', 'REFUND_PENDING', 'REFUND_FAILED'];
+
+      const { data: bookingRow } = await supabaseAdmin
+        .from('bookings')
+        .update({ payment_status: 'REFUND_IN_PROGRESS', updated_at: claimNowIso })
+        .eq('id', bookingId)
+        .in('payment_status', allowedBookingStatuses)
+        .select('id, gateway_payment_id, deposit_amount, total_amount, payment_status')
+        .maybeSingle();
+
+      if (!bookingRow) {
+        return {
+          id: '',
+          amount: amount || 0,
+          status: 'already_claimed',
+          is_mock: false,
+          success: false,
+          booking_id: bookingId,
+          error: 'Booking is not eligible for refund or already refunded',
+        };
+      }
+
+      if (!paymentId && bookingRow?.gateway_payment_id) {
+        paymentId = bookingRow.gateway_payment_id;
+      }
+
+      if (amount === undefined) {
+        const inr = Number(refundAmountInr ?? bookingRow?.total_amount ?? bookingRow?.deposit_amount ?? 0);
+        amount = Math.round(inr * 100);
+      }
+
+      if (!paymentId && canMockPayments()) {
+        paymentId = `mock_${bookingId.slice(0, 8)}`;
+      }
+
+      if (!paymentId) {
+        throw new Error(`No gateway_payment_id found for booking ${bookingId}`);
+      }
+
+      const idempotencyKey = resolveRefundIdempotencyKey(
+        params.idempotencyKey,
+        `refund:${bookingId}:${paymentId}:${amount ?? 'full'}`
+      );
+
+      const refundRes = await initiateRazorpayRefund({
+        paymentId,
+        amount,
+        notes,
+        idempotencyKey,
+        speed,
+      });
+
+      const nowIso = new Date().toISOString();
+      await supabaseAdmin
+        .from('bookings')
+        .update({ payment_status: 'REFUNDED', updated_at: nowIso })
+        .eq('id', bookingId);
+
+      await supabaseAdmin
+        .from('payments')
+        .update({ status: 'REFUNDED', updated_at: nowIso })
+        .eq('booking_id', bookingId);
+
+      return {
+        ...refundRes,
+        success: true,
+        booking_id: bookingId,
+      };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Refund execution failed';
+      try {
+        const failNowIso = new Date().toISOString();
+        await supabaseAdmin
+          .from('bookings')
+          .update({ payment_status: 'REFUND_FAILED', updated_at: failNowIso })
+          .eq('id', bookingId);
+        await supabaseAdmin
+          .from('payments')
+          .update({ status: 'REFUND_FAILED', updated_at: failNowIso })
+          .eq('booking_id', bookingId);
+        const { error: auditErr } = await supabaseAdmin.from('admin_audit_logs').insert({
+          action: 'REFUND_MANUAL_INTERVENTION_REQUIRED',
+          target_type: 'booking',
+          target_id: bookingId,
+          admin_id: actorId || null,
+          details: {
+            reason: reason || 'Automated refund failed',
+            error: errMsg,
+            refund_amount_inr: refundAmountInr,
+          },
+        });
+        if (auditErr) {
+          console.error('[Razorpay] Failed to insert admin_audit_logs for failed refund:', auditErr);
+        }
+      } catch (logErr) {
+        console.error('[Razorpay] Failed to record refund failure state:', logErr);
+      }
+      return {
+        id: '',
+        amount: amount || 0,
+        status: 'failed',
+        is_mock: false,
+        success: false,
+        booking_id: bookingId,
+        error: errMsg,
+      };
+    } finally {
+      inFlightRefundBookingIds.delete(bookingId);
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    assertRazorpayConfigured();
+  }
 
   // Simulated failure hook for test runs (strictly non-production)
   if (canMockPayments() && (paymentId.includes('fail') || paymentId.includes('error'))) {
     throw new Error('Simulated Razorpay refund gateway failure');
   }
 
+  // Only treat payment IDs with sim_ or mock_ prefixes as synthetic; real Razorpay IDs start with pay_
   const isSyntheticMock =
     canMockPayments() &&
-    (paymentId.startsWith('sim_') ||
-      paymentId.startsWith('mock_') ||
-      paymentId.startsWith('pay_'));
+    (paymentId.startsWith('sim_') || paymentId.startsWith('mock_'));
 
   if (isRazorpayConfigured() && !isSyntheticMock) {
+    if (!/^pay_[A-Za-z0-9_-]{4,64}$/.test(paymentId)) {
+      throw new Error('Invalid Razorpay payment ID format');
+    }
+    const safePaymentId = encodeURIComponent(paymentId);
     const keyId = process.env.RAZORPAY_KEY_ID!;
     const keySecret = process.env.RAZORPAY_KEY_SECRET!;
     const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
-    const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
+    const idempotencyKey = resolveRefundIdempotencyKey(
+      params.idempotencyKey,
+      `refund:${safePaymentId}:${amount ?? 'full'}:${notes.booking_id || ''}`
+    );
+
+    const refundUrl = new URL(`/v1/payments/${safePaymentId}/refund`, 'https://api.razorpay.com');
+    const res = await fetch(refundUrl.toString(), {
       method: 'POST',
       headers: {
         Authorization: authHeader,
         'Content-Type': 'application/json',
+        'X-Refund-Idempotency': idempotencyKey,
       },
       body: JSON.stringify({
         ...(amount ? { amount } : {}),
-        ...(notes ? { notes } : {}),
+        ...(speed ? { speed } : {}),
+        ...(Object.keys(notes).length > 0 ? { notes } : {}),
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
@@ -404,10 +770,11 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
       amount: data.amount,
       status: data.status,
       is_mock: false,
+      success: true,
     };
   }
 
-  if (canMockPayments()) {
+  if (canMockPayments() && isSyntheticMock) {
     return {
       id: `rfnd_mock_${Date.now().toString(36)}`,
       amount: amount || 0,
@@ -417,4 +784,51 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
   }
 
   throw new Error('Razorpay credentials are not configured and mock refunds are disabled.');
+}
+
+/**
+ * Scans for payments stuck in REFUND_IN_PROGRESS longer than thresholdMs and
+ * recovers each via reconciliation (if already refunded at Razorpay) or retry.
+ */
+export async function recoverStuckRefunds(options: {
+  supabaseAdmin: any;
+  thresholdMs?: number;
+}): Promise<{ scanned: number; recovered: number; failed: number; results: RazorpayRefundResult[] }> {
+  const { supabaseAdmin, thresholdMs = STUCK_REFUND_THRESHOLD_MS } = options;
+  const cutoffIso = new Date(Date.now() - thresholdMs).toISOString();
+
+  const { data: stuckRows } = await supabaseAdmin
+    .from('payments')
+    .select('id, booking_id, gateway_payment_id, amount, updated_at')
+    .eq('status', 'REFUND_IN_PROGRESS')
+    .lte('updated_at', cutoffIso);
+
+  const rows = Array.isArray(stuckRows) ? stuckRows : [];
+  const results: RazorpayRefundResult[] = [];
+  let recovered = 0;
+  let failed = 0;
+
+  for (const row of rows) {
+    const res = await initiateRazorpayRefund({
+      supabaseAdmin,
+      bookingId: row.booking_id,
+      paymentId: row.gateway_payment_id || undefined,
+      refundAmountInr: Number(row.amount) || undefined,
+      reason: 'Stuck REFUND_IN_PROGRESS recovery',
+      stuckThresholdMs: thresholdMs,
+    });
+    results.push(res);
+    if (res.success) {
+      recovered += 1;
+    } else {
+      failed += 1;
+    }
+  }
+
+  return {
+    scanned: rows.length,
+    recovered,
+    failed,
+    results,
+  };
 }

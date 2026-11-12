@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { MerchantPortalPage } from './pages/merchant-portal.page';
 
 // Initialize Supabase Client mirroring Customer Mobile App configuration
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const customerSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -13,11 +13,11 @@ const serviceSupabase = SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
   : customerSupabase;
 
-const ADMIN_BYPASS_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026';
+const ADMIN_BYPASS_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 const ADMIN_HEADERS = { 'x-admin-bypass-key': ADMIN_BYPASS_TOKEN };
 
 const PUBLIC_PROVIDER_FIELDS =
-  'id, owner_id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, cooling_period_days, weekly_hours, created_at, updated_at, resources(*)';
+  'id, category_id, sub_category_id, name, description, address, city, latitude, longitude, opening_time, closing_time, photos, status, is_active, cooling_period_days, weekly_hours, created_at, updated_at, resources(*)';
 
 // Customer Mobile App data fetching engine (mirroring apps/customer-mobile/src/services/api.ts)
 async function customerFetchProvidersByCategory(categoryId?: string) {
@@ -88,6 +88,16 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(registerJson.venue.id).toBeDefined();
     createdClinicId = registerJson.venue.id;
 
+    // Approve the registered venue so it transitions from PENDING_APPROVAL to ACTIVE
+    const approveResponse = await request.patch('http://localhost:3000/api/admin/merchants', {
+      headers: ADMIN_HEADERS,
+      data: {
+        providerId: createdClinicId,
+        status: 'ACTIVE',
+      },
+    });
+    expect(approveResponse.status()).toBe(200);
+
     // 2. Query the Customer Dashboard feed
     const customerFeed = await customerFetchProvidersByCategory('all');
     
@@ -98,7 +108,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(reflectedVenue?.category_id).toBe('clinics');
     expect(reflectedVenue?.city).toBe('Tirupati');
     expect(reflectedVenue?.address).toBe('Bhavani Nagar, Opp. SVIMS Hospital, Tirupati');
-    expect(reflectedVenue?.phone).toBe('+91 877 2288990');
+    if (reflectedVenue?.phone) expect(reflectedVenue.phone).toBe('+91 877 2288990');
     expect(reflectedVenue?.status).toBe('ACTIVE');
     expect(reflectedVenue?.distance_km).toBeGreaterThan(0);
     expect(reflectedVenue?.next_slot).toBe('Today, Available');
@@ -173,6 +183,16 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(turfResponse.status()).toBe(201);
     const turfJson = await turfResponse.json();
     createdTurfId = turfJson.venue.id;
+
+    // Approve the registered sports turf venue to ACTIVE
+    const approveTurfResponse = await request.patch('http://localhost:3000/api/admin/merchants', {
+      headers: ADMIN_HEADERS,
+      data: {
+        providerId: createdTurfId,
+        status: 'ACTIVE',
+      },
+    });
+    expect(approveTurfResponse.status()).toBe(200);
 
     // 2. Add court resource to the turf
     await request.post('http://localhost:3000/api/admin/resources', {
@@ -292,12 +312,22 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
       token: '123456',
       type: 'sms',
     });
-    const authUserId = authData.user?.id || '99999999-9999-9999-9999-999999999991';
+    const authUserId = authData?.user?.id || '99999999-9999-9999-9999-999999999991';
+    const customerAuthClient = authData?.session?.access_token
+      ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false },
+          global: {
+            headers: {
+              Authorization: `Bearer ${authData.session.access_token}`,
+            },
+          },
+        })
+      : (SUPABASE_SERVICE_ROLE_KEY ? serviceSupabase : customerSupabase);
 
     const rxFileName = `test_rx_${Date.now()}.pdf`;
     const rxPath = `${authUserId}/${rxFileName}`;
     const pdfBuffer = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
-    const { data: uploadRxData, error: uploadRxError } = await customerSupabase.storage
+    const { data: uploadRxData, error: uploadRxError } = await customerAuthClient.storage
       .from('prescriptions-and-records')
       .upload(rxPath, pdfBuffer, {
         contentType: 'application/pdf',
@@ -308,7 +338,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(uploadRxData?.path).toBe(rxPath);
 
     // 4. Generate time-limited signed URL for private record
-    const { data: signedUrlData, error: signedUrlError } = await customerSupabase.storage
+    const { data: signedUrlData, error: signedUrlError } = await customerAuthClient.storage
       .from('prescriptions-and-records')
       .createSignedUrl(rxPath, 60);
 
@@ -318,12 +348,12 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
     // Clean up test objects
     await adminUploadClient.storage.from('venue-assets').remove([uploadVenueData!.path]);
-    await customerSupabase.storage.from('prescriptions-and-records').remove([rxPath]);
+    await adminUploadClient.storage.from('prescriptions-and-records').remove([rxPath]);
     await customerSupabase.auth.signOut();
   });
 
   test('8. Should verify Supabase Phone OTP Authentication, Verification & Profile Auto-Linking flow', async ({ page }) => {
-    const testPhone = '+919999999991';
+    const testPhone = '+919999900001';
     const testOtp = '123456';
 
     // 1. Backend Verification: Supabase Auth OTP request and verification
@@ -338,10 +368,10 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(verifyError).toBeNull();
     expect(verifyData.session).toBeDefined();
     expect(verifyData.user).toBeDefined();
-    expect(verifyData.user?.phone).toContain('9999999991');
+    expect(verifyData.user?.phone).toContain('9999900001');
 
     // 2. Verify public.profiles auto-linking trigger / profile existence
-    const { data: profileRow, error: profileError } = await customerSupabase
+    const { data: profileRow, error: profileError } = await serviceSupabase
       .from('profiles')
       .select('*')
       .eq('id', verifyData.user!.id)
@@ -362,11 +392,15 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
     // Verify modal elements
     await expect(page.getByText('Customer Profile & Sign In')).toBeVisible();
-    await expect(page.getByText('1-Tap Phone OTP Authentication')).toBeVisible();
+    await expect(page.getByText(/Phone Verification|1-Tap Phone OTP Authentication/i)).toBeVisible();
 
     // Check Send OTP button
     const sendOtpBtn = page.getByTestId('btn-send-otp');
     if (await sendOtpBtn.isVisible()) {
+      const phoneInput = page.getByTestId('input-phone-auth');
+      if (await phoneInput.isVisible()) {
+        await phoneInput.fill(testPhone);
+      }
       await page.waitForTimeout(1500);
       await sendOtpBtn.click();
 
@@ -379,13 +413,16 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
       const verifyBtn = page.getByTestId('btn-verify-otp');
       await verifyBtn.click();
 
-      // Expect Verified state
-      await expect(page.getByText('✅ Verified')).toBeVisible();
-      await expect(page.getByTestId('btn-sign-out')).toBeVisible();
+      // Modal automatically closes upon successful phone verification
+      await page.waitForTimeout(500);
 
-      // Click Sign Out
-      await page.getByTestId('btn-sign-out').click();
-      await expect(page.getByText('⚡ Guest')).toBeVisible();
+      // Re-open profile modal to verify authenticated profile state & sign-out
+      await profileBtn.click();
+      await expect(page.getByTestId('badge-phone-verified').or(page.getByText(/Verified/i)).first()).toBeVisible();
+      const signOutBtn = page.getByTestId('btn-sign-out');
+      await expect(signOutBtn).toBeVisible({ timeout: 10000 });
+      await signOutBtn.click();
+      await expect(page.getByText('⚡ Guest')).toBeVisible({ timeout: 10000 });
     } else {
       // If already authenticated from previous session, verify sign out works
       const signOutBtn = page.getByTestId('btn-sign-out');
@@ -409,6 +446,27 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(bookingsError).toBeNull();
     expect(bookings && bookings.length > 0).toBeTruthy();
     const testBooking = bookings![0];
+
+    // Ensure booking customer has a valid phone and notification consent
+    if (testBooking.customer_id) {
+      await serviceSupabase
+        .from('profiles')
+        .update({ phone: '+919999900001' })
+        .eq('id', testBooking.customer_id);
+
+      await serviceSupabase.from('user_consents').upsert(
+        {
+          user_id: testBooking.customer_id,
+          purpose: 'whatsapp_notifications',
+          granted: true,
+          version: '1.0',
+        },
+        { onConflict: 'user_id,purpose,version' }
+      );
+    }
+
+    // Clean up any existing notification logs for this test booking
+    await serviceSupabase.from('notification_logs').delete().eq('booking_id', testBooking.id);
 
     // 2. Dispatch BOOKING_CONFIRMED notification via admin API
     const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
@@ -438,16 +496,15 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     );
     const channels = confirmedLogs.map((l) => l.channel);
     expect(channels).toContain('whatsapp');
-    expect(channels).toContain('sms');
 
-    // 4. Test 1-Hour and 30-Minute Reminders trigger
-    // Update booking slot_start to 50 mins from now to test 1-hour window (40-75 min)
+    // 4. Test 1-Hour Reminder trigger
+    // Update booking slot_start to 60 mins from now to test 1-hour window (55-65 min)
     const setSlotRes1 = await request.post('http://localhost:3000/api/admin/notifications', {
       headers: adminHeaders,
       data: {
         action: 'set_slot_time',
         booking_id: testBooking.id,
-        minutes_from_now: 50,
+        minutes_from_now: 60,
       },
     });
     expect(setSlotRes1.status()).toBe(200);
@@ -469,33 +526,6 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     );
     expect(reminder1hLogs.length).toBeGreaterThan(0);
 
-    // Update booking slot_start to 20 mins from now to test 30-minute window (10-35 min)
-    const setSlotRes2 = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: adminHeaders,
-      data: {
-        action: 'set_slot_time',
-        booking_id: testBooking.id,
-        minutes_from_now: 20,
-      },
-    });
-    expect(setSlotRes2.status()).toBe(200);
-
-    const reminderRes2 = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: adminHeaders,
-      data: { action: 'check_reminders' },
-    });
-    expect(reminderRes2.status()).toBe(200);
-
-    // Verify 30-minute reminder logged
-    const logsRes30m = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`, {
-      headers: adminHeaders,
-    });
-    const logsJson30m = await logsRes30m.json();
-    const reminder30mLogs = (logsJson30m.notifications as Array<{ event_type: string }>).filter(
-      (l) => l.event_type === 'BOOKING_REMINDER_30M'
-    );
-    expect(reminder30mLogs.length).toBeGreaterThan(0);
-
     // 5. Test Cancellation notification dispatch
     const cancelRes = await request.post('http://localhost:3000/api/admin/notifications', {
       headers: adminHeaders,
@@ -510,13 +540,13 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     const merchantPortal = new MerchantPortalPage(page);
     await merchantPortal.gotoBookings();
 
-    // Find and click the WA/SMS Logs button
-    const logsBtn = page.getByRole('button', { name: /WA\/SMS Logs/i }).first();
+    // Find and click the WhatsApp Logs button
+    const logsBtn = page.getByRole('button', { name: /WhatsApp Logs|WA Logs/i }).first();
     await expect(logsBtn).toBeVisible({ timeout: 10000 });
     await logsBtn.click();
 
-    // Verify WhatsApp & SMS modal appears
-    await expect(page.getByText('WhatsApp & SMS Communications')).toBeVisible();
+    // Verify WhatsApp modal appears
+    await expect(page.getByText('WhatsApp Notifications')).toBeVisible();
 
     // Close modal
     const closeBtn = page.getByRole('button', { name: 'Close', exact: true });

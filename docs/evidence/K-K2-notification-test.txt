@@ -1,0 +1,37 @@
+========================================================================
+🚀 RUNNING PHASE 1 REAL NOTIFICATION QUEUE VERIFICATION SUITE
+========================================================================
+
+[Test 1] Testing public.normalize_phone_number()...
+  ✓ Phone normalization works correctly for all formats.
+
+[Setup] Creating test customer, provider, resource, and booking fixtures...
+  ✓ Test fixtures populated successfully.
+
+[Test 2] Testing consent guard: dispatching without whatsapp_notifications consent...
+  ✓ Correctly created SKIPPED row with reason when whatsapp_notifications consent is absent.
+
+[Test 3] Granting consent and verifying notification is queued with status QUEUED...
+  ✓ Notification row successfully queued with status QUEUED (never SENT).
+
+[Test 4] Dispatching duplicate BOOKING_CONFIRMED notification for the same booking...
+  ✓ Duplicate dispatch creates exactly ONE row (idempotent).
+
+[Test 5] Testing concurrent claim_queued_notifications() with SKIP LOCKED...
+  Worker 1 claimed 3 notifications: [
+  '69ac89f3-de1a-458e-9a54-48ea398f6164',
+  'b3786eee-7d1a-4bff-b447-a21564306a2d',
+  '91621788-6983-411b-ac82-21c38a0c0abf'
+]
+  Worker 2 claimed 3 notifications: [
+  'e0ac9674-97b2-496a-bce1-ad5cdc3b3aa0',
+  '70e357d1-168d-4ea0-96f5-106c607db6ee',
+  'd5d739e9-e1ac-448f-9778-7b3257076eb7'
+]
+  ✓ Concurrent workers claimed completely disjoint sets of notifications.
+  ✓ All claimed rows transitioned to status SENDING with attempts = 1.
+
+========================================================================
+🎉 ALL PHASE 1 DATABASE QUEUE TESTS PASSED PERFECTLY!
+========================================================================
+

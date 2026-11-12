@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { acquireSlotLock, releaseSlotLock, checkRateLimit } from '@/lib/redis';
 import { verifyAuthenticatedUser, getClientIp, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 import { captureException } from '@/lib/sentry';
 import { CreateHoldRequest, CreateHoldResponse } from '@appointments/shared';
+import { parseSafeJson, PayloadLimitExceededError } from '@/lib/validation-limits';
 
 interface RpcHoldResult {
   success: boolean;
@@ -12,9 +13,19 @@ interface RpcHoldResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   hold_expires_at?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_age?: number | null;
+  patient_relationship?: string | null;
+  is_minor?: boolean;
+  booking_note?: string | null;
   error?: string;
 }
 
@@ -22,7 +33,39 @@ export async function POST(req: NextRequest) {
   let slotKey = '';
   let lockToken = '';
   try {
-    const body = (await req.json()) as Partial<CreateHoldRequest>;
+    // IP Rate Limit: prioritize platform-verified IP or rightmost trusted proxy before client headers
+    const clientIp = getClientIp(req);
+    const isTestEnv = process.env.NODE_ENV !== "production";
+    if (clientIp) {
+      const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, isTestEnv ? 500 : 30, 60);
+      if (!ipRateLimit.allowed) {
+        return NextResponse.json<CreateHoldResponse>(
+          {
+            success: false,
+            error: "Too many reservation attempts from this network. Please wait a minute.",
+          },
+          { status: 429 }
+        );
+      }
+    } else {
+      console.warn("[RateLimit] missing_trusted_client_ip", { route: "/api/bookings/hold" });
+    }
+
+    let body: Partial<CreateHoldRequest>;
+    try {
+      body = await parseSafeJson<Partial<CreateHoldRequest>>(req);
+    } catch (parseErr) {
+      if (parseErr instanceof PayloadLimitExceededError) {
+        return NextResponse.json<CreateHoldResponse>(
+          { success: false, error: parseErr.message },
+          { status: 413 }
+        );
+      }
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: "Invalid JSON payload" },
+        { status: 400 }
+      );
+    }
     const { resource_id, slot_start, slot_end, customer_id } = body;
 
     if (!resource_id || !slot_start || !slot_end || !customer_id) {
@@ -73,21 +116,57 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // IP Rate Limit: prioritize platform-verified IP or rightmost trusted proxy before client headers
-    // Leverages getClientIp with fallback to req.headers.get('x-real-ip') and req.headers.get('cf-connecting-ip')
-    const clientIp = getClientIp(req);
-    const isTestEnv = process.env.NODE_ENV !== 'production';
-    if (clientIp) {
-      const ipRateLimit = await checkRateLimit(`hold-ip:${clientIp}`, isTestEnv ? 500 : 30, 60);
-      if (!ipRateLimit.allowed) {
+    // Server-side validation for family / minor bookings
+    const bookedFor: 'self' | 'family' = body.booked_for || (body.booking_for_someone_else ? 'family' : 'self');
+    if (bookedFor !== 'self' && bookedFor !== 'family') {
+      return NextResponse.json<CreateHoldResponse>(
+        { success: false, error: 'Invalid booked_for parameter: must be "self" or "family"' },
+        { status: 400 }
+      );
+    }
+
+    let validatedPatientName: string | null = body.patient_name ? body.patient_name.trim() : null;
+    let validatedPatientAge: number | null = body.patient_age !== undefined && body.patient_age !== null ? Number(body.patient_age) : null;
+    let validatedPatientRelationship: string | null = body.patient_relationship ? body.patient_relationship.trim() : null;
+    let validatedBookingNote: string | null = body.booking_note ? body.booking_note.trim() : null;
+
+    if (bookedFor === 'family') {
+      if (!validatedPatientName || validatedPatientName.length === 0) {
         return NextResponse.json<CreateHoldResponse>(
-          {
-            success: false,
-            error: 'Too many reservation attempts from this network. Please wait a minute.',
-          },
-          { status: 429 }
+          { success: false, error: 'Patient name is required when booking for family / minor' },
+          { status: 400 }
         );
       }
+      if (validatedPatientName.length > 100) {
+        return NextResponse.json<CreateHoldResponse>(
+          { success: false, error: 'Patient name must not exceed 100 characters' },
+          { status: 400 }
+        );
+      }
+      if (validatedPatientAge !== null) {
+        if (isNaN(validatedPatientAge) || !Number.isInteger(validatedPatientAge) || validatedPatientAge < 0 || validatedPatientAge > 120) {
+          return NextResponse.json<CreateHoldResponse>(
+            { success: false, error: 'Patient age must be between 0 and 120' },
+            { status: 400 }
+          );
+        }
+      }
+      if (validatedPatientRelationship) {
+        const ALLOWED_RELATIONSHIPS = new Set(['child', 'spouse', 'parent', 'sibling', 'other']);
+        const lowerRel = validatedPatientRelationship.toLowerCase();
+        validatedPatientRelationship = ALLOWED_RELATIONSHIPS.has(lowerRel) ? lowerRel : 'other';
+      }
+      if (validatedBookingNote && validatedBookingNote.length > 200) {
+        return NextResponse.json<CreateHoldResponse>(
+          { success: false, error: 'Booking note must not exceed 200 characters' },
+          { status: 400 }
+        );
+      }
+    } else {
+      validatedPatientName = null;
+      validatedPatientAge = null;
+      validatedPatientRelationship = null;
+      validatedBookingNote = null;
     }
 
     // Customer Rate Limit: max 10 reservation attempts per customer per minute (relaxed in test)
@@ -186,10 +265,10 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
-    // Check if provider is suspended
+    // Check if provider is suspended and fetch department link
     const { data: resData } = await supabaseAdmin
       .from('resources')
-      .select('provider_id')
+      .select('provider_id, department_id')
       .eq('id', resource_id)
       .single();
 
@@ -237,15 +316,21 @@ export async function POST(req: NextRequest) {
         const slotDayStart = new Date(`${istDateStr}T00:00:00.000+05:30`);
         const slotDayEnd = new Date(`${istDateStr}T23:59:59.999+05:30`);
 
-        const { count: slotDayBookingsCount } = await supabaseAdmin
+        const { data: slotDayBookings } = await supabaseAdmin
           .from('bookings')
-          .select('id', { count: 'exact', head: true })
+          .select('id, status, hold_expires_at')
           .eq('provider_id', resData.provider_id)
           .gte('slot_start', slotDayStart.toISOString())
           .lte('slot_start', slotDayEnd.toISOString())
           .in('status', ['HELD', 'CONFIRMED', 'COMPLETED']);
 
-        if ((slotDayBookingsCount || 0) >= dailyLimit) {
+        const nowMs = Date.now();
+        const activeDailyBookings = (slotDayBookings || []).filter(
+          (b) => b.status !== 'HELD' || (b.hold_expires_at && new Date(b.hold_expires_at).getTime() >= nowMs)
+        );
+        const slotDayBookingsCount = activeDailyBookings.length;
+
+        if (slotDayBookingsCount >= dailyLimit) {
           if (slotKey) await releaseSlotLock(slotKey, lockToken);
           return NextResponse.json<CreateHoldResponse>(
             {
@@ -258,11 +343,52 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Ensure customer profile row exists in public.profiles before creating hold to prevent foreign key violation
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', customer_id)
+      .maybeSingle();
+
+    if (!existingProfile) {
+      const fallbackName = body.patient_name?.trim() || (caller.email ? caller.email.split('@')[0] : 'Verified Customer');
+      // public.profiles.id references auth.users(id); ensure auth.users row exists before upserting profile
+      const { data: existingAuthUser } = await supabaseAdmin.auth.admin.getUserById(customer_id);
+      if (!existingAuthUser?.user) {
+        const syntheticEmail = caller.email && !caller.email.startsWith('e2e-bypass')
+          ? caller.email
+          : `customer-${customer_id.slice(0, 8)}@tirupati.local`;
+        await supabaseAdmin.auth.admin.createUser({
+          id: customer_id,
+          email: syntheticEmail,
+          email_confirm: true,
+          user_metadata: { role: 'customer', full_name: fallbackName },
+        });
+      }
+      await supabaseAdmin.from('profiles').upsert(
+        {
+          id: customer_id,
+          role: 'customer',
+          full_name: fallbackName,
+          phone: body.patient_phone || null,
+          email: caller.email || null,
+        },
+        { onConflict: 'id' }
+      );
+    }
+
     const { data, error } = await supabaseAdmin.rpc('create_booking_hold', {
       p_resource_id: resource_id,
       p_slot_start: slot_start,
       p_slot_end: slot_end,
       p_customer_id: customer_id,
+      p_booking_for_someone_else: bookedFor === 'family',
+      p_patient_name: validatedPatientName,
+      p_patient_phone: body.patient_phone || null,
+      p_patient_relationship: validatedPatientRelationship,
+      p_booked_for: bookedFor,
+      p_patient_age: validatedPatientAge,
+      p_booking_note: validatedBookingNote,
     });
 
     if (error) {
@@ -305,6 +431,34 @@ export async function POST(req: NextRequest) {
 
     if (slotKey) await releaseSlotLock(slotKey, lockToken);
 
+    // Auto-associate booking with the doctor's/hospital's department
+    if (result.booking_id) {
+      try {
+        let assignedDepartmentId = (resData as any)?.department_id;
+        if (!assignedDepartmentId && resData?.provider_id) {
+          const { data: dept } = await supabaseAdmin
+            .from('departments')
+            .select('id')
+            .eq('merchant_id', resData.provider_id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          if (dept) {
+            assignedDepartmentId = dept.id;
+          }
+        }
+
+        if (assignedDepartmentId) {
+          await supabaseAdmin
+            .from('bookings')
+            .update({ department_id: assignedDepartmentId })
+            .eq('id', result.booking_id);
+        }
+      } catch (deptErr) {
+        console.warn('Could not auto-assign department to booking:', deptErr);
+      }
+    }
+
     return NextResponse.json<CreateHoldResponse>(
       {
         success: true,
@@ -313,9 +467,19 @@ export async function POST(req: NextRequest) {
         deposit_amount: result.deposit_amount,
         platform_fee: result.platform_fee,
         total_amount: result.total_amount,
+        platform_fee_amount: result.platform_fee_amount ?? result.platform_fee,
+        consultation_fee_amount: result.consultation_fee_amount,
+        platform_payment_status: (result.platform_payment_status as any) || 'PENDING',
+        consultation_payment_status: (result.consultation_payment_status as any) || 'PENDING_OFFLINE',
         hold_expires_at: result.hold_expires_at,
         is_followup: result.is_followup,
         followup_original_booking_id: result.followup_original_booking_id,
+        booked_for: result.booked_for,
+        patient_name: result.patient_name ?? null,
+        patient_age: result.patient_age ?? null,
+        patient_relationship: result.patient_relationship ?? null,
+        is_minor: result.is_minor ?? false,
+        booking_note: result.booking_note ?? null,
       },
       { status: 201 }
     );

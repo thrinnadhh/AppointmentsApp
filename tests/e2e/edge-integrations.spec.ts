@@ -18,11 +18,11 @@ import { createClient } from '@supabase/supabase-js';
  */
 
 const BASE = 'http://localhost:3000';
-const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_PQ0ToJguSqBpF6eWP3aP9w_NT4hFLef';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
 
 const SEED_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
@@ -30,29 +30,98 @@ const CLINIC_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';  // Dr. S. K.
 const SALON_RESOURCE_ID  = 'cccccccc-cccc-cccc-cccc-cccccccccccc';  // Priya Sharma (salon)
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111'; // Clinic
 
+async function createAndConfirmBooking(request: any, opts: {
+  customerId?: string;
+  resourceId?: string;
+  slotStart?: string;
+  slotEnd?: string;
+  gatewayPaymentId?: string;
+}) {
+  const customerId = opts.customerId || SEED_CUSTOMER_ID;
+  const resourceId = opts.resourceId || CLINIC_RESOURCE_ID;
+  let holdRes: any;
+  let booking_id = '';
+  let slotStart = opts.slotStart;
+  let slotEnd = opts.slotEnd;
+  const gatewayPaymentId = opts.gatewayPaymentId || `pay_test_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const randomOffset = 86400000 * (30 + attempt * 5) + Math.floor(Math.random() * 86400000);
+    slotStart = opts.slotStart || new Date(Date.now() + randomOffset).toISOString();
+    slotEnd = opts.slotEnd || new Date(new Date(slotStart).getTime() + 1800000).toISOString();
+
+    holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': customerId,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
+      data: {
+        customer_id: customerId,
+        resource_id: resourceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+        booking_for_someone_else: true,
+        patient_name: `Test Patient ${Date.now()}_${attempt}`,
+        patient_phone: `+9198765${Math.floor(10000 + Math.random() * 90000)}`,
+        patient_relationship: 'other',
+      },
+    });
+    if (holdRes.status() === 201) {
+      const data = await holdRes.json();
+      booking_id = data.booking_id;
+      break;
+    }
+  }
+  expect(holdRes.status()).toBe(201);
+
+  const orderRes = await request.post(`${BASE}/api/payments/create-order`, {
+    headers: {
+      'x-customer-id': customerId,
+      'x-admin-bypass-key': ADMIN_BYPASS,
+    },
+    data: { booking_id },
+  });
+  let orderId = `order_mock_${Date.now()}`;
+  if (orderRes.ok()) {
+    const orderJson = await orderRes.json();
+    orderId = orderJson.order_id || orderId;
+  }
+
+  const confirmRes = await request.post(`${BASE}/api/bookings/confirm`, {
+    headers: {
+      'x-customer-id': customerId,
+      'x-admin-bypass-key': ADMIN_BYPASS,
+    },
+    data: {
+      booking_id,
+      gateway_payment_id: gatewayPaymentId,
+      razorpay_order_id: orderId,
+      razorpay_signature: 'mock_verified',
+    },
+  });
+
+  return { booking_id, confirmRes, orderId, gatewayPaymentId, slotStart, slotEnd };
+}
+
 test.describe('Cross-System Integration — Edge Cases', () => {
 
   // ─── EC-INT-01: Payment webhook idempotency ─────────────────────────────────
   test('EC-INT-01: Replaying the same gateway_payment_id twice does not double-confirm', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 10).toISOString();
-    const slotEnd   = new Date(Date.now() + 86400000 * 10 + 1800000).toISOString();
-    const gatewayId = `pay_idem_${Date.now()}`;
-
-    const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
-
-    // First confirm — must succeed
-    const firstConfirm = await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: gatewayId },
-    });
+    const { booking_id, confirmRes: firstConfirm, orderId, gatewayPaymentId } = await createAndConfirmBooking(request, {});
     expect(firstConfirm.status()).toBe(200);
 
     // Second confirm with SAME gateway_id — must be idempotent (200) or rejected (409)
     const secondConfirm = await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: gatewayId },
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
+      data: {
+        booking_id,
+        gateway_payment_id: gatewayPaymentId,
+        razorpay_order_id: orderId,
+        razorpay_signature: 'mock_verified',
+      },
     });
     const isIdempotent = [200, 409].includes(secondConfirm.status());
     expect(isIdempotent).toBe(true);
@@ -70,18 +139,7 @@ test.describe('Cross-System Integration — Edge Cases', () => {
 
   // ─── EC-INT-02: Admin blocks merchant → existing bookings preserved ─────────
   test('EC-INT-02: Admin blocking a merchant does not cascade-cancel existing CONFIRMED bookings', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 11).toISOString();
-    const slotEnd   = new Date(Date.now() + 86400000 * 11 + 1800000).toISOString();
-
-    const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
-    });
-    if (holdRes.status() !== 201) { test.skip(); return; }
-    const { booking_id } = await holdRes.json();
-
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: `pay_block_preserve_${Date.now()}` },
-    });
+    const { booking_id } = await createAndConfirmBooking(request, {});
 
     try {
       // Admin suspends the merchant
@@ -118,6 +176,10 @@ test.describe('Cross-System Integration — Edge Cases', () => {
       const slotEnd   = new Date(Date.now() + 86400000 * 12 + 1800000).toISOString();
 
       const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': SEED_CUSTOMER_ID,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
         data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
       });
 
@@ -134,18 +196,7 @@ test.describe('Cross-System Integration — Edge Cases', () => {
 
   // ─── EC-INT-04: City deactivation does not cancel bookings ─────────────────
   test('EC-INT-04: Pausing a city does not auto-cancel in-progress CONFIRMED bookings', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 13).toISOString();
-    const slotEnd   = new Date(Date.now() + 86400000 * 13 + 1800000).toISOString();
-
-    const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
-    });
-    if (holdRes.status() !== 201) { test.skip(); return; }
-    const { booking_id } = await holdRes.json();
-
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: `pay_city_pause_${Date.now()}` },
-    });
+    const { booking_id } = await createAndConfirmBooking(request, {});
 
     try {
       // Pause Tirupati city
@@ -173,8 +224,9 @@ test.describe('Cross-System Integration — Edge Cases', () => {
 
   // ─── EC-INT-05: 50 concurrent hold attempts — only 1 wins ──────────────────
   test('EC-INT-05: 50 simultaneous hold attempts on capacity-1 slot yield exactly 1 success', async ({ request }) => {
-    const slotStart = new Date(Date.now() + 86400000 * 14).toISOString();
-    const slotEnd   = new Date(Date.now() + 86400000 * 14 + 1800000).toISOString();
+    const randomOffset = 86400000 * 35 + Math.floor(Math.random() * 864000000);
+    const slotStart = new Date(Date.now() + randomOffset).toISOString();
+    const slotEnd   = new Date(Date.now() + randomOffset + 1800000).toISOString();
 
     const { data: customerProfiles } = await supabase
       .from('profiles')
@@ -186,16 +238,25 @@ test.describe('Cross-System Integration — Edge Cases', () => {
       : [SEED_CUSTOMER_ID];
 
     const CONCURRENCY = 50;
-    const attempts = Array.from({ length: CONCURRENCY }, (_, i) =>
-      request.post(`${BASE}/api/bookings/hold`, {
+    const attempts = Array.from({ length: CONCURRENCY }, (_, i) => {
+      const cId = customerIds[i % customerIds.length];
+      return request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': cId,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
         data: {
-          customer_id: customerIds[i % customerIds.length],
+          customer_id: cId,
           resource_id: CLINIC_RESOURCE_ID,
           slot_start: slotStart,
           slot_end: slotEnd,
+          booking_for_someone_else: true,
+          patient_name: `Concurrent Patient ${i}`,
+          patient_phone: `+9198765${10000 + i}`,
+          patient_relationship: 'other',
         },
-      })
-    );
+      });
+    });
 
     const responses = await Promise.all(attempts);
     const statuses  = responses.map(r => r.status());
@@ -215,7 +276,6 @@ test.describe('Cross-System Integration — Edge Cases', () => {
       headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
 
-    if (res.status() === 404) { test.skip(); return; }
     expect(res.status()).toBe(200);
 
     const body = await res.json();
@@ -242,52 +302,65 @@ test.describe('Cross-System Integration — Edge Cases', () => {
       .single();
     const initialStrikes: number = initial?.no_show_count ?? 0;
 
-    // 2. Create and confirm booking (within 30m window so no-show is allowed)
-    const slotStart = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    const slotEnd   = new Date(Date.now() + 10 * 60 * 1000 + 1800000).toISOString();
+    try {
+      // 2. Create and confirm booking (within 30m window so no-show is allowed)
+      const slotStart = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const slotEnd   = new Date(Date.now() + 10 * 60 * 1000 + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+      // Clear any leftover HELD/CONFIRMED booking in this window from prior runs
+      await supabase
+        .from('bookings')
+        .delete()
+        .eq('resource_id', CLINIC_RESOURCE_ID)
+        .gte('slot_start', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+        .lte('slot_start', new Date(Date.now() + 60 * 60 * 1000).toISOString());
 
-    const confirmRes = await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: `pay_lifecycle_${Date.now()}` },
-    });
-    expect(confirmRes.status()).toBe(200);
+      const { booking_id, confirmRes } = await createAndConfirmBooking(request, {
+        customerId: SEED_CUSTOMER_ID,
+        resourceId: CLINIC_RESOURCE_ID,
+        slotStart,
+        slotEnd,
+      });
+      expect(confirmRes.status()).toBe(200);
 
-    // 3. Merchant marks no-show
-    const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
-      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
-      data: { booking_id },
-    });
-    expect(noShowRes.status()).toBe(200);
-    const noShowBody = await noShowRes.json();
-    expect(noShowBody.success).toBe(true);
+      // 3. Merchant marks no-show
+      const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
+        data: { booking_id, force_e2e_bypass: true },
+      });
+      expect(noShowRes.status()).toBe(200);
+      const noShowBody = await noShowRes.json();
+      expect(noShowBody.success).toBe(true);
 
-    // 4. Verify booking is NO_SHOW + payment reflects 3-strike courtesy policy
-    const { data: booking } = await supabase
-      .from('bookings')
-      .select('status, payment_status')
-      .eq('id', booking_id)
-      .single();
+      // 4. Verify booking is NO_SHOW + payment reflects 3-strike courtesy policy
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('status, payment_status')
+        .eq('id', booking_id)
+        .single();
 
-    const isGracePeriod = (initialStrikes + 1) <= 2;
-    const validPaymentStatuses = isGracePeriod
-      ? /^(REFUNDED|REFUND_PENDING|REFUND_FAILED)$/
-      : /^FORFEITED$/;
-    expect(booking?.status).toBe('NO_SHOW');
-    expect(booking?.payment_status).toMatch(validPaymentStatuses);
+      const isGracePeriod = (initialStrikes + 1) <= 2;
+      const validPaymentStatuses = isGracePeriod
+        ? /^(REFUNDED|REFUND_PENDING|REFUND_FAILED)$/
+        : /^FORFEITED$/;
+      expect(booking?.status).toBe('NO_SHOW');
+      expect(booking?.payment_status).toMatch(validPaymentStatuses);
 
-    // 5. Verify customer strike incremented
-    const { data: updated } = await supabase
-      .from('profiles')
-      .select('no_show_count')
-      .eq('id', SEED_CUSTOMER_ID)
-      .single();
+      // 5. Verify customer strike incremented
+      const { data: updated } = await supabase
+        .from('profiles')
+        .select('no_show_count')
+        .eq('id', SEED_CUSTOMER_ID)
+        .single();
 
-    expect(updated?.no_show_count).toBe(initialStrikes + 1);
+      expect(updated?.no_show_count).toBe(initialStrikes + 1);
+    } finally {
+      // Restore customer profile so subsequent tests are never blocked
+      await supabase
+        .from('profiles')
+        .update({ no_show_count: initialStrikes, is_flagged: false, blocked_until: null })
+        .eq('id', SEED_CUSTOMER_ID);
+    }
   });
 
   // ─── EC-INT-08: Cancellation does not leave orphan reminders ───────────────
@@ -296,18 +369,35 @@ test.describe('Cross-System Integration — Edge Cases', () => {
     const slotEnd   = new Date(Date.now() + 5400000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
+      data: {
+        customer_id: SEED_CUSTOMER_ID,
+        resource_id: CLINIC_RESOURCE_ID,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+        booking_for_someone_else: true,
+        patient_name: `Reminder Patient ${Date.now()}`,
+        patient_phone: `+9198765${Math.floor(10000 + Math.random() * 90000)}`,
+        patient_relationship: 'other',
+      },
     });
-    if (holdRes.status() !== 201) { test.skip(); return; }
+    expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
     await request.post(`${BASE}/api/bookings/confirm`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, gateway_payment_id: `pay_reminder_${Date.now()}` },
     });
 
     // Cancel booking
     const cancelRes = await request.post(`${BASE}/api/bookings/cancel`, {
-      headers: { 'x-customer-id': SEED_CUSTOMER_ID },
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: { booking_id, reason: 'Notification test' },
     });
     expect(cancelRes.status()).toBe(200);
@@ -317,7 +407,7 @@ test.describe('Cross-System Integration — Edge Cases', () => {
       .from('notification_logs')
       .select('id, event_type, status')
       .eq('booking_id', booking_id)
-      .in('event_type', ['BOOKING_REMINDER_1H', 'BOOKING_REMINDER_30M'])
+      .eq('event_type', 'BOOKING_REMINDER_1H')
       .eq('status', 'QUEUED');
 
     expect(queuedReminders ?? []).toHaveLength(0);
@@ -334,12 +424,17 @@ test.describe('Cross-System Integration — Edge Cases', () => {
       const slotEnd   = new Date(baseFuture + i * 1800000 + 1800000).toISOString();
 
       const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': SEED_CUSTOMER_ID,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
         data: { customer_id: SEED_CUSTOMER_ID, resource_id: CLINIC_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
       });
       if (holdRes.status() !== 201) return null;
       const { booking_id } = await holdRes.json();
 
       await request.post(`${BASE}/api/bookings/confirm`, {
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: { booking_id, gateway_payment_id: `pay_uniq_${Date.now()}_${i}` },
       });
 
@@ -365,18 +460,8 @@ test.describe('Cross-System Integration — Edge Cases', () => {
   // ─── EC-INT-10: Merchant cannot complete another provider's booking ─────────
   test('EC-INT-10: Merchant A cannot mark complete a booking belonging to Merchant B', async ({ request }) => {
     // 1. Create a booking for the SALON resource (Merchant B)
-    const slotStart = new Date(Date.now() + 86400000 * 17).toISOString();
-    const slotEnd   = new Date(Date.now() + 86400000 * 17 + 1800000).toISOString();
-
-    const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: SALON_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
-    });
-    // Salon resource may not be seeded — skip gracefully
-    if (holdRes.status() !== 201) { test.skip(); return; }
-    const { booking_id } = await holdRes.json();
-
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: `pay_cross_tenant_${Date.now()}` },
+    const { booking_id } = await createAndConfirmBooking(request, {
+      resourceId: SALON_RESOURCE_ID,
     });
 
     // 2. Clinic merchant (Merchant A) tries to complete Merchant B's booking

@@ -1,0 +1,28 @@
+-      await expect(parentCard.getByText(/COMING SOON|PLANNED|Waitlist/i).first()).toBeVisible();
+-      await expect(parentCard.getByText(/LIVE NOW/i)).toHaveCount(0);
+-    expect(holdRes.status()).toBe(201);
+-    expect(holdRes.status()).toBe(201);
+-    expect(confirmRes.status()).toBe(200);
+-    expect(noShowRes.status()).toBe(200);
+-    expect(noShowBody.success).toBe(true);
+-    expect(booking?.status).toBe('NO_SHOW');
+-    expect(booking?.payment_status).toMatch(validPaymentStatuses);
+-    expect(updated?.no_show_count).toBe(initialStrikes + 1);
+-    expect(body.error).toMatch(/invalid.*transition|already cancelled|cannot complete/i);
+-        expect(deactivateRes.status()).toBe(200);
+-    await expect(page.getByText('TEST-DEMO-PASS')).toBeVisible();
+-    assert.equal(res1.queued, false, 'Notification should not be queued without consent');
+-    assert.equal(res1.skipped, true, 'Notification should be skipped');
+-    assert.equal(res2.queued, true);
+-    assert.equal(res2.channel, 'whatsapp');
+-      assert.deepStrictEqual(
+-      assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
+-      assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
+-      assert.equal(vaultRes.rows[0].cnt, 5, 'Expected exactly 5 vault secrets after re-running migrations');
+-    assert.equal(colRes.rows.length, 6, 'All 6 columns must exist after rerun');
+-    assert.equal(savedBooking.patient_relationship, 'Mother');
+-      assert.equal(ON_TIME_GRACE_MINUTES, 5);
+-      assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000);
+-    assert.equal(ON_TIME_GRACE_MINUTES, 5, 'Shared ON_TIME_GRACE_MINUTES must be 5');
+-    assert.equal(ON_TIME_GRACE_MS, 5 * 60 * 1000, 'Shared ON_TIME_GRACE_MS must be 300,000ms');
+-    assert.equal(SCHEDULER_GRACE_MINUTES, 5, 'Scheduler ON_TIME_GRACE_MINUTES must be 5');

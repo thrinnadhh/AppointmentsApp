@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/redis';
 import { getClientIp, verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { maskPhoneNumber } from '@appointments/shared';
-import { createSignedDeletionToken, verifySignedDeletionToken } from '@/lib/deletion-token';
+import { verifySignedDeletionToken } from '@/lib/deletion-token';
 
 
 function maskIdentifier(id: string): string {
@@ -25,7 +25,7 @@ function maskIdentifier(id: string): string {
 export async function POST(req: NextRequest) {
   try {
     const clientIp = getClientIp(req);
-    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.ENABLE_E2E_BYPASS === 'true' || req.headers.get('x-e2e-bypass') === 'true';
+    const isTestEnv = process.env.NODE_ENV !== 'production' && (process.env.NODE_ENV === 'test' || process.env.ENABLE_E2E_BYPASS === 'true');
     if (clientIp) {
       const ipLimit = await checkRateLimit(`public-del-req:${clientIp}`, isTestEnv ? 500 : 5, 300);
       if (!ipLimit.allowed) {
@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/account/delete-public-request' });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -47,6 +49,13 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanInput = identifier.trim().toLowerCase();
+    const idLimit = await checkRateLimit(`public-del-id:${cleanInput}`, isTestEnv ? 500 : 3, 300);
+    if (!idLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many deletion requests for this account. Please wait a few minutes.' },
+        { status: 429 }
+      );
+    }
     const isEmail = cleanInput.includes('@');
     const digitsOnly = cleanInput.replace(/\D/g, '');
 

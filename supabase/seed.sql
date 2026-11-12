@@ -28,7 +28,7 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 -- 3. Insert Verified Providers in Tirupati
 -- Provider 1: Dental Clinic
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '11111111-1111-1111-1111-111111111111',
     'clinics',
@@ -37,6 +37,7 @@ INSERT INTO public.providers (
     'Comprehensive oral surgery, smile design, and pediatric dental services in central Tirupati.',
     'Shop 12, Bhavani Nagar, Near RTC Bus Stand',
     'Tirupati',
+    'tirupati',
     13.6328000,
     79.4197000,
     '+919876543210',
@@ -49,7 +50,7 @@ INSERT INTO public.providers (
 
 -- Provider 2: Restaurant
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '22222222-2222-2222-2222-222222222222',
     'restaurants',
@@ -58,6 +59,7 @@ INSERT INTO public.providers (
     'Authentic South Indian thalis and multi-cuisine table reservations with zero waiting.',
     'Renigunta Road, Opp. Reliance Trends',
     'Tirupati',
+    'tirupati',
     13.6288000,
     79.4285000,
     '+919876543211',
@@ -70,7 +72,7 @@ INSERT INTO public.providers (
 
 -- Provider 3: Turf & Box Cricket
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '33333333-3333-3333-3333-333333333333',
     'gaming',
@@ -79,6 +81,7 @@ INSERT INTO public.providers (
     'FIFA-standard turf with floodlights for Box Cricket and 5-a-side Football.',
     'Korlagunta Main Road, Near Reliance Mart',
     'Tirupati',
+    'tirupati',
     13.6412000,
     79.4310000,
     '+919876543212',
@@ -91,7 +94,7 @@ INSERT INTO public.providers (
 
 -- Provider 4: Salon & Spa
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '44444444-4444-4444-4444-444444444444',
     'salons',
@@ -100,6 +103,7 @@ INSERT INTO public.providers (
     'Premium hair styling, beard grooming, and rejuvenating facials by senior stylists.',
     'Air Bypass Road, Beside Domino’s Pizza',
     'Tirupati',
+    'tirupati',
     13.6355000,
     79.4123000,
     '+919876543213',
@@ -112,7 +116,7 @@ INSERT INTO public.providers (
 
 -- Provider 5: Pet Care & Hospital
 INSERT INTO public.providers (
-    id, category_id, sub_category_id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status
+    id, category_id, sub_category_id, name, description, address, city, city_id, latitude, longitude, phone, email, opening_time, closing_time, photos, status
 ) VALUES (
     '55555555-5555-5555-5555-555555555555',
     'pets',
@@ -121,6 +125,7 @@ INSERT INTO public.providers (
     'Professional veterinary consultations, vaccination schedules, and dog grooming suites.',
     'Alipiri Bypass Road, Near Balaji Colony',
     'Tirupati',
+    'tirupati',
     13.6450000,
     79.4080000,
     '+919876543214',
@@ -159,3 +164,45 @@ SELECT r.id, d.day, '10:00:00'::TIME, '19:00:00'::TIME, r.duration_minutes
 FROM public.resources r
 CROSS JOIN (VALUES (1), (2), (3), (4), (5), (6)) AS d(day)
 ON CONFLICT DO NOTHING;
+
+-- 6. Insert Test Customer Profiles & Auth Users for E2E Testing
+-- Note: GoTrue stores auth.users.phone without the leading '+' (e.g. '919999900001'),
+-- while public.profiles.phone stores E.164 with '+' ('+919999900001').
+INSERT INTO auth.users (
+  id, instance_id, aud, role, email, phone, encrypted_password, email_confirmed_at, phone_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token,
+  email_change_token_new, email_change
+) VALUES
+  ('2410b495-a238-49ff-a37c-56cfc52654f1', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'customer.e2e@tirupati.local', '919999900001', '', now(), now(), '{"provider":"phone","providers":["phone"]}', '{"sub":"2410b495-a238-49ff-a37c-56cfc52654f1","role":"customer","phone":"+919999900001","full_name":"Verified Test Customer","phone_verified":true}', now(), now(), '', '', '', ''),
+  ('5a260a06-041c-4f7f-afc0-d35ef3a9703b', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ravi.teja.e2e@tirupati.local', '919999900002', '', now(), now(), '{"provider":"phone","providers":["phone"]}', '{"sub":"5a260a06-041c-4f7f-afc0-d35ef3a9703b","role":"customer","phone":"+919999900002","full_name":"Ravi Teja","phone_verified":true}', now(), now(), '', '', '', ''),
+  ('99999999-9999-9999-9999-999999999995', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'customer-e2e@example.com', '919999999995', '', now(), now(), '{"provider":"email","providers":["email"]}', '{"sub":"99999999-9999-9999-9999-999999999995","role":"customer"}', now(), now(), '', '', '', '')
+ON CONFLICT (id) DO UPDATE SET
+  phone = EXCLUDED.phone,
+  phone_confirmed_at = EXCLUDED.phone_confirmed_at,
+  raw_app_meta_data = EXCLUDED.raw_app_meta_data,
+  raw_user_meta_data = EXCLUDED.raw_user_meta_data;
+
+INSERT INTO auth.identities (
+  id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+) VALUES
+  ('2410b495-a238-49ff-a37c-56cfc52654f1', '2410b495-a238-49ff-a37c-56cfc52654f1', '2410b495-a238-49ff-a37c-56cfc52654f1', '{"sub":"2410b495-a238-49ff-a37c-56cfc52654f1","phone_verified":true}', 'phone', now(), now(), now()),
+  ('5a260a06-041c-4f7f-afc0-d35ef3a9703b', '5a260a06-041c-4f7f-afc0-d35ef3a9703b', '5a260a06-041c-4f7f-afc0-d35ef3a9703b', '{"sub":"5a260a06-041c-4f7f-afc0-d35ef3a9703b","phone_verified":true}', 'phone', now(), now(), now())
+ON CONFLICT (provider_id, provider) DO NOTHING;
+
+INSERT INTO public.profiles (id, full_name, role, phone)
+VALUES
+  ('2410b495-a238-49ff-a37c-56cfc52654f1', 'Verified Test Customer', 'customer', '+919999900001'),
+  ('5a260a06-041c-4f7f-afc0-d35ef3a9703b', 'Ravi Teja', 'customer', '+919999900002'),
+  ('99999999-9999-9999-9999-999999999995', 'Customer E2E', 'customer', '+919999999995')
+ON CONFLICT (id) DO UPDATE SET phone = EXCLUDED.phone;
+
+-- 7. Seed Initial Administrative Audit Ledger Record
+INSERT INTO public.admin_audit_logs (action, target_type, target_id, details)
+VALUES (
+  'UPDATE_CITY_STATUS',
+  'city',
+  'tirupati',
+  '{"city_name": "Tirupati", "old_status": "EXPANDING", "new_status": "ACTIVE", "target": 15}'::jsonb
+);
+
+

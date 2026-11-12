@@ -107,3 +107,75 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const authResult = await verifyAdminRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const bookingId = typeof body?.booking_id === 'string' && body.booking_id.trim() ? body.booking_id.trim() : undefined;
+
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = (supabaseAdmin
+      .from('bookings') as any)
+      .select('id, payment_status, refund_amount, deposit_amount, total_amount')
+      .in('payment_status', ['REFUND_PENDING', 'REFUND_FAILED'])
+      .limit(25);
+
+    if (bookingId) {
+      query = query.eq('id', bookingId);
+    }
+
+    const { data: bookings, error: bookingsErr } = await query;
+    if (bookingsErr) {
+      return NextResponse.json({ error: bookingsErr.message }, { status: 400 });
+    }
+
+    const results = [];
+    for (const b of bookings || []) {
+      const refundAmountInr = Number(b.refund_amount ?? b.deposit_amount ?? b.total_amount ?? 0);
+
+      // Asynchronous Queue Pattern:
+      // Record refund_requested state and enqueue into pgmq 'refunds' queue.
+      // The background queue worker (process-refund-queue) processes the refund with Razorpay idempotently.
+      const { data: queueRes, error: queueErr } = await (supabaseAdmin.rpc as any)('enqueue_refund_request', {
+        p_booking_id: b.id,
+        p_actor_id: authResult.user.id,
+        p_reason: 'Admin Manual Refund Reconciliation (Queued)',
+      });
+
+      if (queueErr) {
+        results.push({ booking_id: b.id, success: false, error: queueErr.message });
+      } else if (queueRes && queueRes.success === false) {
+        // Double-enqueue guard: if already pending or refunded, return clear status without error
+        results.push({
+          booking_id: b.id,
+          success: false,
+          status: queueRes.payment_status || 'ALREADY_PENDING',
+          message: queueRes.error || 'Refund already queued or processed',
+        });
+      } else {
+        results.push({
+          booking_id: b.id,
+          success: true,
+          status: 'REFUND_PENDING',
+          refund_amount: refundAmountInr,
+          queue_result: queueRes,
+        });
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      processed: results.length,
+      status: 'REFUND_PENDING',
+      results,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

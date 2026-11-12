@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { 
   Users, 
+  UserPlus,
   Plus, 
   Clock, 
   Check, 
   X, 
-  Sparkles, 
   RefreshCw, 
   Building2, 
   Stethoscope, 
@@ -21,7 +21,14 @@ import {
   Search,
   Filter,
   Trash2,
-  CheckCircle2
+  CheckCircle2,
+  Edit3,
+  KeyRound,
+  Mail,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   supabase, 
@@ -36,7 +43,7 @@ function ResourcesManagementContent() {
   const searchParams = useSearchParams();
   const providerParam = searchParams.get('providerId');
 
-  const { activeProvider: tenantProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
+  const { activeProvider: tenantProvider, verticalConfig, isSuperAdmin, isHospitalAdmin, isLocked } = useMerchantTenant();
 
   const [providers, setProviders] = useState<Provider[]>(tenantProvider ? [tenantProvider] : []);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
@@ -48,6 +55,8 @@ function ResourcesManagementContent() {
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   const defaultResourceType: ResourceType = (
     verticalConfig.id === 'salons' ? 'stylist' :
@@ -66,6 +75,8 @@ function ResourcesManagementContent() {
     duration_minutes: number;
     capacity: number;
     specialization: string;
+    doctorEmail?: string;
+    doctorPassword?: string;
   }>({
     name: '',
     type: defaultResourceType,
@@ -75,7 +86,67 @@ function ResourcesManagementContent() {
     duration_minutes: verticalConfig.defaultDurationMinutes,
     capacity: verticalConfig.id === 'gaming' ? 14 : (verticalConfig.id === 'restaurants' ? 4 : 1),
     specialization: '',
+    doctorEmail: '',
+    doctorPassword: '',
   });
+
+  // Edit Resource Modal State
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    type: ResourceType;
+    department: string;
+    price: number;
+    deposit_amount: number;
+    duration_minutes: number;
+    capacity: number;
+    doctorEmail?: string;
+    doctorPassword?: string;
+  }>({
+    name: '',
+    type: defaultResourceType,
+    department: '',
+    price: verticalConfig.defaultPrice,
+    deposit_amount: verticalConfig.defaultPrice,
+    duration_minutes: verticalConfig.defaultDurationMinutes,
+    capacity: 1,
+    doctorEmail: '',
+    doctorPassword: '',
+  });
+  const [isUpdatingResource, setIsUpdatingResource] = useState(false);
+
+  // Doctor Emergency Cancellation Modal State
+  const [emergencyResource, setEmergencyResource] = useState<Resource | null>(null);
+  const [emergencyReason, setEmergencyReason] = useState('Doctor Acute Medical Emergency / Unscheduled Departure');
+  const [isEmergencySubmitting, setIsEmergencySubmitting] = useState(false);
+
+  const handleConfirmEmergencyCancel = async () => {
+    if (!emergencyResource) return;
+    setIsEmergencySubmitting(true);
+    try {
+      const res = await fetch('/api/doctor/emergency-cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctor_resource_id: emergencyResource.id,
+          reason: emergencyReason
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedbackToast(`🚨 Emergency cancelled ${data.cancelled_count} appointments for ${emergencyResource.name}. 100% full refund initiated.`);
+        setEmergencyResource(null);
+        await loadData();
+      } else {
+        setFeedbackToast(`⚠️ ${data.error || 'Failed to execute emergency cancellation'}`);
+      }
+    } catch (e: any) {
+      setFeedbackToast(`⚠️ Error: ${e.message}`);
+    } finally {
+      setIsEmergencySubmitting(false);
+      setTimeout(() => setFeedbackToast(null), 5000);
+    }
+  };
 
   // Keep selectedProviderId and formData in sync with tenant context
   useEffect(() => {
@@ -164,6 +235,8 @@ function ResourcesManagementContent() {
           depositAmount: Number(formData.price),
           durationMinutes: Number(formData.duration_minutes),
           capacity: Number(formData.capacity),
+          doctorEmail: formData.doctorEmail?.trim() || undefined,
+          doctorPassword: formData.doctorPassword || undefined,
         }),
       });
 
@@ -188,7 +261,69 @@ function ResourcesManagementContent() {
         duration_minutes: verticalConfig.defaultDurationMinutes,
         capacity: verticalConfig.id === 'gaming' ? 14 : (verticalConfig.id === 'restaurants' ? 4 : 1),
         specialization: '',
+        doctorEmail: '',
+        doctorPassword: '',
       });
+      setTimeout(() => setFeedbackToast(null), 5000);
+    }
+  };
+
+  const handleStartEditResource = (res: Resource) => {
+    const resAttr = (res as any)?.attributes || {};
+    setEditingResource(res);
+    setEditFormData({
+      name: res.name,
+      type: res.type,
+      department: res.department || '',
+      price: res.price ?? verticalConfig.defaultPrice,
+      deposit_amount: res.deposit_amount ?? verticalConfig.defaultPrice,
+      duration_minutes: res.duration_minutes ?? verticalConfig.defaultDurationMinutes,
+      capacity: res.capacity ?? 1,
+      doctorEmail: resAttr.email || '',
+      doctorPassword: '',
+    });
+  };
+
+  const handleUpdateResource = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingResource) return;
+    if (!editFormData.name?.trim()) {
+      setFeedbackToast('Error: Name cannot be empty.');
+      return;
+    }
+
+    setIsUpdatingResource(true);
+    try {
+      const res = await fetch('/api/admin/resources', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingResource.id,
+          name: editFormData.name.trim(),
+          type: editFormData.type,
+          department: editFormData.department.trim() || 'General',
+          price: Number(editFormData.price),
+          depositAmount: Number(editFormData.price),
+          durationMinutes: Number(editFormData.duration_minutes),
+          capacity: Number(editFormData.capacity),
+          doctorEmail: editFormData.doctorEmail?.trim() || undefined,
+          doctorPassword: editFormData.doctorPassword || undefined,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.error || 'Failed to update resource');
+      }
+
+      setFeedbackToast(`${verticalConfig.resourceLabelSingular} "${editFormData.name}" updated successfully.`);
+      setEditingResource(null);
+      await loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error updating resource';
+      setFeedbackToast(`Error: ${msg}`);
+    } finally {
+      setIsUpdatingResource(false);
       setTimeout(() => setFeedbackToast(null), 5000);
     }
   };
@@ -290,6 +425,21 @@ function ResourcesManagementContent() {
         </div>
       )}
 
+      {/* Desk Manager Role Banner */}
+      {!isHospitalAdmin && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl flex items-center justify-between text-xs shadow-xs animate-fade-in">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Desk Manager Mode:</strong> Registering new {verticalConfig.resourceLabelPlural.toLowerCase()} is restricted to the primary Hospital Administrator. Desk managers have operational queue access.
+            </span>
+          </div>
+          <span className="px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800 text-[10px] uppercase tracking-wide">
+            View Only
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
@@ -357,13 +507,42 @@ function ResourcesManagementContent() {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
           </button>
 
-          <button
-            onClick={() => setIsAdding(true)}
-            className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Add {verticalConfig.resourceLabelSingular} / Service
-          </button>
+          {isHospitalAdmin && selectedVenue && (
+            <Link
+              href={`/team?providerId=${selectedVenue.id}`}
+              className="inline-flex items-center px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition shadow-xs"
+              title="Manage Team & Assign Front Desk Managers to Doctors"
+            >
+              <UserPlus className="w-4 h-4 mr-1.5 text-emerald-700" />
+              Manage Team & Desk Assignments
+            </Link>
+          )}
+
+          {isHospitalAdmin ? (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Add {verticalConfig.resourceLabelSingular} / Service
+            </button>
+          ) : (
+            <div className="relative group">
+              <button
+                disabled
+                className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-40 shadow-none transition"
+                title="Restricted: Only Hospital Administrator can add doctors"
+                aria-label="Add doctor disabled for desk managers"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Add {verticalConfig.resourceLabelSingular} / Service
+              </button>
+              <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs rounded-lg shadow-lg whitespace-nowrap z-30">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Only Hospital Administrator can add doctors</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -598,6 +777,68 @@ function ResourcesManagementContent() {
                 </div>
               </div>
 
+              {/* Doctor / Staff Portal Login Credentials */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">
+                      {verticalConfig.resourceLabelSingular} Portal Login Credentials (Optional)
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Provision direct email and password so the {verticalConfig.resourceLabelSingular.toLowerCase()} can log in to their dashboard
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label htmlFor="doctor-email" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Login Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        id="doctor-email"
+                        name="doctorEmail"
+                        type="email"
+                        value={formData.doctorEmail || ''}
+                        onChange={(e) => setFormData({ ...formData, doctorEmail: e.target.value })}
+                        placeholder="doctor@hospital.com"
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="doctor-password" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Temporary Password (min 6 chars)
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="doctor-password"
+                        name="doctorPassword"
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.doctorPassword || ''}
+                        onChange={(e) => setFormData({ ...formData, doctorPassword: e.target.value })}
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2 pr-9 border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
@@ -612,6 +853,208 @@ function ResourcesManagementContent() {
                 >
                   <Plus className="w-4 h-4" />
                   Save {verticalConfig.resourceLabelSingular}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Doctor / Resource Modal */}
+      {editingResource && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
+                  <Edit3 className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Edit {verticalConfig.resourceLabelSingular} Details</h3>
+                  <p className="text-xs text-slate-500">Update name, department, consultation fee, and slot duration</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingResource(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateResource} className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="edit-doctor-name" className="block text-xs font-semibold text-slate-700 mb-1">
+                  {verticalConfig.resourceLabelSingular} Full Name *
+                </label>
+                <input
+                  id="edit-doctor-name"
+                  type="text"
+                  required
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="edit-doctor-department" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Department / Specialty
+                </label>
+                <input
+                  id="edit-doctor-department"
+                  type="text"
+                  value={editFormData.department}
+                  onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="edit-doctor-fee" className="block text-xs font-semibold text-slate-700 mb-1">
+                    {verticalConfig.actionVerb} Fee (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400 text-sm">₹</span>
+                    <input
+                      id="edit-doctor-fee"
+                      type="number"
+                      min="0"
+                      step="50"
+                      value={editFormData.price}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setEditFormData({ ...editFormData, price: val, deposit_amount: val });
+                      }}
+                      className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold font-mono"
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-500">Applies to future bookings</span>
+                </div>
+
+                <div>
+                  <label htmlFor="edit-doctor-duration" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Slot Duration (Mins)
+                  </label>
+                  <input
+                    id="edit-doctor-duration"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={editFormData.duration_minutes}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setEditFormData({ ...editFormData, duration_minutes: val });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
+                  />
+                  <span className="text-[11px] text-slate-500">Standard consultation length</span>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="edit-doctor-capacity" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Concurrent Capacity
+                </label>
+                <input
+                  id="edit-doctor-capacity"
+                  type="number"
+                  min="1"
+                  value={editFormData.capacity}
+                  onChange={(e) => setEditFormData({ ...editFormData, capacity: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
+                />
+              </div>
+
+              {/* Doctor Portal Login Credentials Edit */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">
+                      {verticalConfig.resourceLabelSingular} Portal Login Credentials
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Manage or reset {verticalConfig.resourceLabelSingular.toLowerCase()}&apos;s direct login email and OPD console password
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label htmlFor="edit-doctor-email" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Login Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        id="edit-doctor-email"
+                        name="editDoctorEmail"
+                        type="email"
+                        value={editFormData.doctorEmail || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, doctorEmail: e.target.value })}
+                        placeholder="doctor@hospital.com"
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="edit-doctor-password" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      New Password (Optional)
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="edit-doctor-password"
+                        name="editDoctorPassword"
+                        type={showEditPassword ? 'text' : 'password'}
+                        value={editFormData.doctorPassword || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, doctorPassword: e.target.value })}
+                        placeholder="Leave blank to keep current"
+                        className="w-full px-3 py-2 pr-9 border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                        title={showEditPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingResource(null)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingResource}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isUpdatingResource ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -637,7 +1080,6 @@ function ResourcesManagementContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredResources.map((res) => {
             const price = res.price ?? 500;
-            const deposit = res.deposit_amount ?? 50;
             const department = res.department || 'General';
 
             return (
@@ -695,6 +1137,23 @@ function ResourcesManagementContent() {
                     </span>
                   </div>
 
+                  {/* Doctor Portal Login Account Status */}
+                  <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                      Login Access:
+                    </span>
+                    {(res as any)?.attributes?.email ? (
+                      <span className="font-mono text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md truncate max-w-[170px]" title={(res as any)?.attributes?.email}>
+                        {(res as any)?.attributes?.email}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 italic">
+                        No login set
+                      </span>
+                    )}
+                  </div>
+
                   {/* Slot Details */}
                   <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                     <span className="flex items-center gap-1">
@@ -705,21 +1164,46 @@ function ResourcesManagementContent() {
                   </div>
                 </div>
 
-                {/* Footer Toggle & Delete */}
+                {/* Footer Toggle & Actions */}
                 <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    ID: {res.id.substring(0, 8)}
-                  </span>
-                  <div className="flex items-center gap-3">
+                  <Link
+                    href={`/team?providerId=${res.provider_id}&doctorId=${res.id}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200/70 transition-colors shadow-2xs"
+                    title="Assign Front Desk Managers for this doctor"
+                  >
+                    <UserPlus className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Assign Front Desk</span>
+                  </Link>
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => toggleActive(res.id, res.is_active)}
-                      className="text-xs font-bold text-slate-600 hover:text-emerald-700 transition-colors"
+                      type="button"
+                      onClick={() => setEmergencyResource(res)}
+                      className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition-colors cursor-pointer"
+                      title={`Doctor Emergency Cancellation for ${res.name}`}
+                      aria-label={`Emergency Cancel for ${res.name}`}
                     >
-                      {res.is_active ? 'Pause Bookings' : 'Reactivate Unit'}
+                      <AlertTriangle className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      type="button"
+                      onClick={() => handleStartEditResource(res)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                      title={`Edit ${res.name} details & credentials`}
+                      aria-label={`Edit ${res.name}`}
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(res.id, res.is_active)}
+                      className="text-xs font-bold text-slate-600 hover:text-emerald-700 transition-colors cursor-pointer"
+                    >
+                      {res.is_active ? 'Pause' : 'Activate'}
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleDeleteResource(res.id, res.name)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                       title={`Delete ${res.name}`}
                       aria-label={`Delete ${res.name}`}
                     >
@@ -730,6 +1214,76 @@ function ResourcesManagementContent() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Doctor Emergency Cancellation Confirmation Modal */}
+      {emergencyResource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900">
+                  Doctor Emergency Cancellation
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Unscheduled Medical Departure for <span className="font-bold text-slate-800">{emergencyResource.name}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setEmergencyResource(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-950 space-y-1.5">
+              <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                <span>⚠️ Force Majeure Medical Exception</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-amber-900">
+                This will immediately cancel all remaining appointments for this doctor today.
+                Every affected patient receives an automated SMS and a <span className="font-bold underline">100% full refund</span>.
+                Because this is an authorized medical emergency, <span className="font-bold">ZERO merchant cancellation strikes</span> will be applied to your clinic.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Reason for Emergency Cancellation
+              </label>
+              <input
+                type="text"
+                value={emergencyReason}
+                onChange={(e) => setEmergencyReason(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+                placeholder="Reason provided to patients"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setEmergencyResource(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                disabled={isEmergencySubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEmergencyCancel}
+                disabled={isEmergencySubmitting}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isEmergencySubmitting ? 'Cancelling Schedule...' : 'Confirm Emergency Cancellation'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { authEnv } from '@/lib/env';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -11,15 +12,16 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error_description') ?? searchParams.get('error');
 
   if (error) {
-    console.error('[Auth Callback Error]:', error);
+    const safeError = String(error).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
+    console.error('[Auth Callback Error]:', safeError);
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
   }
 
   if (code) {
     const cookieStore = await cookies();
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      authEnv.supabaseUrl,
+      authEnv.supabaseAnonKey,
       {
         cookies: {
           getAll() {

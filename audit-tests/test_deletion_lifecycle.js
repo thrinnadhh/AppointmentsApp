@@ -127,8 +127,8 @@ async function run() {
       recipient_phone: '+919876543210',
       recipient_name: 'Audit Deletion Subject',
       event_type: 'BOOKING_CONFIRMED',
-      channel: 'sms',
-      status: 'SENT',
+      channel: 'whatsapp',
+      status: 'QUEUED',
       message_content: 'Your appointment is confirmed'
     })
   });

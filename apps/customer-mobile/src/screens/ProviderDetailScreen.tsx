@@ -24,7 +24,9 @@ import {
 interface ProviderDetailScreenProps {
   providerId: string;
   customerId?: string;
+  isGuest?: boolean;
   onBack: () => void;
+  onOpenSignIn?: () => void;
   onProceedToHold: (
     resource: Resource,
     slot: Slot,
@@ -36,8 +38,10 @@ interface ProviderDetailScreenProps {
 
 export default function ProviderDetailScreen({
   providerId,
-  customerId = '99999999-9999-9999-9999-999999999991',
+  customerId = '',
+  isGuest = false,
   onBack,
+  onOpenSignIn,
   onProceedToHold,
 }: ProviderDetailScreenProps) {
   const initialCached = getCachedProviderById(providerId);
@@ -50,8 +54,10 @@ export default function ProviderDetailScreen({
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(!initialCached);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [slotsReloadTick, setSlotsReloadTick] = useState(0);
   const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
-  const [checkingCooling, setCheckingCooling] = useState<boolean>(false);
+  const [, setCheckingCooling] = useState<boolean>(false);
   const lastBookedQueryId = useRef(0);
 
   // Generate 3 date options (Today, Tomorrow, Day after)
@@ -116,23 +122,29 @@ export default function ProviderDetailScreen({
     if (selectedResource && dates[selectedDateIndex]) {
       const qId = ++lastBookedQueryId.current;
       setSlotsLoading(true);
+      setSlotsError(null);
       fetchBookedSlots(selectedResource.id, dates[selectedDateIndex])
         .then((res) => {
           if (qId === lastBookedQueryId.current) {
             setBookedSlots(res);
+            setSlotsError(null);
             setSlotsLoading(false);
           }
         })
-        .catch(() => {
+        .catch((err) => {
           if (qId === lastBookedQueryId.current) {
+            setBookedSlots([]);
+            setSelectedSlot(null);
+            setSlotsError(err instanceof Error ? err.message : 'Unable to load slot availability');
             setSlotsLoading(false);
           }
         });
     } else {
       setBookedSlots([]);
+      setSlotsError(null);
       setSlotsLoading(false);
     }
-  }, [selectedResource?.id, selectedDateIndex]);
+  }, [selectedResource?.id, selectedDateIndex, slotsReloadTick, customerId, isGuest]);
 
   useEffect(() => {
     // If opening venue when today has zero slots left, automatically select Tomorrow
@@ -153,6 +165,13 @@ export default function ProviderDetailScreen({
     : [];
 
   const isToday = selectedDateIndex === 0;
+  const isAuthError = Boolean(
+    slotsError &&
+      (slotsError.toLowerCase().includes('unauthorized') ||
+        slotsError.toLowerCase().includes('authentication') ||
+        slotsError.toLowerCase().includes('auth') ||
+        slotsError.includes('401'))
+  );
   // For today, only display slots that haven't passed yet, so user immediately sees upcoming bookable slots!
   const availableSlots = isToday
     ? rawSlots.filter((slot) => {
@@ -386,6 +405,38 @@ export default function ProviderDetailScreen({
               <Text style={{ fontSize: 12, color: '#64748b', marginTop: 8, fontWeight: '500' }}>
                 Checking live slot availability...
               </Text>
+            </View>
+          ) : isAuthError ? (
+            <View style={styles.signInPromptBanner} testID="customer-slots-signin-prompt">
+              <Text style={styles.signInPromptTitle}>Sign In to View Available Slots</Text>
+              <Text style={styles.signInPromptSub}>
+                Please sign in to check live appointment availability and reserve your slot.
+              </Text>
+              <TouchableOpacity
+                style={styles.signInPromptBtn}
+                testID="customer-slots-signin-button"
+                onPress={() => {
+                  if (onOpenSignIn) {
+                    onOpenSignIn();
+                  }
+                }}
+              >
+                <Text style={styles.signInPromptBtnText}>Sign In to Book Slot →</Text>
+              </TouchableOpacity>
+            </View>
+          ) : slotsError ? (
+            <View style={styles.closedDayBanner} testID="customer-slots-error">
+              <Text style={styles.closedDayTitle}>⚠️ Unable to Load Live Availability</Text>
+              <Text style={styles.closedDaySub}>
+                {slotsError}. Slots are hidden to prevent double-booking. Please retry.
+              </Text>
+              <TouchableOpacity
+                style={styles.viewTomorrowBtn}
+                testID="customer-slots-retry-button"
+                onPress={() => setSlotsReloadTick((t) => t + 1)}
+              >
+                <Text style={styles.viewTomorrowBtnText}>Retry Loading Slots →</Text>
+              </TouchableOpacity>
             </View>
           ) : isSelectedDateClosed ? (
             <View style={styles.closedDayBanner} testID="customer-day-closed-notice">
@@ -955,6 +1006,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   viewTomorrowBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  signInPromptBanner: {
+    padding: 20,
+    borderRadius: 14,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    marginVertical: 8,
+    alignItems: 'center',
+  },
+  signInPromptTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  signInPromptSub: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 19,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  signInPromptBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signInPromptBtnText: {
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '700',

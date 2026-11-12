@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { sanitizeLogData } from '@appointments/shared';
+import { getClientIp } from '@/lib/auth-admin';
+import { checkRateLimit } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    // Read raw body with length check (max 64KB)
+    // 1. Ingestion Rate Limiting via Redis (Max 60 log submissions per minute per IP; never uses a shared IP bucket)
+    const ip = getClientIp(request);
+    if (ip) {
+      const rl = await checkRateLimit(`logs-ingest:${ip}`, 60, 60);
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { error: 'Rate limit exceeded: Too many log submissions. Please try again later.' },
+          { status: 429 }
+        );
+      }
+    } else {
+      console.warn('[RateLimit] missing_trusted_client_ip', { route: '/api/logs/ingest' });
+    }
+
+    // 2. Read raw body with length check (max 64KB)
     const rawText = await request.text();
     if (rawText.length > 65536) {
       return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
@@ -16,13 +32,37 @@ export async function POST(request: NextRequest) {
     const sanitized = sanitizeLogData(payload) as Record<string, unknown>;
 
     const platform = typeof sanitized.platform === 'string' ? sanitized.platform : 'web';
-    const level = typeof sanitized.level === 'string' ? sanitized.level : 'error';
+    const level = typeof sanitized.level === 'string' ? sanitized.level : 'info';
     const message = typeof sanitized.message === 'string' ? sanitized.message : 'Unknown client event';
     const component = typeof sanitized.component === 'string' ? sanitized.component : null;
     const stackTrace = typeof sanitized.stack_trace === 'string' ? sanitized.stack_trace : null;
     const metadata = typeof sanitized.metadata === 'object' && sanitized.metadata !== null ? sanitized.metadata : {};
     const deviceInfo = typeof sanitized.device_info === 'object' && sanitized.device_info !== null ? sanitized.device_info : {};
     const sessionId = typeof sanitized.session_id === 'string' ? sanitized.session_id : null;
+
+    if (!ip && sessionId) {
+      const sessionRl = await checkRateLimit(`logs-ingest:session:${sessionId}`, 30, 60);
+      if (!sessionRl.allowed) {
+        return NextResponse.json(
+          { error: 'Rate limit exceeded for session. Please try again later.' },
+          { status: 429 }
+        );
+      }
+    }
+
+    const severity = typeof sanitized.severity === 'string' ? sanitized.severity : null;
+    const category = typeof sanitized.category === 'string' ? sanitized.category : 'OTHER';
+    const source = typeof sanitized.source === 'string' ? sanitized.source : 'merchant-web';
+    const errorCode = typeof sanitized.error_code === 'string' ? sanitized.error_code : null;
+    const role = typeof sanitized.role === 'string' ? sanitized.role : null;
+    const cityId = typeof sanitized.city_id === 'string' ? sanitized.city_id : null;
+    const vertical = typeof sanitized.vertical === 'string' ? sanitized.vertical : null;
+    const appointmentId = typeof sanitized.appointment_id === 'string' ? sanitized.appointment_id : null;
+    const appVersion = typeof sanitized.app_version === 'string' ? sanitized.app_version : '1.0.0';
+    const platformOs = typeof sanitized.platform_os === 'string' ? sanitized.platform_os : null;
+    const deviceModel = typeof sanitized.device_model === 'string' ? sanitized.device_model : null;
+    const environment = typeof sanitized.environment === 'string' ? sanitized.environment : 'dev';
+    const fingerprint = typeof sanitized.fingerprint === 'string' ? sanitized.fingerprint : null;
 
     const supabaseAdmin = getSupabaseAdmin();
     const { data: logId, error } = await (supabaseAdmin.rpc as any)('log_client_event', {
@@ -34,6 +74,19 @@ export async function POST(request: NextRequest) {
       p_metadata: metadata,
       p_device_info: deviceInfo,
       p_session_id: sessionId,
+      p_severity: severity,
+      p_category: category,
+      p_source: source,
+      p_error_code: errorCode,
+      p_role: role,
+      p_city_id: cityId,
+      p_vertical: vertical,
+      p_appointment_id: appointmentId,
+      p_app_version: appVersion,
+      p_platform_os: platformOs,
+      p_device_model: deviceModel,
+      p_environment: environment,
+      p_fingerprint: fingerprint,
     });
 
     if (error) {

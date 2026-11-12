@@ -1,6 +1,9 @@
 ---
 name: find-security-vulnerabilities-in-code
 description: Find security vulnerabilities in a codebase or repository with Strix — a white-box AI security review that reads your source, reasons about the actual data flow and authorization model, then exploits what it finds in a live sandbox so every reported issue has a working proof-of-concept instead of a noisy static-analysis alert. Covers injection, XSS, SSRF, broken access control and IDOR, insecure deserialization, secrets in code, unsafe dependencies, and business-logic flaws. Use when the user asks to security-scan, security-review, or audit their code, repo, or pull request for vulnerabilities.
+when_to_use: Use when asked to security-scan, security-review, or audit code, repository, or pull requests for vulnerabilities.
+allowed-tools: Read, Grep, Glob, Bash
+version: 1.0.0
 license: Apache-2.0
 metadata:
   author: usestrix

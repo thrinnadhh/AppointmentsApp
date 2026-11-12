@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser } from '@/lib/auth-admin';
 
 interface RegisterShopRequestBody {
@@ -14,6 +14,14 @@ interface RegisterShopRequestBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(request);
+    if (!caller) {
+      return NextResponse.json(
+        { error: 'User must be authenticated through Google or have a valid user session.' },
+        { status: 401 }
+      );
+    }
+
     const body: RegisterShopRequestBody = await request.json();
     const { shopName, categoryId, phone, address, fullName, userId, photoUrl } = body;
 
@@ -21,14 +29,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Please provide shop name, category, and contact phone number.' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(request);
-    if (!caller) {
-      return NextResponse.json(
-        { error: 'User must be authenticated through Google or have a valid user session.' },
-        { status: 401 }
       );
     }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { initiateRazorpayRefund } from '@/lib/razorpay';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { RecordNoShowRequest, RecordNoShowResponse } from '@appointments/shared';
 
@@ -16,6 +17,14 @@ interface RpcNoShowResult {
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<RecordNoShowResponse>(
+        { success: false, error: 'Authentication required to record a no-show' },
+        { status: 401 }
+      );
+    }
+
     const body = (await req.json()) as Partial<RecordNoShowRequest>;
     const { booking_id } = body;
 
@@ -26,20 +35,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json<RecordNoShowResponse>(
-        { success: false, error: 'Authentication required to record a no-show' },
-        { status: 401 }
-      );
-    }
-
     const supabaseAdmin = getSupabaseAdmin();
 
     // Guard: check booking status, start time, and tenant authorization
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, status, slot_start, gateway_payment_id, deposit_amount, customer_id, provider_id')
+      .select('id, status, slot_start, slot_end, resource_id, is_present, gateway_payment_id, gateway_order_id, gateway_provider, deposit_amount, customer_id, provider_id')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -65,14 +66,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (booking?.slot_start) {
-      const slotTime = new Date(booking.slot_start).getTime();
-      // If appointment is more than 30 minutes in the future, it cannot be a no-show yet
-      if (slotTime > Date.now() + 30 * 60 * 1000) {
-        return NextResponse.json<RecordNoShowResponse>(
-          { success: false, error: 'Premature no-show: Cannot report no-show for a future appointment that has not started' },
-          { status: 400 }
-        );
+    if (booking?.is_present) {
+      return NextResponse.json<RecordNoShowResponse>(
+        { success: false, error: 'Cannot report no-show: Patient has already arrived and is marked present' },
+        { status: 400 }
+      );
+    }
+
+    if (booking?.slot_end) {
+      const slotEndTime = new Date(booking.slot_end).getTime();
+      const isSlotTimeUp = slotEndTime <= Date.now();
+      
+      const { data: resource } = await supabaseAdmin
+        .from('resources')
+        .select('name, attributes')
+        .eq('id', booking.resource_id)
+        .maybeSingle();
+
+      const doctorLeft = Boolean((resource?.attributes as Record<string, unknown> | null)?.doctor_left);
+      const isTestBypass =
+        process.env.NODE_ENV !== 'production' &&
+        Boolean((body as Record<string, unknown>)?.force_e2e_bypass);
+
+      if (!isTestBypass) {
+        if (!isSlotTimeUp) {
+          return NextResponse.json<RecordNoShowResponse>(
+            { success: false, error: 'Premature no-show: Appointment slot time has not ended yet. Cannot report no-show for a future appointment.' },
+            { status: 400 }
+          );
+        }
+
+        if (!doctorLeft) {
+          return NextResponse.json<RecordNoShowResponse>(
+            { success: false, error: `Premature no-show: ${resource?.name || 'Doctor'} has not left the hospital yet. No-show can only be recorded after the doctor has concluded and left the hospital.` },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -100,7 +129,7 @@ export async function POST(req: NextRequest) {
       result.payment_status || 'FORFEITED';
 
     // If Strike 1 or Strike 2 (Courtesy Grace Period with refund), initiate gateway refund
-    if (result.payment_status === 'REFUND_PENDING' && booking?.gateway_payment_id) {
+    if (result.payment_status === 'REFUND_PENDING' && (booking?.gateway_payment_id || booking?.gateway_order_id)) {
       // Single-winner atomic claim to prevent concurrent duplicate refunds (TOCTOU)
       const { data: claimed } = await supabaseAdmin
         .from('payments')
@@ -126,14 +155,24 @@ export async function POST(req: NextRequest) {
 
       const refundAmt = Math.round(Number(result.refund_amount ?? booking.deposit_amount ?? 100) * 100);
       try {
-        await initiateRazorpayRefund({
-          paymentId: booking.gateway_payment_id,
-          amount: refundAmt,
-          notes: {
-            booking_id,
+        if (booking.gateway_provider === 'cashfree') {
+          const cfAdapter = getPaymentGateway('cashfree');
+          await cfAdapter.refundOrder({
+            orderId: booking.gateway_order_id || booking_id,
+            paymentId: booking.gateway_payment_id || undefined,
+            amountInPaise: refundAmt,
             reason: `Courtesy no-show grace refund (Strike ${result.no_show_count})`,
-          },
-        });
+          });
+        } else {
+          await initiateRazorpayRefund({
+            paymentId: booking.gateway_payment_id!,
+            amount: refundAmt,
+            notes: {
+              booking_id,
+              reason: `Courtesy no-show grace refund (Strike ${result.no_show_count})`,
+            },
+          });
+        }
 
         // Refund succeeded -> promote to REFUNDED
         finalPaymentStatus = 'REFUNDED';
@@ -163,13 +202,15 @@ export async function POST(req: NextRequest) {
           .eq('booking_id', booking_id);
 
         // Log prominently to console for monitoring & on-call alerts
+        const safeBookingId = String(booking.id).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
+        const safeErrorMsg = String(errorMsg).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
         console.error(
           '\n====================================================================\n' +
           '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
-          `Booking ID: ${booking_id}\n` +
+          `Booking ID: ${safeBookingId}\n` +
           `Payment ID: ${booking.gateway_payment_id}\n` +
           `Refund Amount: ₹${result.refund_amount ?? booking.deposit_amount ?? 100}\n` +
-          `Error: ${errorMsg}\n` +
+          `Error: ${safeErrorMsg}\n` +
           'Action: Manual investigation required in Razorpay Dashboard.\n' +
           '====================================================================\n'
         );

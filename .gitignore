@@ -2,31 +2,43 @@
 node_modules/
 .pnpm-store/
 
-# Next.js
+# Next.js & Build Outputs
 .next/
+.next-dev/
 out/
 build/
 dist/
+**/build/
+**/bin/
+**/.kotlin/
+.vercel
 
 # Expo / React Native
 .expo/
 .expo-shared/
 
 # Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.env
+.env*
+!.env.example
 
 # TypeScript
 *.tsbuildinfo
+*.dump
+supabase/backups/
 next-env.d.ts
 
-# OS & IDE
+# OS, IDE & Signing Keys
 .DS_Store
 *.pem
+*.key
+*.jwk
+*.jwks.json
+*signing-key*
+!scripts/generate-signing-keys.mjs
+*signing_keys*
+signing_keys.json
+jwt_keys/
+keys/
 .vscode/
 .idea/
 
@@ -49,8 +61,6 @@ supabase/.temp/
 .opencode.json
 opencode*.json
 .mcp.json
-.vercel
-.env*
 .gradle/
 audit/
 strix_runs/
@@ -64,4 +74,15 @@ __agent__/
 scripts/e2e-*.mjs
 *.log
 strix-*.log
-
+.venv/
+.local/
+signing_keys.json
+tests/e2e/stories/story-manifest.json
+story-manifest.json
+supabase/signing_keys.json
+scripts/test-seed-manifest.json
+*signing_keys*.json
+scratch/
+.local/
+tests/e2e/stories/story-manifest.json
+story-manifest.json

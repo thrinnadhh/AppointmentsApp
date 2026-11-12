@@ -1,0 +1,30 @@
+appId: host.exp.exponent
+---
+# Journey J-02: Provider Discovery, Doctor Selection, Slot Hold (±10m window), and Checkout Breakdown
+# Verified against SPEC.md (Hold timer 5 mins, deposit + platform fee, ±10m window)
+- launchApp
+- tapOn: "Explore"
+- tapOn: "Hospitals & Clinics"
+- assertVisible: "Hospitals & Clinics in Tirupati"
+- tapOn: "Story H1 Apex Multi-Specialty Hospital"
+- assertVisible: "7-Day Free Follow-up Policy"
+- assertVisible: "₹0 RE-VISIT"
+- tapOn: "Dr. Sharma (Neurology)"
+- scrollUntilVisible:
+    element: "3. AVAILABLE SLOTS"
+    direction: DOWN
+- tapOn: "3:00 PM"
+- assertVisible: "Hold Slot & Pay Deposit →"
+- tapOn: "Hold Slot & Pay Deposit →"
+- assertVisible: "Patient & Booking Details"
+- tapOn: "Proceed to Hold & Pay Deposit"
+- assertVisible: "Slot Held for You"
+- assertVisible: "Arrival Window"
+- assertVisible: "2:50 PM – 3:10 PM (±10m)"
+- assertVisible: "Booking Deposit (refundable)"
+- assertVisible: "₹200"
+- assertVisible: "Platform Convenience Fee"
+- assertVisible: "₹10"
+- assertVisible: "Total charged now"
+- assertVisible: "₹210"
+- tapOn: "✕ Cancel"

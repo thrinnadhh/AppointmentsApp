@@ -5,6 +5,9 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  schedule:
+    # Full history secret scan weekly on Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
       run_stress:
@@ -16,16 +19,19 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 # ─── Environment defaults shared across jobs ───────────────────────────────────
 env:
   NODE_VERSION: '22'
   PNPM_VERSION: '8.15.0'
-  # Supabase — populated from repo secrets; fall back to stubs for build-only jobs
-  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-  EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
-  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+  # Supabase — local containerized defaults for CI test isolation (Standing Rule 5: Local database only)
+  NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+  EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+  SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
   RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID || 'rzp_test_51MockAppPlatform' }}
   RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET || 'mock_secret_key_1234567890' }}
   RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET || 'mock_webhook_secret' }}
@@ -34,11 +40,20 @@ env:
   TEST_SALON_EMAIL: ${{ secrets.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com' }}
   TEST_SALON_PASSWORD: ${{ secrets.TEST_SALON_PASSWORD || 'NaturalsSalon2026!' }}
   TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com' }}
-  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || '' }}
-  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || '' }}
-  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || '' }}
-  ALLOW_MOCK_PAYMENTS: 'true'
+  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'AdminSecure2026!' }}
+  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2' }}
+  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || 'tirupati_e2e_secure_bypass_key_2026_x9k2' }}
+  ALLOW_MOCK_PAYMENTS: 'false'
   CRON_SECRET: ${{ secrets.CRON_SECRET || 'test_cron_secret_2026' }}
+  NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME || 'Dr. K. S. Rao' }}
+  NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL || 'grievance-officer@tirupati-appointments.org' }}
+  NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE || '+91-877-2244888' }}
+  NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS || 'Balaji Colony, Tirupati, AP 517502' }}
+  EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME || 'Dr. K. S. Rao' }}
+  EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL || 'grievance-officer@tirupati-appointments.org' }}
+  EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE || '+91-877-2244888' }}
+  EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS || 'Balaji Colony, Tirupati, AP 517502' }}
+  EXPO_PUBLIC_EAS_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_EAS_PROJECT_ID }}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 1 — Dependency Audit & Security Scan
@@ -47,6 +62,9 @@ jobs:
   security-audit:
     name: 🔒 Security & Dependency Audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -56,16 +74,21 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Audit for high/critical vulnerabilities
-        run: pnpm audit --audit-level=critical
+      - name: Audit for high/critical vulnerabilities (pnpm audit)
+        run: node scripts/audit-dependencies.mjs --audit-level=high
+        continue-on-error: false
+
+      - name: Check for unpopulated DPDP legal placeholders
+        run: pnpm run check:legal
         continue-on-error: false
 
       - name: Check for secrets in source tree (PR)
@@ -88,6 +111,24 @@ jobs:
           extra_args: --only-verified
         continue-on-error: false
 
+      - name: Gitleaks secret scan (PR & Push)
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+        continue-on-error: false
+
+      - name: Gitleaks full-history secret scan (Scheduled & Push to main)
+        if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        with:
+          args: --log-opts="--all"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+        continue-on-error: false
+
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 2 — Lint, Typecheck
 # ─────────────────────────────────────────────────────────────────────────────
@@ -101,10 +142,11 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -112,8 +154,107 @@ jobs:
       - name: Lint (all workspaces)
         run: pnpm lint
 
+      - name: Verify environment configuration (check:env)
+        run: pnpm run check:env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key-ci
+          SUPABASE_SERVICE_ROLE_KEY: stub-service-role-key-ci
+
       - name: Typecheck (all workspaces)
-        run: pnpm typecheck
+        run: pnpm -r exec tsc --noEmit
+
+      - name: Check for unpopulated DPDP legal placeholders
+        run: pnpm run check:legal
+        continue-on-error: false
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2B — Unit & Script Verification Suites (tests/unit & tests/scripts)
+# ─────────────────────────────────────────────────────────────────────────────
+  unit-and-script-tests:
+    name: 🧪 Unit & Script Verification Suites
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate local PostgREST asymmetric signing key if absent
+        run: node scripts/generate-signing-keys.mjs
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          sudo systemctl stop postgresql 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+
+      - name: Provision local and production env templates
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
+
+          if [ ! -f .env.production ]; then
+            printf "NODE_ENV=production\nALLOW_MOCK_PAYMENTS=false\nNEXT_PUBLIC_SUPABASE_URL=https://tirupati-appointments.supabase.co\nNEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder_production_anon_key\nSUPABASE_SERVICE_ROLE_KEY=placeholder_production_service_role_key\nRAZORPAY_KEY_ID=rzp_live_placeholder\nRAZORPAY_KEY_SECRET=placeholder_live_razorpay_secret\nRAZORPAY_WEBHOOK_SECRET=placeholder_live_webhook_secret\nADMIN_SECRET=placeholder_secure_admin_secret\nSUPERADMIN_E2E_TOKEN=placeholder_secure_superadmin_token\nCRON_SECRET=placeholder_secure_cron_secret\n" > .env.production
+          fi
+          if [ ! -f apps/merchant-web/.env.production ]; then
+            cp .env.production apps/merchant-web/.env.production
+          fi
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
+          node scripts/seed-hospital-test-data.mjs
+
+      - name: Start merchant-web server and run all unit & script suites
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN:-tirupati_e2e_secure_bypass_key_2026_x9k2}"
+          export ADMIN_SECRET="${ADMIN_SECRET:-tirupati_e2e_secure_bypass_key_2026_x9k2}"
+          export CRON_SECRET="${CRON_SECRET:-test_cron_secret_2026}"
+          export DELETION_TOKEN_SECRET="${DELETION_TOKEN_SECRET:-d24831bb6c322697ea855e7464e8e9767191d1f4d340548e400bab603f927cfe}"
+          export ALLOW_MOCK_PAYMENTS="false"
+
+          pnpm --filter @appointments/merchant-web dev --port 3000 > /tmp/merchant-web-ci.log 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -s -o /dev/null http://127.0.0.1:3000; then
+              break
+            fi
+            sleep 1
+          done
+
+          node --test --test-concurrency=1 tests/unit/*.mjs
+          node --test --test-concurrency=1 tests/scripts/test-*.mjs
+          kill $SERVER_PID || true
+        continue-on-error: false
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 3 — Build (merchant-web + customer-mobile export)
@@ -129,16 +270,22 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Provision build environment
+        run: node scripts/generate-ci-env.mjs
+
       - name: Build all workspaces
         run: pnpm build
+        env:
+          SKIP_ENV_VALIDATION: 'true'
 
       - name: Upload merchant-web build artifact
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
@@ -161,16 +308,95 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          sudo systemctl stop postgresql 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
+          node scripts/seed-hospital-test-data.mjs
 
       - name: Run Admin E2E — Core auth & RBAC
         run: pnpm exec playwright test tests/e2e/admin-auth-guard.spec.ts --reporter=github,list,html
@@ -216,16 +442,95 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          sudo systemctl stop postgresql 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
+          node scripts/seed-hospital-test-data.mjs
 
       - name: Run Merchant E2E — Tenancy isolation
         run: pnpm exec playwright test tests/e2e/merchant-tenancy-isolation.spec.ts --reporter=github,list,html
@@ -271,16 +576,95 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          sudo systemctl stop postgresql 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
+          node scripts/seed-hospital-test-data.mjs
 
       - name: Run Customer E2E — App flows
         run: pnpm exec playwright test tests/e2e/customer-app.spec.ts --project=mobile-chrome --reporter=github,list,html
@@ -321,16 +705,95 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          sudo systemctl stop postgresql 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
+          node scripts/seed-hospital-test-data.mjs
 
       - name: Run Customer ↔ Merchant Integration
         run: pnpm exec playwright test tests/e2e/customer-merchant-integration.spec.ts --reporter=github,list,html
@@ -378,16 +841,95 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Harden runner DNS and APT configuration
+        run: |
+          # 1. Configure reliable DNS servers (Cloudflare & Google)
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          sudo tee /etc/systemd/resolved.conf.d/99-dns.conf > /dev/null << 'EOF'
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=1.1.1.1 8.8.8.8
+          EOF
+          sudo systemctl restart systemd-resolved || true
+          sudo resolvectl flush-caches || true
+          if ! grep -q "1.1.1.1" /etc/resolv.conf 2>/dev/null; then
+            echo -e "\nnameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null || true
+          fi
+
+          # 2. Configure APT retries, timeouts, and IPv4 preference
+          sudo tee /etc/apt/apt.conf.d/99-ci-retries > /dev/null << 'EOF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT::Get::Fix-Missing "true";
+          Acquire::ForceIPv4 "true";
+          EOF
+
+          # 3. Replace flaky azure mirror with canonical archive.ubuntu.com
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers and dependencies
+        run: |
+          SUCCESS=false
+          for attempt in 1 2 3; do
+            echo "Installing Playwright Chromium and OS dependencies (Attempt $attempt/3)..."
+            sudo apt-get update -o Acquire::Retries=5 --fix-missing || true
+            if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+              pnpm exec playwright install-deps chromium && SUCCESS=true && break
+            else
+              pnpm exec playwright install --with-deps chromium && SUCCESS=true && break
+            fi
+            echo "Attempt $attempt failed. Flushing DNS and retrying in 10s..."
+            sudo resolvectl flush-caches || true
+            sleep 10
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Playwright installation failed after 3 attempts."
+            exit 1
+          fi
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          sudo systemctl stop postgresql 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          npx --yes supabase@latest start
+          npx --yes supabase@latest db reset
+          eval "$(npx --yes supabase@latest status -o env)"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/generate-ci-env.mjs
+
+      - name: Seed hospital and tenant test data
+        run: |
+          eval "$(npx --yes supabase@latest status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          node scripts/seed-e2e-data.mjs
+          node scripts/seed-hospital-test-data.mjs
 
       - name: "Run stress: 50-concurrent-hold (EC-INT-05) in isolation"
         run: >
@@ -425,9 +967,11 @@ jobs:
   all-checks-pass:
     name: ✅ All CI Gates Passed
     runs-on: ubuntu-latest
+    permissions: {}
     needs:
       - security-audit
       - lint-typecheck
+      - unit-and-script-tests
       - build
       - e2e-admin
       - e2e-merchant
@@ -440,6 +984,7 @@ jobs:
         run: |
           echo "Security audit : ${{ needs.security-audit.result }}"
           echo "Lint/Typecheck : ${{ needs.lint-typecheck.result }}"
+          echo "Unit/Scripts   : ${{ needs.unit-and-script-tests.result }}"
           echo "Build          : ${{ needs.build.result }}"
           echo "Admin E2E      : ${{ needs.e2e-admin.result }}"
           echo "Merchant E2E   : ${{ needs.e2e-merchant.result }}"
@@ -447,13 +992,14 @@ jobs:
           echo "Integration E2E: ${{ needs.e2e-integration.result }}"
 
           # Fail if any required job failed or was cancelled
-          if [[ "${{ needs.security-audit.result }}"   != "success" ]] ||
-             [[ "${{ needs.lint-typecheck.result }}"  != "success" ]] ||
-             [[ "${{ needs.build.result }}"           != "success" ]] ||
-             [[ "${{ needs.e2e-admin.result }}"       != "success" ]] ||
-             [[ "${{ needs.e2e-merchant.result }}"    != "success" ]] ||
-             [[ "${{ needs.e2e-customer.result }}"    != "success" ]] ||
-             [[ "${{ needs.e2e-integration.result }}" != "success" ]]; then
+          if [[ "${{ needs.security-audit.result }}"         != "success" ]] ||
+             [[ "${{ needs.lint-typecheck.result }}"        != "success" ]] ||
+             [[ "${{ needs.unit-and-script-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.build.result }}"                 != "success" ]] ||
+             [[ "${{ needs.e2e-admin.result }}"             != "success" ]] ||
+             [[ "${{ needs.e2e-merchant.result }}"          != "success" ]] ||
+             [[ "${{ needs.e2e-customer.result }}"          != "success" ]] ||
+             [[ "${{ needs.e2e-integration.result }}"       != "success" ]]; then
             echo "❌ One or more required CI gates failed."
             exit 1
           fi

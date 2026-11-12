@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
       id,
       name,
       state = 'Andhra Pradesh',
-      country = 'India',
       status = 'EXPANDING',
       latitude,
       longitude,
@@ -58,7 +57,6 @@ export async function POST(request: NextRequest) {
         id: id.toLowerCase().trim(),
         name: name.trim(),
         state,
-        country,
         status: status as CityStatus,
         latitude: Number(latitude),
         longitude: Number(longitude),
@@ -128,7 +126,8 @@ export async function PATCH(request: NextRequest) {
     const result = await updateAdminCityStatus(
       cityId,
       status,
-      target !== undefined ? Number(target) : null
+      target !== undefined ? Number(target) : null,
+      adminBypassToken || undefined
     );
 
     if (!result.success) {

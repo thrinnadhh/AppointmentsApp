@@ -1,10 +1,28 @@
+/**
+ * Shared list of booking statuses that reserve a resource time slot.
+ * Must stay strictly in sync with the PostgreSQL range exclusion constraint
+ * `no_overlapping_active_bookings` on `public.bookings`.
+ */
+export const ACTIVE_SLOT_BOOKING_STATUSES = [
+  'HELD',
+  'PENDING_PAYMENT',
+  'CONFIRMED',
+  'CHECKED_IN',
+  'IN_CONSULTATION',
+] as const;
+
+export type ActiveSlotBookingStatus = (typeof ACTIVE_SLOT_BOOKING_STATUSES)[number];
+
 export const APP_CONFIG = {
+
   CITY: 'Tirupati',
   DEFAULT_LATITUDE: 13.6288,
   DEFAULT_LONGITUDE: 79.4192,
   DEFAULT_RADIUS_KM: 15,
   HOLD_DURATION_MINUTES: 5,
-  FREE_CANCELLATION_WINDOW_HOURS: 1,
+  FREE_CANCELLATION_WINDOW_MINUTES: 60,
+  CANCELLATION_CUTOFF_MINUTES: 60,
+  CANCELLATION_GRACE_PERIOD_MINUTES: 10,
   NO_SHOW_FLAG_THRESHOLD: 4,
   CURRENCY: 'INR',
   CURRENCY_SYMBOL: '₹',

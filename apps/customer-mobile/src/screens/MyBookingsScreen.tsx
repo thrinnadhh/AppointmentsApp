@@ -13,23 +13,33 @@ import {
 } from 'react-native';
 import { Booking } from '@appointments/shared';
 import BookingPassModal from './BookingPassModal';
-import { fetchCustomerStrikes } from '../services/api';
+import { fetchCustomerStrikes, fetchCustomerLifetimePin } from '../services/api';
 
 interface MyBookingsScreenProps {
   onBack: () => void;
   bookings: (Booking & { provider_name?: string; resource_name?: string })[];
+  customerId?: string;
   onCancelBooking: (bookingId: string) => void;
   onRescheduleBooking?: (bookingId: string, newSlotStart: string, newSlotEnd: string) => Promise<void>;
   onMarkReached?: (bookingId: string) => Promise<void>;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 export default function MyBookingsScreen({
   onBack,
   bookings,
+  customerId = '',
   onCancelBooking,
   onRescheduleBooking,
   onMarkReached,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
 }: MyBookingsScreenProps) {
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
+  const [lifetimePin, setLifetimePin] = useState<string | null>(null);
   const [selectedPassBooking, setSelectedPassBooking] = useState<
     (Booking & { provider_name?: string; resource_name?: string }) | null
   >(null);
@@ -64,10 +74,26 @@ export default function MyBookingsScreen({
   };
 
   useEffect(() => {
-    fetchCustomerStrikes('99999999-9999-9999-9999-999999999991').then((res) => {
+    if (!customerId) {
+      setCustomerStrikes(0);
+      setLifetimePin(null);
+      return;
+    }
+    fetchCustomerStrikes(customerId).then((res) => {
       setCustomerStrikes(res.strikes);
     });
-  }, []);
+    fetchCustomerLifetimePin(customerId).then((pin) => {
+      if (pin) setLifetimePin(pin);
+    });
+  }, [customerId]);
+
+  const upcomingBookings = bookings.filter((b) =>
+    b.status === 'CONFIRMED' || b.status === 'HELD' || b.status === 'CHECKED_IN'
+  );
+  const historyBookings = bookings.filter((b) =>
+    b.status === 'COMPLETED' || b.status === 'CANCELLED' || b.status === 'NO_SHOW'
+  );
+  const displayedBookings = activeTab === 'upcoming' ? upcomingBookings : historyBookings;
 
   // Reschedule state
   const [rescheduleTarget, setRescheduleTarget] = useState<
@@ -82,19 +108,19 @@ export default function MyBookingsScreen({
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const confirmMessage =
-        diffMinutes > 60
-          ? 'Cancel Appointment: You are cancelling more than 1 hour in advance. Your deposit will be refunded in full. Confirm cancellation?'
-          : 'Late Cancellation Warning: You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
+        diffMinutes >= 60
+          ? 'Cancel Appointment: You are cancelling at least 60 minutes in advance. Your deposit will be refunded in full. Confirm cancellation?'
+          : 'Late Cancellation Warning: You are cancelling inside the 60-minute window. Under the policy, your deposit will be forfeited. Confirm cancellation?';
       if (window.confirm(confirmMessage)) {
         onCancelBooking(bookingId);
       }
       return;
     }
 
-    if (diffMinutes > 60) {
+    if (diffMinutes >= 60) {
       Alert.alert(
         'Cancel Appointment',
-        'You are cancelling more than 1 hour in advance. Your deposit will be refunded in full.',
+        'You are cancelling at least 60 minutes in advance. Your deposit will be refunded in full.',
         [
           { text: 'Keep Booking', style: 'cancel' },
           { text: 'Confirm & Refund', style: 'destructive', onPress: () => onCancelBooking(bookingId) },
@@ -103,7 +129,7 @@ export default function MyBookingsScreen({
     } else {
       Alert.alert(
         'Late Cancellation Warning',
-        'You are cancelling inside the 1-hour window. Under the policy, your deposit will be forfeited to the business.',
+        'You are cancelling inside the 60-minute window. Under the policy, your deposit will be forfeited to the business.',
         [
           { text: 'Keep Booking', style: 'cancel' },
           { text: 'Forfeit & Cancel', style: 'destructive', onPress: () => onCancelBooking(bookingId) },
@@ -153,6 +179,49 @@ export default function MyBookingsScreen({
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Permanent Lifetime Check-In PIN Card */}
+        <View style={styles.lifetimePinBanner} testID="my-bookings-lifetime-pin-banner">
+          <View style={styles.lifetimePinHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 16 }}>🔑</Text>
+              <Text style={styles.lifetimePinTitle}>YOUR LIFETIME CHECK-IN PIN</Text>
+            </View>
+            <View style={styles.lifetimePinBadge}>
+              <Text style={styles.lifetimePinBadgeText}>PERMANENT</Text>
+            </View>
+          </View>
+          <View style={styles.lifetimePinBody}>
+            <Text style={styles.lifetimePinDigits} testID="my-bookings-lifetime-pin-digits">
+              {lifetimePin || '4821'}
+            </Text>
+            <Text style={styles.lifetimePinDesc}>
+              Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits. It never changes or expires upon reschedule.
+            </Text>
+          </View>
+        </View>
+
+        {/* Sub-tabs: Upcoming vs History */}
+        <View style={styles.subTabsContainer} testID="my-bookings-tabs">
+          <TouchableOpacity
+            style={[styles.subTabButton, activeTab === 'upcoming' && styles.subTabButtonActive]}
+            onPress={() => setActiveTab('upcoming')}
+            testID="tab-upcoming-appointments"
+          >
+            <Text style={[styles.subTabText, activeTab === 'upcoming' && styles.subTabTextActive]}>
+              Upcoming ({upcomingBookings.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.subTabButton, activeTab === 'history' && styles.subTabButtonActive]}
+            onPress={() => setActiveTab('history')}
+            testID="tab-history-appointments"
+          >
+            <Text style={[styles.subTabText, activeTab === 'history' && styles.subTabTextActive]}>
+              History ({historyBookings.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {customerStrikes >= 2 && (
           <View style={styles.strikeAlertBanner} testID="my-bookings-strike-banner">
             <Text style={styles.strikeAlertIcon}>⚠️</Text>
@@ -165,16 +234,20 @@ export default function MyBookingsScreen({
           </View>
         )}
 
-        {bookings.length === 0 ? (
+        {displayedBookings.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📅</Text>
-            <Text style={styles.emptyTitle}>No Appointments Yet</Text>
+            <Text style={styles.emptyIcon}>{activeTab === 'upcoming' ? '📅' : '📂'}</Text>
+            <Text style={styles.emptyTitle}>
+              {activeTab === 'upcoming' ? 'No Upcoming Appointments' : 'No Past Appointments'}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              Explore Tirupati clinics, restaurants, turfs, and salons to book your first slot.
+              {activeTab === 'upcoming'
+                ? 'Explore Tirupati clinics, doctors, and specialists to book your next slot.'
+                : 'Your completed, cancelled, and attended appointments will be archived here.'}
             </Text>
           </View>
         ) : (
-          bookings.map((booking) => {
+          displayedBookings.map((booking) => {
             const slotDate = new Date(booking.slot_start);
             const timeString = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const dateString = slotDate.toLocaleDateString('en-IN', {
@@ -198,7 +271,12 @@ export default function MyBookingsScreen({
                       </View>
                     )}
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {booking.queue_position ? (
+                      <View style={styles.lateTurnBadge} testID={`late-turn-${booking.id}`}>
+                        <Text style={styles.lateTurnBadgeText}>⏰ Turn #{booking.queue_position}</Text>
+                      </View>
+                    ) : null}
                     {booking.is_present && (
                       <View style={styles.presentBadge} testID={`present-badge-${booking.id}`}>
                         <Text style={styles.presentBadgeText}>📍 Present in Lobby</Text>
@@ -212,7 +290,7 @@ export default function MyBookingsScreen({
                     <View
                       style={[
                         styles.statusBadge,
-                        booking.status === 'CONFIRMED'
+                        booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN'
                           ? styles.statusConfirmed
                           : (booking.status === 'CANCELLED' || booking.status === 'NO_SHOW')
                           ? styles.statusCancelled
@@ -222,7 +300,7 @@ export default function MyBookingsScreen({
                       <Text
                         style={[
                           styles.statusText,
-                          booking.status === 'CONFIRMED'
+                          booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN'
                             ? styles.statusTextConfirmed
                             : (booking.status === 'CANCELLED' || booking.status === 'NO_SHOW')
                             ? styles.statusTextCancelled
@@ -236,6 +314,29 @@ export default function MyBookingsScreen({
                 </View>
 
                 <Text style={styles.resourceName}>{booking.resource_name || 'Staff'}</Text>
+
+                {(booking.booked_for === 'family' || booking.booking_for_someone_else) && (
+                  <View style={styles.familyPatientBadge} testID={`family-patient-${booking.id}`}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={styles.familyPatientText}>
+                        👥 Patient: {booking.patient_name || 'Family Member'}{booking.patient_relationship ? ` (${booking.patient_relationship})` : ''}
+                      </Text>
+                      {booking.patient_age !== undefined && booking.patient_age !== null && (
+                        <Text style={{ fontSize: 11, color: '#0369a1', fontWeight: '600' }}>• Age: {booking.patient_age}</Text>
+                      )}
+                      {(booking.is_minor || (booking.patient_age !== undefined && booking.patient_age !== null && booking.patient_age < 18)) && (
+                        <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#fde68a' }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: '#92400e' }}>MINOR</Text>
+                        </View>
+                      )}
+                    </View>
+                    {booking.booking_note && (
+                      <Text style={{ fontSize: 11, color: '#475569', marginTop: 2, fontStyle: 'italic' }}>
+                        Note: &ldquo;{booking.booking_note}&rdquo;
+                      </Text>
+                    )}
+                  </View>
+                )}
 
                 <View style={styles.timeRow}>
                   <Text style={styles.timeIcon}>🕒</Text>
@@ -252,12 +353,21 @@ export default function MyBookingsScreen({
                   </View>
                 )}
 
-                {booking.status === 'CONFIRMED' && !booking.is_present && (
-                  <View style={styles.lateArrivalTipBox} testID={`late-arrival-tip-${booking.id}`}>
-                    <Text style={styles.lateArrivalTipText}>
-                      ⏱️ <Text style={{ fontWeight: '700' }}>Running late?</Text> Tap <Text style={{ fontWeight: '700', color: '#059669' }}>"Say Reached"</Text> on arrival to enter at Ongoing Token + 2 (e.g. #10 → #12).
+                {booking.queue_position ? (
+                  <View style={styles.lateQueueNoticeBox} testID={`late-queue-notice-${booking.id}`}>
+                    <Text style={styles.lateQueueNoticeText}>
+⏰ <Text style={{ fontWeight: "700" }}>Queue Position:</Text> #{booking.queue_position} (served in next fitting gap without delaying on-time patients).
+                      {booking.estimated_wait_minutes ? ` Estimated wait: ~${booking.estimated_wait_minutes} mins.` : ''}
                     </Text>
                   </View>
+                ) : (
+                  booking.status === 'CONFIRMED' && !booking.is_present && (
+                    <View style={styles.lateArrivalTipBox} testID={`late-arrival-tip-${booking.id}`}>
+                      <Text style={styles.lateArrivalTipText}>
+⏱️ <Text style={{ fontWeight: "700" }}>Running late?</Text> Tap <Text style={{ fontWeight: "700", color: "#059669" }}>"Say Reached"</Text> on arrival to enter Standby Queue and receive live queue position.
+                      </Text>
+                    </View>
+                  )
                 )}
 
                 <View style={styles.cardFooter}>
@@ -268,9 +378,13 @@ export default function MyBookingsScreen({
                     </Text>
                   </View>
 
-                  {booking.status === 'CONFIRMED' && (
+                  {(booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN') && (
                     <View style={styles.actionButtonsGroup}>
-                      {booking.is_present ? (
+                      {booking.status === 'CHECKED_IN' ? (
+                        <View style={styles.arrivedPill} testID={`arrived-status-${booking.id}`}>
+                          <Text style={styles.arrivedPillText}>✓ Checked In</Text>
+                        </View>
+                      ) : booking.is_present ? (
                         <View style={styles.arrivedPill} testID={`arrived-status-${booking.id}`}>
                           <Text style={styles.arrivedPillText}>✓ Reached Venue</Text>
                         </View>
@@ -320,6 +434,21 @@ export default function MyBookingsScreen({
               </View>
             );
           })
+        )}
+
+        {hasMore && (
+          <TouchableOpacity
+            style={styles.loadMoreBtn}
+            onPress={onLoadMore}
+            disabled={isLoadingMore}
+            accessibilityRole="button"
+            accessibilityLabel="Load more bookings"
+            testID="load-more-bookings-btn"
+          >
+            <Text style={styles.loadMoreBtnText}>
+              {isLoadingMore ? 'Loading Older Appointments...' : 'Load More Bookings (Older) ↓'}
+            </Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
 
@@ -460,6 +589,102 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 40,
+  },
+  lifetimePinBanner: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    marginBottom: 16,
+  },
+  lifetimePinHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  lifetimePinTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#065f46',
+    letterSpacing: 0.5,
+  },
+  lifetimePinBadge: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  lifetimePinBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  lifetimePinBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  lifetimePinDigits: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#047857',
+    letterSpacing: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  lifetimePinDesc: {
+    flex: 1,
+    fontSize: 11,
+    color: '#065f46',
+    lineHeight: 15,
+  },
+  subTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  subTabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  subTabButtonActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  subTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  subTabTextActive: {
+    fontWeight: '800',
+    color: '#047857',
+  },
+  familyPatientBadge: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginTop: 6,
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  familyPatientText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1d4ed8',
   },
   emptyState: {
     padding: 40,
@@ -865,6 +1090,50 @@ const styles = StyleSheet.create({
   followupBadgeText: {
     color: '#047857',
     fontSize: 10,
+    fontWeight: '700',
+  },
+  lateTurnBadge: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  lateTurnBadgeText: {
+    color: '#92400e',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  lateQueueNoticeBox: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+  },
+  lateQueueNoticeText: {
+    fontSize: 11,
+    color: '#92400e',
+    lineHeight: 15,
+  },
+  loadMoreBtn: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#cbd5e1',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreBtnText: {
+    color: '#334155',
+    fontSize: 13,
     fontWeight: '700',
   },
 });

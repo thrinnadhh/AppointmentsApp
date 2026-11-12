@@ -90,9 +90,12 @@ test.describe('Admin Merchant Governance & Cross-App Integration', () => {
     const admin = new AdminDashboardPage(adminPage);
     const merchant = new MerchantPortalPage(merchantPage);
 
+    const targetMerchantEmail = 'svims.clinic@tirupati-appointments.com';
+    const targetMerchantPass = 'SvimsClinic2026!';
+
     try {
       // 2. Load Merchant Portal first - verify initial active state (no suspended banner)
-      await merchant.goto();
+      await merchant.goto(targetMerchantEmail, targetMerchantPass);
       await merchant.expectSuspendedBanner(false);
 
       // 3. Admin navigates and searches for the target merchant shop
@@ -105,7 +108,7 @@ test.describe('Admin Merchant Governance & Cross-App Integration', () => {
       await admin.expectMerchantStatus('Sri Venkateswara Dental & Implant Care', 'BLOCKED / SUSPENDED');
 
       // 5. Merchant Portal updates - verify prominent suspended banner is displayed
-      await merchant.goto();
+      await merchant.goto(targetMerchantEmail, targetMerchantPass);
       await merchant.expectSuspendedBanner(true);
       await expect(merchantPage.getByText(/Account Suspended & Blocked by Platform Administration/i)).toBeVisible();
       await expect(merchantPage.getByText(/Bookings Paused/i)).toBeVisible();
@@ -115,9 +118,12 @@ test.describe('Admin Merchant Governance & Cross-App Integration', () => {
       await admin.expectMerchantStatus('Sri Venkateswara Dental & Implant Care', 'ONBOARDED (ACTIVE)');
 
       // 7. Merchant Portal updates - verify suspended banner is cleared
-      await merchant.goto();
+      await merchant.goto(targetMerchantEmail, targetMerchantPass);
       await merchant.expectSuspendedBanner(false);
     } finally {
+      try {
+        await admin.unblockMerchant('Sri Venkateswara Dental & Implant Care');
+      } catch {}
       await adminContext.close();
       await merchantContext.close();
     }

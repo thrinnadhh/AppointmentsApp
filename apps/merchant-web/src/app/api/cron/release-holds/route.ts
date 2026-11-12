@@ -60,10 +60,36 @@ async function handleRelease(req: NextRequest) {
 
     const result = data as unknown as RpcReleaseResult;
 
+    let standbyExpired = 0;
+    try {
+      const { data: standbyData } = await (supabaseAdmin.rpc as any)('expire_stale_standby_queue');
+      if (typeof standbyData === 'number') {
+        standbyExpired = standbyData;
+      } else if (standbyData && typeof standbyData === 'object') {
+        standbyExpired = Number((standbyData as any).expired_count ?? (standbyData as any).standby_expired ?? 0);
+      }
+    } catch {
+      // Best-effort if RPC is not yet applied on test DB
+    }
+
+    let deletionsProcessed = 0;
+    try {
+      const { data: deletionsData } = await (supabaseAdmin.rpc as any)('process_expired_account_deletions');
+      if (typeof deletionsData === 'number') {
+        deletionsProcessed = deletionsData;
+      } else if (deletionsData && typeof deletionsData === 'object') {
+        deletionsProcessed = Number((deletionsData as any).deleted_count ?? (deletionsData as any).deletions_processed ?? 0);
+      }
+    } catch {
+      // Best-effort if RPC is not yet applied on test DB
+    }
+
     return NextResponse.json(
       {
         success: true,
         released_count: result?.released_count ?? 0,
+        standby_expired: standbyExpired,
+        deletions_processed: deletionsProcessed,
         executed_at: result?.timestamp ?? new Date().toISOString(),
       },
       { status: 200 }

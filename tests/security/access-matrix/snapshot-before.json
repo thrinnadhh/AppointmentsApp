@@ -1,0 +1,6596 @@
+{
+  "anon": {
+    "bookings": {
+      "select": {
+        "error": "permission denied for table bookings",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "error": "permission denied for table city_settlements",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table city_waitlist",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "error": "permission denied for table department_members",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "error": "permission denied for table departments",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "error": "permission denied for table doctor_front_desk_assignments",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "error": "permission denied for table merchant_memberships",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "error": "permission denied for table notification_logs",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "error": "permission denied for table providers",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "error": "permission denied for table push_tokens",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table push_tokens"
+      }
+    }
+  },
+  "customerA": {
+    "bookings": {
+      "select": {
+        "visible_ids": [
+          "e0000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [
+          "c8c5cfce-5af8-44a1-bace-045c83e6d56b",
+          "f0000000-0000-0000-0000-000000000001"
+        ],
+        "count": 2
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [
+          "f1000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "customerB": {
+    "bookings": {
+      "select": {
+        "visible_ids": [
+          "e0000000-0000-0000-0000-000000000002"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [
+          "cc59ac5f-cdc0-4165-b6bf-4de8f2c89df3",
+          "f0000000-0000-0000-0000-000000000002"
+        ],
+        "count": 2
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000002"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [
+          "f1000000-0000-0000-0000-000000000002"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    }
+  },
+  "merchant1": {
+    "bookings": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [
+          "f4000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000003"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "merchant2": {
+    "bookings": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [
+          "f4000000-0000-0000-0000-000000000002"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000004"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "hospital_admin_h1": {
+    "bookings": {
+      "select": {
+        "visible_ids": [
+          "e0000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [
+          "f5000000-0000-0000-0000-000000000001",
+          "f5000000-0000-0000-0000-000000000002",
+          "f5000000-0000-0000-0000-000000000003"
+        ],
+        "count": 3
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [
+          "c0000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [
+          "f6000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000005"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "hospital_admin_h2": {
+    "bookings": {
+      "select": {
+        "visible_ids": [
+          "e0000000-0000-0000-0000-000000000002"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [
+          "c0000000-0000-0000-0000-000000000002"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000006"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "front_desk_assigned": {
+    "bookings": {
+      "select": {
+        "visible_ids": [
+          "e0000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [
+          "f5000000-0000-0000-0000-000000000002"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [
+          "c0000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000007"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "front_desk_unassigned": {
+    "bookings": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [
+          "f5000000-0000-0000-0000-000000000003"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [
+          "c0000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000008"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "city_director": {
+    "bookings": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [
+          "f2000000-0000-0000-0000-000000000001"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "a0000000-0000-0000-0000-000000000011"
+        ],
+        "count": 1
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "platform_admin": {
+    "bookings": {
+      "select": {
+        "visible_ids": [
+          "06ae6d99-9231-4e65-8979-f91062e6162b",
+          "17824890-c4de-4d55-9214-46daf4a8a9e6",
+          "28310df2-7f25-41ea-bf22-138e1478e625",
+          "3513353e-e0ff-4d9e-bbb8-ff37fe908fbb",
+          "38baf9c2-e262-4710-a1bc-a8e77186a9bf",
+          "4464608d-76b3-43df-bae8-cb983bd69adb",
+          "4ed82cf0-65e0-4172-a5c3-6423614ac15b",
+          "6a894233-4f07-48a0-a4db-5ecb0cd7ec9f",
+          "6e39c96a-6910-4efa-9e51-b1581ab575cf",
+          "87c6fb47-662a-4148-ab0b-d1f8ff09bcca",
+          "8b6dc9ca-e407-4f9d-81d1-af3f70e0d954",
+          "91b59185-b854-4e01-b86a-80b0ac52f343",
+          "aa8d4a0a-4154-4457-95a5-dcbb564ffda4",
+          "abfcc2d3-ccd2-4bdb-ac5c-917f6cc6e7dd",
+          "b069e96f-1615-4c06-aee6-7629867dd0eb",
+          "b5555555-5555-5555-5555-555555555552",
+          "c55b4775-d6c7-4463-ac32-5b5dbc2c126b",
+          "c926fb68-dd27-43ef-ba8c-fc19f1b86688",
+          "e0000000-0000-0000-0000-000000000001",
+          "e0000000-0000-0000-0000-000000000002",
+          "e2782454-8cf9-4d7b-ac8d-8a46d73073f0"
+        ],
+        "count": 21
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table bookings"
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table cities"
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [
+          "f2000000-0000-0000-0000-000000000001",
+          "f2000000-0000-0000-0000-000000000002"
+        ],
+        "count": 2
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_settlements"
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "error": "permission denied for table profiles",
+        "count": 0,
+        "visible_ids": []
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table city_waitlist"
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [
+          "43a9c422-194e-437d-9557-ff7ce2749b79",
+          "4f1c4860-8eff-4600-8a22-3c5746ad1d7a",
+          "5add1040-8807-4fae-9acd-d889d858cf47",
+          "8cd581cd-146a-4238-88a0-8a61cc274a67",
+          "9881544a-50e7-465e-b949-5b40a00e7c77",
+          "9db3245d-8089-4c79-a2e8-039a44c6062e",
+          "a3add479-4e87-4971-8462-9d12ccc9540d",
+          "d278c867-2038-49a3-b33c-fd420592b74f",
+          "d44b1759-f433-435e-be37-00750e05523e",
+          "e65167df-0b88-40e6-9b73-8a82975177bc",
+          "f5000000-0000-0000-0000-000000000001",
+          "f5000000-0000-0000-0000-000000000002",
+          "f5000000-0000-0000-0000-000000000003",
+          "fd583d82-1327-4b83-991a-74bfab56dc99"
+        ],
+        "count": 14
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table department_members"
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [
+          "0b7197af-d058-40b0-85a5-f66717704b2d",
+          "11207846-4fa7-468f-ad1d-c1b9251bf129",
+          "133a04c6-dca6-487f-86eb-201f66d6817f",
+          "15ead86f-0b82-4ea9-9ce4-feb6872a3f4a",
+          "17b67e56-9131-4937-b1c9-01121a3a7e9b",
+          "1b0e13dc-f955-4984-be3e-1892f05b0ed0",
+          "4f752820-3567-4d53-9c37-7b0325716f35",
+          "511dec09-2585-43cc-9cf3-d9183b677716",
+          "5aa967f6-209a-4661-93b8-bbaf4c26e8f6",
+          "66a4310b-2822-45fb-af71-f2ee07feea1b",
+          "78b9bb08-35f6-4903-bdd8-6c0287ddb155",
+          "7e849b64-892d-467b-91a5-8631a94f12c7",
+          "8b04f8af-9d88-409b-837c-e2e05d584da3",
+          "93ef8d26-4704-4c32-9c4d-3873c57358bc",
+          "afa3317b-acf9-47c6-983b-8c8314f9ba89",
+          "b63e5201-dc19-4b20-8ba2-1b852dd59751",
+          "c0000000-0000-0000-0000-000000000001",
+          "c0000000-0000-0000-0000-000000000002",
+          "e7b3c292-df96-4129-a930-8c95af3b01c4"
+        ],
+        "count": 19
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table departments"
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [
+          "30a96ee9-131b-44d2-972c-965755b14b65",
+          "5a090b3c-0ca5-4d2b-8ccb-ca21ec24a1b5",
+          "872bb443-6e7a-403e-9407-3a3b3dcfa66f",
+          "aa764386-e796-452b-ad59-ecf68b7ec569",
+          "db8a8f9e-8567-486d-b837-f44a9412fe89",
+          "f6000000-0000-0000-0000-000000000001"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table doctor_front_desk_assignments"
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [
+          "3034e441-c4b4-4460-8feb-780b2cf3d5ba",
+          "5b7654e4-c375-4b18-974d-d8cae784e3b6",
+          "a78b7b5d-d2b8-40b2-8169-0919b0f3f1e7",
+          "f4000000-0000-0000-0000-000000000001",
+          "f4000000-0000-0000-0000-000000000002",
+          "fc85046c-be9d-430e-9cd0-099b6eaef3e2"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table merchant_memberships"
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [
+          "01a7f181-fdad-4d15-9da1-9d102f450ab0",
+          "1676687f-505b-4b13-a288-9eedae905d51",
+          "34a07694-f182-475a-80cf-019fe13ed7ca",
+          "3a0704d8-9cc9-46c7-abb5-71b468b4120b",
+          "4897d2f8-859c-4f16-a87e-9281479e80cf",
+          "5ac84007-ec57-4512-9836-30b312318674",
+          "5bc257ca-e80d-4232-924f-a79e60deb05f",
+          "5da32dcc-e194-40ba-91cb-405750db25c6",
+          "7389ceac-301e-4c0a-b04d-0a16cf54efbf",
+          "73d48e94-4363-4bc0-9441-84f5f6ad3740",
+          "78d93303-cbc7-4413-be0b-7ff16c80a6cc",
+          "81771dea-8468-4e8c-a99a-1adfc4b398ac",
+          "8494eb0a-3f7d-4d5f-bd95-3378327e4145",
+          "95416e7e-01fc-43d6-89aa-8be640adb629",
+          "99f974f8-efbd-4c15-a1df-dee9982c43c5",
+          "aaa8b2d9-3297-4442-aa9e-e9ee4860c38f",
+          "b2cf52c9-a4c9-4a14-8bad-bf27f5dccc5d",
+          "c66d38bb-fbd1-4f1b-af1f-1101b9a5dbf6",
+          "c7bc34de-d5b3-4bfb-9928-5560fab6d386",
+          "c8c5cfce-5af8-44a1-bace-045c83e6d56b",
+          "cc59ac5f-cdc0-4165-b6bf-4de8f2c89df3",
+          "d2d155a2-1a6e-4f27-81a8-4d31c3582f77",
+          "e608472c-e109-4050-9538-8bf85e48923d",
+          "e95cbb00-960a-4126-810f-57d28f403097",
+          "ece03033-1649-4c8c-a013-10229e55a2ab",
+          "ee49cfaa-6854-4d2b-85ae-f6c45402e0fb",
+          "f0000000-0000-0000-0000-000000000001",
+          "f0000000-0000-0000-0000-000000000002"
+        ],
+        "count": 28
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "update_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table notification_logs"
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "00000000-0000-0000-0000-728037328236",
+          "1015b408-ddcf-4541-84a4-9ad79888aafe",
+          "118dbc83-bc40-47e8-8747-908fa7c88e55",
+          "123a6778-23a0-4073-a016-6e652031090a",
+          "1ec44dd8-0d15-4fba-8796-2e913d0ddc83",
+          "1f8b0b03-efe8-449d-b0c7-fdc1292c86b7",
+          "2284fdf9-ec7f-402d-b5ae-dc8a8996494e",
+          "34f90583-b2dc-474d-b18c-fb13c3770a38",
+          "45de795a-f55a-4172-8196-2c388cabf115",
+          "4785a18a-0d4c-4998-95cc-562448dc79e4",
+          "49658735-33eb-43fe-a415-af29f4bccf7e",
+          "4e9cb74d-e484-4118-acfc-fa591b55ce85",
+          "5f3ea367-1213-45b9-909b-42c70d0d6439",
+          "6b68a340-3ab7-435b-9954-cbe7a546a0fd",
+          "6be12bfd-f10b-4b60-bf52-31c09b952398",
+          "6bf3866d-e0ae-4e03-8817-c2f3450036eb",
+          "707c9743-e5c9-4f61-b3f8-339e8662a033",
+          "7407b319-5eec-4fab-864b-86c9d5796ee4",
+          "79abf76b-5e3e-4a89-840d-3ba424423b41",
+          "7b07ba29-edc1-4025-90ee-07a04ec1e247",
+          "7b4de4b3-9f54-40ef-8a1c-d3718ee1bc96",
+          "7b9bf8bb-d4e7-437d-b7ae-3a8d10f317d5",
+          "7df9bd1b-ddcd-47c0-a3cc-5ccf10cf8b8a",
+          "8044852e-8082-4f68-b2cd-0bd736b3c4f1",
+          "8366cc0e-bda9-477a-852b-dace879fd9eb",
+          "88888888-8888-8888-8888-888888888881",
+          "88888888-8888-8888-8888-888888888882",
+          "88888888-8888-8888-8888-888888888883",
+          "8899248c-d703-48af-a490-d4276ec8ac49",
+          "8a46cbe8-a38c-47e4-a131-337289b5db8e",
+          "8ae1673f-d64a-4950-833f-64d5f22eab35",
+          "8b5471e8-5f2b-4e49-a52a-c704046b864f",
+          "8c60cefc-42e1-4462-a68c-9b5f13aa4c8c",
+          "8d4d145a-f489-4bb9-817e-7215f6da0a07",
+          "9638ea1b-1f35-4b2a-a769-1752d860a1f1",
+          "96a17645-59de-44fd-ae02-96b7ac200434",
+          "98ea20a2-eabf-464d-b9db-25136e034321",
+          "99999999-9999-9999-9999-999999999992",
+          "9c5b3a79-befe-4d9b-a108-54bcc3da6c43",
+          "a0000000-0000-0000-0000-000000000001",
+          "a0000000-0000-0000-0000-000000000002",
+          "a0000000-0000-0000-0000-000000000003",
+          "a0000000-0000-0000-0000-000000000004",
+          "a0000000-0000-0000-0000-000000000005",
+          "a0000000-0000-0000-0000-000000000006",
+          "a0000000-0000-0000-0000-000000000007",
+          "a0000000-0000-0000-0000-000000000008",
+          "a0000000-0000-0000-0000-000000000009",
+          "a0000000-0000-0000-0000-000000000010",
+          "a0000000-0000-0000-0000-000000000011",
+          "a0000000-0000-0000-0000-000000000012",
+          "a6fea022-2a8c-45a2-a97c-756111935d43",
+          "a728f6fb-e802-42ed-be6f-568861a7b8c2",
+          "b2921aea-163c-43ac-9c12-06dce39978f0",
+          "bb329f5f-c2f5-4719-9f51-6450728eaae3",
+          "be3a10ca-7806-4129-96f3-564c5f7ccfd9",
+          "c08d5b94-0569-4051-850e-1baac1353a8a",
+          "c2cd97eb-336f-4914-a52c-e97b024923fc",
+          "cad0dc11-0a72-474d-a761-a774e80bed63",
+          "d3205cde-a3e5-4478-bcef-6c36fc34d320",
+          "d3b5246a-603d-46ab-9aef-95b81217b9fd",
+          "d55afb65-51e7-42d7-98db-88ea342c5660",
+          "dfcc20c6-3658-40a9-bbbb-53ed439f17aa",
+          "e5e18b81-15cb-4063-8671-2c853e2f1aff",
+          "e68fb319-f702-4412-926a-7207fd4f40e8",
+          "fd6f1d85-a5fb-477b-ae32-4616bed0f485",
+          "fe0478ab-0680-45c1-9ea4-8d9064d4e593"
+        ],
+        "count": 67
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table profiles"
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table providers"
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "permission denied for table resources"
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [],
+        "count": 0
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "new row violates row-level security policy for table \"push_tokens\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 0,
+        "error": null
+      }
+    }
+  },
+  "service_role": {
+    "bookings": {
+      "select": {
+        "visible_ids": [
+          "06ae6d99-9231-4e65-8979-f91062e6162b",
+          "17824890-c4de-4d55-9214-46daf4a8a9e6",
+          "28310df2-7f25-41ea-bf22-138e1478e625",
+          "3513353e-e0ff-4d9e-bbb8-ff37fe908fbb",
+          "38baf9c2-e262-4710-a1bc-a8e77186a9bf",
+          "4464608d-76b3-43df-bae8-cb983bd69adb",
+          "4ed82cf0-65e0-4172-a5c3-6423614ac15b",
+          "6a894233-4f07-48a0-a4db-5ecb0cd7ec9f",
+          "6e39c96a-6910-4efa-9e51-b1581ab575cf",
+          "87c6fb47-662a-4148-ab0b-d1f8ff09bcca",
+          "8b6dc9ca-e407-4f9d-81d1-af3f70e0d954",
+          "91b59185-b854-4e01-b86a-80b0ac52f343",
+          "aa8d4a0a-4154-4457-95a5-dcbb564ffda4",
+          "abfcc2d3-ccd2-4bdb-ac5c-917f6cc6e7dd",
+          "b069e96f-1615-4c06-aee6-7629867dd0eb",
+          "b5555555-5555-5555-5555-555555555552",
+          "c55b4775-d6c7-4463-ac32-5b5dbc2c126b",
+          "c926fb68-dd27-43ef-ba8c-fc19f1b86688",
+          "e0000000-0000-0000-0000-000000000001",
+          "e0000000-0000-0000-0000-000000000002",
+          "e2782454-8cf9-4d7b-ac8d-8a46d73073f0"
+        ],
+        "count": 21
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "cities": {
+      "select": {
+        "visible_ids": [
+          "bangalore",
+          "chennai",
+          "chittoor",
+          "hyderabad",
+          "nellore",
+          "tirupati"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "update or delete on table \"cities\" violates foreign key constraint \"city_settlements_city_id_fkey\" on table \"city_settlements\""
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "update or delete on table \"cities\" violates foreign key constraint \"city_settlements_city_id_fkey\" on table \"city_settlements\""
+      }
+    },
+    "city_settlements": {
+      "select": {
+        "visible_ids": [
+          "f2000000-0000-0000-0000-000000000001",
+          "f2000000-0000-0000-0000-000000000002"
+        ],
+        "count": 2
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "city_waitlist": {
+      "select": {
+        "visible_ids": [
+          "005e89ca-8c5b-4952-91d6-f2cfffe432b1",
+          "104d747a-6ee9-48dd-8920-7bf466ea2679",
+          "1342b8ee-fff5-45a4-96ed-aaf566c063c9",
+          "18d59bb0-8f9f-42cb-ac4b-4de80eff099c",
+          "565bd4c7-7ffa-4cf6-b68e-a8831188b66b",
+          "9b638d6b-46d8-475f-9a9c-ce67cfcf0ace",
+          "e1f9fd14-4966-4daa-a845-78610cf189ff",
+          "e8c839a8-42d0-4ea7-966a-334004fa681c",
+          "f2246686-9d18-43e0-8383-724c93425a81",
+          "f3000000-0000-0000-0000-000000000001"
+        ],
+        "count": 10
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "department_members": {
+      "select": {
+        "visible_ids": [
+          "43a9c422-194e-437d-9557-ff7ce2749b79",
+          "4f1c4860-8eff-4600-8a22-3c5746ad1d7a",
+          "5add1040-8807-4fae-9acd-d889d858cf47",
+          "8cd581cd-146a-4238-88a0-8a61cc274a67",
+          "9881544a-50e7-465e-b949-5b40a00e7c77",
+          "9db3245d-8089-4c79-a2e8-039a44c6062e",
+          "a3add479-4e87-4971-8462-9d12ccc9540d",
+          "d278c867-2038-49a3-b33c-fd420592b74f",
+          "d44b1759-f433-435e-be37-00750e05523e",
+          "e65167df-0b88-40e6-9b73-8a82975177bc",
+          "f5000000-0000-0000-0000-000000000001",
+          "f5000000-0000-0000-0000-000000000002",
+          "f5000000-0000-0000-0000-000000000003",
+          "fd583d82-1327-4b83-991a-74bfab56dc99"
+        ],
+        "count": 14
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "This department already has 3 members."
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "departments": {
+      "select": {
+        "visible_ids": [
+          "0b7197af-d058-40b0-85a5-f66717704b2d",
+          "11207846-4fa7-468f-ad1d-c1b9251bf129",
+          "133a04c6-dca6-487f-86eb-201f66d6817f",
+          "15ead86f-0b82-4ea9-9ce4-feb6872a3f4a",
+          "17b67e56-9131-4937-b1c9-01121a3a7e9b",
+          "1b0e13dc-f955-4984-be3e-1892f05b0ed0",
+          "4f752820-3567-4d53-9c37-7b0325716f35",
+          "511dec09-2585-43cc-9cf3-d9183b677716",
+          "5aa967f6-209a-4661-93b8-bbaf4c26e8f6",
+          "66a4310b-2822-45fb-af71-f2ee07feea1b",
+          "78b9bb08-35f6-4903-bdd8-6c0287ddb155",
+          "7e849b64-892d-467b-91a5-8631a94f12c7",
+          "8b04f8af-9d88-409b-837c-e2e05d584da3",
+          "93ef8d26-4704-4c32-9c4d-3873c57358bc",
+          "afa3317b-acf9-47c6-983b-8c8314f9ba89",
+          "b63e5201-dc19-4b20-8ba2-1b852dd59751",
+          "c0000000-0000-0000-0000-000000000001",
+          "c0000000-0000-0000-0000-000000000002",
+          "e7b3c292-df96-4129-a930-8c95af3b01c4"
+        ],
+        "count": 19
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "doctor_front_desk_assignments": {
+      "select": {
+        "visible_ids": [
+          "30a96ee9-131b-44d2-972c-965755b14b65",
+          "5a090b3c-0ca5-4d2b-8ccb-ca21ec24a1b5",
+          "872bb443-6e7a-403e-9407-3a3b3dcfa66f",
+          "aa764386-e796-452b-ad59-ecf68b7ec569",
+          "db8a8f9e-8567-486d-b837-f44a9412fe89",
+          "f6000000-0000-0000-0000-000000000001"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "merchant_memberships": {
+      "select": {
+        "visible_ids": [
+          "3034e441-c4b4-4460-8feb-780b2cf3d5ba",
+          "5b7654e4-c375-4b18-974d-d8cae784e3b6",
+          "a78b7b5d-d2b8-40b2-8169-0919b0f3f1e7",
+          "f4000000-0000-0000-0000-000000000001",
+          "f4000000-0000-0000-0000-000000000002",
+          "fc85046c-be9d-430e-9cd0-099b6eaef3e2"
+        ],
+        "count": 6
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "notification_logs": {
+      "select": {
+        "visible_ids": [
+          "01a7f181-fdad-4d15-9da1-9d102f450ab0",
+          "1676687f-505b-4b13-a288-9eedae905d51",
+          "34a07694-f182-475a-80cf-019fe13ed7ca",
+          "3a0704d8-9cc9-46c7-abb5-71b468b4120b",
+          "4897d2f8-859c-4f16-a87e-9281479e80cf",
+          "5ac84007-ec57-4512-9836-30b312318674",
+          "5bc257ca-e80d-4232-924f-a79e60deb05f",
+          "5da32dcc-e194-40ba-91cb-405750db25c6",
+          "7389ceac-301e-4c0a-b04d-0a16cf54efbf",
+          "73d48e94-4363-4bc0-9441-84f5f6ad3740",
+          "78d93303-cbc7-4413-be0b-7ff16c80a6cc",
+          "81771dea-8468-4e8c-a99a-1adfc4b398ac",
+          "8494eb0a-3f7d-4d5f-bd95-3378327e4145",
+          "95416e7e-01fc-43d6-89aa-8be640adb629",
+          "99f974f8-efbd-4c15-a1df-dee9982c43c5",
+          "aaa8b2d9-3297-4442-aa9e-e9ee4860c38f",
+          "b2cf52c9-a4c9-4a14-8bad-bf27f5dccc5d",
+          "c66d38bb-fbd1-4f1b-af1f-1101b9a5dbf6",
+          "c7bc34de-d5b3-4bfb-9928-5560fab6d386",
+          "c8c5cfce-5af8-44a1-bace-045c83e6d56b",
+          "cc59ac5f-cdc0-4165-b6bf-4de8f2c89df3",
+          "d2d155a2-1a6e-4f27-81a8-4d31c3582f77",
+          "e608472c-e109-4050-9538-8bf85e48923d",
+          "e95cbb00-960a-4126-810f-57d28f403097",
+          "ece03033-1649-4c8c-a013-10229e55a2ab",
+          "ee49cfaa-6854-4d2b-85ae-f6c45402e0fb",
+          "f0000000-0000-0000-0000-000000000001",
+          "f0000000-0000-0000-0000-000000000002"
+        ],
+        "count": 28
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "profiles": {
+      "select": {
+        "visible_ids": [
+          "00000000-0000-0000-0000-728037328236",
+          "1015b408-ddcf-4541-84a4-9ad79888aafe",
+          "118dbc83-bc40-47e8-8747-908fa7c88e55",
+          "123a6778-23a0-4073-a016-6e652031090a",
+          "1ec44dd8-0d15-4fba-8796-2e913d0ddc83",
+          "1f8b0b03-efe8-449d-b0c7-fdc1292c86b7",
+          "2284fdf9-ec7f-402d-b5ae-dc8a8996494e",
+          "34f90583-b2dc-474d-b18c-fb13c3770a38",
+          "45de795a-f55a-4172-8196-2c388cabf115",
+          "4785a18a-0d4c-4998-95cc-562448dc79e4",
+          "49658735-33eb-43fe-a415-af29f4bccf7e",
+          "4e9cb74d-e484-4118-acfc-fa591b55ce85",
+          "5f3ea367-1213-45b9-909b-42c70d0d6439",
+          "6b68a340-3ab7-435b-9954-cbe7a546a0fd",
+          "6be12bfd-f10b-4b60-bf52-31c09b952398",
+          "6bf3866d-e0ae-4e03-8817-c2f3450036eb",
+          "707c9743-e5c9-4f61-b3f8-339e8662a033",
+          "7407b319-5eec-4fab-864b-86c9d5796ee4",
+          "79abf76b-5e3e-4a89-840d-3ba424423b41",
+          "7b07ba29-edc1-4025-90ee-07a04ec1e247",
+          "7b4de4b3-9f54-40ef-8a1c-d3718ee1bc96",
+          "7b9bf8bb-d4e7-437d-b7ae-3a8d10f317d5",
+          "7df9bd1b-ddcd-47c0-a3cc-5ccf10cf8b8a",
+          "8044852e-8082-4f68-b2cd-0bd736b3c4f1",
+          "8366cc0e-bda9-477a-852b-dace879fd9eb",
+          "88888888-8888-8888-8888-888888888881",
+          "88888888-8888-8888-8888-888888888882",
+          "88888888-8888-8888-8888-888888888883",
+          "8899248c-d703-48af-a490-d4276ec8ac49",
+          "8a46cbe8-a38c-47e4-a131-337289b5db8e",
+          "8ae1673f-d64a-4950-833f-64d5f22eab35",
+          "8b5471e8-5f2b-4e49-a52a-c704046b864f",
+          "8c60cefc-42e1-4462-a68c-9b5f13aa4c8c",
+          "8d4d145a-f489-4bb9-817e-7215f6da0a07",
+          "9638ea1b-1f35-4b2a-a769-1752d860a1f1",
+          "96a17645-59de-44fd-ae02-96b7ac200434",
+          "98ea20a2-eabf-464d-b9db-25136e034321",
+          "99999999-9999-9999-9999-999999999992",
+          "9c5b3a79-befe-4d9b-a108-54bcc3da6c43",
+          "a0000000-0000-0000-0000-000000000001",
+          "a0000000-0000-0000-0000-000000000002",
+          "a0000000-0000-0000-0000-000000000003",
+          "a0000000-0000-0000-0000-000000000004",
+          "a0000000-0000-0000-0000-000000000005",
+          "a0000000-0000-0000-0000-000000000006",
+          "a0000000-0000-0000-0000-000000000007",
+          "a0000000-0000-0000-0000-000000000008",
+          "a0000000-0000-0000-0000-000000000009",
+          "a0000000-0000-0000-0000-000000000010",
+          "a0000000-0000-0000-0000-000000000011",
+          "a0000000-0000-0000-0000-000000000012",
+          "a6fea022-2a8c-45a2-a97c-756111935d43",
+          "a728f6fb-e802-42ed-be6f-568861a7b8c2",
+          "b2921aea-163c-43ac-9c12-06dce39978f0",
+          "bb329f5f-c2f5-4719-9f51-6450728eaae3",
+          "be3a10ca-7806-4129-96f3-564c5f7ccfd9",
+          "c08d5b94-0569-4051-850e-1baac1353a8a",
+          "c2cd97eb-336f-4914-a52c-e97b024923fc",
+          "cad0dc11-0a72-474d-a761-a774e80bed63",
+          "d3205cde-a3e5-4478-bcef-6c36fc34d320",
+          "d3b5246a-603d-46ab-9aef-95b81217b9fd",
+          "d55afb65-51e7-42d7-98db-88ea342c5660",
+          "dfcc20c6-3658-40a9-bbbb-53ed439f17aa",
+          "e5e18b81-15cb-4063-8671-2c853e2f1aff",
+          "e68fb319-f702-4412-926a-7207fd4f40e8",
+          "fd6f1d85-a5fb-477b-ae32-4616bed0f485",
+          "fe0478ab-0680-45c1-9ea4-8d9064d4e593"
+        ],
+        "count": 67
+      },
+      "insert_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "insert or update on table \"profiles\" violates foreign key constraint \"profiles_id_fkey\""
+      },
+      "insert_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "insert or update on table \"profiles\" violates foreign key constraint \"profiles_id_fkey\""
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "update or delete on table \"profiles\" violates foreign key constraint \"bookings_customer_id_fkey\" on table \"bookings\""
+      },
+      "delete_other": {
+        "allowed": false,
+        "rowCount": 0,
+        "error": "update or delete on table \"profiles\" violates foreign key constraint \"bookings_customer_id_fkey\" on table \"bookings\""
+      }
+    },
+    "providers": {
+      "select": {
+        "visible_ids": [
+          "11111111-1111-1111-1111-111111111111",
+          "22222222-2222-2222-2222-222222222222",
+          "33333333-3333-3333-3333-333333333333",
+          "44444444-4444-4444-4444-444444444444",
+          "55555555-5555-5555-5555-555555555555",
+          "6b2fbc74-d8a8-4b9f-afd9-3b63f5e568fe",
+          "b0000000-0000-0000-0000-000000000001",
+          "b0000000-0000-0000-0000-000000000002",
+          "b0000000-0000-0000-0000-000000000003",
+          "b0000000-0000-0000-0000-000000000004",
+          "ca9ec048-86c2-4cf5-997b-5828f3be4948",
+          "d6eb18f4-111a-4a86-a38f-307f430584a0"
+        ],
+        "count": 12
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "resources": {
+      "select": {
+        "visible_ids": [
+          "01080cd3-817f-4e59-a089-2260ea16982c",
+          "1c5fded3-506b-4b7a-8636-6afc746c3c91",
+          "1e24d121-a3ff-41ae-90c7-26d93def2326",
+          "2b1e8fb4-58d4-49b4-bae2-322b15509230",
+          "62f9cee8-9b89-4991-8d4d-b49442bbbefc",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaab-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaac-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaad-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "aaaaaaae-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "b9e97b07-2fb7-4b2c-a053-7f054ff67043",
+          "bbbbbbba-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "c2883dab-6974-474b-a1f1-6591bebc4916",
+          "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "d0000000-0000-0000-0000-000000000001",
+          "d0000000-0000-0000-0000-000000000002",
+          "d0000000-0000-0000-0000-000000000003",
+          "d0000000-0000-0000-0000-000000000004",
+          "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "ddddddde-dddd-dddd-dddd-dddddddddddd",
+          "e304e359-9d1e-4797-91dc-8b58a780cbbc",
+          "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "eeeeeeef-eeee-eeee-eeee-eeeeeeeeeeee"
+        ],
+        "count": 24
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    },
+    "push_tokens": {
+      "select": {
+        "visible_ids": [
+          "f1000000-0000-0000-0000-000000000001",
+          "f1000000-0000-0000-0000-000000000002"
+        ],
+        "count": 2
+      },
+      "insert_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "insert_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "update_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_own": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      },
+      "delete_other": {
+        "allowed": true,
+        "rowCount": 1,
+        "error": null
+      }
+    }
+  }
+}

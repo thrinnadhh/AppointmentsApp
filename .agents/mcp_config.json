@@ -8,6 +8,14 @@
         "--api-key",
         "YOUR_API_KEY"
       ]
+    },
+    "whatsapp_business_tools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.facebook.com/whatsapp_business_tools"
+      ]
     }
   }
 }

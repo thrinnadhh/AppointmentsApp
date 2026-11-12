@@ -10,7 +10,9 @@ import {
   Alert, ActivityIndicator, ScrollView, Linking, Switch,
   Platform, StatusBar,
 } from 'react-native';
-import { supabase, getApiBaseUrl } from '../services/api';
+import { supabase, getApiBaseUrl, fetchCustomerStrikes } from '../services/api';
+
+declare const process: { env: Record<string, string | undefined> };
 
 interface DeletionStatus {
   pending: boolean;
@@ -20,6 +22,7 @@ interface DeletionStatus {
 interface ConsentState {
   location_detection: boolean;
   marketing_notifications: boolean;
+  whatsapp_notifications: boolean;
   loaded: boolean;
 }
 
@@ -30,9 +33,10 @@ export interface AccountScreenProps {
 export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
   const [user, setUser]                 = useState<{ id: string; phone?: string; email?: string } | null>(null);
   const [deletion, setDeletion]         = useState<DeletionStatus | null>(null);
+  const [strikeInfo, setStrikeInfo]     = useState<{ strikes: number; isBlocked: boolean; blockedUntil: string | null } | null>(null);
   const [loadingDelete, setLoadingDelete] = useState(false);
   const [loading, setLoading]           = useState(true);
-  const [consents, setConsents]         = useState<ConsentState>({ location_detection: false, marketing_notifications: false, loaded: false });
+  const [consents, setConsents]         = useState<ConsentState>({ location_detection: false, marketing_notifications: false, whatsapp_notifications: false, loaded: false });
   const [savingConsent, setSavingConsent] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,14 +44,19 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user ? { id: user.id, phone: user.phone, email: user.email } : null);
 
-      // Load optional consent settings from DB (DPDPA §6 right to withdraw)
       if (user) {
+        try {
+          const strikesRes = await fetchCustomerStrikes(user.id);
+          setStrikeInfo(strikesRes);
+        } catch { /* non-fatal */ }
+
+        // Load optional consent settings from DB (DPDPA §6 right to withdraw)
         try {
           const { data: rows } = await supabase
             .from('user_consents')
             .select('purpose, granted')
             .eq('user_id', user.id)
-            .in('purpose', ['location_detection', 'marketing_notifications']);
+            .in('purpose', ['location_detection', 'marketing_notifications', 'whatsapp_notifications']);
 
           if (rows) {
             const map: Record<string, boolean> = {};
@@ -55,6 +64,7 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
             setConsents({
               location_detection: map['location_detection'] ?? false,
               marketing_notifications: map['marketing_notifications'] ?? false,
+              whatsapp_notifications: map['whatsapp_notifications'] ?? false,
               loaded: true,
             });
           }
@@ -85,7 +95,7 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
     if (onClose) onClose();
   };
 
-  const toggleConsent = async (purpose: 'location_detection' | 'marketing_notifications', value: boolean) => {
+  const toggleConsent = async (purpose: 'location_detection' | 'marketing_notifications' | 'whatsapp_notifications', value: boolean) => {
     if (!user) return;
     setSavingConsent(purpose);
     try {
@@ -182,6 +192,29 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
     }
   };
 
+  const [exportingData, setExportingData] = useState(false);
+
+  const handleExportData = async () => {
+    if (!user) {
+      Alert.alert('Authentication Required', 'Please sign in to export your personal data archive.');
+      return;
+    }
+    setExportingData(true);
+    try {
+      const base = getApiBaseUrl();
+      const exportUrl = `${base}/api/account/export`;
+      await Linking.openURL(exportUrl);
+      Alert.alert(
+        'Data Export',
+        'Your personal data archive (profile, appointments, consents) is being downloaded in JSON format.'
+      );
+    } catch (err: any) {
+      Alert.alert('Export Error', err?.message || 'Could not trigger data export');
+    } finally {
+      setExportingData(false);
+    }
+  };
+
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color="#047857" /></View>;
   }
@@ -199,6 +232,34 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
       )}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
         {!onClose && <Text style={styles.heading}>Account</Text>}
+
+      {/* Account Standing & No-Show Policy */}
+      {strikeInfo?.isBlocked ? (
+        <View style={[styles.section, styles.blockedSection]} testID="account-blocked-banner">
+          <Text style={[styles.sectionTitle, { color: '#991b1b' }]}>🚫 Account Blocked (7 Days)</Text>
+          <Text style={styles.blockedText}>
+            Your account is temporarily blocked for 7 days due to excessive missed appointments (exceeded 5 no-shows).
+            {strikeInfo.blockedUntil
+              ? ` Cooldown expires on ${new Date(strikeInfo.blockedUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.`
+              : ''}
+            {'\n\n'}You cannot book new appointments during this 7-day cooldown period. After the cooldown expires, your no-show strikes will reset to zero.
+          </Text>
+        </View>
+      ) : strikeInfo && strikeInfo.strikes > 0 ? (
+        <View style={[styles.section, styles.strikeSection]} testID="account-strikes-banner">
+          <Text style={[styles.sectionTitle, { color: '#92400e' }]}>⚠️ Attendance Standing</Text>
+          <Text style={styles.strikeText}>
+            {strikeInfo.strikes === 1 && '1 missed appointment recorded. Two times there will be no issue or penalty (100% deposit refunded).'}
+            {strikeInfo.strikes === 2 && "2 missed appointments recorded. Two times there was no issue, but for your third time booking: if you don't show up this time, there will be a penalty of ₹60. In ₹60, ₹50 will be given to the hospital and ₹10 to the Appointments app (the rest of your deposit will be refunded)."}
+            {strikeInfo.strikes >= 3 && `${strikeInfo.strikes} missed appointments recorded. If you don't show up, a penalty of ₹60 will be deducted (₹50 to the hospital and ₹10 to the Appointments app). Exceeding 5 no-shows will block your account for 7 days.`}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.section} testID="account-good-standing-card">
+          <Text style={styles.sectionTitle}>Attendance Standing</Text>
+          <Text style={styles.detail}>✨ Good Standing (0 Missed Appointments)</Text>
+        </View>
+      )}
 
       {/* Profile */}
       <View style={styles.section}>
@@ -224,9 +285,28 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.link}
-          onPress={() => Linking.openURL('mailto:grievance@appointments4u.in')}
+          onPress={() => {
+            const email = process.env.EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL?.trim();
+            if (email) {
+              Linking.openURL(`mailto:${email}`);
+            }
+          }}
         >
           <Text style={styles.linkText}>Grievance Officer →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.link}
+          onPress={handleExportData}
+          disabled={exportingData}
+          testID="btn-export-data-archive"
+        >
+          {exportingData ? (
+            <ActivityIndicator size="small" color="#047857" />
+          ) : (
+            <Text style={[styles.linkText, { color: '#047857', fontWeight: '600' }]}>
+              📥 Export Personal Data Archive (JSON) →
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -261,6 +341,22 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
             : <Switch
                 value={consents.marketing_notifications}
                 onValueChange={(v) => toggleConsent('marketing_notifications', v)}
+                trackColor={{ false: '#e2e8f0', true: '#059669' }}
+                thumbColor="#ffffff"
+              />
+          }
+        </View>
+
+        <View style={[styles.consentRow, { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12, marginTop: 4 }]}>
+          <View style={styles.consentLabelGroup}>
+            <Text style={styles.consentLabel}>WhatsApp Appointment Updates</Text>
+            <Text style={styles.consentSub}>Booking confirmation and reminder notifications on WhatsApp</Text>
+          </View>
+          {savingConsent === 'whatsapp_notifications'
+            ? <ActivityIndicator size="small" color="#059669" />
+            : <Switch
+                value={consents.whatsapp_notifications}
+                onValueChange={(v) => toggleConsent('whatsapp_notifications', v)}
                 trackColor={{ false: '#e2e8f0', true: '#059669' }}
                 thumbColor="#ffffff"
               />
@@ -304,7 +400,7 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
       </View>
 
       <Text style={styles.footer}>
-        Grievance Officer: grievance@appointments4u.in{'\n'}
+        Grievance Officer: {process.env.EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL?.trim()}{'\n'}
         Response within 48 hours · Resolution within 30 days
       </Text>
     </ScrollView>
@@ -375,4 +471,8 @@ const styles = StyleSheet.create({
   consentLabelGroup:    { flex: 1, marginRight: 12 },
   consentLabel:         { fontSize: 14, fontWeight: '600', color: '#1e293b' },
   consentSub:           { fontSize: 12, color: '#64748b', marginTop: 2 },
+  blockedSection:       { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1.5 },
+  blockedText:          { fontSize: 13, color: '#b91c1c', lineHeight: 18 },
+  strikeSection:        { backgroundColor: '#fffbeb', borderColor: '#fde68a', borderWidth: 1.5 },
+  strikeText:           { fontSize: 13, color: '#b45309', lineHeight: 18 },
 });

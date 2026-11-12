@@ -23,6 +23,7 @@ const SEED_CUSTOMER_ID = '99999999-9999-9999-9999-999999999991';
 const SEED_RESOURCE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111'; // Sri Venkateswara Dental
 const MERCHANT_B_PROVIDER_ID = '22222222-2222-2222-2222-222222222222'; // Naturals Salon
+const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 
 test.describe('Merchant — Edge & Boundary Cases', () => {
 
@@ -34,46 +35,64 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const slotEnd = new Date(Date.now() + offset1 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
       data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
     });
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
     await request.post(`${BASE}/api/bookings/confirm`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, gateway_payment_id: `pay_cancel_then_complete_${Date.now()}` },
     });
     await request.post(`${BASE}/api/bookings/cancel`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, reason: 'Test cancellation' },
     });
 
     // 2. Attempt to mark it COMPLETED
     const completeRes = await request.post(`${BASE}/api/bookings/complete`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
     expect([409, 422]).toContain(completeRes.status());
     const body = await completeRes.json();
-    expect(body.error).toMatch(/invalid.*transition|already cancelled|cannot complete/i);
+    expect(body.error).toMatch(/invalid.*transition|illegal.*transition|already cancelled|cannot complete/i);
   });
 
   // ─── EC-MERCH-02: No-show on a COMPLETED booking ──────────────────────────
   test('EC-MERCH-02: Reporting no-show on a COMPLETED booking returns 409', async ({ request }) => {
-    const offset2 = 86400000 * 6 + Math.floor(Math.random() * 86400000);
+    const offset2 = 86400000 * 28 + Math.floor(Math.random() * 86400000);
     const slotStart = new Date(Date.now() + offset2).toISOString();
     const slotEnd = new Date(Date.now() + offset2 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
+      data: {
+        customer_id: SEED_CUSTOMER_ID,
+        resource_id: SEED_RESOURCE_ID,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+        booked_for: 'family',
+        patient_name: `Patient Complete ${Date.now()}`,
+        patient_relationship: 'other',
+      },
     });
     expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
     await request.post(`${BASE}/api/bookings/confirm`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, gateway_payment_id: `pay_complete_then_noshow_${Date.now()}` },
     });
     await request.post(`${BASE}/api/bookings/complete`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
 
@@ -83,7 +102,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     // the slot is in the future the premature-no-show guard fires first (400).
     // All of these responses indicate the operation was correctly rejected.
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
     expect([400, 401, 409, 422]).toContain(noShowRes.status());
@@ -95,23 +114,37 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
   // ─── EC-MERCH-03: No-show before appointment time ─────────────────────────
   test('EC-MERCH-03: Reporting no-show on a future CONFIRMED booking (> 30 min away) is rejected', async ({ request }) => {
-    // Slot is 2 days in the future — cannot mark no-show yet
-    const slotStart = new Date(Date.now() + 86400000 * 2).toISOString();
-    const slotEnd = new Date(Date.now() + 86400000 * 2 + 1800000).toISOString();
+    // Slot is in the future — cannot mark no-show yet
+    const offset3 = 86400000 * 25 + Math.floor(Math.random() * 86400000);
+    const slotStart = new Date(Date.now() + offset3).toISOString();
+    const slotEnd = new Date(Date.now() + offset3 + 1800000).toISOString();
 
     const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+      headers: {
+        'x-customer-id': SEED_CUSTOMER_ID,
+        'x-admin-bypass-key': ADMIN_BYPASS,
+      },
+      data: {
+        customer_id: SEED_CUSTOMER_ID,
+        resource_id: SEED_RESOURCE_ID,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+        booked_for: 'family',
+        patient_name: `Patient Future ${Date.now()}`,
+        patient_relationship: 'other',
+      },
     });
-    if (holdRes.status() !== 201) { test.skip(); return; }
+    expect(holdRes.status()).toBe(201);
     const { booking_id } = await holdRes.json();
 
     await request.post(`${BASE}/api/bookings/confirm`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id, gateway_payment_id: `pay_future_noshow_${Date.now()}` },
     });
 
     // Attempt early no-show
     const noShowRes = await request.post(`${BASE}/api/bookings/no-show`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { booking_id },
     });
     expect([400, 409, 422]).toContain(noShowRes.status());
@@ -134,7 +167,6 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     );
 
     // Should be 403 Forbidden — not their tenant
-    if (res.status() === 404) { test.skip(); return; } // route may not exist in this shape
     expect([401, 403]).toContain(res.status());
   });
 
@@ -144,7 +176,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await request.patch(`${BASE}/api/admin/merchants`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': ADMIN_BYPASS,
       },
       data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'SUSPENDED' },
     });
@@ -155,6 +187,10 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       const slotEnd = new Date(Date.now() + 86400000 * 7 + 1800000).toISOString();
 
       const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': SEED_CUSTOMER_ID,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
         data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
       });
       expect([403, 422]).toContain(holdRes.status());
@@ -165,7 +201,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       await request.patch(`${BASE}/api/admin/merchants`, {
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+          'x-admin-bypass-key': ADMIN_BYPASS,
         },
         data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'ACTIVE' },
       });
@@ -174,26 +210,51 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
   // ─── EC-MERCH-06: Suspended merchant UI shows locked banner ───────────────
   test('EC-MERCH-06: Suspended merchant portal displays Account Suspended banner prominently', async ({ page, request }) => {
-    // 1. Suspend merchant
-    await request.patch(`${BASE}/api/admin/merchants`, {
+    // 1. Resolve target merchant provider corresponding to the login credentials
+    const merchantsRes = await request.get(`${BASE}/api/admin/merchants`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
+    });
+    expect(merchantsRes.ok()).toBeTruthy();
+    const { merchants } = await merchantsRes.json();
+    const testEmail = (process.env.TEST_MERCHANT_EMAIL || 'admin.apex@test-tirupati.local').trim();
+    const testPassword = process.env.TEST_MERCHANT_PASSWORD || 'HospitalTest2026!';
+    const normalizedEmail = testEmail.toLowerCase();
+
+    const targetMerchant =
+      (merchants || []).find((m: any) => m.email?.toLowerCase() === normalizedEmail) ||
+      (normalizedEmail.includes('svims.clinic')
+        ? (merchants || []).find(
+            (m: any) => m.id === MERCHANT_A_PROVIDER_ID || m.name?.includes('Sri Venkateswara Dental')
+          ) || { id: MERCHANT_A_PROVIDER_ID }
+        : (merchants || []).find(
+            (m: any) => m.name?.includes('[TEST-HOSP-A]') || m.name?.includes('Apex')
+          )) ||
+      { id: MERCHANT_A_PROVIDER_ID };
+    const targetProviderId = targetMerchant.id;
+
+    // Suspend merchant
+    const suspendRes = await request.patch(`${BASE}/api/admin/merchants`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+        'x-admin-bypass-key': ADMIN_BYPASS,
       },
-      data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'SUSPENDED' },
+      data: { providerId: targetProviderId, status: 'SUSPENDED' },
     });
+    expect(suspendRes.ok()).toBeTruthy();
 
     try {
-      // 2. Load merchant portal
-      await page.goto(`${MERCHANT_BASE}/`);
+      // 2. Load merchant portal, wait for login form hydration, and authenticate
+      await page.goto(`${MERCHANT_BASE}/login`);
       await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
       const emailInput = page.getByTestId('login-email');
-      if (await emailInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await emailInput.fill(process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com');
-        await page.getByTestId('login-password').fill(process.env.TEST_MERCHANT_PASSWORD || '');
+      if (await emailInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await emailInput.fill(testEmail);
+        await page.getByTestId('login-password').fill(testPassword);
         await page.getByTestId('login-submit').click();
+        await page.waitForURL((url) => url.pathname === '/' || url.pathname === '', { timeout: 15000 });
+      } else {
+        await page.goto(`${MERCHANT_BASE}/`);
       }
-      await page.waitForURL(/localhost:3000/, { timeout: 15000 }).catch(() => null);
 
       // 3. Verify suspension banner is visible
       const suspendedBanner = page.getByText(/Account Suspended|Bookings Paused/i).first();
@@ -203,55 +264,57 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       await request.patch(`${BASE}/api/admin/merchants`, {
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
+          'x-admin-bypass-key': ADMIN_BYPASS,
         },
-        data: { providerId: MERCHANT_A_PROVIDER_ID, status: 'ACTIVE' },
+        data: { providerId: targetProviderId, status: 'ACTIVE' },
       });
     }
   });
 
   // ─── EC-MERCH-07: Resource deactivation with active booking ───────────────
   test('EC-MERCH-07: Deactivating a resource with CONFIRMED bookings returns warning/error or 409', async ({ request }) => {
-    // 1. Confirm a booking for the resource
-    const offset7 = 86400000 * 8 + Math.floor(Math.random() * 86400000);
-    const slotStart = new Date(Date.now() + offset7).toISOString();
-    const slotEnd = new Date(Date.now() + offset7 + 1800000).toISOString();
-
-    const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
-      data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
-    });
-    if (holdRes.status() !== 201) { test.skip(); return; }
-    const { booking_id } = await holdRes.json();
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id, gateway_payment_id: `pay_deactivate_${Date.now()}` },
+    // Ensure resource is active before test
+    await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
+      data: { is_active: true },
     });
 
     try {
+      // 1. Confirm a booking for the resource at a dedicated future day offset to avoid anti-hoarding collision
+      const offset7 = 86400000 * 20 + Math.floor(Math.random() * 86400000);
+      const slotStart = new Date(Date.now() + offset7).toISOString();
+      const slotEnd = new Date(Date.now() + offset7 + 1800000).toISOString();
+
+      const holdRes = await request.post(`${BASE}/api/bookings/hold`, {
+        headers: {
+          'x-customer-id': SEED_CUSTOMER_ID,
+          'x-admin-bypass-key': ADMIN_BYPASS,
+        },
+        data: { customer_id: SEED_CUSTOMER_ID, resource_id: SEED_RESOURCE_ID, slot_start: slotStart, slot_end: slotEnd },
+      });
+      expect(holdRes.status()).toBe(201);
+      const { booking_id } = await holdRes.json();
+      await request.post(`${BASE}/api/bookings/confirm`, {
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
+        data: { booking_id, gateway_payment_id: `pay_deactivate_${Date.now()}` },
+      });
+
       // 2. Attempt to deactivate the resource
       const deactivateRes = await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: { is_active: false },
       });
 
       // Should either block (409) or succeed (200).
-      // 409 means confirmed bookings exist and deactivation was blocked.
-      // 200 means no upcoming confirmed bookings were found so deactivation
-      //   succeeded (the test booking confirm may have not propagated yet, or
-      //   the route deactivated cleanly). Either outcome is valid.
+      expect([200, 409]).toContain(deactivateRes.status());
       if (deactivateRes.status() === 409) {
         const body = await deactivateRes.json();
         expect(body.error).toMatch(/active booking|conflict|cannot deactivate/i);
-      } else if (deactivateRes.status() === 200) {
-        // Deactivated successfully — no blocking confirmed bookings found.
-        // Both 409-block and 200-success are valid outcomes for this test.
-        expect(deactivateRes.status()).toBe(200);
-      } else if (deactivateRes.status() === 404) {
-        test.skip(); // endpoint not yet implemented
       }
     } finally {
       // Always restore seed resource to active
       await request.patch(`${BASE}/api/resources/${SEED_RESOURCE_ID}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: { is_active: true },
       });
     }
@@ -260,13 +323,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-08: Zero deposit resource ────────────────────────────────────
   test('EC-MERCH-08: Creating a resource with zero deposit amount is accepted or rejected with clear error', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
 
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: `Zero Deposit Test Resource ${Date.now()}`,
@@ -286,7 +349,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
       const resId = body.resource?.id ?? body.id;
       if (resId) {
         await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
-          headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+          headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         });
       }
     } else {
@@ -299,7 +362,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-09: Duplicate resource name ─────────────────────────────────
   test('EC-MERCH-09: Creating two resources with identical names under the same provider is rejected', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
@@ -307,7 +370,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const uniqueName = `Duplicate Resource ${Date.now()}`;
 
     const createFirst = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: uniqueName,
@@ -319,13 +382,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
         capacity: 1,
       },
     });
-    if (createFirst.status() !== 201) { test.skip(); return; }
+    expect(createFirst.status()).toBe(201);
     const firstBody = await createFirst.json();
     const firstId = firstBody.resource?.id ?? firstBody.id;
 
     try {
       const createSecond = await request.post(`${BASE}/api/admin/resources`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         data: {
           providerId: testProviderId,
           name: uniqueName, // same name
@@ -344,7 +407,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     } finally {
       if (firstId) {
         await request.delete(`${BASE}/api/admin/resources?id=${firstId}`, {
-          headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+          headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
         });
       }
     }
@@ -356,7 +419,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     await page.goto(`${MERCHANT_BASE}/login`);
     await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
     const emailInput = page.getByTestId('login-email');
-    if (!await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) { test.skip(); return; }
+    await expect(emailInput).toBeVisible({ timeout: 10000 });
     await emailInput.fill(process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com');
     await page.getByTestId('login-password').fill(process.env.TEST_SALON_PASSWORD || '');
     await page.getByTestId('login-submit').click();
@@ -393,14 +456,14 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-11: Zero duration slot resource ──────────────────────────────
   test('EC-MERCH-11: Creating a doctor resource with slot duration 0 is accepted', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
 
     const uniqueName = `Walk-in Doctor Zero Duration ${Date.now()}`;
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: uniqueName,
@@ -420,7 +483,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
     if (resId) {
       await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       });
     }
   });
@@ -428,14 +491,14 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-12: Custom slot duration ─────────────────────────────────────
   test('EC-MERCH-12: Creating a resource with custom duration (e.g. 12 mins) is accepted', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
 
     const uniqueName = `Specialist Custom Duration ${Date.now()}`;
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: uniqueName,
@@ -455,7 +518,7 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
     if (resId) {
       await request.delete(`${BASE}/api/admin/resources?id=${resId}`, {
-        headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+        headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       });
     }
   });
@@ -463,13 +526,13 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
   // ─── EC-MERCH-13: Negative slot duration rejected ──────────────────────────
   test('EC-MERCH-13: Creating a resource with negative slot duration is rejected with 400', async ({ request }) => {
     const venuesRes = await request.get(`${BASE}/api/admin/venues`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
     const venuesData = await venuesRes.json();
     const testProviderId = venuesData.venues?.[0]?.id || MERCHANT_A_PROVIDER_ID;
 
     const createRes = await request.post(`${BASE}/api/admin/resources`, {
-      headers: { 'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026' },
+      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: {
         providerId: testProviderId,
         name: `Negative Duration Doctor ${Date.now()}`,

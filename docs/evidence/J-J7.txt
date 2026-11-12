@@ -1,0 +1,45 @@
+=== J7 AUDIT: .github/workflows/ci.yml GITLEAKS CONFIGURATION ===
+
+1. Triggers in on: block:
+1: name: CI — Tirupati Appointments Platform
+2: 
+3: on:
+4:   push:
+5:     branches: [main, develop]
+6:   pull_request:
+7:     branches: [main, develop]
+8:   schedule:
+9:     # Full history secret scan weekly on Sunday at 00:00 UTC
+10:     - cron: '0 0 * * 0'
+11:   workflow_dispatch:
+12:     inputs:
+13:       run_stress:
+14:         description: 'Run concurrency/stress tests (slow)'
+15:         type: boolean
+16:         default: false
+17: 
+18: concurrency:
+19:   group: ${{ github.workflow }}-${{ github.ref }}
+20:   cancel-in-progress: true
+
+2. Job 1 actions/checkout fetch-depth lines:
+59:   security-audit:
+63:       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+65:           fetch-depth: 0
+
+3. Gitleaks scan steps in Job 1:
+105:         continue-on-error: false
+107:       - name: Gitleaks secret scan (PR & Push)
+108:         if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
+109:         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+113:         continue-on-error: false
+115:       - name: Gitleaks full-history secret scan (Scheduled & Push to main)
+116:         if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+117:         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+119:           args: --log-opts="--all"
+123:         continue-on-error: false
+
+4. Verification analysis:
+- Does gitleaks step live in the same job as fetch-depth: 0 checkout? YES (Job: security-audit).
+- Does gitleaks-action scan full history on pull_request events? NO. By default, gitleaks-action scans only the PR commit range (base..head).
+- Scheduled / push-to-main full history scan added? YES. Added schedule cron (weekly) and full-history scan step with args: --log-opts="--all".

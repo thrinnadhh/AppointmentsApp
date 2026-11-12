@@ -43,18 +43,16 @@ export default function SettingsPage() {
   const [razorpayKeyId, setRazorpayKeyId] = useState('');
   const [webhookSecretConfigured, setWebhookSecretConfigured] = useState(true);
   const [payoutUpi, setPayoutUpi] = useState('merchant.ops@upi');
-  const [bankAccount, setBankAccount] = useState('•••• •••• 9821 (SBI Tirupati Main Branch)');
+  const [bankAccount] = useState('•••• •••• 9821 (SBI Tirupati Main Branch)');
   const [minDeposit, setMinDeposit] = useState('50');
 
   // Notification State
-  const [smsAlerts, setSmsAlerts] = useState(true);
   const [whatsappConfirmations, setWhatsappConfirmations] = useState(true);
   const [autoConfirmHolds, setAutoConfirmHolds] = useState(true);
   const [reminderOffsetHours, setReminderOffsetHours] = useState('2');
 
   // Policy State
   const [cancellationWindowHours, setCancellationWindowHours] = useState('1');
-  const [forfeitOnNoShow, setForfeitOnNoShow] = useState(true);
   const [coolingPeriodDays, setCoolingPeriodDays] = useState<number>(0);
 
   useEffect(() => {
@@ -266,9 +264,23 @@ export default function SettingsPage() {
                     id="support-phone-input"
                     name="supportPhone"
                     aria-label="Support Telephone"
-                    type="text"
+                    type="tel"
+                    inputMode="tel"
+                    pattern="[0-9+\s-]*"
                     value={supportPhone}
-                    onChange={(e) => setSupportPhone(e.target.value)}
+                    onChange={(e) => {
+                      let cleaned = e.target.value.replace(/[^0-9+\s-]/g, '');
+                      if (cleaned.includes('+')) {
+                        const hasLeading = cleaned.startsWith('+');
+                        cleaned = (hasLeading ? '+' : '') + cleaned.replace(/\+/g, '');
+                      }
+                      setSupportPhone(cleaned);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
@@ -415,22 +427,6 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
                 <div>
-                  <p className="text-sm font-bold text-slate-900">SMS Booking Notifications</p>
-                  <p className="text-xs text-slate-500">Send instant SMS with appointment time and venue address to customer upon deposit confirmation.</p>
-                </div>
-                <input
-                  id="sms-alerts-checkbox"
-                  name="smsAlerts"
-                  aria-label="Enable SMS Booking Notifications"
-                  type="checkbox"
-                  checked={smsAlerts}
-                  onChange={(e) => setSmsAlerts(e.target.checked)}
-                  className="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
-                <div>
                   <p className="text-sm font-bold text-slate-900">WhatsApp Appointment Confirmation</p>
                   <p className="text-xs text-slate-500">Deliver digital appointment voucher and Google Maps directions via verified WhatsApp Business API.</p>
                 </div>
@@ -512,20 +508,43 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
-                <div>
-                  <p className="text-sm font-bold text-slate-900">Auto-Forfeit Deposit on Verified No-Show</p>
-                  <p className="text-xs text-slate-500">When clinic manager marks patient as No-Show, lock deposit into merchant ledger and flag profile.</p>
+              {/* Fixed Platform Financial Policy: No-Show Breakdown & 60m Cutoff */}
+              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Standard Hospital Cancellation &amp; No-Show Policy
+                    </h3>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    SPEC Read-Only Rule
+                  </span>
                 </div>
-                <input
-                  id="forfeit-no-show-checkbox"
-                  name="forfeitOnNoShow"
-                  aria-label="Auto-Forfeit Deposit on Verified No-Show"
-                  type="checkbox"
-                  checked={forfeitOnNoShow}
-                  onChange={(e) => setForfeitOnNoShow(e.target.checked)}
-                  className="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
-                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Cancellation Cutoff</span>
+                    <p className="text-base font-bold text-slate-900 mt-0.5 font-mono">60 Minutes</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">100% refund before 60m cutoff</p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Doctor Retained</span>
+                    <p className="text-base font-bold text-emerald-700 mt-0.5 font-mono">₹50.00</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Doctor compensation on no-show</p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Platform Retention</span>
+                    <p className="text-base font-bold text-slate-700 mt-0.5 font-mono">₹10.00</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Payment gateway &amp; routing fee</p>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-emerald-900 bg-white/80 p-2.5 rounded-lg border border-emerald-100 leading-relaxed">
+                  <strong>Forfeiture Split:</strong> In the event of a verified patient No-Show, ₹50 is credited to the attending consultant&apos;s ledger, ₹10 is retained by the platform, and any remaining balance of the initial deposit is automatically refunded to the patient&apos;s original payment method.
+                </p>
               </div>
 
               {/* Cooling Period / Hospital Free Follow-up Policy */}

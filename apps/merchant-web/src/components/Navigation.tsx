@@ -20,21 +20,26 @@ import {
   Stethoscope,
   Gamepad2,
   Utensils,
-  Terminal
+  Terminal,
+  Sparkles,
+  Layers,
+  FileText
 } from 'lucide-react';
 import { supabase, getCurrentUserProfile, signOutMerchant } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { HospitalAccessContext } from '@appointments/shared';
 
 export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
-  const { activeProvider, verticalConfig, isSuperAdmin, isLocked } = useMerchantTenant();
+  const { activeProvider, verticalConfig, isSuperAdmin, isHospitalAdmin, isLocked } = useMerchantTenant();
 
   const [currentUser, setCurrentUser] = useState<{
     email?: string;
     fullName?: string;
     role?: string;
   } | null>(null);
+  const [hospitalContext, setHospitalContext] = useState<HospitalAccessContext | null>(null);
 
   useEffect(() => {
     async function loadUser() {
@@ -55,19 +60,41 @@ export default function Navigation() {
         } else {
           setCurrentUser(null);
         }
+
+        // Fetch hospital context
+        try {
+          const res = await fetch('/api/hospital/context');
+          if (res.ok) {
+            const hCtx = await res.json();
+            setHospitalContext(hCtx);
+          }
+        } catch (hErr) {
+          console.warn('Failed to fetch hospital access context:', hErr);
+        }
       } catch (err) {
         console.warn('Auth check fallback:', err);
       }
     }
     loadUser();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setCurrentUser({
           email: session.user.email,
           fullName: (session.user.user_metadata?.full_name as string) || 'Authorized Staff',
           role: (session.user.user_metadata?.role as string) || 'merchant',
         });
+        try {
+          const res = await fetch('/api/hospital/context');
+          if (res.ok) {
+            const hCtx = await res.json();
+            setHospitalContext(hCtx);
+          }
+        } catch (hErr) {
+          console.warn('Failed to fetch hospital access context on auth state change:', hErr);
+        }
+      } else {
+        setHospitalContext(null);
       }
     });
 
@@ -92,27 +119,77 @@ export default function Navigation() {
 
   const isAdminRoute = pathname.startsWith('/admin');
 
-  const navItems = isAdminRoute
-    ? [
-        { href: '/admin', label: 'Admin Hub', icon: ShieldCheck },
-        { href: '/admin/logs', label: 'System Logs', icon: Terminal },
-        { href: '/', label: 'Merchant App', icon: LayoutDashboard },
-      ]
-    : [
-        { href: '/', label: 'Overview', icon: LayoutDashboard },
-        ...(isSuperAdmin || currentUser?.role === 'admin'
-          ? [
-              { href: '/admin', label: 'Platform Admin', icon: ShieldCheck },
-              { href: '/admin/logs', label: 'System Logs', icon: Terminal },
-            ]
-          : []),
-        { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },
-        { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users },
-        { href: '/bookings', label: 'Bookings', icon: CalendarDays },
-        { href: '/schedule', label: 'Schedule', icon: Clock },
-        { href: '/team', label: 'Team', icon: UserCheck },
-        { href: '/settings', label: 'Settings', icon: Settings },
-      ];
+  const isHospitalVenue = Boolean(
+    hospitalContext?.isHospital ||
+    verticalConfig.id === 'clinics' ||
+    activeProvider?.category_id === 'clinics' ||
+    activeProvider?.category_id === 'hospital'
+  );
+
+  let navItems: { href: string; label: string; icon: any }[];
+  if (isAdminRoute) {
+    navItems = [
+      { href: '/admin', label: 'Admin Hub', icon: ShieldCheck },
+      { href: '/admin/logs', label: 'System Logs', icon: Terminal },
+      { href: '/demo', label: 'Live Simulator', icon: Sparkles },
+      { href: '/', label: 'Merchant App', icon: LayoutDashboard },
+    ];
+  } else if (isHospitalVenue && hospitalContext?.role === 'consultant') {
+    navItems = [
+      { href: '/consultation', label: 'Consultation Desk', icon: Stethoscope },
+      { href: '/schedule', label: 'My Schedule', icon: Clock },
+      { href: '/', label: 'Overview', icon: LayoutDashboard },
+    ];
+  } else if (isHospitalVenue && hospitalContext?.role === 'front_desk') {
+    navItems = [
+      { href: '/', label: 'Check-In Desk', icon: LayoutDashboard },
+      { href: '/bookings', label: 'Bookings', icon: CalendarDays },
+      { href: '/schedule', label: 'Schedule', icon: Clock },
+    ];
+  } else if (isHospitalVenue && hospitalContext?.role === 'department_member') {
+    // Scoped navigation for hospital department members
+    const allowed = hospitalContext.allowedModules || [];
+    navItems = [
+      { href: '/', label: 'Overview', icon: LayoutDashboard },
+      ...(allowed.includes('appointments') || allowed.includes('queue_schedule')
+        ? [{ href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users }]
+        : []),
+      ...(allowed.includes('appointments')
+        ? [{ href: '/bookings', label: 'Bookings', icon: CalendarDays }]
+        : []),
+      ...(allowed.includes('queue_schedule')
+        ? [{ href: '/schedule', label: 'Schedule', icon: Clock }]
+        : []),
+    ];
+  } else {
+    // Hospital Admin access check
+    const canSeeHospitalAdmin =
+      isHospitalVenue &&
+      (isSuperAdmin ||
+        isHospitalAdmin ||
+        currentUser?.role === 'admin' ||
+        hospitalContext?.role === 'owner' ||
+        hospitalContext?.role === 'admin');
+
+    const canSeeTeam =
+      isHospitalVenue &&
+      (canSeeHospitalAdmin ||
+        currentUser?.role === 'merchant');
+
+    navItems = [
+      { href: '/', label: 'Overview', icon: LayoutDashboard },
+      ...(isSuperAdmin ? [{ href: '/admin', label: 'Platform Admin', icon: ShieldCheck }] : []),
+      ...(canSeeHospitalAdmin ? [{ href: '/departments', label: 'Departments', icon: Layers }] : []),
+      ...(isHospitalVenue ? [{ href: '/consultation', label: 'Consultation', icon: Stethoscope }] : []),
+      { href: '/venues', label: isLocked ? 'My Venue' : 'Venues', icon: Building2 },
+      { href: '/resources', label: `${verticalConfig.resourceLabelSingular}s`, icon: Users },
+      { href: '/bookings', label: 'Bookings', icon: CalendarDays },
+      { href: '/schedule', label: 'Schedule', icon: Clock },
+      ...(canSeeTeam ? [{ href: '/team', label: 'Team', icon: UserCheck }] : []),
+      ...(canSeeHospitalAdmin ? [{ href: '/audit-logs', label: 'Audit Logs', icon: FileText }] : []),
+      { href: '/settings', label: 'Settings', icon: Settings },
+    ];
+  }
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname.startsWith('/admin/login');
 
@@ -272,7 +349,11 @@ export default function Navigation() {
                   <div style={{ fontSize: 10, color: 'var(--color-ink-tertiary)', display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end', marginTop: 2 }}>
                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--color-primary)', display: 'inline-block' }} />
                     <span style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                      {currentUser.role === 'admin' ? 'Super Admin' : `${verticalConfig.badgeLabel} Owner`}
+                      {currentUser.role === 'admin'
+                        ? 'Super Admin'
+                        : hospitalContext?.role === 'department_member'
+                        ? `${hospitalContext.departmentName} Staff`
+                        : `${verticalConfig.badgeLabel} Owner`}
                     </span>
                   </div>
                 </div>

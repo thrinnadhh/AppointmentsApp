@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customer_id');
     const providerId = searchParams.get('provider_id');
+    const rawLimit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const rawOffset = parseInt(searchParams.get('offset') || '0', 10);
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     if (!customerId && !providerId) {
       return NextResponse.json({ error: 'Missing customer_id or provider_id parameter' }, { status: 400 });
@@ -21,6 +26,7 @@ export async function GET(req: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
     const { data: isAdmin } = await (supabaseAdmin.rpc as any)('is_admin', { p_user_id: caller.id });
+    let scopedDoctorIds: string[] | null = null;
 
     // Non-admin callers must satisfy strict ownership / tenancy
     if (!isAdmin) {
@@ -29,26 +35,11 @@ export async function GET(req: NextRequest) {
       }
 
       if (providerId) {
-        const { data: authProviders } = await (supabaseAdmin.rpc as any)('get_user_authorized_providers', {
-          p_user_id: caller.id,
-        });
-        const allowedList = Array.isArray(authProviders) ? authProviders : [];
-        let isAuthorizedProvider = allowedList.includes(providerId);
-
-        if (!isAuthorizedProvider) {
-          const { data: prov } = await supabaseAdmin
-            .from('providers')
-            .select('owner_id')
-            .eq('id', providerId)
-            .maybeSingle();
-          if (prov && prov.owner_id === caller.id) {
-            isAuthorizedProvider = true;
-          }
-        }
-
-        if (!isAuthorizedProvider) {
+        const authCheck = await authorizeHospitalResourceOrMerchant(req, caller.id, providerId);
+        if (!authCheck.authorized) {
           return NextResponse.json({ error: 'Forbidden: Tenant isolation boundary violation' }, { status: 403 });
         }
+        scopedDoctorIds = authCheck.assignedDoctorIds;
       }
     }
 
@@ -65,9 +56,17 @@ export async function GET(req: NextRequest) {
     }
     if (providerId) {
       query = query.eq('provider_id', providerId);
+      if (scopedDoctorIds !== null) {
+        if (scopedDoctorIds.length === 0) {
+          return NextResponse.json({ success: true, bookings: [] });
+        }
+        query = query.in('resource_id', scopedDoctorIds);
+      }
     }
 
-    const { data, error } = await query.order('slot_start', { ascending: false });
+    const { data, error } = await query
+      .order('slot_start', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { RazorpayWebhookPayload } from '@appointments/shared';
+import { assertSafePayloadStructure, PayloadLimitExceededError } from '@/lib/validation-limits';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +18,11 @@ export async function POST(req: NextRequest) {
 
     try {
       body = JSON.parse(rawBody);
-    } catch {
+      assertSafePayloadStructure(body);
+    } catch (parseErr) {
+      if (parseErr instanceof PayloadLimitExceededError) {
+        return NextResponse.json({ error: parseErr.message }, { status: 413 });
+      }
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
@@ -38,14 +43,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing x-razorpay-signature header' }, { status: 401 });
     }
 
+    if (!/^[a-f0-9]{64}$/i.test(signature)) {
+      return NextResponse.json({ error: 'Malformed x-razorpay-signature header' }, { status: 400 });
+    }
+
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)
       .update(rawBody)
       .digest('hex');
 
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expectedBuf = Buffer.from(expectedSignature, 'utf8');
+
     const isMatch =
-      signature.length === expectedSignature.length &&
-      crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+      sigBuf.length === expectedBuf.length &&
+      crypto.timingSafeEqual(sigBuf, expectedBuf);
 
     if (!isMatch) {
       return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 });
@@ -67,6 +79,22 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
+    // Check payment ledger for already-processed event ID (idempotency)
+    if (paymentId) {
+      const { data: existingPayment } = await supabaseAdmin
+        .from('payments')
+        .select('id, booking_id, status')
+        .eq('gateway_payment_id', paymentId)
+        .maybeSingle();
+
+      if (existingPayment && existingPayment.status === 'CAPTURED') {
+        return NextResponse.json(
+          { success: true, booking_id: existingPayment.booking_id, idempotent: true, status: 'CONFIRMED' },
+          { status: 200 }
+        );
+      }
+    }
+
     // Handle payment.captured or order.paid
     if (event === 'payment.captured' || event === 'order.paid') {
       // 4. Find booking by gateway_order_id first, fallback to notes.booking_id
@@ -74,7 +102,7 @@ export async function POST(req: NextRequest) {
       if (orderId) {
         const { data: bByOrder } = await supabaseAdmin
           .from('bookings')
-          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, gateway_payment_id, gateway_order_id')
+          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, expected_payment_amount_paise, gateway_payment_id, gateway_order_id, hold_expires_at')
           .eq('gateway_order_id', orderId)
           .maybeSingle();
         booking = bByOrder;
@@ -83,7 +111,7 @@ export async function POST(req: NextRequest) {
       if (!booking && bookingIdFromNotes) {
         const { data: bById } = await supabaseAdmin
           .from('bookings')
-          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, gateway_payment_id, gateway_order_id')
+          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, expected_payment_amount_paise, gateway_payment_id, gateway_order_id, hold_expires_at')
           .eq('id', bookingIdFromNotes)
           .maybeSingle();
         booking = bById;
@@ -98,32 +126,141 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Invalid currency: expected INR, received ${paymentCurrency}` }, { status: 400 });
       }
 
-      const expectedOrderAmountPaise = Math.round(Number(booking.total_amount ?? booking.deposit_amount ?? 100) * 100);
-      if (rawAmount !== expectedOrderAmountPaise) {
+      // Strict 1-to-1 payment amount verification: compare strictly to single stored expected amount
+      const expectedAmountPaise = (booking as any).expected_payment_amount_paise != null
+        ? Number((booking as any).expected_payment_amount_paise)
+        : Math.round(Number(booking.total_amount ?? booking.deposit_amount ?? 10) * 100);
+
+      if (rawAmount !== expectedAmountPaise) {
         return NextResponse.json(
-          { error: `Payment amount mismatch: expected ${expectedOrderAmountPaise} paise, received ${rawAmount}` },
+          { error: `Payment amount mismatch: expected ${expectedAmountPaise} paise, received ${rawAmount}` },
           { status: 400 }
         );
       }
 
-      // 6. Idempotency Check: if booking is already confirmed with this payment
-      if (booking.status === 'CONFIRMED' && booking.gateway_payment_id === paymentId) {
+      // 6. Idempotency Check: if booking is already confirmed or captured
+      if (booking.status === 'CONFIRMED' || booking.payment_status === 'CAPTURED') {
         return NextResponse.json(
-          { success: true, booking_id: booking.id, idempotent: true, status: 'CONFIRMED' },
-          { status: 200 }
-        );
-      }
-
-      // If already confirmed with any payment, return idempotent success
-      if (booking.status === 'CONFIRMED') {
-        return NextResponse.json(
-          { success: true, booking_id: booking.id, idempotent: true, status: 'CONFIRMED' },
+          { success: true, booking_id: booking.id, idempotent: true, status: booking.status },
           { status: 200 }
         );
       }
 
       const payableStatuses = ['HELD', 'PENDING_PAYMENT', 'PENDING'];
-      if (!payableStatuses.includes(booking.status)) {
+      const isHoldExpired =
+        booking.status === 'HELD' &&
+        (booking as any).hold_expires_at &&
+        new Date((booking as any).hold_expires_at).getTime() < Date.now();
+
+      if (!payableStatuses.includes(booking.status) || isHoldExpired) {
+        if (booking.status === 'CANCELLED' || isHoldExpired) {
+          // Late payment arrived for cancelled or expired hold:
+          // Record payment into ledger, mark booking as REFUND_PENDING, and trigger automated refund.
+          const depositInInr = rawAmount ? rawAmount / 100 : Number(booking.deposit_amount || 0);
+          await supabaseAdmin.from('payments').upsert(
+            {
+              booking_id: booking.id,
+              gateway_payment_id: paymentId,
+              amount: depositInInr,
+              currency: paymentCurrency,
+              status: 'CAPTURED',
+              metadata: {
+                gateway: 'razorpay',
+                order_id: orderId || booking.gateway_order_id,
+                event,
+                reason: 'Late payment received after booking hold expired or cancelled',
+                captured_at: new Date().toISOString(),
+              },
+            },
+            { onConflict: 'gateway_payment_id' }
+          );
+
+          await supabaseAdmin
+            .from('bookings')
+            .update({
+              status: 'CANCELLED',
+              payment_status: 'REFUND_PENDING',
+              gateway_payment_id: paymentId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', booking.id);
+
+          try {
+            const { initiateRazorpayRefund } = await import('@/lib/razorpay');
+            const refundResult = await initiateRazorpayRefund({
+              paymentId,
+              amount: Math.round(depositInInr * 100),
+              notes: {
+                booking_id: booking.id,
+                reason: 'Hold expired before payment completion',
+              },
+            });
+
+            await supabaseAdmin
+              .from('bookings')
+              .update({
+                payment_status: 'REFUNDED',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', booking.id);
+
+            await supabaseAdmin.from('payments').insert({
+              booking_id: booking.id,
+              gateway_payment_id: refundResult.id,
+              amount: depositInInr,
+              currency: paymentCurrency,
+              status: 'REFUNDED',
+              metadata: {
+                original_payment_id: paymentId,
+                reason: 'Hold expired before payment completion',
+              },
+            });
+          } catch (refundErr) {
+            const errorMsg = refundErr instanceof Error ? refundErr.message : String(refundErr);
+            await supabaseAdmin
+              .from('bookings')
+              .update({ payment_status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+              .eq('id', booking.id);
+
+            await supabaseAdmin
+              .from('payments')
+              .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+              .eq('gateway_payment_id', paymentId);
+
+            const safePaymentId = String(paymentId).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
+            const safeErrorMsg = String(errorMsg).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
+            console.error(
+              '\n====================================================================\n' +
+              '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
+              `Booking ID: ${booking.id}\n` +
+              `Payment ID: ${safePaymentId}\n` +
+              `Refund Amount: ₹${depositInInr}\n` +
+              `Error: ${safeErrorMsg}\n` +
+              'Action: Manual investigation required in Razorpay Dashboard.\n' +
+              '====================================================================\n'
+            );
+
+            await supabaseAdmin.from('admin_audit_logs').insert({
+              admin_id: null,
+              action: 'REFUND_MANUAL_INTERVENTION_REQUIRED',
+              target_type: 'bookings',
+              target_id: booking.id,
+              details: {
+                error: errorMsg,
+                gateway_payment_id: paymentId,
+                refund_amount: depositInInr,
+                reason: 'Hold expired before payment completion (webhook)',
+                failed_at: new Date().toISOString(),
+              },
+            });
+          }
+
+          return NextResponse.json(
+            { success: true, received: true, event, booking_id: booking.id, status: 'CANCELLED', payment_status: 'REFUND_PENDING' },
+            { status: 200 }
+          );
+        }
+
         return NextResponse.json(
           { error: `Cannot confirm booking in state: ${booking.status}` },
           { status: 400 }

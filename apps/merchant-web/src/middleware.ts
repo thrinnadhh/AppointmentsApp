@@ -12,11 +12,15 @@ const PUBLIC_ROUTES = [
   '/terms',
   '/refund-policy',
   '/account/delete',
+  '/demo',
+  '/ticket',
+  '/customer',
 ];
 
 // Strictly public API endpoints (webhook listeners, auth callbacks, customer checkout, and territory endpoints)
 const PUBLIC_API_ROUTES = [
   '/api/webhooks/razorpay',
+  '/api/webhooks/cashfree',
   '/api/auth/',
   '/api/payments/create-order',
   '/api/payments/verify',
@@ -27,6 +31,9 @@ const PUBLIC_API_ROUTES = [
   '/api/merchant/register-shop',
   '/api/account/delete-public-request',
   '/api/logs/ingest',
+  '/api/ticket/',
+  '/api/customer/',
+  '/api/queue/',
 ];
 
 function isPrivateIpv4(host: string): boolean {
@@ -60,12 +67,24 @@ export function isAllowedOrigin(origin: string | null): boolean {
       }
     }
 
-    // Production & preview whitelisted domains (Vercel & Cloudflare preview dynamic subdomains)
+    // Production & preview whitelisted domains (restricted to explicit team slug and trusted preview branch prefixes)
+    // Fail-closed in production: previews rejected if VERCEL_TEAM_SLUG is not explicitly set.
+    const teamSlug = process.env.VERCEL_TEAM_SLUG || (process.env.NODE_ENV !== 'production' ? 'appointments4u' : null);
+    let isVercelPreview = false;
+    if (teamSlug) {
+      const escapedTeamSlug = teamSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const vercelPreviewRegex = new RegExp(
+        `^appointments-merchant-(?:git-(?:preview|staging|dev|release|main)(?:-[a-z0-9_.-]+)?|[a-z0-9]{9})-(?:${escapedTeamSlug})\\.vercel\\.app$`,
+        'i'
+      );
+      isVercelPreview = vercelPreviewRegex.test(host);
+    }
+
     if (
       host === 'appointments4u.in' ||
       host.endsWith('.appointments4u.in') ||
       host === 'appointments-merchant.vercel.app' ||
-      (host.startsWith('appointments-merchant-') && host.endsWith('.vercel.app')) ||
+      isVercelPreview ||
       host === 'appointments4u.pages.dev' ||
       host.endsWith('.appointments4u.pages.dev')
     ) {
@@ -83,7 +102,7 @@ export function isAllowedOrigin(origin: string | null): boolean {
   return false;
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // If an OAuth code arrives on any route (e.g. /?code=...), route to /auth/callback to exchange for session
@@ -100,6 +119,16 @@ export function middleware(req: NextRequest) {
 
   const isProduction = process.env.NODE_ENV === 'production';
 
+  // Strictly block all test routes in production builds before any routing, E2E bypass, or auth logic
+  if (pathname.startsWith('/api/test')) {
+    if (isProduction) {
+      return NextResponse.json(
+        { error: 'Not Found: Test routes are strictly disabled in production builds' },
+        { status: 404 }
+      );
+    }
+  }
+
   const corsHeaders: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': isProduction
@@ -107,9 +136,24 @@ export function middleware(req: NextRequest) {
       : 'Content-Type, Authorization, x-merchant-bypass-key, x-admin-bypass-key, x-customer-id',
   };
 
+  let isPreviewOrigin = false;
+  if (reqOrigin) {
+    try {
+      const originHost = new URL(reqOrigin).hostname;
+      isPreviewOrigin =
+        (originHost.endsWith('.vercel.app') && originHost !== 'appointments-merchant.vercel.app') ||
+        originHost.endsWith('.pages.dev');
+    } catch {
+      isPreviewOrigin = false;
+    }
+  }
+
   if (originAllowed && reqOrigin) {
     corsHeaders['Access-Control-Allow-Origin'] = reqOrigin;
-    corsHeaders['Access-Control-Allow-Credentials'] = 'true';
+    // Do not send Access-Control-Allow-Credentials for preview origins. Preview origins use Bearer JWT headers, not cross-site ambient cookies.
+    if (!isPreviewOrigin) {
+      corsHeaders['Access-Control-Allow-Credentials'] = 'true';
+    }
   }
 
   // Handle CORS preflight OPTIONS requests immediately
@@ -173,10 +217,31 @@ export function middleware(req: NextRequest) {
     bearerToken.split('.').length === 3
   );
 
-  const isAuthenticated = hasAuthCookie || hasBearerToken;
+  const cronSecret = process.env.CRON_SECRET;
+  let isCronAuth = false;
+  if (pathname.startsWith('/api/cron/') && cronSecret && bearerToken && bearerToken.length === cronSecret.length) {
+    let diff = 0;
+    for (let i = 0; i < bearerToken.length; i++) {
+      diff |= bearerToken.charCodeAt(i) ^ cronSecret.charCodeAt(i);
+    }
+    isCronAuth = diff === 0;
+  }
+
+  const isAuthenticated = hasAuthCookie || hasBearerToken || isCronAuth;
 
   // 1. API Route Access Control: Enforce authentication for all sensitive / non-whitelisted routes
   if (pathname.startsWith('/api/')) {
+    // Interim mitigation for GHSA-mrhx-c7xc-m3w5 (Zod / JSON parser memory exhaustion):
+    // Reject payloads exceeding 2MB before body parsing
+    const MAX_API_BODY_BYTES = 2 * 1024 * 1024; // 2MB
+    const contentLength = req.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_API_BODY_BYTES) {
+      return NextResponse.json(
+        { error: 'Payload Too Large: Request body exceeds maximum allowed size of 2MB' },
+        { status: 413, headers: corsHeaders }
+      );
+    }
+
     const isPublicApi =
       PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route)) ||
       (pathname === '/api/admin/waitlist' && req.method === 'POST');
@@ -196,9 +261,12 @@ export function middleware(req: NextRequest) {
   }
 
   // 2. Public Page Routes Gate
+  const isDemoAllowed = !isProduction && !process.env.VERCEL && !process.env.CF_PAGES;
+  const isDemo = isDemoAllowed && req.nextUrl.searchParams.get('demo') === '1';
+
   if (
     PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) ||
-    (pathname === '/' && req.nextUrl.searchParams.get('demo') === '1') ||
+    ((['/', '/schedule', '/departments', '/audit-logs', '/consultation', '/team', '/settings'].includes(pathname)) && isDemo) ||
     isE2EBypass
   ) {
     return NextResponse.next();
@@ -206,14 +274,14 @@ export function middleware(req: NextRequest) {
 
   // 3. Admin Page Routes Gate
   const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login';
-  if (isAdminRoute && !isAuthenticated) {
+  if (isAdminRoute && !isAuthenticated && !isE2EBypass) {
     const adminLoginUrl = new URL('/admin/login', req.url);
     adminLoginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(adminLoginUrl);
   }
 
   // 4. Standard Merchant Page Routes Gate
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isE2EBypass) {
     const loginUrl = new URL('/login', req.url);
     if (pathname !== '/') {
       loginUrl.searchParams.set('redirect', pathname);

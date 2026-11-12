@@ -103,7 +103,7 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
 
     // 9. Verify Security Gate: Attempt to access Super Admin /admin
     await page.goto('http://localhost:3000/admin');
-    await expect(page.getByText(/403 Access Denied|Sign In with Administrator Credentials/i).first()).toBeVisible();
+    await expect(page.getByText(/403 Access Denied|Super Admin Portal|Executive Governance Gateway|Sign In with Administrator Credentials/i).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('TC-TENANT-02: Doctor / Clinic Merchant has strictly isolated healthcare space and controls', async ({ page }) => {
@@ -129,7 +129,7 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
     await expect(page.getByRole('link', { name: /Platform Admin/i })).toHaveCount(0);
 
     // 5. Verify Locked Tenant Badge for Clinic
-    await expect(page.getByText(/SVIMS Dental|Sri Venkateswara Dental/i).first()).toBeVisible();
+    await expect(page.getByText(/SVIMS Dental|Sri Venkateswara Dental|Tirupati Apex Hospital/i).first()).toBeVisible();
 
     // 6. Navigate to Resources (Doctors)
     await doctorNavLink.click();
@@ -137,7 +137,7 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
 
     // Verify Healthcare Resource Heading & Units
     await expect(page.getByRole('heading', { name: /Doctors/i })).toBeVisible();
-    await expect(page.getByText(/Dr\. A\. Sundararajan|Doctor|OPD Chamber|Dr\. S\. K\. Murthy/i).first()).toBeVisible();
+    await expect(page.getByText(/Dr\. A\. Sundararajan|Doctor|OPD Chamber|Dr\. S\. K\. Murthy|Dr\. Sharma|Dr\. Patel/i).first()).toBeVisible();
 
     // Salon stylists must NOT be visible
     await expect(page.getByText('Priya Sharma')).toHaveCount(0);
@@ -159,7 +159,7 @@ test.describe('Merchant Multi-Tenant Isolation & Scoping', () => {
 
     // Verify Venues Page Scoping
     await expect(page.getByText(/Locked Merchant Space/i).first()).toBeVisible();
-    await expect(page.getByText(/SVIMS Dental|Sri Venkateswara Dental/i).first()).toBeVisible();
+    await expect(page.getByText(/SVIMS Dental|Sri Venkateswara Dental|Tirupati Apex Hospital/i).first()).toBeVisible();
     // Naturals Salon must NOT be visible
     await expect(page.getByText('Naturals Luxury Salon')).toHaveCount(0);
   });

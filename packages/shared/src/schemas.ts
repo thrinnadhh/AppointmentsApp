@@ -7,6 +7,13 @@ export interface CreateHoldRequest {
   slot_start: string;
   slot_end: string;
   customer_id: string;
+  booking_for_someone_else?: boolean;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_phone?: string | null;
+  patient_relationship?: string | null;
+  patient_age?: number | null;
+  booking_note?: string | null;
 }
 
 export interface CreateHoldResponse {
@@ -15,10 +22,20 @@ export interface CreateHoldResponse {
   reference_code?: string;
   deposit_amount?: number;
   platform_fee?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
   total_amount?: number;
   hold_expires_at?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_age?: number | null;
+  patient_relationship?: string | null;
+  is_minor?: boolean;
+  booking_note?: string | null;
   error?: string;
 }
 
@@ -32,8 +49,13 @@ export interface ConfirmPaymentResponse {
   success: boolean;
   booking_id?: string;
   reference_code?: string;
+  queue_position?: number;
   status?: string;
   payment_status?: string;
+  platform_payment_status?: string;
+  consultation_payment_status?: string;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
   error?: string;
 }
 
@@ -127,10 +149,10 @@ export interface RazorpayWebhookPayload {
 }
 
 /**
- * 60-Minute Cancellation Cutoff Policy Helper
+ * 30-Minute Cancellation Cutoff Policy Helper
  * - Merchant-initiated cancellation: ALWAYS 100% full refund (Customer protected: deposit + fees)
- * - Customer-initiated cancellation: 100% full refund IF requested > 60 minutes before slot_start
- * - Customer-initiated cancellation: Deposit FORFEITED IF requested <= 60 minutes before slot_start
+ * - Customer-initiated cancellation: 100% full refund IF requested > 30 minutes before slot_start
+ * - Customer-initiated cancellation: Deposit FORFEITED IF requested <= 30 minutes before slot_start
  */
 export function isEligibleForFullRefund(
   slotStartIso: string,
@@ -148,17 +170,17 @@ export function isEligibleForFullRefund(
   const now = Date.now();
   const diffMinutes = Math.round((slotTime - now) / (1000 * 60));
 
-  if (diffMinutes > 60) {
+  if (diffMinutes > 30) {
     return {
       eligible: true,
       minutesUntilSlot: diffMinutes,
-      rule: `Cancelled with ${diffMinutes}m remaining (> 60m required for full refund).`,
+      rule: `Cancelled with ${diffMinutes}m remaining (> 30m required for full refund).`,
     };
   }
 
   return {
     eligible: false,
     minutesUntilSlot: diffMinutes,
-    rule: `Late cancellation (${diffMinutes}m before slot). Deposits are forfeited within 60 minutes of slot start.`,
+    rule: `Late cancellation (${diffMinutes}m before slot). Deposits are forfeited within 30 minutes of slot start.`,
   };
 }

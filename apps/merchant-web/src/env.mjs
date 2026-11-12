@@ -9,7 +9,7 @@ export const PLACEHOLDER_PATTERNS = [
   /placeholder/i,
   /^(xxx+|change[_-]?me|your[_-].*|dummy.*|test[_-]secret|rzp[_-]test[_-]placeholder)$/i,
   /^TODO$/i,
-  /^replace[_-]?me$/i,
+  /replace[_-]?me/i,
   /^<.*>$/,
 ];
 
@@ -57,12 +57,27 @@ export const REQUIRED_PRODUCTION_VARS = [
   'ADMIN_SECRET',
   'CRON_SECRET',
   'DELETION_TOKEN_SECRET',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS',
+];
+
+export const GRIEVANCE_OFFICER_VARS = [
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE',
+  'NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS',
 ];
 
 export const APP_KEY_PREFIXES = [
   'NEXT_PUBLIC_',
   'SUPABASE_',
   'RAZORPAY_',
+  'CASHFREE_',
+  'PAYMENT_GATEWAY_PROVIDER',
   'R2_',
   'UPSTASH_',
   'CRON_',
@@ -84,7 +99,7 @@ export function isAppEnvKey(key) {
  * Validates environment variables and throws on default/placeholder values.
  */
 export function validateEnv(env = process.env, options = {}) {
-  const { throwOnError = true, isProduction = env.NODE_ENV === 'production', explicitOnly = false } = options;
+  const { throwOnError = true, isProduction = env.NODE_ENV === 'production' } = options;
   const errors = [];
 
   // 1. Scan application environment variables for forbidden placeholder patterns
@@ -121,10 +136,17 @@ export function validateEnv(env = process.env, options = {}) {
 
   // 2. Production-specific strict requirements
   if (isProduction) {
-    for (const requiredKey of REQUIRED_PRODUCTION_VARS) {
+    const isCashfree = (env.PAYMENT_GATEWAY_PROVIDER || '').toLowerCase() === 'cashfree';
+    const effectiveRequiredVars = isCashfree
+      ? REQUIRED_PRODUCTION_VARS.filter((k) => !k.startsWith('RAZORPAY_')).concat(['CASHFREE_APP_ID', 'CASHFREE_SECRET_KEY'])
+      : REQUIRED_PRODUCTION_VARS;
+
+    for (const requiredKey of effectiveRequiredVars) {
       const val = env[requiredKey];
       if (!val || typeof val !== 'string' || val.trim().length === 0) {
-        errors.push(`Missing mandatory production environment variable: "${requiredKey}".`);
+        errors.push(
+          `Missing mandatory production environment variable (required environment variable in production): "${requiredKey}".`
+        );
       }
     }
 
@@ -138,12 +160,20 @@ export function validateEnv(env = process.env, options = {}) {
     if (env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
       errors.push('NEXT_PUBLIC_SUPABASE_URL cannot point to a placeholder domain in production.');
     }
+
+    if (env.NEXT_PUBLIC_SUPABASE_URL && !env.NEXT_PUBLIC_SUPABASE_URL.startsWith('https://')) {
+      errors.push('NEXT_PUBLIC_SUPABASE_URL must use https:// protocol in production.');
+    }
+
+    if (env.NEXT_PUBLIC_APP_URL && !env.NEXT_PUBLIC_APP_URL.startsWith('https://')) {
+      errors.push('NEXT_PUBLIC_APP_URL must use https:// protocol in production.');
+    }
   }
 
   if (errors.length > 0 && throwOnError) {
     const header = '\n============================================================\n' +
-                   '🚨 FATAL RUNTIME CONFIGURATION ERROR: INVALID ENVIRONMENT\n' +
-                   '============================================================\n';
+      '🚨 FATAL RUNTIME CONFIGURATION ERROR: INVALID ENVIRONMENT\n' +
+      '============================================================\n';
     const message = header + errors.map((e, idx) => `  ${idx + 1}. ${e}`).join('\n') + '\n';
     throw new Error(message);
   }
@@ -159,11 +189,39 @@ const isBuildPhase =
   process.env.npm_lifecycle_event === 'build' ||
   Boolean(process.env.CI && !process.env.ADMIN_SECRET && !process.env.SUPERADMIN_E2E_TOKEN);
 
-// Auto-validate on startup unless explicitly opted out (e.g. for lightweight scripts or build phase)
+const isLintPhase = process.env.npm_lifecycle_event === 'lint';
+
+// Auto-validate on startup unless explicitly opted out
 if (process.env.SKIP_ENV_VALIDATION !== 'true') {
+  // Production Security Assertion: Never permit payment mocking in production environments
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true') {
+    throw new Error('FATAL SECURITY VIOLATION: ALLOW_MOCK_PAYMENTS cannot be set to "true" in production environments.');
+  }
+
+  // Grievance Officer configuration is mandatory in both production build and startup
+  if (process.env.NODE_ENV === 'production' && !isLintPhase) {
+    for (const key of GRIEVANCE_OFFICER_VARS) {
+      const val = process.env[key];
+      const trimmed = typeof val === 'string' ? val.trim() : '';
+      if (!trimmed) {
+        throw new Error(
+          `Missing mandatory production environment variable: ${key}. Grievance Officer details must be supplied via environment variables.`
+        );
+      }
+      const matchesPlaceholder =
+        PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(trimmed)) ||
+        FORBIDDEN_SUBSTRINGS.some((sub) => trimmed.toLowerCase().includes(sub.toLowerCase()));
+      if (matchesPlaceholder) {
+        throw new Error(
+          `Environment variable "${key}" contains forbidden placeholder value: "${trimmed}". Real Grievance Officer details must be supplied before building for production.`
+        );
+      }
+    }
+  }
+
   validateEnv(process.env, {
-    throwOnError: process.env.NODE_ENV === 'production' && !isBuildPhase,
-    isProduction: process.env.NODE_ENV === 'production' && !isBuildPhase,
+    throwOnError: process.env.NODE_ENV === 'production' && !isBuildPhase && !isLintPhase,
+    isProduction: process.env.NODE_ENV === 'production' && !isBuildPhase && !isLintPhase,
   });
 }
 

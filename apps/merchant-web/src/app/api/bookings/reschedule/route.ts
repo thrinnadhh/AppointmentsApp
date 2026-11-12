@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { validateBookingStatusTransition } from '@/lib/hospital-access';
 import { RescheduleBookingRequest, RescheduleBookingResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as Partial<RescheduleBookingRequest>;
-    const { booking_id, new_slot_start, new_slot_end } = body;
-
-    if (!booking_id || !new_slot_start || !new_slot_end) {
-      return NextResponse.json<RescheduleBookingResponse>(
-        { success: false, error: 'Missing required parameters: booking_id, new_slot_start, new_slot_end' },
-        { status: 400 }
-      );
-    }
-
     const caller = await verifyAuthenticatedUser(req);
     if (!caller) {
       return NextResponse.json<RescheduleBookingResponse>(
@@ -23,11 +14,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const body = (await req.json()) as Partial<RescheduleBookingRequest>;
+    const { booking_id, new_slot_start, new_slot_end, expected_version, expected_updated_at } = body as any;
+
+    if (!booking_id || !new_slot_start || !new_slot_end) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: 'Missing required parameters: booking_id, new_slot_start, new_slot_end' },
+        { status: 400 }
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
 
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, status, slot_start')
+      .select('id, customer_id, provider_id, resource_id, status, slot_start, version, updated_at')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -38,11 +39,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (expected_version !== undefined && booking.version !== expected_version) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: 'Updated by someone else, please refresh' },
+        { status: 409 }
+      );
+    }
+    if (expected_updated_at !== undefined && booking.updated_at && new Date(booking.updated_at).getTime() !== new Date(expected_updated_at).getTime()) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: 'Updated by someone else, please refresh' },
+        { status: 409 }
+      );
+    }
+
     const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
     if (!isAuthorized) {
       return NextResponse.json<RescheduleBookingResponse>(
         { success: false, error: 'Unauthorized: Caller is not authorized to reschedule this booking' },
         { status: 403 }
+      );
+    }
+
+    const transitionCheck = validateBookingStatusTransition(booking.status, 'CONFIRMED');
+    if (!transitionCheck.valid) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: transitionCheck.error },
+        { status: 409 }
       );
     }
 
@@ -60,9 +82,9 @@ export async function POST(req: NextRequest) {
       const currentSlotTime = new Date(booking.slot_start).getTime();
       const now = Date.now();
       const minutesToSlot = (currentSlotTime - now) / (60 * 1000);
-      if (minutesToSlot <= 30) {
+      if (minutesToSlot < 60) {
         return NextResponse.json<RescheduleBookingResponse>(
-          { success: false, error: 'Late reschedule: appointments within 30 minutes of their slot cannot be rescheduled.' },
+          { success: false, error: 'Late reschedule: appointments within 60 minutes of their slot cannot be rescheduled.' },
           { status: 400 }
         );
       }

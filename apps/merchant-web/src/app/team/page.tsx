@@ -1,56 +1,71 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, Suspense, useMemo } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { 
-  UserCheck, 
-  UserPlus, 
-  ShieldCheck, 
-  Mail, 
-  KeyRound, 
-  Phone, 
+  Building2, 
+  RefreshCw, 
   CheckCircle2, 
-  AlertCircle, 
-  Search,
-  Building2,
-  RefreshCw,
-  Eye,
-  EyeOff,
-  Copy,
-  Check
+  Search, 
+  Stethoscope, 
+  ArrowRight,
+  UserPlus
 } from 'lucide-react';
 import { fetchAllProfiles, supabase } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { TeamMetricsCards } from '@/components/team/TeamMetricsCards';
+import { DoctorAssignmentCard } from '@/components/team/DoctorAssignmentCard';
+import { AssignFrontDeskModal, TeamMember, DoctorWithAssignments } from '@/components/team/AssignFrontDeskModal';
+import { StaffRosterTable } from '@/components/team/StaffRosterTable';
+import { UnifiedAddStaffModal } from '@/components/team/UnifiedAddStaffModal';
 
-interface TeamMember {
-  id: string;
-  email: string | null;
-  full_name: string | null;
-  role: 'admin' | 'merchant' | 'customer';
-  phone: string | null;
-  created_at: string;
-  no_show_count?: number;
-}
+function TeamManagementContent() {
+  const searchParams = useSearchParams();
+  const doctorParam = searchParams.get('doctorId');
 
-export default function TeamManagementPage() {
-  const { activeProvider, isSuperAdmin, verticalConfig } = useMerchantTenant();
+  const { activeProvider, isSuperAdmin, isHospitalAdmin, verticalConfig } = useMerchantTenant();
+  
+  // State
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'merchant'>('merchant');
-  const [phone, setPhone] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [doctors, setDoctors] = useState<DoctorWithAssignments[]>([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(true);
+  const [selectedDoctorForAssignment, setSelectedDoctorForAssignment] = useState<DoctorWithAssignments | null>(null);
+  const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
+  const [doctorSearch, setDoctorSearch] = useState('');
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = useCallback((text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }, []);
+
+  // Helper to find any existing ID card number already associated with a staff user
+  const getExistingStaffIdCard = useCallback((userId: string): string | null => {
+    if (!userId) return null;
+    for (const doc of doctors) {
+      const match = doc.front_desk_managers?.find((fd) => fd.user_id === userId);
+      if (match?.id_card_number) {
+        return match.id_card_number;
+      }
+    }
+    return null;
+  }, [doctors]);
+
+  // Helper to identify if a roster member is a doctor
+  const isDoctorUser = useCallback((member: TeamMember) => {
+    if (member.membershipRole === 'doctor') return true;
+    if (member.full_name?.toLowerCase().startsWith('dr.') || member.full_name?.toLowerCase().startsWith('dr ')) return true;
+    return doctors.some(
+      (doc) =>
+        doc.id === member.id ||
+        (doc as any)?.attributes?.user_id === member.id ||
+        (doc.doctor_email && doc.doctor_email.toLowerCase() === (member.email || '').toLowerCase())
+    );
+  }, [doctors]);
 
   const loadTeam = useCallback(async () => {
     setLoading(true);
@@ -61,10 +76,12 @@ export default function TeamManagementPage() {
       } else if (activeProvider?.id) {
         const { data, error } = await supabase
           .from('merchant_memberships' as any)
-          .select('user_id, role, profile:profiles(*)')
+          .select('user_id, role, profile:profiles(id, full_name, email, phone, created_at)')
           .eq('provider_id', activeProvider.id);
         if (!error && data) {
-          const mapped = data.map((m: any) => m.profile).filter(Boolean);
+          const mapped = data
+            .map((m: any) => (m.profile ? { ...m.profile, membershipRole: m.role } : null))
+            .filter(Boolean);
           setMembers(mapped as TeamMember[]);
         } else {
           setMembers([]);
@@ -80,77 +97,161 @@ export default function TeamManagementPage() {
     }
   }, [activeProvider?.id, isSuperAdmin]);
 
+  const loadDoctorAssignments = useCallback(async () => {
+    if (!activeProvider?.id) {
+      setDoctors([]);
+      setLoadingDoctors(false);
+      return;
+    }
+    setLoadingDoctors(true);
+    try {
+      const res = await fetch(`/api/admin/doctor-assignments?providerId=${activeProvider.id}`);
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setDoctors(json.doctors || []);
+      } else {
+        setDoctors([]);
+      }
+    } catch (err) {
+      console.error('Failed to load doctor assignments:', err);
+      setDoctors([]);
+    } finally {
+      setLoadingDoctors(false);
+    }
+  }, [activeProvider?.id]);
+
   useEffect(() => {
     loadTeam();
-  }, [loadTeam]);
+    loadDoctorAssignments();
+  }, [loadTeam, loadDoctorAssignments]);
 
-  const handleAddMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password || !fullName) {
-      setFormError('Please fill in all required fields (Name, Email, Password).');
+  // Handle URL query parameter ?doctorId=...
+  useEffect(() => {
+    if (doctorParam && doctors.length > 0 && !selectedDoctorForAssignment) {
+      const match = doctors.find((d) => d.id === doctorParam);
+      if (match) {
+        setSelectedDoctorForAssignment(match);
+      }
+    }
+  }, [doctorParam, doctors, selectedDoctorForAssignment]);
+
+  const handleUnassignFrontDesk = async (
+    doctorId: string, 
+    doctorName: string, 
+    userId: string, 
+    managerName: string
+  ) => {
+    if (!activeProvider?.id) return;
+    if (!window.confirm(`Unassign "${managerName}" from ${doctorName}?`)) {
       return;
     }
-
-    if (password.length < 6) {
-      setFormError('Password must be at least 6 characters.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setFormError(null);
 
     try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: fullName.trim(),
-          email: email.trim(),
-          password,
-          role,
-          phone: phone.trim() || undefined,
-          providerId: activeProvider?.id,
-        }),
-      });
-
+      const res = await fetch(
+        `/api/admin/doctor-assignments?providerId=${activeProvider.id}&doctorId=${doctorId}&userId=${userId}`,
+        { method: 'DELETE' }
+      );
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || 'Failed to create user account');
+      if (!res.ok || json.error) {
+        throw new Error(json.error || 'Failed to unassign front desk manager');
       }
 
-      setSuccessBanner(`Staff account created for ${fullName} (${email}) with role "${role}".`);
-      setIsModalOpen(false);
-      setFullName('');
-      setEmail('');
-      setPassword('');
-      setPhone('');
-      await loadTeam();
+      setSuccessBanner(`Unassigned "${managerName}" from ${doctorName}.`);
+      await loadDoctorAssignments();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error adding staff user';
-      setFormError(msg);
-    } finally {
-      setIsSubmitting(false);
+      const msg = err instanceof Error ? err.message : 'Error unassigning front desk manager';
+      setSuccessBanner(`Error: ${msg}`);
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
+  // Merge members with doctors or front desk staff
+  const allRosterMembers = useMemo(() => {
+    const list = [...members];
+    const existingIds = new Set(list.map((m) => m.id));
+    const existingEmails = new Set(list.map((m) => (m.email || '').toLowerCase()).filter(Boolean));
 
-  const filteredMembers = members.filter((m) => {
-    const matchesSearch = 
-      (m.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (m.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (m.phone || '').includes(searchQuery);
-    
-    if (roleFilter === 'all') return matchesSearch;
-    return matchesSearch && m.role === roleFilter;
-  });
+    doctors.forEach((doc) => {
+      const email = doc.doctor_email?.toLowerCase();
+      const attrUserId = (doc as any)?.attributes?.user_id;
+      if (attrUserId && !existingIds.has(attrUserId)) {
+        list.push({
+          id: attrUserId,
+          email: doc.doctor_email || null,
+          full_name: `Dr. ${doc.name}`,
+          role: 'merchant',
+          membershipRole: 'doctor',
+          phone: null,
+          created_at: new Date().toISOString(),
+        });
+        existingIds.add(attrUserId);
+        if (email) existingEmails.add(email);
+      } else if (email && !existingEmails.has(email)) {
+        list.push({
+          id: `doc-${doc.id}`,
+          email: doc.doctor_email || null,
+          full_name: `Dr. ${doc.name}`,
+          role: 'merchant',
+          membershipRole: 'doctor',
+          phone: null,
+          created_at: new Date().toISOString(),
+        });
+        existingEmails.add(email);
+      }
 
-  const adminCount = members.filter((m) => m.role === 'admin').length;
-  const merchantCount = members.filter((m) => m.role === 'merchant').length;
+      doc.front_desk_managers?.forEach((fd) => {
+        const fdEmail = fd.email?.toLowerCase();
+        if (fd.user_id && !existingIds.has(fd.user_id)) {
+          list.push({
+            id: fd.user_id,
+            email: fd.email || null,
+            full_name: fd.full_name || 'Front Desk Staff',
+            role: 'merchant',
+            membershipRole: 'staff',
+            phone: fd.phone || null,
+            created_at: fd.assigned_at || new Date().toISOString(),
+          });
+          existingIds.add(fd.user_id);
+          if (fdEmail) existingEmails.add(fdEmail);
+        } else if (fdEmail && !existingEmails.has(fdEmail)) {
+          list.push({
+            id: `fd-${fd.assignment_id || Date.now()}`,
+            email: fd.email || null,
+            full_name: fd.full_name || 'Front Desk Staff',
+            role: 'merchant',
+            membershipRole: 'staff',
+            phone: fd.phone || null,
+            created_at: fd.assigned_at || new Date().toISOString(),
+          });
+          existingEmails.add(fdEmail);
+        }
+      });
+    });
+
+    return list;
+  }, [members, doctors]);
+
+  const filteredDoctors = useMemo(() => {
+    return doctors.filter((doc) => {
+      return (
+        doc.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
+        (doc.department || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
+        (doc.doctor_email || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
+        doc.front_desk_managers.some((fd) => 
+          (fd.full_name || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
+          (fd.email || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
+          (fd.id_card_number || '').toLowerCase().includes(doctorSearch.toLowerCase())
+        )
+      );
+    });
+  }, [doctors, doctorSearch]);
+
+  const adminCount = useMemo(() => {
+    return allRosterMembers.filter((m) => m.role === 'admin' || (activeProvider?.owner_id && m.id === activeProvider.owner_id)).length;
+  }, [allRosterMembers, activeProvider?.owner_id]);
+
+  const totalFrontDeskCount = useMemo(() => {
+    return doctors.reduce((sum, d) => sum + (d.front_desk_managers?.length || 0), 0);
+  }, [doctors]);
 
   if (!activeProvider && !isSuperAdmin) {
     return (
@@ -174,7 +275,6 @@ export default function TeamManagementPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
@@ -182,34 +282,37 @@ export default function TeamManagementPage() {
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
               Access Control & Auth
             </span>
-            <span className="text-xs text-slate-500">• Primary Admin Master Console</span>
+            <span className="text-xs text-slate-500">• Hospital Admin Master Console</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
             Team & Merchant Credentials
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Add authorized staff, clinic managers, salon owners, and turf coordinators with direct email and password authentication.
+            Manage authorized doctors and assign up to 4 front desk reception managers per doctor with direct email, password, and ID badge authentication.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={loadTeam}
-            className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs"
-            title="Refresh List"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
-            Refresh
-          </button>
+          {isHospitalAdmin && (
+            <button
+              onClick={() => setIsAddStaffOpen(true)}
+              className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm cursor-pointer gap-2"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Provision Staff</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
-              setIsModalOpen(true);
-              setFormError(null);
+              loadTeam();
+              loadDoctorAssignments();
             }}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm"
+            className="inline-flex items-center px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+            title="Refresh All"
           >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Add Staff Member
+            <RefreshCw className={`w-4 h-4 mr-2 ${(loading || loadingDoctors) ? 'animate-spin text-emerald-600' : ''}`} />
+            Refresh
           </button>
         </div>
       </div>
@@ -223,367 +326,147 @@ export default function TeamManagementPage() {
           </div>
           <button 
             onClick={() => setSuccessBanner(null)}
-            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 px-2 py-1 rounded"
+            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 px-2 py-1 rounded cursor-pointer"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Accounts</span>
-            <UserCheck className="w-5 h-5 text-emerald-600" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{members.length}</p>
-          <p className="text-xs text-slate-500 mt-1">Verified Supabase profiles</p>
-        </div>
+      {/* Metric KPI Cards */}
+      <TeamMetricsCards
+        totalStaffCount={allRosterMembers.length}
+        doctorCount={doctors.length}
+        frontDeskCount={totalFrontDeskCount}
+        adminCount={adminCount}
+        resourceLabelPlural={verticalConfig.resourceLabelPlural}
+      />
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Super Admins</span>
-            <ShieldCheck className="w-5 h-5 text-teal-600" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{adminCount}</p>
-          <p className="text-xs text-slate-500 mt-1">Full platform authority</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Merchant Staff</span>
-            <Building2 className="w-5 h-5 text-amber-600" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{merchantCount}</p>
-          <p className="text-xs text-slate-500 mt-1">Clinic, salon & turf managers</p>
-        </div>
-      </div>
-
-      {/* Search & Role Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-          <input
-            id="team-search"
-            name="teamSearch"
-            aria-label="Search by name, email, or phone"
-            type="text"
-            placeholder="Search by name, email, or phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50/50"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          {['all', 'admin', 'merchant', 'customer'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setRoleFilter(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize ${
-                roleFilter === tab
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100 bg-slate-50 border border-slate-200'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Team Members Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-              <tr>
-                <th className="px-6 py-3.5">Member / Name</th>
-                <th className="px-6 py-3.5">Email & Credentials</th>
-                <th className="px-6 py-3.5">Role</th>
-                <th className="px-6 py-3.5">Phone</th>
-                <th className="px-6 py-3.5">Created</th>
-                <th className="px-6 py-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    <div className="inline-flex items-center gap-2">
-                      <RefreshCw className="w-5 h-5 animate-spin text-emerald-600" />
-                      Loading team credentials...
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredMembers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    No members match your criteria. Click &quot;Add Staff Member&quot; to invite someone.
-                  </td>
-                </tr>
-              ) : (
-                filteredMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
-                          {(member.full_name || 'U').substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900">{member.full_name || 'Anonymous Staff'}</p>
-                          <p className="text-[11px] text-slate-400 font-mono">ID: {member.id.substring(0, 8)}...</p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-slate-400" />
-                        <span className="font-medium text-slate-800">{member.email || 'Email unlinked'}</span>
-                        {member.email && (
-                          <button
-                            onClick={() => copyToClipboard(member.email || '', member.id)}
-                            className="text-slate-400 hover:text-emerald-600 p-1"
-                            title="Copy email"
-                          >
-                            {copiedId === member.id ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {member.role === 'admin' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-200">
-                          <ShieldCheck className="w-3 h-3 mr-1" />
-                          Super Admin
-                        </span>
-                      ) : member.role === 'merchant' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                          <Building2 className="w-3 h-3 mr-1" />
-                          Merchant Staff
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-                          Customer
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-600">
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{member.phone || 'N/A'}</span>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-500">
-                      {new Date(member.created_at).toLocaleDateString()}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
-                        Active Auth
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Add Staff Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <UserPlus className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">
-                    Add {verticalConfig.resourceLabelSingular} / Staff Account
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Provision email and password credentials for new {verticalConfig.resourceLabelPlural.toLowerCase()}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1"
-              >
-                ✕
-              </button>
+      {/* SECTION 1: Doctor-Centric Cards & Front Desk Manager Assignments */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 text-white p-5 rounded-2xl shadow-sm">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                Desk Routing
+              </span>
+              <h2 className="text-lg font-bold text-white">
+                {verticalConfig.resourceLabelSingular} Desks & Front Desk Manager Assignments
+              </h2>
             </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Assign 1 to 4 Front Desk Managers per {verticalConfig.resourceLabelSingular.toLowerCase()} with unique login credentials and staff ID badges.
+            </p>
+          </div>
 
-            {formError && (
-              <div className="my-4 rounded-lg bg-rose-50 border border-rose-200 p-3 flex items-start gap-2 text-xs text-rose-700">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>{formError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAddMember} className="mt-5 space-y-4">
-              <div>
-                <label htmlFor="team-member-name" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Full Name *
-                </label>
-                <input
-                  id="team-member-name"
-                  name="teamMemberName"
-                  aria-label="Full Name"
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder={
-                    verticalConfig.id === 'clinics'
-                      ? 'e.g., Dr. Ramesh Naidu (Cardiology Head)'
-                      : verticalConfig.id === 'salons'
-                      ? 'e.g., Priya Sharma (Senior Stylist)'
-                      : verticalConfig.id === 'gaming'
-                      ? 'e.g., Suresh Reddy (Turf Coordinator)'
-                      : verticalConfig.id === 'restaurants'
-                      ? 'e.g., Rajesh Kumar (Floor Manager)'
-                      : 'e.g., Staff Member Name'
-                  }
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="team-member-email" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Email Address *
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    id="team-member-email"
-                    name="teamMemberEmail"
-                    aria-label="Email Address"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder={
-                      activeProvider?.name
-                        ? `staff@${activeProvider.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
-                        : 'staff@tirupati-appointments.com'
-                    }
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="team-member-password" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Temporary Password *
-                </label>
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    id="team-member-password"
-                    name="teamMemberPassword"
-                    aria-label="Temporary Password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min 6 characters (e.g. StaffPass2026!)"
-                    className="w-full pl-9 pr-10 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="team-member-role" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Role Access *
-                  </label>
-                  <select
-                    id="team-member-role"
-                    name="teamMemberRole"
-                    aria-label="Role Access"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as 'admin' | 'merchant')}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
-                  >
-                    <option value="merchant">Merchant / Manager</option>
-                    <option value="admin">Super Admin</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="team-member-phone" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Phone (Optional)
-                  </label>
-                  <input
-                    id="team-member-phone"
-                    name="teamMemberPhone"
-                    aria-label="Phone Number"
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98480 00000"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                <span>
-                  The user will be immediately provisioned with confirmed Supabase Auth and can sign in to the Merchant Hub right away.
-                </span>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Provisioning...
-                    </>
-                  ) : (
-                    <>
-                      <UserCheck className="w-4 h-4" />
-                      Save & Provision User
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder={`Search ${verticalConfig.resourceLabelPlural.toLowerCase()} or staff...`}
+              value={doctorSearch}
+              onChange={(e) => setDoctorSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
           </div>
         </div>
+
+        {loadingDoctors ? (
+          <div className="py-16 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
+            <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
+            Loading {verticalConfig.resourceLabelPlural.toLowerCase()} and desk assignments...
+          </div>
+        ) : filteredDoctors.length === 0 ? (
+          <div className="py-12 text-center bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
+            <Stethoscope className="w-10 h-10 text-slate-300 mx-auto" />
+            <p className="text-base font-bold text-slate-800">
+              No {verticalConfig.resourceLabelPlural.toLowerCase()} found
+            </p>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Add your doctors and consultation fees in the Resources & Departments screen first, then return here to assign their front desk managers.
+            </p>
+            {isHospitalAdmin ? (
+              <Link
+                href="/resources"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+              >
+                Go to Resources & Departments
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            ) : (
+              <span className="text-xs text-slate-400 italic">
+                Only the Hospital Administrator can add doctors.
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredDoctors.map((doc: DoctorWithAssignments) => (
+              <DoctorAssignmentCard
+                key={doc.id}
+                doctor={doc}
+                isHospitalAdmin={isHospitalAdmin}
+                copiedId={copiedId}
+                onCopy={copyToClipboard}
+                onOpenAssignModal={(d: DoctorWithAssignments) => setSelectedDoctorForAssignment(d)}
+                onUnassign={handleUnassignFrontDesk}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 2: Master Hospital Staff Directory */}
+      <StaffRosterTable
+        members={allRosterMembers}
+        doctors={doctors}
+        loading={loading}
+        ownerId={activeProvider?.owner_id}
+      />
+
+      {/* MODAL 1: Assign Front Desk Manager to Specific Doctor */}
+      {selectedDoctorForAssignment && (
+        <AssignFrontDeskModal
+          doctor={selectedDoctorForAssignment}
+          providerId={activeProvider?.id}
+          allRosterMembers={allRosterMembers}
+          onClose={() => setSelectedDoctorForAssignment(null)}
+          onSuccess={(msg) => {
+            setSuccessBanner(msg);
+            loadDoctorAssignments();
+            loadTeam();
+          }}
+          getExistingStaffIdCard={getExistingStaffIdCard}
+          isDoctorUser={isDoctorUser}
+        />
+      )}
+
+      {/* MODAL 2: Unified Staff Provisioning */}
+      {isAddStaffOpen && (
+        <UnifiedAddStaffModal
+          isOpen={isAddStaffOpen}
+          onClose={() => setIsAddStaffOpen(false)}
+          onSuccess={(msg) => {
+            setSuccessBanner(msg);
+            loadDoctorAssignments();
+            loadTeam();
+          }}
+          providerId={activeProvider?.id}
+          doctors={doctors}
+        />
       )}
     </div>
+  );
+}
+
+export default function TeamManagementPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-7xl mx-auto px-4 py-16 text-center text-slate-500">
+        Loading team and desk credentials...
+      </div>
+    }>
+      <TeamManagementContent />
+    </Suspense>
   );
 }

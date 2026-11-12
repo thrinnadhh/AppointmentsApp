@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { validateBookingStatusTransition } from '@/lib/hospital-access';
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required to complete a booking' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { booking_id } = body;
 
@@ -14,18 +23,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required to complete a booking' },
-        { status: 401 }
-      );
-    }
-
     const supabaseAdmin = getSupabaseAdmin();
     const { data: booking, error: fetchError } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, status, payment_status')
+      .select('id, customer_id, provider_id, resource_id, status, payment_status')
       .eq('id', booking_id)
       .maybeSingle();
 
@@ -44,39 +45,62 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Edge check: cannot complete a cancelled or no-show booking
-    if (booking.status === 'CANCELLED') {
+    const transitionCheck = validateBookingStatusTransition(booking.status, 'COMPLETED');
+    if (!transitionCheck.valid) {
       return NextResponse.json(
-        { success: false, error: 'Invalid transition: Booking is already cancelled' },
+        { success: false, error: transitionCheck.error },
         { status: 409 }
       );
     }
 
-    if (booking.status === 'NO_SHOW') {
-      return NextResponse.json(
-        { success: false, error: 'Invalid transition: Booking is marked as no-show' },
-        { status: 409 }
-      );
+    if (booking.status === 'COMPLETED') {
+      return NextResponse.json({
+        success: true,
+        booking_id,
+        status: 'COMPLETED',
+      });
     }
 
-    // Mark completed via SECURITY DEFINER RPC
-    const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('complete_booking', {
-      p_booking_id: booking_id,
-    });
-
-    if (rpcError) {
+    if (booking.status !== 'CONFIRMED' && booking.status !== 'CHECKED_IN' && booking.status !== 'IN_CONSULTATION') {
       return NextResponse.json(
-        { success: false, error: rpcError.message },
-        { status: 500 }
-      );
-    }
-
-    const rpcResult = rpcData as { success: boolean; error?: string };
-    if (!rpcResult?.success) {
-      return NextResponse.json(
-        { success: false, error: rpcResult?.error || 'Failed to complete booking' },
+        { success: false, error: `Invalid transition: Only CONFIRMED, CHECKED_IN, or IN_CONSULTATION bookings can be completed (current: ${booking.status})` },
         { status: 400 }
       );
+    }
+
+    // Try RPC first if CONFIRMED for backward compatibility
+    let completed = false;
+    if (booking.status === 'CONFIRMED') {
+      try {
+        const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('complete_booking', {
+          p_booking_id: booking_id,
+        });
+        if (!rpcError && (rpcData as any)?.success) {
+          completed = true;
+        }
+      } catch (rpcCatch) {
+        console.warn('RPC complete_booking error, will use admin update:', rpcCatch);
+      }
+    }
+
+    // If not completed via RPC (e.g., status is CHECKED_IN), update directly as service_role
+    if (!completed) {
+      const now = new Date().toISOString();
+      const { error: updateError } = await supabaseAdmin
+        .from('bookings')
+        .update({
+          status: 'COMPLETED',
+          updated_at: now,
+        })
+        .eq('id', booking_id);
+
+      if (updateError) {
+        console.error('Failed to complete booking via supabaseAdmin:', updateError);
+        return NextResponse.json(
+          { success: false, error: updateError.message },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({

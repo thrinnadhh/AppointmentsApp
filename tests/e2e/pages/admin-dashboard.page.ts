@@ -288,11 +288,11 @@ export class AdminDashboardPage {
   }
 
   async expectCityInMatrix(cityName: string, statusText?: string) {
-    const row = this.territoryTable.locator('tr', { hasText: cityName });
+    const row = this.territoryTable.locator('tbody tr').filter({ hasText: cityName }).first();
     await expect(row).toBeVisible();
     if (statusText) {
       if (statusText === 'ACTIVE') {
-        await expect(row.getByText('ACTIVE (LIVE)')).toBeVisible();
+        await expect(row.getByText(/ACTIVE \(LIVE\)|ACTIVE/i).first()).toBeVisible();
       } else if (statusText === 'EXPANDING') {
         await expect(row.getByText(/EXPANDING/i).first()).toBeVisible();
       } else if (statusText === 'PLANNED') {
@@ -304,8 +304,8 @@ export class AdminDashboardPage {
   }
 
   async clickCityAction(cityName: string, actionButtonText: 'Launch Active' | 'Start Expansion' | 'Pause' | 'Resume') {
-    const row = this.territoryTable.locator('tr', { hasText: cityName });
-    const actionBtn = row.getByRole('button', { name: new RegExp(actionButtonText, 'i') });
+    const row = this.territoryTable.locator('tbody tr').filter({ hasText: cityName }).first();
+    const actionBtn = row.getByRole('button', { name: new RegExp(actionButtonText, 'i') }).first();
     await expect(actionBtn).toBeVisible();
     await actionBtn.click();
   }

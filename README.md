@@ -8,14 +8,18 @@
 appointments-monorepo/
 ├── apps/
 │   ├── merchant-web/       # Next.js 15 — Admin & merchant dashboard
-│   └── customer-mobile/    # Expo (React Native) — Customer booking app
+│   ├── customer-mobile/    # Expo SDK 58 (React Native) — Customer booking app
+│   └── backend/            # Spring Boot (Legacy / Deprecated; superseded by Next.js + Supabase)
 ├── packages/
-│   └── shared/             # Shared types, schemas, constants
+│   └── shared/             # Shared types, schemas, queue algorithms, constants
 ├── supabase/
-│   ├── migrations/         # PostgreSQL schema, RLS, stored procedures
+│   ├── migrations/         # PostgreSQL schema, RLS, stored procedures (155 migrations)
 │   ├── functions/          # Edge functions (cron, webhooks)
 │   └── seed.sql            # Demo data for development
+├── scripts/                # Verification, seed, and CI test runner scripts
 └── tests/
+    ├── unit/               # Fast serial node:test unit suites
+    ├── scripts/            # Security, advisor, and integration test scripts
     └── e2e/                # Playwright E2E test suite
 ```
 
@@ -24,17 +28,68 @@ appointments-monorepo/
 | Layer | Technology |
 |-------|-----------|
 | **Frontend (Web)** | Next.js 15, React 18, Tailwind CSS 3 |
-| **Frontend (Mobile)** | Expo 57, React Native 0.86 |
+| **Frontend (Mobile)** | Expo 58, React Native 0.88, React 19 |
 | **Backend** | Supabase (PostgreSQL 15, RLS, Auth, Realtime, Edge Functions) |
 | **Payments** | Razorpay (HMAC SHA256 webhook verification) |
 | **Shared Types** | TypeScript 5, pnpm workspaces |
-| **Testing** | Playwright (E2E), TypeScript strict mode |
+| **Testing** | Node test runner (serial unit suites), pgTAP (database), Playwright (E2E) |
 
 ## Prerequisites
 
-- Node.js ≥ 18
-- pnpm ≥ 8
-- Supabase project (free tier works)
+- Node.js ≥ 22.0.0
+- pnpm ≥ 9
+- Supabase CLI & Docker (for local Supabase dev instance)
+
+## Local Setup & Environment Rules
+
+> **CRITICAL ENVIRONMENT FILE RULE**: Next.js loads environment variables strictly from within its application folder (`apps/merchant-web/.env.local`), NOT from the monorepo root `.env.local`. Variables placed solely in the repository root will not be picked up by Next.js. Customer mobile configuration resides in `apps/customer-mobile/.env`.
+
+Follow these steps for reliable local development setup:
+
+```bash
+# 1. Install dependencies
+pnpm install
+
+# 2. Copy environment templates to their exact application folders
+cp apps/merchant-web/.env.example apps/merchant-web/.env.local
+cp apps/customer-mobile/.env.example apps/customer-mobile/.env
+
+# 3. Configure values in apps/merchant-web/.env.local
+# - Set NEXT_PUBLIC_SUPABASE_URL (default: http://127.0.0.1:54321)
+# - Set NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY
+# - Default: Google OAuth is OFF. Email and password authentication is primary and fully operational.
+# - (Optional) To enable Google OAuth:
+#   1. Set NEXT_PUBLIC_ENABLE_GOOGLE_AUTH=true and NEXT_PUBLIC_GOOGLE_CLIENT_ID in apps/merchant-web/.env.local
+#   2. In supabase/config.toml, set [auth.external.google] enabled = true
+#   3. Put SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID & SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET in supabase/.env (or shell environment)
+#   4. Restart Supabase: supabase stop && supabase start
+#
+# 4. Verify all environment variables
+pnpm run check:env
+
+# 5. Start development servers
+pnpm dev:merchant
+# Note: Whenever you add or change NEXT_PUBLIC_* variables, restart the dev server
+# and clear .next (rm -rf apps/merchant-web/.next) because Next.js inlines them at bundle time.
+```
+
+### Supabase GoTrue External Google OAuth Configuration
+
+In `supabase/config.toml`:
+```toml
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+skip_nonce_check = true
+email_optional = false
+```
+
+**Environment Variable Resolution:**
+- Supabase CLI substitutes `env(...)` variables by loading `supabase/.env` when starting local containers (`supabase start`).
+- Host shell exports (`export SUPABASE_AUTH_EXTERNAL_GOOGLE_...`) also provide or override these values.
+- `check:env` audits live Supabase settings (`http://127.0.0.1:54321/auth/v1/settings`) to ensure `external.google` matches `NEXT_PUBLIC_ENABLE_GOOGLE_AUTH`.
 
 ## Setup
 
@@ -42,15 +97,19 @@ appointments-monorepo/
 # 1. Install dependencies
 pnpm install
 
-# 2. Configure environment variables
+# 2. Configure environment variables (see Local Setup above)
 cp apps/merchant-web/.env.example apps/merchant-web/.env.local
 cp apps/customer-mobile/.env.example apps/customer-mobile/.env
 # Fill in your Supabase URL and anon key
 
-# 3. Apply database migrations
+# 3. Generate local PostgREST asymmetric signing key (ES256)
+# Required by supabase/config.toml (signing_keys_path = "./signing_keys.json")
+node scripts/generate-signing-keys.mjs
+
+# 4. Apply database migrations
 # Use the Supabase CLI or dashboard to run files in supabase/migrations/ in order
 
-# 4. Seed demo data (optional)
+# 5. Seed demo data (optional)
 # Run supabase/seed.sql against your database
 ```
 
@@ -72,6 +131,10 @@ pnpm dev:mobile
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase publishable (anon) key |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | ❌ (Optional) | Google OAuth 2.0 Client ID for Google Sign-In |
+| `NEXT_PUBLIC_ENABLE_GOOGLE_AUTH` | ❌ (Optional) | Flag to enable Google Sign-In (default: false / OFF) |
+| `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` | ❌ (Optional) | Server-side Google Client ID for Supabase CLI |
+| `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` | ❌ (Optional) | Server-side Google Client Secret for Supabase CLI |
 | `RAZORPAY_WEBHOOK_SECRET` | ✅ (production) | HMAC secret for webhook verification |
 
 ### Customer Mobile (`apps/customer-mobile/.env`)
@@ -85,21 +148,27 @@ pnpm dev:mobile
 ## Testing
 
 ```bash
+# Run unit test suites serially (Standing Rule 4)
+node scripts/run-all-unit-tests-serially.mjs
+
+# Run security & advisor tests
+pnpm test:security
+
+# TypeScript type checking across all workspaces
+pnpm -r --if-present typecheck
+
 # Run E2E tests (requires merchant-web dev server running)
 npx playwright test
-
-# TypeScript type checking
-pnpm --filter @appointments/merchant-web typecheck
-pnpm --filter @appointments/customer-mobile typecheck
 ```
 
 ## Key Features
 
 - **Deposit-backed booking**: 5-minute hold → payment → confirmation flow
-- **Multi-vertical support**: Clinics, salons, gaming, restaurants, pets
+- **Multi-vertical support**: Clinics & Hospitals, Salons, Gaming Turfs, Restaurants, Pet Care
+- **Hospital Vertical (SPEC.md)**: Department governance (max 3 staff/dept), front-desk doctor assignments, permanent check-in PIN revealed 60m pre-slot, doctor emergency departure refund flow
 - **Realtime sync**: Supabase Realtime channels for instant booking updates
-- **Anti-no-show system**: Deposit forfeiture + customer flagging after 4 no-shows
-- **Role-based access**: Admin, merchant, and customer roles with RLS policies
+- **6-Strike Anti-no-show policy**: Strikes 1–2 courtesy refund, strikes 3–5 ₹60 penalty split, 6th strike triggers 7-day account block (SPEC.md)
+- **Role-based access**: Admin, hospital admin, front desk, consultant, merchant, and customer roles with locked-down RLS policies
 - **Razorpay integration**: Webhook-verified payment confirmation
 
 ## License

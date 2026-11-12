@@ -28,14 +28,27 @@ async function flushWebLog(entry: AppLogEntry): Promise<void> {
         p_metadata: entry.metadata || {},
         p_device_info: entry.device_info || {},
         p_session_id: entry.session_id || null,
+        p_severity: entry.severity || (entry.level === 'error' ? 'ERROR' : entry.level === 'warn' ? 'WARN' : 'INFO'),
+        p_category: entry.category || 'OTHER',
+        p_source: entry.source || 'merchant-web',
+        p_error_code: entry.error_code || null,
+        p_role: entry.role || null,
+        p_city_id: entry.city_id || null,
+        p_vertical: entry.vertical || null,
+        p_appointment_id: entry.appointment_id || null,
+        p_app_version: entry.app_version || '1.0.0',
+        p_platform_os: entry.platform_os || 'node',
+        p_device_model: entry.device_model || null,
+        p_environment: entry.environment || (process.env.NODE_ENV === 'production' ? 'prod' : 'dev'),
+        p_fingerprint: entry.fingerprint || null,
       });
     } catch {
       // Non-blocking telemetry
     }
   }
 
-  // Also notify Sentry radar if level is error
-  if (entry.level === 'error') {
+  // Also notify Sentry radar if level is error or critical
+  if (entry.level === 'error' || entry.severity === 'CRITICAL') {
     const errorObj = new Error(entry.message);
     if (entry.stack_trace) {
       errorObj.stack = entry.stack_trace;
@@ -44,6 +57,8 @@ async function flushWebLog(entry: AppLogEntry): Promise<void> {
       tags: {
         platform: entry.platform,
         component: entry.component || 'unknown',
+        severity: entry.severity || 'ERROR',
+        category: entry.category || 'OTHER',
       },
       extra: entry.metadata,
     }).catch(() => null);
@@ -52,21 +67,50 @@ async function flushWebLog(entry: AppLogEntry): Promise<void> {
 
 function getBrowserDeviceInfo(): Record<string, unknown> {
   if (typeof window === 'undefined') {
-    return { runtime: 'node' };
+    return { runtime: 'node', os: 'node' };
   }
   return {
     userAgent: navigator.userAgent,
     language: navigator.language,
     screen: `${window.innerWidth}x${window.innerHeight}`,
     url: window.location.href,
+    os: 'browser',
   };
 }
 
 export const webLogger: AppLoggerInstance = createAppLogger({
   platform: 'web',
+  source: 'merchant-web',
   flushHandler: flushWebLog,
   getDeviceInfo: getBrowserDeviceInfo,
   enableConsole: process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true',
 });
 
 export const logger = webLogger;
+
+// Register global window error & unhandled promise rejection listeners on web
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    webLogger.critical(
+      event.message || 'Unhandled global window error',
+      event.error,
+      'GlobalWindow',
+      {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      },
+      'UI_CRASH'
+    );
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    webLogger.critical(
+      event.reason instanceof Error ? event.reason.message : String(event.reason || 'Unhandled Promise Rejection'),
+      event.reason,
+      'UnhandledPromise',
+      {},
+      'UI_CRASH'
+    );
+  });
+}

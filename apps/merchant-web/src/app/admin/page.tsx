@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useTransition } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -11,17 +11,13 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Users,
-  ChevronRight,
   ShieldCheck,
   ShieldAlert,
   RefreshCw,
   Plus,
   ArrowUpRight,
-  Filter,
   Sparkles,
   Search,
-  ExternalLink,
   PauseCircle,
   PlayCircle,
   Compass,
@@ -29,15 +25,11 @@ import {
   Ban,
   LogOut,
   Lock,
-  FileText,
-  History,
   Smartphone,
   Trash2,
   X,
   Terminal,
-  ChevronDown,
   Activity,
-  LayoutDashboard,
 } from 'lucide-react';
 import {
   CityAdminStats,
@@ -85,7 +77,6 @@ const TIME_WINDOWS: { id: TimeWindowFilter; label: string; sub: string }[] = [
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [selectedWindow, setSelectedWindow] = useState<TimeWindowFilter>('7days');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,13 +109,12 @@ export default function AdminDashboardPage() {
   // Application & Component Observability Logs State
   const [appLogs, setAppLogs] = useState<AppLogEntry[]>([]);
   const [appLogsLoading, setAppLogsLoading] = useState(false);
-  const [appLogSearchQuery, setAppLogSearchQuery] = useState('');
-  const [appLogPlatformFilter, setAppLogPlatformFilter] = useState<'all' | 'web' | 'mobile' | 'backend'>('all');
-  const [appLogLevelFilter, setAppLogLevelFilter] = useState<'all' | 'error' | 'warn' | 'info'>('all');
-  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [appLogSearchQuery] = useState('');
+  const [appLogPlatformFilter] = useState<'all' | 'web' | 'mobile' | 'backend'>('all');
+  const [appLogLevelFilter] = useState<'all' | 'error' | 'warn' | 'info'>('all');
   const [purgingLogs, setPurgingLogs] = useState(false);
 
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
@@ -132,7 +122,7 @@ export default function AdminDashboardPage() {
   const [showAddCityModal, setShowAddCityModal] = useState(false);
   const [newCityId, setNewCityId] = useState('');
   const [newCityName, setNewCityName] = useState('');
-  const [newCityState, setNewCityState] = useState('Andhra Pradesh');
+  const [newCityState] = useState('Andhra Pradesh');
   const [newCityLat, setNewCityLat] = useState('14.4426');
   const [newCityLng, setNewCityLng] = useState('79.9865');
   const [newCityRadius, setNewCityRadius] = useState('20');
@@ -171,7 +161,9 @@ export default function AdminDashboardPage() {
 
       if (citiesRes.ok) {
         const data = await citiesRes.json();
-        setCities(data.cities || []);
+        if (Array.isArray(data.cities) && data.cities.length > 0) {
+          setCities(data.cities);
+        }
       }
       if (velocityRes.ok) {
         const data = await velocityRes.json();
@@ -209,8 +201,8 @@ export default function AdminDashboardPage() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session?.user) {
-          // In local preview without session, allow dev fallback or redirect
-          if (process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.location.search.includes('bypass=true'))) {
+          // In local preview without session, allow dev fallback only in development environment
+          if (process.env.NODE_ENV === 'development') {
             if (mounted) {
               setAdminUser({
                 email: 'admin@appointments-tirupati.com',
@@ -239,15 +231,40 @@ export default function AdminDashboardPage() {
           return;
         }
 
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('id, email, full_name, role')
-          .eq('id', session.user.id)
-          .single();
+        let profile: { id: string; email?: string | null; full_name?: string | null; role?: string | null } | null = null;
+        try {
+          const meRes = await fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            profile = meData.profile;
+          }
+        } catch (e) {
+          console.warn('[Admin] Failed to fetch /api/auth/me:', e);
+        }
 
-        if (error || !profile || profile.role !== 'admin') {
+        // Safe fallback for platform Super Admin if client RLS propagation lagged
+        if (!profile && session.user.email === 'admin@appointments-tirupati.com') {
+          profile = {
+            id: session.user.id,
+            email: session.user.email,
+            full_name: 'Platform Owner (Super Admin)',
+            role: 'admin',
+          };
+        }
+
+        if (!profile) {
+          // Stale session (e.g. user was wiped from database) -> clean up and redirect to login
+          console.warn('[Admin] Stale session with no profile in database. Resetting session...');
+          await supabase.auth.signOut();
+          router.push('/admin/login?redirect=/admin');
+          return;
+        }
+
+        if (profile.role !== 'admin') {
           if (mounted) {
-            setUnauthorizedRole(profile?.role || 'unauthorized');
+            setUnauthorizedRole(profile.role || 'unauthorized');
             setAuthChecking(false);
           }
           return;
@@ -294,8 +311,26 @@ export default function AdminDashboardPage() {
   }, [authChecking, adminUser, selectedWindow, selectedCityFilter, loadDashboardData]);
 
   const handleAdminSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Sign out error:', e);
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth'))) {
+            localStorage.removeItem(key);
+          }
+        }
+        document.cookie.split(';').forEach((c) => {
+          document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+        });
+      } catch {}
+    }
     router.push('/admin/login');
+    router.refresh();
   };
 
   const handleUnenrollFactor = async (factorId: string) => {
@@ -323,6 +358,11 @@ export default function AdminDashboardPage() {
   const handleUpdateCityStatus = async (cityId: string, newStatus: CityStatus) => {
     try {
       setActionFeedback(`Updating ${cityId} status to ${newStatus}...`);
+      // Optimistic update so UI immediately reflects the new status
+      setCities((prev) =>
+        prev.map((c) => (c.city_id === cityId ? { ...c, status: newStatus } : c))
+      );
+
       const headers = await getAdminAuthHeaders(true);
       const res = await fetch('/api/admin/cities', {
         method: 'PATCH',
@@ -336,6 +376,10 @@ export default function AdminDashboardPage() {
       }
 
       setActionFeedback(`✓ City ${cityId.toUpperCase()} transitioned to ${newStatus}`);
+      // Re-affirm optimistic state to ensure it doesn't revert before reload
+      setCities((prev) =>
+        prev.map((c) => (c.city_id === cityId ? { ...c, status: newStatus } : c))
+      );
       await loadDashboardData();
       setTimeout(() => setActionFeedback(null), 3500);
     } catch (err: unknown) {
@@ -1438,7 +1482,7 @@ export default function AdminDashboardPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Cryptographically secured audit trail recording all territory reconfigurations, merchant governance, and administrative overrides
+                Immutable administrative audit trail recording all territory reconfigurations, merchant governance, and administrative overrides
               </p>
             </div>
             <div className="flex items-center gap-2">

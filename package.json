@@ -7,22 +7,28 @@
     "apps/*",
     "packages/*"
   ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
+    "check:env": "node scripts/check-env.mjs",
     "check:agents": "python3 .agents/scripts/validate_kit.py",
     "check:legal": "node scripts/check-legal-placeholders.js",
     "check:antigravity": "python3 .agents/scripts/checklist.py .",
     "test:antigravity": "python3 -m unittest discover -s .agents/scripts/tests -v",
     "status": "python3 .agents/scripts/session_manager.py status .",
     "dev:merchant": "pnpm --filter @appointments/merchant-web dev",
-    "dev:mobile": "pnpm --filter @appointments/customer-mobile start",
+    "dev:mobile": "pnpm --filter @appointments/customer-mobile web --port 8081",
+    "db:wipe": "node scripts/wipe-test-data.mjs",
+    "db:seed": "node scripts/seed-hospital-test-data.mjs",
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test:e2e": "playwright test",
     "test:mobile": "node tests/mobile/customer-mobile-android.test.mjs",
     "test": "pnpm test:e2e",
-    "test:validation": "node --test test-validation.mjs",
-    "test:security": "node --test test-security.mjs test-routes.mjs test-validation.mjs"
+    "test:validation": "node --test tests/scripts/test-validation.mjs",
+    "test:security": "node --test tests/scripts/test-security.mjs tests/scripts/test-routes.mjs tests/scripts/test-validation.mjs"
   },
   "keywords": [
     "appointments",
@@ -36,6 +42,7 @@
   "license": "ISC",
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "pg": "^8.23.1",
     "webdriverio": "^9.32.0"
   },
   "pnpm": {
@@ -45,11 +52,19 @@
       "brace-expansion": ">=5.0.12",
       "uuid": ">=11.1.1",
       "braces": ">=3.0.3",
-      "node-forge": ">=1.4.0",
+      "node-forge": ">=1.4.1",
       "shell-quote": ">=1.11.0",
       "compression": ">=1.8.2",
       "source-map-js": ">=1.2.2",
-      "sharp": ">=0.35.5"
+      "sharp": ">=0.35.5",
+      "next": "15.5.28",
+      "@types/react": "18.3.18",
+      "@types/react-dom": "18.3.5",
+      "zod": ">=3.24.0",
+      "undici": ">=6.29.1"
+    },
+    "patchedDependencies": {
+      "expo-notifications@58.1.6": "patches/expo-notifications@58.1.6.patch"
     }
   }
 }

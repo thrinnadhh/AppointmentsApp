@@ -1,4 +1,4 @@
-export type UserRole = 'customer' | 'merchant' | 'admin';
+export type UserRole = 'customer' | 'merchant' | 'admin' | 'city_director';
 
 export type ProviderStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED';
 
@@ -6,11 +6,17 @@ export type BookingStatus =
   | 'HELD'
   | 'PENDING_PAYMENT'
   | 'CONFIRMED'
+  | 'CHECKED_IN'
   | 'COMPLETED'
   | 'CANCELLED'
-  | 'NO_SHOW';
+  | 'NO_SHOW'
+  | 'IN_CONSULTATION'
+  | 'ADMITTED';
 
-export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'FORFEITED';
+export type PaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'REFUND_PENDING' | 'REFUND_IN_PROGRESS' | 'REFUND_FAILED' | 'FORFEITED';
+
+export type PlatformPaymentStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'WAIVED';
+export type ConsultationPaymentStatus = 'PENDING_OFFLINE' | 'COLLECTED_AT_DESK' | 'WAIVED' | 'REFUNDED';
 
 export type ResourceType = 'doctor' | 'table' | 'court' | 'stylist' | 'groomer' | 'vet';
 
@@ -79,6 +85,7 @@ export interface Resource {
   deposit_amount: number;
   price?: number | null;
   department?: string | null;
+  department_id?: string | null;
   attributes: Record<string, unknown>;
   is_active: boolean;
   created_at: string;
@@ -116,6 +123,13 @@ export interface Booking {
   deposit_amount: number;
   platform_fee?: number | null;
   total_amount?: number | null;
+  platform_fee_amount?: number | null;
+  consultation_fee_amount?: number | null;
+  expected_payment_amount_paise?: number | null;
+  platform_payment_status?: PlatformPaymentStatus;
+  consultation_payment_status?: ConsultationPaymentStatus;
+  consultation_collected_at?: string | null;
+  consultation_collected_by?: string | null;
   hold_expires_at?: string | null;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
@@ -125,9 +139,29 @@ export interface Booking {
   updated_at: string;
   attachment_url?: string | null;
   reminder_1h_sent_at?: string | null;
-  reminder_30m_sent_at?: string | null;
   is_present?: boolean;
   customer_arrived_at?: string | null;
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
+  checked_in_method?: 'code' | 'manual' | null;
+  skipped_at?: string | null;
+  queue_position?: number | null;
+  estimated_wait_minutes?: number | null;
+  department_id?: string | null;
+  department_name?: string | null;
+  emergency_cancelled?: boolean;
+  emergency_doctor_arrived?: boolean;
+  emergency_patient_choice?: string | null;
+  booking_for_someone_else?: boolean;
+  booked_for?: 'self' | 'family';
+  patient_name?: string | null;
+  patient_phone?: string | null;
+  patient_relationship?: string | null;
+  patient_age?: number | null;
+  booking_note?: string | null;
+  is_minor?: boolean;
+  total_charged?: number | null;
+  version?: number;
   provider?: Provider;
   resource?: Resource;
 }
@@ -150,6 +184,7 @@ export interface UserProfile {
   email?: string | null;
   full_name?: string | null;
   role: UserRole;
+  assigned_city_id?: string | null;
   no_show_count: number;
   is_flagged: boolean;
   created_at: string;
@@ -163,6 +198,10 @@ export interface CreateHoldResult {
   deposit_amount?: number;
   platform_fee?: number;
   total_amount?: number;
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
+  platform_payment_status?: PlatformPaymentStatus;
+  consultation_payment_status?: ConsultationPaymentStatus;
   hold_expires_at?: string;
   is_followup?: boolean;
   followup_original_booking_id?: string | null;
@@ -172,23 +211,31 @@ export interface CreateHoldResult {
 export type NotificationEventType =
   | 'BOOKING_CONFIRMED'
   | 'BOOKING_REMINDER_1H'
-  | 'BOOKING_REMINDER_30M'
   | 'BOOKING_CANCELLED'
-  | 'BOOKING_COMPLETED';
+  | 'REFUND_PROCESSED'
+  | 'AUTH_CODE';
 
-export type NotificationChannel = 'whatsapp' | 'sms' | 'email' | 'push';
+export type NotificationChannel = 'whatsapp' | 'push';
 
 export interface NotificationLog {
   id: string;
-  booking_id: string;
+  booking_id?: string | null;
   recipient_phone: string;
   recipient_name?: string | null;
   event_type: NotificationEventType | string;
   channel: NotificationChannel | string;
-  status: 'QUEUED' | 'SENT' | 'FAILED' | string;
-  message_content: string;
+  status: 'QUEUED' | 'SENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'SKIPPED' | string;
+  template_name?: string | null;
+  template_params?: any;
+  provider_message_id?: string | null;
+  attempts?: number;
+  last_error?: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  next_attempt_at?: string | null;
+  message_content?: string;
   provider_response?: Record<string, unknown> | null;
-  sent_at: string;
+  sent_at?: string;
   created_at: string;
 }
 
@@ -324,29 +371,40 @@ export interface CreateRazorpayOrderRequest {
 export interface CreateRazorpayOrderResponse {
   success: boolean;
   order_id?: string;
+  cf_order_id?: string;
+  payment_session_id?: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
   key_id?: string;
   amount?: number; // in paise
   currency?: string;
   is_mock?: boolean;
   deposit_amount?: number; // merchant deposit in INR
   platform_fee?: number;   // platform fee in INR (₹10 or ₹50)
-  total_amount?: number;   // total payable in INR (deposit_amount + platform_fee)
+  total_amount?: number;   // total payable online in INR (platform_fee)
+  platform_fee_amount?: number;
+  consultation_fee_amount?: number;
   error?: string;
 }
 
 export interface VerifyRazorpayPaymentRequest {
   booking_id: string;
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
+  order_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_order_id?: string;
+  razorpay_signature?: string;
   attachment_url?: string | null;
 }
 
 export interface VerifyRazorpayPaymentResponse {
   success: boolean;
   booking_id?: string;
+  reference_code?: string;
+  queue_position?: number;
   status?: string;
   payment_status?: string;
+  platform_payment_status?: PlatformPaymentStatus;
+  consultation_payment_status?: ConsultationPaymentStatus;
   error?: string;
 }
 
@@ -366,25 +424,160 @@ export interface CoolingPeriodEligibilityResult {
 export type AppPlatform = 'web' | 'mobile' | 'backend' | 'edge';
 export type AppLogLevel = 'error' | 'warn' | 'info';
 
+export type AppSeverity = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';
+export type AppLogCategory =
+  | 'AUTH'
+  | 'BOOKING'
+  | 'PAYMENT'
+  | 'HOSPITAL_QUEUE'
+  | 'NOTIFICATION'
+  | 'DATABASE'
+  | 'NETWORK'
+  | 'UI_CRASH'
+  | 'SECURITY'
+  | 'OTHER';
+export type AppLogSource =
+  | 'customer-mobile'
+  | 'merchant-web'
+  | 'admin-web'
+  | 'edge-function'
+  | 'database';
+
 export interface AppLogEntry {
   id?: string;
   created_at?: string;
   platform: AppPlatform;
   level: AppLogLevel;
+  severity?: AppSeverity;
+  category?: AppLogCategory;
+  source?: AppLogSource;
   component?: string;
   message: string;
   stack_trace?: string;
+  error_code?: string | null;
   metadata?: Record<string, unknown>;
   device_info?: Record<string, unknown>;
   user_id?: string | null;
   session_id?: string | null;
+  role?: string | null;
+  city_id?: string | null;
+  vertical?: string | null;
+  appointment_id?: string | null;
+  app_version?: string | null;
+  platform_os?: string | null;
+  device_model?: string | null;
+  environment?: 'dev' | 'test' | 'prod';
+  fingerprint?: string | null;
+  duplicate_count?: number;
 }
 
 export interface AppLogsFilter {
   platform?: AppPlatform | 'all';
   level?: AppLogLevel | 'all';
+  severity?: AppSeverity | 'all';
+  category?: AppLogCategory | 'all';
+  source?: AppLogSource | 'all';
   component?: string;
   search?: string;
+  dateRange?: 'all' | 'today' | '24h' | '7d' | '30d';
   limit?: number;
   offset?: number;
 }
+
+export interface AppointmentCheckinCode {
+  id: string;
+  booking_id: string;
+  provider_id: string;
+  customer_id: string;
+  appointment_date: string;
+  code: string;
+  created_at: string;
+}
+
+export type CheckinErrorCode =
+  | 'INVALID_CODE'
+  | 'ALREADY_CHECKED_IN'
+  | 'TOO_EARLY'
+  | 'EXPIRED'
+  | 'WRONG_SHOP'
+  | 'RATE_LIMITED'
+  | 'UNAUTHORIZED'
+  | 'NOT_FOUND'
+  | 'INVALID_STATUS'
+  | 'UNAUTHORIZED_DEPARTMENT'
+  | 'APPOINTMENT_FUTURE';
+
+export interface VerifyCheckinCodeResult {
+  success: boolean;
+  booking_id?: string;
+  patient_name?: string;
+  service_doctor?: string;
+  slot_time?: string;
+  is_late?: boolean;
+  checked_in_at?: string;
+  error?: CheckinErrorCode;
+  message?: string;
+  locked_until?: string;
+}
+
+export type HospitalModule = 'appointments' | 'queue_schedule' | 'check_in' | 'patients';
+
+export interface HospitalDepartment {
+  id: string;
+  merchant_id: string;
+  name: string;
+  is_preset: boolean;
+  is_active?: boolean;
+  allowed_modules: HospitalModule[];
+  member_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DepartmentMemberStatus = 'invited' | 'active' | 'revoked';
+export type HospitalStaffRole = 'consultant' | 'front_desk';
+
+export interface DepartmentMember {
+  id: string;
+  department_id: string;
+  merchant_id: string;
+  email: string;
+  user_id?: string | null;
+  role?: HospitalStaffRole;
+  status: DepartmentMemberStatus;
+  invited_by?: string | null;
+  invited_at: string;
+  accepted_at?: string | null;
+  invite_expires_at: string;
+  created_at: string;
+  updated_at: string;
+  department_name?: string;
+}
+
+export interface HospitalAuditLog {
+  id: string;
+  merchant_id: string;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  actor_email?: string | null;
+  action: string;
+  target: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export type HospitalRole = 'admin' | 'front_desk' | 'consultant' | 'none' | 'owner' | 'department_member' | 'superadmin';
+
+export interface HospitalAccessContext {
+  role: HospitalRole;
+  merchantId: string | null;
+  departmentId: string | null;
+  departmentName?: string | null;
+  allowedModules: HospitalModule[];
+  isHospital: boolean;
+  email?: string | null;
+  userId: string | null;
+  assignedDoctorIds: string[];
+}
+
+

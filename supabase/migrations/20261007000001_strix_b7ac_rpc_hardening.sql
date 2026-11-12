@@ -11,7 +11,18 @@
 -- Revoke all permissions and drop this signature. The platform uses the
 -- guarded 4-argument signature (with p_admin_token and is_admin() checks) restricted to service_role.
 
-REVOKE ALL ON FUNCTION public.update_city_status(TEXT, TEXT, INT) FROM PUBLIC, anon, authenticated;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_proc p 
+        JOIN pg_namespace n ON p.pronamespace = n.oid 
+        WHERE n.nspname = 'public' 
+          AND p.proname = 'update_city_status'
+          AND pg_get_function_identity_arguments(p.oid) = 'text, text, integer'
+    ) THEN
+        EXECUTE 'REVOKE ALL ON FUNCTION public.update_city_status(TEXT, TEXT, INT) FROM PUBLIC, anon, authenticated';
+    END IF;
+END $$;
 DROP FUNCTION IF EXISTS public.update_city_status(TEXT, TEXT, INT);
 
 -- ============================================================================

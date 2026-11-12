@@ -4,7 +4,7 @@ import { AdminDashboardPage } from './pages/admin-dashboard.page';
 const TEST_ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com';
 const TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!';
 const TEST_SALON_EMAIL = process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com';
-const TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || '';
+const TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || 'NaturalsSalon2026!';
 
 test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
   test('TC-ADMIN-AUTH-01: Unauthenticated request to /admin redirects to /admin/login', async ({ page }) => {
@@ -83,8 +83,20 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     expect(data.error).toBeDefined();
   });
 
-  test('TC-ADMIN-AUDIT-01: Immutable Audit Trail UI displays cryptographically verifiable admin logs', async ({ page }) => {
+  test('TC-ADMIN-AUDIT-01: Immutable Audit Trail UI displays cryptographically verifiable admin logs', async ({ page, request }) => {
     await page.context().clearCookies();
+    const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+
+    // Ensure at least one audited administrative action exists in the ledger independent of test ordering
+    const seedAuditRes = await request.patch('http://localhost:3000/api/admin/cities', {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-bypass-key': adminBypass,
+      },
+      data: { cityId: 'nellore', status: 'EXPANDING', target: 15 },
+    });
+    expect(seedAuditRes.ok()).toBeTruthy();
+
     const adminPage = new AdminDashboardPage(page);
 
     await adminPage.gotoLoginPage();
@@ -118,7 +130,7 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     expect([401, 403]).toContain(unauthResponse.status());
 
     // 2. Authenticated Admin request must succeed and return structured logs
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ynkdnwhubfknnnzjtpeg.supabase.co';
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     const authRes = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
       headers: {
@@ -132,6 +144,18 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     });
     const authData = await authRes.json();
     const token = authData?.access_token || '';
+
+    // Ensure at least one audited administrative action exists in the ledger independent of test ordering
+    const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+    const seedAuditRes = await request.patch('http://localhost:3000/api/admin/cities', {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'x-admin-bypass-key': adminBypass,
+      },
+      data: { cityId: 'nellore', status: 'EXPANDING', target: 15 },
+    });
+    expect(seedAuditRes.ok()).toBeTruthy();
 
     const authResponse = await request.get('http://localhost:3000/api/admin/audit-logs', {
       headers: { Authorization: `Bearer ${token}` },

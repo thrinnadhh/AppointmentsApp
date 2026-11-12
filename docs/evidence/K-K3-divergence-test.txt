@@ -1,0 +1,14 @@
+▶ Mantis Track 1 Database Hardening & SPEC Invariant Verification
+  ✔ 1. Privilege Hygiene: public.sync_booking_for_family() must NOT be executable by anon or authenticated (1.758875ms)
+  ✔ 2. SPEC Invariant: Hospital patient arriving +7 minutes after slot_start (within +/-10m window) is NOT late in verify_checkin_code (65.065ms)
+  ✔ 3. SPEC Invariant: Hospital patient arriving +7 minutes after slot_start (within +/-10m window) is NOT late in mark_present_manually (33.198458ms)
+  ✔ 4. Divergence Guard: SQL stored procedures and TypeScript queue-engine.ts must agree on arrival window / late threshold per SPEC.md (40.045417ms)
+✔ Mantis Track 1 Database Hardening & SPEC Invariant Verification (511.612708ms)
+ℹ tests 4
+ℹ suites 1
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.420625

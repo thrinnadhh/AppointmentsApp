@@ -9,7 +9,7 @@
  * - Non-destructive upload policy (upsert: false) to prevent overwriting existing assets
  */
 
-import { supabase } from './supabase';
+import { supabase, getSupabaseAdmin } from './supabase';
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_BUCKET = process.env.R2_BUCKET_NAME || 'appointments-assets';
@@ -198,14 +198,23 @@ export function getStorageStatus(): {
   };
 }
 
+export interface GetPrivateDocumentSignedUrlOptions {
+  callerUserId?: string;
+  providerId?: string;
+  bookingId?: string;
+  role?: string;
+}
+
 /**
  * Generates a time-limited signed URL for private documents (prescriptions, clinical records).
  * Strictly forbids public URL generation for private buckets.
+ * Logs access in public.audit_logs for medical record read traceability (MED-02).
  */
 export async function getPrivateDocumentSignedUrl(
   storagePath: string,
   expiresInSeconds: number = 300,
-  bucket: string = 'prescriptions-and-records'
+  bucket: string = 'prescriptions-and-records',
+  options?: GetPrivateDocumentSignedUrlOptions
 ): Promise<{ signedUrl: string | null; error?: string }> {
   if (isPublicBucket(bucket)) {
     return { signedUrl: null, error: `Bucket ${bucket} is public; use getPublicUrl instead` };
@@ -215,12 +224,39 @@ export async function getPrivateDocumentSignedUrl(
   const boundedTtl = Math.max(60, Math.min(expiresInSeconds, 3600));
 
   try {
-    const { data, error } = await supabase.storage
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.storage
       .from(bucket)
       .createSignedUrl(storagePath, boundedTtl);
 
     if (error || !data?.signedUrl) {
       return { signedUrl: null, error: error?.message || 'Failed to generate signed URL' };
+    }
+
+    // Log audit trail for accessing private medical documents (Finding MED-02)
+    const providerId =
+      options?.providerId ||
+      (storagePath.split('/')[0]?.match(/^[0-9a-f-]{36}$/i) ? storagePath.split('/')[0] : null);
+
+    if (providerId) {
+      const actorId =
+        options?.callerUserId ||
+        (await supabase.auth.getUser().then((res) => res.data.user?.id).catch(() => null)) ||
+        null;
+
+      await (admin.from('audit_logs') as any).insert({
+        merchant_id: providerId,
+        actor_id: actorId,
+        action: 'READ_PRESCRIPTION_ATTACHMENT',
+        target: `${bucket}/${storagePath}`,
+        metadata: {
+          bucket,
+          storagePath,
+          expiresInSeconds: boundedTtl,
+        },
+        booking_id: options?.bookingId || null,
+        role: options?.role || 'staff',
+      });
     }
 
     return { signedUrl: data.signedUrl };
@@ -229,6 +265,7 @@ export async function getPrivateDocumentSignedUrl(
     return { signedUrl: null, error: msg };
   }
 }
+
 
 export interface UploadPrivateDocumentOptions {
   providerId?: string;
