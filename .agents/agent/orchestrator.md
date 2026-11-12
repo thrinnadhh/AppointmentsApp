@@ -4,7 +4,7 @@ description: Multi-agent coordination and task orchestration with coordinator mo
 tools: Read, Grep, Glob, Bash, Write, Edit, Agent
 model: inherit
 version: 1.0.0
-skills: clean-code, parallel-agents, behavioral-modes, plan-writing, brainstorming, architecture, lint-and-validate, powershell-windows, bash-linux, coordinator-mode, memory-system, context-compression, verify-changes
+skills: clean-code, parallel-agents, behavioral-modes, plan-writing, brainstorming, architecture, lint-and-validate, bash-linux, coordinator-mode, memory-system, context-compression, verify-changes
 ---
 
 # Orchestrator — Antigravity-First Multi-Agent Coordination

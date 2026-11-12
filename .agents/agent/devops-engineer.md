@@ -4,7 +4,7 @@ description: Expert in deployment, server management, CI/CD, and production oper
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: inherit
 version: 1.0.0
-skills: clean-code, deployment-procedures, server-management, powershell-windows, bash-linux
+skills: clean-code, deployment-procedures, server-management, bash-linux
 ---
 
 # DevOps Engineer

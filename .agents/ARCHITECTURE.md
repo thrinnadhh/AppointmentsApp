@@ -105,7 +105,6 @@ Specialist AI personas for different domains.
 | `backend-specialist`     | API, business logic        | api-patterns, nodejs-best-practices, database-design     |
 | `database-architect`     | Schema, SQL                | database-design                                          |
 | `mobile-developer`       | iOS, Android, RN           | mobile-design                                            |
-| `game-developer`         | Game logic, mechanics      | game-development                                         |
 | `devops-engineer`        | CI/CD, Docker              | deployment-procedures, server-management                 |
 | `security-auditor`       | Security compliance        | vulnerability-scanner, red-team-tactics                  |
 | `penetration-tester`     | Offensive security         | red-team-tactics                                         |
@@ -144,7 +143,6 @@ Modular knowledge domains that agents can load on-demand based on task context. 
 | `api-patterns`          | REST, GraphQL, tRPC            |
 | `nodejs-best-practices` | Node.js async, modules         |
 | `python-patterns`       | Python standards, FastAPI      |
-| `rust-pro`              | Rust async, systems, type system |
 
 ### Database
 
@@ -191,12 +189,6 @@ Modular knowledge domains that agents can load on-demand based on task context. 
 | --------------- | --------------------- |
 | `mobile-design` | Mobile UI/UX patterns |
 
-### Game Development
-
-| Skill              | Description           |
-| ------------------ | --------------------- |
-| `game-development` | Game logic, mechanics |
-
 ### SEO & Growth
 
 | Skill              | Description                   |
@@ -209,7 +201,6 @@ Modular knowledge domains that agents can load on-demand based on task context. 
 | Skill                | Description               |
 | -------------------- | ------------------------- |
 | `bash-linux`         | Linux commands, scripting |
-| `powershell-windows` | Windows PowerShell        |
 
 ### Orchestration & Memory (2026.5.13)
 
@@ -366,8 +357,8 @@ For command details and prerequisites, see [scripts/README.md](scripts/README.md
 
 | Metric              | Value                             |
 | ------------------- | --------------------------------- |
-| **Total Agents**    | 20 (1 major upgrade in 2026.5.13) |
-| **Total Skills**    | 57                                |
+| **Total Agents**    | 19 (1 major upgrade in 2026.5.13) |
+| **Total Skills**    | 86                                |
 | **Total Workflows** | 13 (+2 new in 2026.5.13)          |
 | **Toolkit Utilities** | 7 user-facing + 2 internal modules |
 | **Antigravity Utilities** | 4 runtime utilities              |

@@ -13,9 +13,7 @@
           "lint-and-validate": "^1.0.0",
           "mcp-builder": "^1.0.0",
           "nodejs-best-practices": "^1.0.0",
-          "powershell-windows": "^1.0.0",
-          "python-patterns": "^1.0.0",
-          "rust-pro": "^1.0.0"
+          "python-patterns": "^1.0.0"
         }
       },
       "tools": [
@@ -92,7 +90,6 @@
           "bash-linux": "^1.0.0",
           "clean-code": "^2.0.0",
           "deployment-procedures": "^1.0.0",
-          "powershell-windows": "^1.0.0",
           "server-management": "^1.0.0"
         }
       },
@@ -172,25 +169,6 @@
       ],
       "version": "1.0.0"
     },
-    "game-developer": {
-      "model": "inherit",
-      "path": "agent/game-developer.md",
-      "requires": {
-        "skills": {
-          "clean-code": "^2.0.0",
-          "game-development": "^1.0.0"
-        }
-      },
-      "tools": [
-        "Read",
-        "Write",
-        "Edit",
-        "Bash",
-        "Grep",
-        "Glob"
-      ],
-      "version": "1.0.0"
-    },
     "mobile-developer": {
       "model": "inherit",
       "path": "agent/mobile-developer.md",
@@ -227,7 +205,6 @@
           "memory-system": "^1.0.0",
           "parallel-agents": "^1.0.0",
           "plan-writing": "^1.0.0",
-          "powershell-windows": "^1.0.0",
           "verify-changes": "^1.0.0"
         }
       },
@@ -672,6 +649,12 @@
       "scripts": [],
       "version": "1.0.0"
     },
+    "codebase-mapper": {
+      "allowedTools": [],
+      "path": "skills/codebase-mapper/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
     "context-compression": {
       "allowedTools": [
         "Read",
@@ -681,6 +664,24 @@
       "path": "skills/context-compression/SKILL.md",
       "scripts": [],
       "version": "1.0.0"
+    },
+    "context-compressor": {
+      "allowedTools": [],
+      "path": "skills/context-compressor/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "context-fetch": {
+      "allowedTools": [],
+      "path": "skills/context-fetch/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "context-health-monitor": {
+      "allowedTools": [],
+      "path": "skills/context-health-monitor/SKILL.md",
+      "scripts": [],
+      "version": ""
     },
     "coordinator-mode": {
       "allowedTools": [
@@ -709,6 +710,12 @@
         "skills/database-design/scripts/schema_validator.py"
       ],
       "version": "1.0.0"
+    },
+    "debugger": {
+      "allowedTools": [],
+      "path": "skills/debugger/SKILL.md",
+      "scripts": [],
+      "version": ""
     },
     "deployment-procedures": {
       "allowedTools": [
@@ -742,6 +749,18 @@
       "path": "skills/documentation-templates/SKILL.md",
       "scripts": [],
       "version": "1.0.0"
+    },
+    "empirical-validation": {
+      "allowedTools": [],
+      "path": "skills/empirical-validation/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "executor": {
+      "allowedTools": [],
+      "path": "skills/executor/SKILL.md",
+      "scripts": [],
+      "version": ""
     },
     "find-security-vulnerabilities-in-code": {
       "allowedTools": [
@@ -793,19 +812,6 @@
         "skills/frontend-design/scripts/accessibility_checker.py",
         "skills/frontend-design/scripts/ux_audit.py"
       ],
-      "version": "1.0.0"
-    },
-    "game-development": {
-      "allowedTools": [
-        "Read",
-        "Write",
-        "Edit",
-        "Glob",
-        "Grep",
-        "Bash"
-      ],
-      "path": "skills/game-development/SKILL.md",
-      "scripts": [],
       "version": "1.0.0"
     },
     "geo-fundamentals": {
@@ -866,6 +872,120 @@
       "path": "skills/managed-pentesting-with-strix/SKILL.md",
       "scripts": [],
       "version": "1.0.0"
+    },
+    "mantis-advise": {
+      "allowedTools": [],
+      "path": "skills/mantis-advise/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-architecture": {
+      "allowedTools": [],
+      "path": "skills/mantis-architecture/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-calibrate": {
+      "allowedTools": [],
+      "path": "skills/mantis-calibrate/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-chain": {
+      "allowedTools": [],
+      "path": "skills/mantis-chain/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-critic": {
+      "allowedTools": [],
+      "path": "skills/mantis-critic/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-dedupe": {
+      "allowedTools": [],
+      "path": "skills/mantis-dedupe/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-history": {
+      "allowedTools": [],
+      "path": "skills/mantis-history/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-meta-agent": {
+      "allowedTools": [],
+      "path": "skills/mantis-meta-agent/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-patch": {
+      "allowedTools": [],
+      "path": "skills/mantis-patch/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-pipeline-adapter": {
+      "allowedTools": [],
+      "path": "skills/mantis-pipeline-adapter/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-plan": {
+      "allowedTools": [],
+      "path": "skills/mantis-plan/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-reflect": {
+      "allowedTools": [],
+      "path": "skills/mantis-reflect/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-report": {
+      "allowedTools": [],
+      "path": "skills/mantis-report/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-reproduce": {
+      "allowedTools": [],
+      "path": "skills/mantis-reproduce/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-researcher": {
+      "allowedTools": [],
+      "path": "skills/mantis-researcher/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-review": {
+      "allowedTools": [],
+      "path": "skills/mantis-review/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-structural-index": {
+      "allowedTools": [],
+      "path": "skills/mantis-structural-index/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-summarize": {
+      "allowedTools": [],
+      "path": "skills/mantis-summarize/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "mantis-threat-model": {
+      "allowedTools": [],
+      "path": "skills/mantis-threat-model/SKILL.md",
+      "scripts": [],
+      "version": ""
     },
     "mcp-builder": {
       "allowedTools": [
@@ -977,6 +1097,12 @@
       ],
       "version": "1.0.0"
     },
+    "plan-checker": {
+      "allowedTools": [],
+      "path": "skills/plan-checker/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
     "plan-writing": {
       "allowedTools": [
         "Read",
@@ -987,18 +1113,11 @@
       "scripts": [],
       "version": "1.0.0"
     },
-    "powershell-windows": {
-      "allowedTools": [
-        "Read",
-        "Write",
-        "Edit",
-        "Glob",
-        "Grep",
-        "Bash"
-      ],
-      "path": "skills/powershell-windows/SKILL.md",
+    "planner": {
+      "allowedTools": [],
+      "path": "skills/planner/SKILL.md",
       "scripts": [],
-      "version": "1.0.0"
+      "version": ""
     },
     "python-patterns": {
       "allowedTools": [
@@ -1019,19 +1138,6 @@
         "Grep"
       ],
       "path": "skills/red-team-tactics/SKILL.md",
-      "scripts": [],
-      "version": "1.0.0"
-    },
-    "rust-pro": {
-      "allowedTools": [
-        "Read",
-        "Write",
-        "Edit",
-        "Glob",
-        "Grep",
-        "Bash"
-      ],
-      "path": "skills/rust-pro/SKILL.md",
       "scripts": [],
       "version": "1.0.0"
     },
@@ -1094,6 +1200,12 @@
       "scripts": [],
       "version": "1.0.0"
     },
+    "subagent-delegation": {
+      "allowedTools": [],
+      "path": "skills/subagent-delegation/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
     "systematic-debugging": {
       "allowedTools": [
         "Read",
@@ -1143,6 +1255,24 @@
         "skills/testing-patterns/scripts/test_runner.py"
       ],
       "version": "1.0.0"
+    },
+    "token-budget": {
+      "allowedTools": [],
+      "path": "skills/token-budget/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "untangle-codebase": {
+      "allowedTools": [],
+      "path": "skills/untangle-codebase/SKILL.md",
+      "scripts": [],
+      "version": ""
+    },
+    "verifier": {
+      "allowedTools": [],
+      "path": "skills/verifier/SKILL.md",
+      "scripts": [],
+      "version": ""
     },
     "verify-changes": {
       "allowedTools": [
