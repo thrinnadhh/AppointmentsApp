@@ -227,8 +227,8 @@ export async function POST(req: NextRequest) {
               .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
               .eq('gateway_payment_id', paymentId);
 
-            const safePaymentId = String(paymentId).replace(/[\r\n]+/g, ' ');
-            const safeErrorMsg = String(errorMsg).replace(/[\r\n]+/g, ' ');
+            const safePaymentId = String(paymentId).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
+            const safeErrorMsg = String(errorMsg).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
             console.error(
               '\n====================================================================\n' +
               '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +

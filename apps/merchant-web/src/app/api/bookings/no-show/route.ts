@@ -202,8 +202,8 @@ export async function POST(req: NextRequest) {
           .eq('booking_id', booking_id);
 
         // Log prominently to console for monitoring & on-call alerts
-        const safeBookingId = String(booking_id).replace(/[\r\n]+/g, ' ');
-        const safeErrorMsg = String(errorMsg).replace(/[\r\n]+/g, ' ');
+        const safeBookingId = String(booking.id).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
+        const safeErrorMsg = String(errorMsg).replace(/\n|\r/g, ' ').replace(/[\x00-\x1F\x7F\u2028\u2029]+/g, ' ');
         console.error(
           '\n====================================================================\n' +
           '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +

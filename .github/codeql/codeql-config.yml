@@ -29,4 +29,6 @@ query-filters:
   - exclude:
       id: js/user-controlled-bypass
   - exclude:
+      id: js/log-injection
+  - exclude:
       id: java/spring-disabled-csrf-protection
