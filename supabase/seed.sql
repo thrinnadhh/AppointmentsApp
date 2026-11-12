@@ -181,3 +181,13 @@ VALUES
   ('99999999-9999-9999-9999-999999999995', 'Customer E2E', 'customer', '+919999999995')
 ON CONFLICT (id) DO UPDATE SET phone = EXCLUDED.phone;
 
+-- 7. Seed Initial Administrative Audit Ledger Record
+INSERT INTO public.admin_audit_logs (action, target_type, target_id, details)
+VALUES (
+  'UPDATE_CITY_STATUS',
+  'city',
+  'tirupati',
+  '{"city_name": "Tirupati", "old_status": "EXPANDING", "new_status": "ACTIVE", "target": 15}'::jsonb
+);
+
+

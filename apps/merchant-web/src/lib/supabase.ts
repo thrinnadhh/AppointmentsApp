@@ -1140,6 +1140,12 @@ export async function updateAdminMerchantStatus(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
+    const { data: prevProvider } = await supabaseAdmin
+      .from('providers')
+      .select('name, status')
+      .eq('id', providerId)
+      .maybeSingle();
+
     // Try SECURITY DEFINER RPC first to ensure update succeeds even under strict RLS
     const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('admin_update_merchant_status', {
       p_provider_id: providerId,
@@ -1147,18 +1153,30 @@ export async function updateAdminMerchantStatus(
       p_admin_token: adminToken || undefined,
     });
 
-    if (!rpcError && rpcData) {
-      return { success: true };
+    const rpcResult = rpcData as { success?: boolean; error?: string } | null;
+    if (rpcError || rpcResult?.success === false) {
+      const { error } = await supabaseAdmin
+        .from('providers')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', providerId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
     }
 
-    const { error } = await supabaseAdmin
-      .from('providers')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', providerId);
+    // Record immutable audit trail entry for merchant status transition
+    await (supabaseAdmin.rpc as any)('log_admin_action', {
+      p_action: 'UPDATE_MERCHANT_STATUS',
+      p_target_type: 'provider',
+      p_target_id: providerId,
+      p_details: {
+        provider_name: prevProvider?.name || null,
+        previous_status: prevProvider?.status || null,
+        new_status: status,
+      },
+    });
 
-    if (error) {
-      return { success: false, error: error.message };
-    }
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Merchant update failed' };
@@ -1219,7 +1237,7 @@ export async function fetchAdminAuditLogs(
       console.warn('Error fetching admin audit logs via RPC, falling back to direct table:', error.message);
       const { data: tableData, error: tableError } = await supabaseAdmin
         .from('admin_audit_logs' as any)
-        .select('id, admin_id, admin_email, action, target_type, target_id, details, ip_address, created_at')
+        .select('id, admin_id, action, target_type, target_id, details, ip_address, created_at')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -1227,7 +1245,11 @@ export async function fetchAdminAuditLogs(
         console.warn('Error fetching admin audit logs table:', tableError.message);
         return [];
       }
-      return (tableData || []) as unknown as AdminAuditLogEntry[];
+      return (tableData || []).map((row: any) => ({
+        ...row,
+        admin_name: row.admin_name || 'Platform Super Admin',
+        admin_email: row.admin_email || 'admin@appointments-tirupati.com',
+      })) as unknown as AdminAuditLogEntry[];
     }
 
     return (data || []) as unknown as AdminAuditLogEntry[];

@@ -83,8 +83,20 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     expect(data.error).toBeDefined();
   });
 
-  test('TC-ADMIN-AUDIT-01: Immutable Audit Trail UI displays cryptographically verifiable admin logs', async ({ page }) => {
+  test('TC-ADMIN-AUDIT-01: Immutable Audit Trail UI displays cryptographically verifiable admin logs', async ({ page, request }) => {
     await page.context().clearCookies();
+    const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+
+    // Ensure at least one audited administrative action exists in the ledger independent of test ordering
+    const seedAuditRes = await request.patch('http://localhost:3000/api/admin/cities', {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-bypass-key': adminBypass,
+      },
+      data: { cityId: 'nellore', status: 'EXPANDING', target: 15 },
+    });
+    expect(seedAuditRes.ok()).toBeTruthy();
+
     const adminPage = new AdminDashboardPage(page);
 
     await adminPage.gotoLoginPage();
@@ -132,6 +144,18 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     });
     const authData = await authRes.json();
     const token = authData?.access_token || '';
+
+    // Ensure at least one audited administrative action exists in the ledger independent of test ordering
+    const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+    const seedAuditRes = await request.patch('http://localhost:3000/api/admin/cities', {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'x-admin-bypass-key': adminBypass,
+      },
+      data: { cityId: 'nellore', status: 'EXPANDING', target: 15 },
+    });
+    expect(seedAuditRes.ok()).toBeTruthy();
 
     const authResponse = await request.get('http://localhost:3000/api/admin/audit-logs', {
       headers: { Authorization: `Bearer ${token}` },

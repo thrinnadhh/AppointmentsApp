@@ -402,6 +402,17 @@ async function seedE2EData() {
     })
   });
 
+  // Record initial territory governance audit log entry via update_city_status RPC
+  await fetch(`${url}/rest/v1/rpc/update_city_status`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      p_city_id: 'nellore',
+      p_status: 'EXPANDING',
+      p_target: 15
+    })
+  });
+
   console.log('✅ Remote Supabase database reseeded successfully!');
 }
 

@@ -210,41 +210,51 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
 
   // ─── EC-MERCH-06: Suspended merchant UI shows locked banner ───────────────
   test('EC-MERCH-06: Suspended merchant portal displays Account Suspended banner prominently', async ({ page, request }) => {
-    // 1. Resolve target merchant provider to suspend
+    // 1. Resolve target merchant provider corresponding to the login credentials
     const merchantsRes = await request.get(`${BASE}/api/admin/merchants`, {
       headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
     });
+    expect(merchantsRes.ok()).toBeTruthy();
     const { merchants } = await merchantsRes.json();
-    const testEmail = process.env.TEST_MERCHANT_EMAIL || 'admin.apex@test-tirupati.local';
+    const testEmail = (process.env.TEST_MERCHANT_EMAIL || 'admin.apex@test-tirupati.local').trim();
+    const testPassword = process.env.TEST_MERCHANT_PASSWORD || 'HospitalTest2026!';
+    const normalizedEmail = testEmail.toLowerCase();
+
     const targetMerchant =
-      (merchants || []).find((m: any) => m.name?.includes('[TEST-HOSP-A]')) ||
-      (merchants || []).find((m: any) => m.email === testEmail) ||
-      (merchants || []).find((m: any) => m.name?.includes('Apex')) ||
+      (merchants || []).find((m: any) => m.email?.toLowerCase() === normalizedEmail) ||
+      (normalizedEmail.includes('svims.clinic')
+        ? (merchants || []).find(
+            (m: any) => m.id === MERCHANT_A_PROVIDER_ID || m.name?.includes('Sri Venkateswara Dental')
+          ) || { id: MERCHANT_A_PROVIDER_ID }
+        : (merchants || []).find(
+            (m: any) => m.name?.includes('[TEST-HOSP-A]') || m.name?.includes('Apex')
+          )) ||
       { id: MERCHANT_A_PROVIDER_ID };
     const targetProviderId = targetMerchant.id;
 
     // Suspend merchant
-    await request.patch(`${BASE}/api/admin/merchants`, {
+    const suspendRes = await request.patch(`${BASE}/api/admin/merchants`, {
       headers: {
         'Content-Type': 'application/json',
         'x-admin-bypass-key': ADMIN_BYPASS,
       },
       data: { providerId: targetProviderId, status: 'SUSPENDED' },
     });
+    expect(suspendRes.ok()).toBeTruthy();
 
     try {
-      // 2. Load merchant portal and log in if unauthenticated
+      // 2. Load merchant portal, wait for login form hydration, and authenticate
       await page.goto(`${MERCHANT_BASE}/login`);
+      await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
       const emailInput = page.getByTestId('login-email');
       if (await emailInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await emailInput.fill(process.env.TEST_MERCHANT_EMAIL || 'admin.apex@test-tirupati.local');
-        await page.getByTestId('login-password').fill(process.env.TEST_MERCHANT_PASSWORD || 'HospitalTest2026!');
+        await emailInput.fill(testEmail);
+        await page.getByTestId('login-password').fill(testPassword);
         await page.getByTestId('login-submit').click();
-        await page.waitForURL((url) => url.pathname === '/' || url.pathname === '', { timeout: 15000 }).catch(() => null);
+        await page.waitForURL((url) => url.pathname === '/' || url.pathname === '', { timeout: 15000 });
       } else {
         await page.goto(`${MERCHANT_BASE}/`);
       }
-      await page.locator('[data-hydrated="true"]').waitFor({ timeout: 15000 }).catch(() => null);
 
       // 3. Verify suspension banner is visible
       const suspendedBanner = page.getByText(/Account Suspended|Bookings Paused/i).first();
