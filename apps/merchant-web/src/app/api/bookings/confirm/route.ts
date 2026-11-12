@@ -4,7 +4,7 @@ import { localDbStore, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { verifyRazorpaySignature, fetchRazorpayPayment, fetchRazorpayOrder, isRazorpayConfigured, canMockPayments } from '@/lib/razorpay';
+import { verifyRazorpaySignature, fetchRazorpayPayment, fetchRazorpayOrder, canMockPayments } from '@/lib/razorpay';
 import { ConfirmPaymentResponse } from '@appointments/shared';
 
 interface ExtendedConfirmRequest {
@@ -247,8 +247,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Strictly assert booking.gateway_order_id is non-null and strictly equals the incoming razorpay_order_id
       const allowMockOrder = canMockPayments() && razorpay_order_id.startsWith('order_mock_');
+      if (isMockOrder && !allowMockOrder && !canMockPayments()) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Mock payments and mock orders are strictly forbidden in this environment' },
+          { status: 400 }
+        );
+      }
+
+      // Strictly assert booking.gateway_order_id is non-null and strictly equals the incoming razorpay_order_id
       if (!booking.gateway_order_id || booking.gateway_order_id !== razorpay_order_id) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },

@@ -1,16 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { 
-  Category, 
   Provider, 
   Resource, 
   ResourceType,
   Slot, 
   Booking, 
-  CreateHoldResult, 
-  VERTICALS,
   Database,
   resolveCategoryId,
-  normCategory,
   City,
   WeeklyHours,
   DayOfWeek,
@@ -1623,7 +1619,7 @@ export async function fetchActiveCities(includeExpanding: boolean = true): Promi
       return fallback;
     }
 
-    const result = (data as unknown as City[]) || [];
+    const result = data as unknown as City[];
     activeCitiesCache = { data: result, timestamp: Date.now() };
     return result;
   } catch (err) {

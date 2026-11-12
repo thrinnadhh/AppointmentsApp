@@ -15,6 +15,10 @@ export async function POST(req: NextRequest) {
       authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`);
 
     let isAuthorized = isServiceRole;
+    const caller = isAuthorized ? null : await verifyAuthenticatedUser(req);
+    if (!isAuthorized && !caller) {
+      return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
+    }
 
     const body = await req.json();
     const { doctor_id, date, currently_serving_token, waiting_count } = body;
@@ -28,12 +32,7 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
-    if (!isAuthorized) {
-      const caller = await verifyAuthenticatedUser(req);
-      if (!caller) {
-        return NextResponse.json({ error: 'Unauthorized: Session required' }, { status: 401 });
-      }
-
+    if (!isAuthorized && caller) {
       const { data: resource } = await supabaseAdmin
         .from('resources')
         .select('id, provider_id')

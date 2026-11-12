@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useTransition } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -11,17 +11,13 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Users,
-  ChevronRight,
   ShieldCheck,
   ShieldAlert,
   RefreshCw,
   Plus,
   ArrowUpRight,
-  Filter,
   Sparkles,
   Search,
-  ExternalLink,
   PauseCircle,
   PlayCircle,
   Compass,
@@ -29,15 +25,11 @@ import {
   Ban,
   LogOut,
   Lock,
-  FileText,
-  History,
   Smartphone,
   Trash2,
   X,
   Terminal,
-  ChevronDown,
   Activity,
-  LayoutDashboard,
 } from 'lucide-react';
 import {
   CityAdminStats,
@@ -85,7 +77,6 @@ const TIME_WINDOWS: { id: TimeWindowFilter; label: string; sub: string }[] = [
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [selectedWindow, setSelectedWindow] = useState<TimeWindowFilter>('7days');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,13 +109,12 @@ export default function AdminDashboardPage() {
   // Application & Component Observability Logs State
   const [appLogs, setAppLogs] = useState<AppLogEntry[]>([]);
   const [appLogsLoading, setAppLogsLoading] = useState(false);
-  const [appLogSearchQuery, setAppLogSearchQuery] = useState('');
-  const [appLogPlatformFilter, setAppLogPlatformFilter] = useState<'all' | 'web' | 'mobile' | 'backend'>('all');
-  const [appLogLevelFilter, setAppLogLevelFilter] = useState<'all' | 'error' | 'warn' | 'info'>('all');
-  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [appLogSearchQuery] = useState('');
+  const [appLogPlatformFilter] = useState<'all' | 'web' | 'mobile' | 'backend'>('all');
+  const [appLogLevelFilter] = useState<'all' | 'error' | 'warn' | 'info'>('all');
   const [purgingLogs, setPurgingLogs] = useState(false);
 
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
@@ -132,7 +122,7 @@ export default function AdminDashboardPage() {
   const [showAddCityModal, setShowAddCityModal] = useState(false);
   const [newCityId, setNewCityId] = useState('');
   const [newCityName, setNewCityName] = useState('');
-  const [newCityState, setNewCityState] = useState('Andhra Pradesh');
+  const [newCityState] = useState('Andhra Pradesh');
   const [newCityLat, setNewCityLat] = useState('14.4426');
   const [newCityLng, setNewCityLng] = useState('79.9865');
   const [newCityRadius, setNewCityRadius] = useState('20');

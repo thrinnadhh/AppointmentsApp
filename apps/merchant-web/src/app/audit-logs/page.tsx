@@ -7,18 +7,13 @@ import {
   Search, 
   RefreshCw, 
   AlertCircle, 
-  Filter, 
   Clock, 
   User, 
   FileText, 
   ChevronDown, 
   ChevronUp, 
   AlertTriangle,
-  Building2,
-  Users,
-  Calendar,
-  CheckCircle2,
-  ExternalLink
+  Building2
 } from 'lucide-react';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
@@ -34,7 +29,7 @@ interface AuditLogEntry {
 }
 
 function AuditLogsContent() {
-  const { activeProvider, isSuperAdmin, isHospitalAdmin } = useMerchantTenant();
+  const { isSuperAdmin, isHospitalAdmin } = useMerchantTenant();
 
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);

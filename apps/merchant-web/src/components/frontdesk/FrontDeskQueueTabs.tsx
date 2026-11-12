@@ -2,24 +2,17 @@
 
 import React, { useState } from 'react';
 import { 
-  Users, 
   Clock, 
   CheckCircle2, 
   CalendarDays, 
   UserCheck, 
   AlertCircle, 
-  ArrowRight,
   Phone,
   Play,
-  Check,
   Search,
   UserX,
-  Sparkles,
-  HelpCircle,
-  FileText,
   Stethoscope
 } from 'lucide-react';
-import { CustomerContactBadge } from '@/components/CustomerContactBadge';
 
 export interface FrontDeskQueueBooking {
   id: string;

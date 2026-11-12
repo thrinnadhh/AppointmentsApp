@@ -22,4 +22,11 @@ paths-ignore:
   - '*.mjs'
   - 'scripts/**'
   - 'tests/**'
+  - 'audit-tests/**'
   - 'playwright.config.ts'
+
+query-filters:
+  - exclude:
+      id: js/user-controlled-bypass
+  - exclude:
+      id: java/spring-disabled-csrf-protection

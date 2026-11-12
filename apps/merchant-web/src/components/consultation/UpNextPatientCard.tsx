@@ -9,7 +9,6 @@ import {
   AlertCircle, 
   CheckCircle,
   HelpCircle,
-  ShieldCheck,
   Sparkles
 } from 'lucide-react';
 import { ActiveConsultationBooking } from './ActiveConsultationCard';

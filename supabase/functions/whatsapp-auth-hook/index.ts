@@ -114,6 +114,11 @@ function getCorsHeaders(req: Request) {
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   // Feature flag check: default OFF
   const isEnabled = Deno.env.get('ENABLE_WHATSAPP_AUTH_HOOK') === 'true';
 

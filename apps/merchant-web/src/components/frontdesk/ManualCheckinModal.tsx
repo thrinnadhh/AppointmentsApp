@@ -5,12 +5,10 @@ import {
   X, 
   UserCheck, 
   Search, 
-  FileText, 
   AlertCircle, 
   Clock, 
   Loader2, 
-  CheckCircle2,
-  Calendar
+  CheckCircle2
 } from 'lucide-react';
 
 export interface UpcomingCandidateBooking {

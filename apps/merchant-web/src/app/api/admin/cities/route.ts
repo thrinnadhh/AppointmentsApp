@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
       id,
       name,
       state = 'Andhra Pradesh',
-      country = 'India',
       status = 'EXPANDING',
       latitude,
       longitude,

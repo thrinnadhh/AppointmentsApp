@@ -10,8 +10,7 @@ import {
   Clock, 
   Lock, 
   UserPlus, 
-  ShieldAlert,
-  ArrowRight
+  ShieldAlert
 } from 'lucide-react';
 
 export interface CheckinSuccessData {

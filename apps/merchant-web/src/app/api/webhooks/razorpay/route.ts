@@ -227,13 +227,15 @@ export async function POST(req: NextRequest) {
               .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
               .eq('gateway_payment_id', paymentId);
 
+            const safePaymentId = String(paymentId).replace(/[\r\n]+/g, ' ');
+            const safeErrorMsg = String(errorMsg).replace(/[\r\n]+/g, ' ');
             console.error(
               '\n====================================================================\n' +
               '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
               `Booking ID: ${booking.id}\n` +
-              `Payment ID: ${paymentId}\n` +
+              `Payment ID: ${safePaymentId}\n` +
               `Refund Amount: ₹${depositInInr}\n` +
-              `Error: ${errorMsg}\n` +
+              `Error: ${safeErrorMsg}\n` +
               'Action: Manual investigation required in Razorpay Dashboard.\n' +
               '====================================================================\n'
             );

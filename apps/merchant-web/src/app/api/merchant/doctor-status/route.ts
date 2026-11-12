@@ -7,6 +7,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { provider_id, resource_id, doctor_left } = body;
 
@@ -14,14 +22,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: provider_id, resource_id, doctor_left' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
       );
     }
 

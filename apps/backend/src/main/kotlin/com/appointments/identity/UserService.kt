@@ -15,8 +15,9 @@ class UserService(private val userRepository: UserRepository) {
 
     @Transactional
     fun provisionUser(authRef: String, email: String?, phone: String?): UserEntity {
+        val safeAuthRef = authRef.replace("\r", "").replace("\n", "")
         if (userRepository.existsByAuthRef(authRef)) {
-            log.debug("User already provisioned: authRef={}", authRef)
+            log.debug("User already provisioned: authRef={}", safeAuthRef)
             return userRepository.findByAuthRef(authRef)!!
         }
         val user = UserEntity(
@@ -26,7 +27,7 @@ class UserService(private val userRepository: UserRepository) {
             role = "customer",
         )
         return userRepository.save(user).also {
-            log.info("Provisioned new user: id={}, authRef={}", it.id, authRef)
+            log.info("Provisioned new user: id={}, authRef={}", it.id, safeAuthRef)
         }
     }
 

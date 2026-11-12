@@ -11,8 +11,6 @@ import {
   Sparkles,
   RefreshCw,
   Building2,
-  Stethoscope,
-  Calendar,
   AlertCircle,
   ShieldCheck,
   ArrowRight,

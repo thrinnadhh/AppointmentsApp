@@ -8,15 +8,11 @@ import {
   CheckCircle2, 
   Zap, 
   ArrowRight, 
-  Building2, 
   CalendarDays,
-  AlertCircle,
   Stethoscope,
   Calendar,
   Trash2,
-  Plus,
-  ShieldCheck,
-  UserCheck
+  Plus
 } from 'lucide-react';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 import { Resource } from '@appointments/shared';
@@ -33,7 +29,7 @@ interface DoctorLeave {
 }
 
 export default function ScheduleManagementPage() {
-  const { activeProvider, isHospitalAdmin, isSuperAdmin, verticalConfig } = useMerchantTenant();
+  const { activeProvider } = useMerchantTenant();
 
   const resources: Resource[] = useMemo(() => {
     return (activeProvider?.resources as Resource[]) || [];

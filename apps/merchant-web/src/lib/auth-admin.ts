@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { AsyncLocalStorage } from 'async_hooks';
-import crypto from 'crypto';
 import './env-check';
 import { getSupabaseAdmin, registerLocalCheckFn } from './supabase';
 

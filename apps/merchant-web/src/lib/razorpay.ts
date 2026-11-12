@@ -48,10 +48,6 @@ export interface RazorpayRefundResult {
   error?: string;
 }
 
-const KEY_ID = process.env.RAZORPAY_KEY_ID;
-const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
-const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
-
 /**
  * Fail-fast runtime assertion: Ensure critical payment secrets are configured before executing live operations.
  * Deferring check from top-level module load prevents build crashes during Next.js SSG / page data collection.
@@ -735,15 +731,20 @@ export async function initiateRazorpayRefund(params: RefundParams): Promise<Razo
     (paymentId.startsWith('sim_') || paymentId.startsWith('mock_'));
 
   if (isRazorpayConfigured() && !isSyntheticMock) {
+    if (!/^pay_[A-Za-z0-9_-]{4,64}$/.test(paymentId)) {
+      throw new Error('Invalid Razorpay payment ID format');
+    }
+    const safePaymentId = encodeURIComponent(paymentId);
     const keyId = process.env.RAZORPAY_KEY_ID!;
     const keySecret = process.env.RAZORPAY_KEY_SECRET!;
     const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const idempotencyKey = resolveRefundIdempotencyKey(
       params.idempotencyKey,
-      `refund:${paymentId}:${amount ?? 'full'}:${notes.booking_id || ''}`
+      `refund:${safePaymentId}:${amount ?? 'full'}:${notes.booking_id || ''}`
     );
 
-    const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
+    const refundUrl = new URL(`/v1/payments/${safePaymentId}/refund`, 'https://api.razorpay.com');
+    const res = await fetch(refundUrl.toString(), {
       method: 'POST',
       headers: {
         Authorization: authHeader,

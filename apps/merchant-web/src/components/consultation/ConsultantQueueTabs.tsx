@@ -9,9 +9,7 @@ import {
   AlertTriangle,
   FileCheck,
   CalendarDays,
-  ShieldAlert,
-  ChevronRight,
-  ArrowUpDown
+  ShieldAlert
 } from 'lucide-react';
 import { ActiveConsultationBooking } from './ActiveConsultationCard';
 

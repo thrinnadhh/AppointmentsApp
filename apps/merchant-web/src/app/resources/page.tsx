@@ -10,7 +10,6 @@ import {
   Clock, 
   Check, 
   X, 
-  Sparkles, 
   RefreshCw, 
   Building2, 
   Stethoscope, 
@@ -1081,7 +1080,6 @@ function ResourcesManagementContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredResources.map((res) => {
             const price = res.price ?? 500;
-            const deposit = res.deposit_amount ?? 50;
             const department = res.department || 'General';
 
             return (

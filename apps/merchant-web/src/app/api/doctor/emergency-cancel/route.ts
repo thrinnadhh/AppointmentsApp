@@ -24,6 +24,14 @@ export interface DoctorEmergencyCancelResponse {
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<DoctorEmergencyCancelResponse>(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const body = (await req.json()) as DoctorEmergencyCancelRequest;
     const { doctor_resource_id, effective_from, reason } = body;
 
@@ -31,14 +39,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<DoctorEmergencyCancelResponse>(
         { success: false, error: 'Missing required parameter: doctor_resource_id' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json<DoctorEmergencyCancelResponse>(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
       );
     }
 

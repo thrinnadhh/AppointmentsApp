@@ -223,8 +223,6 @@ export function buildRollingTenSlotQueue(
         : new Date());
 
   const durationMs = slotDurationMinutes * 60 * 1000;
-  const anchorTimeIso = anchorStartTime.toISOString();
-
 
   // Normalize and filter out cancelled / no-show / completed / other-consultant bookings
   const activeBookings = (bookings || [])

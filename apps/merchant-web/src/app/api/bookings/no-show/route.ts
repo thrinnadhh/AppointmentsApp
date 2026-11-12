@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { initiateRazorpayRefund } from '@/lib/razorpay';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
@@ -17,6 +17,14 @@ interface RpcNoShowResult {
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<RecordNoShowResponse>(
+        { success: false, error: 'Authentication required to record a no-show' },
+        { status: 401 }
+      );
+    }
+
     const body = (await req.json()) as Partial<RecordNoShowRequest>;
     const { booking_id } = body;
 
@@ -24,14 +32,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<RecordNoShowResponse>(
         { success: false, error: 'Missing required parameter: booking_id' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json<RecordNoShowResponse>(
-        { success: false, error: 'Authentication required to record a no-show' },
-        { status: 401 }
       );
     }
 
@@ -202,13 +202,15 @@ export async function POST(req: NextRequest) {
           .eq('booking_id', booking_id);
 
         // Log prominently to console for monitoring & on-call alerts
+        const safeBookingId = String(booking_id).replace(/[\r\n]+/g, ' ');
+        const safeErrorMsg = String(errorMsg).replace(/[\r\n]+/g, ' ');
         console.error(
           '\n====================================================================\n' +
           '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
-          `Booking ID: ${booking_id}\n` +
+          `Booking ID: ${safeBookingId}\n` +
           `Payment ID: ${booking.gateway_payment_id}\n` +
           `Refund Amount: ₹${result.refund_amount ?? booking.deposit_amount ?? 100}\n` +
-          `Error: ${errorMsg}\n` +
+          `Error: ${safeErrorMsg}\n` +
           'Action: Manual investigation required in Razorpay Dashboard.\n' +
           '====================================================================\n'
         );

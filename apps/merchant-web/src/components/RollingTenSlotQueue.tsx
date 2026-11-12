@@ -6,10 +6,8 @@ import {
   UserCheck, 
   Sparkles, 
   ShieldCheck, 
-  ArrowRight, 
   Hourglass, 
   CheckCircle2, 
-  AlertCircle,
   Stethoscope,
   Zap,
   Info
@@ -35,9 +33,6 @@ export function RollingTenSlotQueue({
   onRefresh,
   isLoading = false,
 }: RollingTenSlotQueueProps) {
-  const currentSlot = slots[0];
-  const upcomingSlots = slots.slice(1);
-
   // Statistics across the 10 slots
   const presentCount = slots.filter((s) => s.isPresent).length;
   const freeGapsCount = slots.filter((s) => s.type === 'FREE_GAP').length;

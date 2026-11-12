@@ -57,7 +57,7 @@ export default function ProviderDetailScreen({
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [slotsReloadTick, setSlotsReloadTick] = useState(0);
   const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
-  const [checkingCooling, setCheckingCooling] = useState<boolean>(false);
+  const [, setCheckingCooling] = useState<boolean>(false);
   const lastBookedQueryId = useRef(0);
 
   // Generate 3 date options (Today, Tomorrow, Day after)

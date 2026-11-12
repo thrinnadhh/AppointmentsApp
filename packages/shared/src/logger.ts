@@ -162,19 +162,22 @@ export function sanitizeLogData<T = unknown>(input: T, depth = 0): T {
   }
 
   if (typeof input === 'object') {
-    const sanitizedObj: Record<string, unknown> = {};
+    const sanitizedEntries: Array<[string, unknown]> = [];
     for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        continue;
+      }
       if (SENSITIVE_KEY_REGEX.test(key)) {
-        sanitizedObj[key] = '[REDACTED]';
+        sanitizedEntries.push([key, '[REDACTED]']);
       } else if (MEDICAL_KEY_REGEX.test(key)) {
-        sanitizedObj[key] = '[REDACTED_MEDICAL]';
+        sanitizedEntries.push([key, '[REDACTED_MEDICAL]']);
       } else if (/(phone|mobile|contact)/i.test(key) && typeof value === 'string') {
-        sanitizedObj[key] = maskPhoneValue(value);
+        sanitizedEntries.push([key, maskPhoneValue(value)]);
       } else {
-        sanitizedObj[key] = sanitizeLogData(value, depth + 1);
+        sanitizedEntries.push([key, sanitizeLogData(value, depth + 1)]);
       }
     }
-    return sanitizedObj as unknown as T;
+    return Object.fromEntries(sanitizedEntries) as unknown as T;
   }
 
   return input;

@@ -26,7 +26,7 @@ export function generateCiEnv() {
     `DELETION_TOKEN_SECRET="${deletionSecret}"`,
     `ALLOW_MOCK_PAYMENTS="${allowMock}"`,
     `ENABLE_E2E_BYPASS="true"`,
-    `RAZORPAY_KEY_ID="rzp_test_51MockAppPlatform"`,
+    `RAZORPAY_KEY_ID="${process.env.RAZORPAY_KEY_ID || ''}"`,
     `RAZORPAY_KEY_SECRET="mock_secret_key_1234567890"`,
     `RAZORPAY_WEBHOOK_SECRET="mock_webhook_secret"`,
     `PAYMENT_GATEWAY_PROVIDER="cashfree"`,

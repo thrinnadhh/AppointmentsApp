@@ -8,7 +8,6 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  errorMessage: string;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -16,14 +15,12 @@ export class ErrorBoundary extends Component<Props, State> {
     super(props);
     this.state = {
       hasError: false,
-      errorMessage: '',
     };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(_error: Error): State {
     return {
       hasError: true,
-      errorMessage: error.message || 'An unexpected error occurred',
     };
   }
 
@@ -39,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   handleReload = (): void => {
-    this.setState({ hasError: false, errorMessage: '' });
+    this.setState({ hasError: false });
   };
 
   render(): ReactNode {

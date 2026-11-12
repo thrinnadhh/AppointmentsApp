@@ -6,6 +6,14 @@ import { RescheduleBookingRequest, RescheduleBookingResponse } from '@appointmen
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<RescheduleBookingResponse>(
+        { success: false, error: 'Authentication required to reschedule a booking' },
+        { status: 401 }
+      );
+    }
+
     const body = (await req.json()) as Partial<RescheduleBookingRequest>;
     const { booking_id, new_slot_start, new_slot_end, expected_version, expected_updated_at } = body as any;
 
@@ -13,14 +21,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<RescheduleBookingResponse>(
         { success: false, error: 'Missing required parameters: booking_id, new_slot_start, new_slot_end' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json<RescheduleBookingResponse>(
-        { success: false, error: 'Authentication required to reschedule a booking' },
-        { status: 401 }
       );
     }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { acquireSlotLock, releaseSlotLock, checkRateLimit } from '@/lib/redis';
 import { verifyAuthenticatedUser, getClientIp, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 import { captureException } from '@/lib/sentry';

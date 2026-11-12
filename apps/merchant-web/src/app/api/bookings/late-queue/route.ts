@@ -7,14 +7,20 @@ import {
 } from '@/lib/auth-admin';
 import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 import {
-  calculateArrivalTag,
-  computePatientETA,
   evaluateConsultantQueue,
   toClinicDateString,
 } from '@appointments/shared/queue-engine';
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { booking_id, action, buffer_offset = 2, provider_id, threshold_minutes = 45 } = body;
 
@@ -22,14 +28,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Missing required parameter: action' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
       );
     }
 

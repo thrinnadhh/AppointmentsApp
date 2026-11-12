@@ -8,6 +8,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required to start consultation' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { booking_id, expected_version, expected_updated_at } = body;
 
@@ -15,14 +23,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Missing required parameter: booking_id' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required to start consultation' },
-        { status: 401 }
       );
     }
 

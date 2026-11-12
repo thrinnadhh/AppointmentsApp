@@ -341,23 +341,6 @@ serve(async (req: Request) => {
         }
       }
     }
-          }
-        }
-      }
-
-      // 3b. Fallback to profiles.expo_push_token for backwards compatibility
-      if (pushTokensList.length === 0) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('expo_push_token')
-          .eq('id', booking.customer_id)
-          .maybeSingle();
-
-        if (profile?.expo_push_token && !pushTokensList.includes(profile.expo_push_token)) {
-          pushTokensList.push(profile.expo_push_token);
-        }
-      }
-    }
 
     // ── 4. Build Notification Content (Names patient if family booking) ─────
     const targetPatientName =

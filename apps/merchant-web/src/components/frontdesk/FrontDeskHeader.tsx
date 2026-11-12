@@ -7,9 +7,7 @@ import {
   Tv, 
   Users, 
   Clock, 
-  AlertCircle, 
   CheckCircle2, 
-  ChevronRight,
   ShieldCheck,
   UserCheck
 } from 'lucide-react';

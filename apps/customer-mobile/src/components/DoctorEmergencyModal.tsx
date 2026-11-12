@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Platform,
 } from 'react-native';
 import { Booking } from '@appointments/shared';
 import { chooseEmergencyOption } from '../services/api';

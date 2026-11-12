@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyStaffManagerRequest, isCallerAuthorizedForProvider, isCallerHospitalAdminForProvider } from '@/lib/auth-admin';
 
 export const dynamic = 'force-dynamic';

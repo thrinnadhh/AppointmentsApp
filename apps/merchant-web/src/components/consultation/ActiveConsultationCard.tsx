@@ -2,13 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  UserCheck, 
   Clock, 
   FileEdit, 
   CheckCircle, 
   Loader2, 
   AlertCircle,
-  Tag,
   Stethoscope,
   Sparkles
 } from 'lucide-react';

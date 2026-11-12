@@ -43,7 +43,7 @@ export default function SettingsPage() {
   const [razorpayKeyId, setRazorpayKeyId] = useState('');
   const [webhookSecretConfigured, setWebhookSecretConfigured] = useState(true);
   const [payoutUpi, setPayoutUpi] = useState('merchant.ops@upi');
-  const [bankAccount, setBankAccount] = useState('•••• •••• 9821 (SBI Tirupati Main Branch)');
+  const [bankAccount] = useState('•••• •••• 9821 (SBI Tirupati Main Branch)');
   const [minDeposit, setMinDeposit] = useState('50');
 
   // Notification State
@@ -53,7 +53,6 @@ export default function SettingsPage() {
 
   // Policy State
   const [cancellationWindowHours, setCancellationWindowHours] = useState('1');
-  const [forfeitOnNoShow, setForfeitOnNoShow] = useState(true);
   const [coolingPeriodDays, setCoolingPeriodDays] = useState<number>(0);
 
   useEffect(() => {

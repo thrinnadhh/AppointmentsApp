@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAdminRequest } from '@/lib/auth-admin';
-import { initiateRazorpayRefund } from '@/lib/razorpay';
 
 export const dynamic = 'force-dynamic';
 

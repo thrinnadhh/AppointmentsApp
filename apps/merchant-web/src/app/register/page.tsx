@@ -11,14 +11,10 @@ import {
   Phone, 
   MapPin, 
   Layers, 
-  Sparkles, 
   ArrowRight,
   ShieldCheck,
   RefreshCw,
   UploadCloud,
-  ImageIcon,
-  X,
-  Camera,
   User
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -26,7 +22,7 @@ import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 export default function ShopRegistrationPage() {
   const router = useRouter();
-  const { activeProvider, refreshTenant } = useMerchantTenant();
+  const { refreshTenant } = useMerchantTenant();
 
   const [user, setUser] = useState<{ id: string; email?: string; user_metadata?: any } | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);

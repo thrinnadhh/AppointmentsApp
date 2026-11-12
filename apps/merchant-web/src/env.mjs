@@ -99,7 +99,7 @@ export function isAppEnvKey(key) {
  * Validates environment variables and throws on default/placeholder values.
  */
 export function validateEnv(env = process.env, options = {}) {
-  const { throwOnError = true, isProduction = env.NODE_ENV === 'production', explicitOnly = false } = options;
+  const { throwOnError = true, isProduction = env.NODE_ENV === 'production' } = options;
   const errors = [];
 
   // 1. Scan application environment variables for forbidden placeholder patterns

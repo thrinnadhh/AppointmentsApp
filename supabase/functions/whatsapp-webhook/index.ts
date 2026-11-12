@@ -82,6 +82,10 @@ function getCorsHeaders(req: Request) {
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
   const url = new URL(req.url);
 
   // ───────────────────────────────────────────────────────────────────────────

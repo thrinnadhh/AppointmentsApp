@@ -21,6 +21,14 @@ export interface EmergencyChoiceResponse {
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<EmergencyChoiceResponse>(
+        { success: false, error: 'Unauthorized: Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const body = (await req.json()) as EmergencyChoiceRequest;
     const { booking_id, choice, reschedule_slot_start, reschedule_slot_end } = body;
 
@@ -35,14 +43,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<EmergencyChoiceResponse>(
         { success: false, error: 'Invalid choice. Must be WAIT, RESCHEDULE, or REFUND' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json<EmergencyChoiceResponse>(
-        { success: false, error: 'Unauthorized: Authentication required' },
-        { status: 401 }
       );
     }
 

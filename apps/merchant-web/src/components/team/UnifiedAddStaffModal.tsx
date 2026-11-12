@@ -11,7 +11,6 @@ import {
   AlertCircle, 
   RefreshCw, 
   Check, 
-  Building2, 
   Stethoscope, 
   Users, 
   ShieldCheck, 

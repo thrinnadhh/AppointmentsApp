@@ -19,6 +19,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 # ─── Environment defaults shared across jobs ───────────────────────────────────
 env:
   NODE_VERSION: '22'
@@ -59,6 +62,9 @@ jobs:
   security-audit:
     name: 🔒 Security & Dependency Audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -961,6 +967,7 @@ jobs:
   all-checks-pass:
     name: ✅ All CI Gates Passed
     runs-on: ubuntu-latest
+    permissions: {}
     needs:
       - security-audit
       - lint-typecheck

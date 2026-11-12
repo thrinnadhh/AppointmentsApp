@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { booking_id, new_position, doctor_id, provider_id, booking_ids } = body;
+    const { booking_id, new_position, booking_ids } = body;
 
     const caller = await verifyAuthenticatedUser(req);
     if (!caller) {

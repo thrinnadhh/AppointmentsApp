@@ -9,8 +9,6 @@ import {
   TrendingUp, 
   Users, 
   ArrowRight, 
-  Phone, 
-  User, 
   ShieldCheck, 
   MapPin,
   RefreshCw,
@@ -30,7 +28,6 @@ import {
   UserCheck,
   UserPlus,
   Ticket,
-  Stethoscope,
   ShieldAlert
 } from 'lucide-react';
 import { 
@@ -47,13 +44,12 @@ import {
   Resource,
   WeeklyHours,
   DayOfWeek,
-  DaySchedule,
   PROVIDER_SELECT_COLUMNS
 } from '@/lib/supabase';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 import { CustomerContactBadge } from '@/components/CustomerContactBadge';
 import FrontDeskHeader, { AssignedDoctor } from '@/components/frontdesk/FrontDeskHeader';
-import FastPassCheckinPanel, { CheckinSuccessData } from '@/components/frontdesk/FastPassCheckinPanel';
+import FastPassCheckinPanel from '@/components/frontdesk/FastPassCheckinPanel';
 import ManualCheckinModal, { UpcomingCandidateBooking } from '@/components/frontdesk/ManualCheckinModal';
 import FrontDeskQueueTabs, { FrontDeskQueueBooking } from '@/components/frontdesk/FrontDeskQueueTabs';
 import WaitingLoungeDisplayModal, { DisplayQueueItem } from '@/components/frontdesk/WaitingLoungeDisplayModal';
@@ -315,7 +311,6 @@ export default function MerchantOverviewPage() {
     isSuperAdmin, 
     isHospitalAdmin,
     isLocked, 
-    memberships, 
     switchActiveProvider,
     refreshTenant,
     isLoading: isTenantLoading,
@@ -446,8 +441,8 @@ export default function MerchantOverviewPage() {
   const [hoursActiveTab, setHoursActiveTab] = useState<'today' | 'tomorrow' | 'full_week'>('full_week');
   const [tempAutoAccept, setTempAutoAccept] = useState(true);
   const [tempDailyLimit, setTempDailyLimit] = useState(50);
-  const [tempOpeningTime, setTempOpeningTime] = useState('09:00');
-  const [tempClosingTime, setTempClosingTime] = useState('21:00');
+  const [, setTempOpeningTime] = useState('09:00');
+  const [, setTempClosingTime] = useState('21:00');
   const [tempWeeklyHours, setTempWeeklyHours] = useState<WeeklyHours>(DEFAULT_WEEKLY_HOURS);
   const [bulkOpenTime, setBulkOpenTime] = useState('09:00');
   const [bulkCloseTime, setBulkCloseTime] = useState('21:00');
@@ -1150,7 +1145,7 @@ export default function MerchantOverviewPage() {
     if (!activeProvider || isUpdatingOperational) return;
     setIsUpdatingOperational(true);
 
-    const { todayKey, tomorrowKey } = getKolkataDayKeys();
+    const { todayKey } = getKolkataDayKeys();
     const todaySched = tempWeeklyHours[todayKey] || tempWeeklyHours.monday;
     const newOpen = todaySched.open.length === 5 ? `${todaySched.open}:00` : todaySched.open;
     const newClose = todaySched.close.length === 5 ? `${todaySched.close}:00` : todaySched.close;
@@ -1427,7 +1422,6 @@ export default function MerchantOverviewPage() {
     new Date(booking.slot_start).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === today);
   const confirmedCount = todaysBookings.filter((b) => b.status === 'CONFIRMED' || b.status === 'CHECKED_IN').length;
   const heldCount = todaysBookings.filter((b) => b.status === 'HELD').length;
-  const completedCount = todaysBookings.filter((b) => b.status === 'COMPLETED').length;
   const totalDepositCollected = todaysBookings
     .filter((b) => b.payment_status === 'CAPTURED')
     .reduce((acc, curr) => acc + Number(curr.deposit_amount), 0);
@@ -2650,7 +2644,6 @@ export default function MerchantOverviewPage() {
             });
             const standbyIdSet = new Set(consultantQueueEval.standbyQueue.map((s) => s.id));
 
-            const matrixCompletedCount = baseBookings.filter((b) => b.status === 'COMPLETED').length;
             const matrixPresentCount = baseBookings.filter((b) => (b.is_present || b.status === 'CHECKED_IN') && b.status !== 'COMPLETED').length;
             const matrixAbsentCount = baseBookings.filter((b) => b.status === 'NO_SHOW').length;
             const matrixLateCount = baseBookings.filter((b) => standbyIdSet.has(b.id) || Boolean(b.queue_position && new Date(b.checked_in_at || b.customer_arrived_at || b.slot_start).getTime() - new Date(b.slot_start).getTime() > ON_TIME_GRACE_MS)).length;

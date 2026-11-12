@@ -13,13 +13,9 @@ import {
   UserPlus, 
   ShieldCheck, 
   Mail, 
-  Calendar, 
   Check, 
   Trash2, 
-  Clock, 
-  ExternalLink,
-  ChevronRight,
-  Sparkles
+  ChevronRight
 } from 'lucide-react';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
@@ -62,7 +58,7 @@ const PRESET_SPECIALTIES = [
 ];
 
 function DepartmentsContent() {
-  const { activeProvider, isSuperAdmin, isHospitalAdmin } = useMerchantTenant();
+  const { isSuperAdmin, isHospitalAdmin } = useMerchantTenant();
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -821,7 +817,6 @@ function DepartmentsContent() {
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {members.map((m) => {
-                    const isRevoked = m.status === 'revoked';
                     const isInvited = m.status === 'invited';
                     const isActiveMember = m.status === 'active';
 

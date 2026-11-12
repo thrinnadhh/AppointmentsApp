@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Building2, ShieldCheck, ChevronDown, Check } from 'lucide-react';
+import { Building2, ChevronDown, Check } from 'lucide-react';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 import { fetchAllProviders, Provider } from '@/lib/supabase';
 

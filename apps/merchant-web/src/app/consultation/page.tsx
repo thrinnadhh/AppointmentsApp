@@ -2,17 +2,15 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
-  Stethoscope, 
   RefreshCw, 
   AlertTriangle, 
   ShieldAlert, 
   CheckCircle2, 
-  ArrowLeft,
-  Loader2 
+  ArrowLeft
 } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
-import { HospitalAccessContext, HospitalDepartmentQueueEngine, calculateArrivalTag } from '@appointments/shared';
+import { HospitalAccessContext, calculateArrivalTag } from '@appointments/shared';
 import ConsultationSessionHeader, { FrontDeskStaffMember, DoctorOption } from '@/components/consultation/ConsultationSessionHeader';
 import ActiveConsultationCard, { ActiveConsultationBooking } from '@/components/consultation/ActiveConsultationCard';
 import UpNextPatientCard from '@/components/consultation/UpNextPatientCard';
@@ -20,7 +18,7 @@ import ConsultantQueueTabs from '@/components/consultation/ConsultantQueueTabs';
 import MedicalUrgencyOverrideModal from '@/components/consultation/MedicalUrgencyOverrideModal';
 
 export default function DoctorConsultationWorkspacePage() {
-  const { activeProvider, isHospitalAdmin, isSuperAdmin, verticalConfig } = useMerchantTenant();
+  const { activeProvider, isHospitalAdmin, isSuperAdmin } = useMerchantTenant();
 
   // Eager URL search parameter resolution
   const [urlDoctorId, setUrlDoctorId] = useState<string | null>(() => {
@@ -31,14 +29,14 @@ export default function DoctorConsultationWorkspacePage() {
     return null;
   });
 
-  const [demoRole, setDemoRole] = useState<string | null>(() => {
+  const [demoRole] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return new URLSearchParams(window.location.search).get('demo_role');
     }
     return null;
   });
 
-  const [demoAssigned, setDemoAssigned] = useState<string | null>(() => {
+  const [demoAssigned] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return new URLSearchParams(window.location.search).get('assigned');
     }

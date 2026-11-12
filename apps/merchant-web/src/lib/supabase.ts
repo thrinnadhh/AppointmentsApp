@@ -2,8 +2,6 @@ import { createClient } from '@supabase/supabase-js';
 import { createBrowserClient } from '@supabase/ssr';
 import {
   Database,
-  BookingStatus,
-  PaymentStatus,
   Provider,
   DaySchedule,
   DayOfWeek,
@@ -506,7 +504,6 @@ export function subscribeToBookings(
   providerId: string | undefined | null,
   callback: (payload: any) => void
 ) {
-  const filter = providerId ? `provider_id=eq.${providerId}` : undefined;
   return supabase
     .channel(`bookings-channel-${providerId || 'all'}`)
     .on(

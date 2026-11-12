@@ -9,15 +9,10 @@ import {
   XCircle, 
   Clock, 
   Sparkles, 
-  UserCheck, 
-  Building2, 
   Stethoscope, 
   Users, 
   Zap, 
-  Filter, 
-  ArrowRight,
-  TrendingUp,
-  AlertCircle
+  Filter
 } from 'lucide-react';
 import { MonthlyAttendanceSummary, DayAttendance } from '@/lib/queue-scheduler';
 import { RollingTenSlotQueue } from './RollingTenSlotQueue';
@@ -104,7 +99,6 @@ export function MonthlyAttendanceCalendar({
   // Filter summary counts
   const daysWithQueues = summary.days.filter((d) => d.totalAppointments > 0).length;
   const daysWithAbsences = summary.days.filter((d) => d.absentCount > 0).length;
-  const daysWithGaps = summary.days.filter((d) => d.hasGaps).length;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-0" data-testid="monthly-queue-calendar-container">

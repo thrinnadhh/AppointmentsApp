@@ -6,6 +6,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'UNAUTHORIZED', message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const bookingId = body.booking_id || body.bookingId;
 
@@ -13,14 +21,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'MISSING_PARAM', message: 'Booking ID is required' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED', message: 'Authentication required' },
-        { status: 401 }
       );
     }
 

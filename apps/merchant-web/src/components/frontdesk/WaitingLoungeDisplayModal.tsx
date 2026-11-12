@@ -3,11 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  Tv, 
   Clock, 
   UserCheck, 
   Stethoscope, 
-  Sparkles,
   Maximize2,
   Minimize2,
   Building2,

@@ -109,7 +109,6 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     let occurrenceCount = 1;
-    let shouldSendImmediate = true;
 
     if (existingDedup) {
       const lastAlerted = new Date(existingDedup.last_alerted_at);
@@ -119,7 +118,6 @@ serve(async (req: Request) => {
 
       if (minutesSinceLast < DEDUP_WINDOW_MINUTES) {
         // Within deduplication window: Suppress email, update count
-        shouldSendImmediate = false;
         await supabaseAdmin
           .from('crash_alert_dedup')
           .update({

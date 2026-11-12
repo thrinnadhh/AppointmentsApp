@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/redis';
 import { getClientIp, verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { maskPhoneNumber } from '@appointments/shared';
-import { createSignedDeletionToken, verifySignedDeletionToken } from '@/lib/deletion-token';
+import { verifySignedDeletionToken } from '@/lib/deletion-token';
 
 
 function maskIdentifier(id: string): string {

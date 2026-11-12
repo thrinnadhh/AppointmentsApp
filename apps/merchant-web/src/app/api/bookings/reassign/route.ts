@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
+import { verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 import { ReassignResourceRequest, ReassignResourceResponse } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<ReassignResourceResponse>(
+        { success: false, error: 'Authentication required to reassign staff resource' },
+        { status: 401 }
+      );
+    }
+
     const body = (await req.json()) as Partial<ReassignResourceRequest>;
     const { booking_id, new_resource_id, reason = 'Emergency staff reassignment' } = body;
 
@@ -13,14 +21,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<ReassignResourceResponse>(
         { success: false, error: 'Missing required parameters: booking_id, new_resource_id' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json<ReassignResourceResponse>(
-        { success: false, error: 'Authentication required to reassign staff resource' },
-        { status: 401 }
       );
     }
 

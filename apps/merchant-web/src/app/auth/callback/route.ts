@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error_description') ?? searchParams.get('error');
 
   if (error) {
-    console.error('[Auth Callback Error]:', error);
+    const safeError = String(error).replace(/[\r\n]+/g, ' ');
+    console.error('[Auth Callback Error]:', safeError);
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
   }
 

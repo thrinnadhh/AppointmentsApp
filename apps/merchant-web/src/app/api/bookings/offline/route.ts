@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
@@ -8,6 +9,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const {
       provider_id,
@@ -16,21 +25,12 @@ export async function POST(req: NextRequest) {
       patient_phone,
       slot_start_time, // e.g. '18:30' or ISO string or 'now'
       is_present = true,
-      notes,
     } = body;
 
     if (!provider_id || !resource_id || !patient_name) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: provider_id, resource_id, patient_name' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
       );
     }
 
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       customerId = existingProfile.id;
     } else {
       const offlineEmail = `offline.${cleanPhone}.${Date.now().toString(36)}@appointments-tirupati.com`;
-      const tempPass = `WalkinPass${Math.random().toString(36).substring(2, 10)}!`;
+      const tempPass = `WalkinPass${crypto.randomBytes(12).toString('base64url')}!`;
 
       const { data: newUser, error: userCreateErr } = await supabaseAdmin.auth.admin.createUser({
         email: offlineEmail,
@@ -117,7 +117,6 @@ export async function POST(req: NextRequest) {
     } else if (typeof slot_start_time === 'string' && slot_start_time.includes(':') && !slot_start_time.includes('T')) {
       // Time format "HH:mm" on today's date in IST
       const [hours, minutes] = slot_start_time.split(':').map(Number);
-      const slotDate = new Date();
       // Set hours in IST (UTC+5:30)
       const istOffsetMs = 5.5 * 60 * 60 * 1000;
       const todayIstMidnightMs = Math.floor((now.getTime() + istOffsetMs) / (24 * 60 * 60 * 1000)) * (24 * 60 * 60 * 1000) - istOffsetMs;

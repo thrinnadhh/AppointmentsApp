@@ -8,6 +8,14 @@ import { CancelBookingRequest, CancelBookingResponse } from '@appointments/share
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<CancelBookingResponse>(
+        { success: false, error: 'Authentication required to cancel a booking' },
+        { status: 401 }
+      );
+    }
+
     const body = (await req.json()) as Partial<CancelBookingRequest>;
     const { booking_id, reason, initiated_by = 'CUSTOMER', expected_version, expected_updated_at } = body as any;
 
@@ -15,14 +23,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<CancelBookingResponse>(
         { success: false, error: 'Missing required parameter: booking_id' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json<CancelBookingResponse>(
-        { success: false, error: 'Authentication required to cancel a booking' },
-        { status: 401 }
       );
     }
 
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
         try {
           const refundAmountPaise = Math.round(Number(result.refund_amount) * 100);
           let refundId = '';
-          let refundAmount = refundAmountPaise;
+          let refundAmount: number;
 
           if (bkg.gateway_provider === 'cashfree') {
             const cfAdapter = getPaymentGateway('cashfree');
@@ -227,13 +227,15 @@ export async function POST(req: NextRequest) {
             .eq('booking_id', booking_id);
 
           // Log prominently to console for monitoring & on-call alerts
+          const safeBookingId = String(booking_id).replace(/[\r\n]+/g, ' ');
+          const safeErrorMsg = String(errorMsg).replace(/[\r\n]+/g, ' ');
           console.error(
             '\n====================================================================\n' +
             '[CRITICAL REFUND FAILURE - MANUAL FOLLOWUP REQUIRED]\n' +
-            `Booking ID: ${booking_id}\n` +
+            `Booking ID: ${safeBookingId}\n` +
             `Payment ID: ${bkg.gateway_payment_id}\n` +
             `Refund Amount: ₹${result.refund_amount}\n` +
-            `Error: ${errorMsg}\n` +
+            `Error: ${safeErrorMsg}\n` +
             'Action: Manual investigation required in Razorpay Dashboard.\n' +
             '====================================================================\n'
           );

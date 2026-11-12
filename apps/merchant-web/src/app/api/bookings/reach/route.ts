@@ -3,8 +3,6 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 import {
-  calculateArrivalTag,
-  computePatientETA,
   evaluateConsultantQueue,
   ON_TIME_GRACE_MS,
   toClinicDateString,
@@ -12,6 +10,14 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { booking_id } = body;
 
@@ -19,14 +25,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Missing required parameter: booking_id' },
         { status: 400 }
-      );
-    }
-
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
       );
     }
 

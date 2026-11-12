@@ -5,20 +5,15 @@ import { ON_TIME_GRACE_MS } from '@/lib/queue-scheduler';
 import { 
   CheckCircle2, 
   Clock, 
-  Phone, 
   AlertTriangle,
   RotateCcw,
-  Check,
   Search,
   RefreshCw,
   Building2,
   Sparkles,
   FileText,
   MessageSquare,
-  Send,
-  Bell,
   Calendar,
-  History,
   UserCheck,
   Info
 } from 'lucide-react';
@@ -193,7 +188,7 @@ export default function BookingsManagementPage() {
           event: '*',
           schema: 'public',
           table: 'bookings',
-          filter: selectedProviderId ? `provider_id=eq.${selectedProviderId}` : undefined,
+          filter: `provider_id=eq.${selectedProviderId}`,
         },
         async (payload) => {
           const eventType = payload.eventType;

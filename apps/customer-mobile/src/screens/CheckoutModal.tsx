@@ -12,7 +12,6 @@ import {
   Linking,
   StatusBar,
   TextInput,
-  Switch,
 } from 'react-native';
 import { Resource, Slot, getPlatformFee, CoolingPeriodEligibilityResult } from '@appointments/shared';
 import {
@@ -110,7 +109,7 @@ export default function CheckoutModal({
   const [acknowledgedThirdStrike, setAcknowledgedThirdStrike] = useState<boolean>(false);
   const [secondsLeft, setSecondsLeft] = useState<number>(300); // 5 minutes
   const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
-  const [checkingCooling, setCheckingCooling] = useState<boolean>(false);
+  const [, setCheckingCooling] = useState<boolean>(false);
 
   const isFreeFollowup = Boolean(coolingEligibility?.eligible);
   const rawPlatformFee = getPlatformFee(categoryId);

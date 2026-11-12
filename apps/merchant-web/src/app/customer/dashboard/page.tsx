@@ -5,15 +5,8 @@ import Link from 'next/link';
 import { 
   Building2, 
   Stethoscope, 
-  Clock, 
-  Search, 
-  CheckCircle2, 
-  User, 
   Calendar as CalendarIcon, 
-  ShieldCheck, 
   ArrowRight,
-  RefreshCw,
-  Sparkles,
   Users,
   Zap
 } from 'lucide-react';
@@ -35,7 +28,7 @@ export default function CustomerDashboardPage() {
   
   // Patient search & selection
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [selectedBookingId] = useState<string | null>(null);
 
   // Queue & Calendar state
   const [queueSlots, setQueueSlots] = useState<QueueSlot[]>([]);

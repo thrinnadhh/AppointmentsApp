@@ -5,30 +5,24 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Terminal,
-  ShieldCheck,
   ShieldAlert,
   Lock,
   RefreshCw,
   Search,
-  Filter,
   Trash2,
   ChevronDown,
   ChevronRight,
   ArrowLeft,
   Smartphone,
   Globe,
-  Server,
   AlertTriangle,
   Info,
   XCircle,
   Copy,
   Check,
-  ExternalLink,
-  Clock,
   Layers,
   Database,
   Flame,
-  Send,
   Zap,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -46,7 +40,7 @@ export default function AdminLogsDedicatedPage() {
 
   // Authentication State
   const [authChecking, setAuthChecking] = useState(true);
-  const [adminUser, setAdminUser] = useState<{ email: string; fullName: string; role: string } | null>(null);
+  const [, setAdminUser] = useState<{ email: string; fullName: string; role: string } | null>(null);
   const [unauthorizedRole, setUnauthorizedRole] = useState<string | null>(null);
 
   // Observability Logs State

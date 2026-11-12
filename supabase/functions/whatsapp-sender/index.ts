@@ -18,6 +18,8 @@ const TEMPLATE_PARAM_COUNTS: Record<string, number> = {
   booking_cancelled: 3,
   refund_processed: 2,
   auth_code: 1,
+};
+
 /** Dynamic CORS headers without wildcard */
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get('Origin') || req.headers.get('origin') || '';
