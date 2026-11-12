@@ -223,26 +223,22 @@ function ResourcesManagementContent() {
     }
 
     try {
-      const res = await fetch('/api/admin/resources', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          providerId: targetProviderId,
+      const { error } = await supabase
+        .from('resources')
+        .insert({
+          provider_id: targetProviderId,
           name: formData.name.trim(),
           type: formData.type,
           department: formData.department.trim() || 'General',
           price: Number(formData.price),
-          depositAmount: Number(formData.price),
-          durationMinutes: Number(formData.duration_minutes),
+          deposit_amount: Number(formData.price),
+          duration_minutes: Number(formData.duration_minutes),
           capacity: Number(formData.capacity),
-          doctorEmail: formData.doctorEmail?.trim() || undefined,
-          doctorPassword: formData.doctorPassword || undefined,
-        }),
-      });
+          is_active: true,
+        });
 
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || 'Failed to create resource');
+      if (error) {
+        throw new Error(error.message || 'Failed to create resource');
       }
 
       setFeedbackToast(`${verticalConfig.resourceLabelSingular} "${formData.name}" added successfully.`);
@@ -294,26 +290,22 @@ function ResourcesManagementContent() {
 
     setIsUpdatingResource(true);
     try {
-      const res = await fetch('/api/admin/resources', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingResource.id,
+      const { error } = await supabase
+        .from('resources')
+        .update({
           name: editFormData.name.trim(),
           type: editFormData.type,
           department: editFormData.department.trim() || 'General',
           price: Number(editFormData.price),
-          depositAmount: Number(editFormData.price),
-          durationMinutes: Number(editFormData.duration_minutes),
+          deposit_amount: Number(editFormData.price),
+          duration_minutes: Number(editFormData.duration_minutes),
           capacity: Number(editFormData.capacity),
-          doctorEmail: editFormData.doctorEmail?.trim() || undefined,
-          doctorPassword: editFormData.doctorPassword || undefined,
-        }),
-      });
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingResource.id);
 
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        throw new Error(json.error || 'Failed to update resource');
+      if (error) {
+        throw new Error(error.message || 'Failed to update resource');
       }
 
       setFeedbackToast(`${verticalConfig.resourceLabelSingular} "${editFormData.name}" updated successfully.`);
@@ -351,12 +343,13 @@ function ResourcesManagementContent() {
       return;
     }
     try {
-      const res = await fetch(`/api/admin/resources?id=${id}`, {
-        method: 'DELETE',
-      });
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        throw new Error(json.error || 'Failed to delete resource');
+      const { error } = await supabase
+        .from('resources')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw new Error(error.message || 'Failed to delete resource');
       }
       // Optimistically remove from state immediately
       setResources((prev) => prev.filter((r) => r.id !== id));

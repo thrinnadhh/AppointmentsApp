@@ -25,7 +25,7 @@ import {
   Flame,
   Zap,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, fetchAdminAppLogs, purgeAdminAppLogs } from '@/lib/supabase';
 import type {
   AppLogEntry,
   AppPlatform,
@@ -88,15 +88,14 @@ export default function AdminLogsDedicatedPage() {
 
         let profile: { id: string; email?: string | null; full_name?: string | null; role?: string | null } | null = null;
         try {
-          const meRes = await fetch('/api/auth/me', {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          });
-          if (meRes.ok) {
-            const meData = await meRes.json();
-            profile = meData.profile;
-          }
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, role')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          profile = profileData;
         } catch (e) {
-          console.warn('[Admin Logs] Failed to fetch /api/auth/me:', e);
+          console.warn('[Admin Logs] Failed to fetch profile:', e);
         }
 
         if (!profile || profile.role !== 'admin') {
@@ -150,31 +149,15 @@ export default function AdminLogsDedicatedPage() {
     setErrorMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-
-      const params = new URLSearchParams({
-        limit: '150',
+      const data = await fetchAdminAppLogs({
+        limit: 150,
         severity: severityFilter,
         category: categoryFilter,
         source: sourceFilter,
         dateRange: dateFilter,
+        search: searchQuery.trim() || undefined,
       });
-
-      if (searchQuery.trim()) {
-        params.set('search', searchQuery.trim());
-      }
-
-      const res = await fetch(`/api/admin/app-logs?${params.toString()}`, { headers });
-      if (!res.ok) {
-        throw new Error(`Failed to load logs (HTTP ${res.status})`);
-      }
-
-      const data = await res.json();
-      setLogs(data.logs || []);
+      setLogs(data || []);
     } catch (err) {
       console.warn('[AdminLogs] Load error:', err);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to retrieve observability telemetry');
@@ -242,23 +225,11 @@ export default function AdminLogsDedicatedPage() {
 
     setPurging(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+      const result = await purgeAdminAppLogs(30);
+      if (result.error) {
+        throw new Error(result.error);
       }
-
-      const res = await fetch('/api/admin/app-logs?retentionDays=30', {
-        method: 'DELETE',
-        headers,
-      });
-
-      if (!res.ok) {
-        throw new Error(`Prune failed (HTTP ${res.status})`);
-      }
-
-      const result = await res.json();
-      alert(`Pruned ${result.deleted_count ?? 0} application logs matching retention expiration criteria.`);
+      alert(`Pruned ${result.count ?? 0} application logs matching retention expiration criteria.`);
       void fetchLogs();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to prune logs.');

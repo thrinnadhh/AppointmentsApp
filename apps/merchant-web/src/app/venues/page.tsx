@@ -112,20 +112,18 @@ export default function VenuesPage() {
     setEditModalError(null);
 
     try {
-      const res = await fetch('/api/merchant/provider', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider_id: editingVenue.id,
+      const { error: updateError } = await supabase
+        .from('providers')
+        .update({
           address: editStoreAddress.trim(),
           description: editStoreDescription.trim(),
           photos: editStorePhotos,
-        }),
-      });
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingVenue.id);
 
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || 'Failed to update store profile');
+      if (updateError) {
+        throw new Error(updateError.message || 'Failed to update store profile');
       }
 
       setSuccessBanner(`Store profile for "${editingVenue.name}" updated successfully!`);
@@ -198,24 +196,36 @@ export default function VenuesPage() {
     setFormError(null);
 
     try {
-      const res = await fetch('/api/admin/venues', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          categoryId,
-          address: address.trim(),
-          phone: phone.trim(),
-          email: email.trim() || undefined,
-          openingTime: `${openingTime}:00`,
-          closingTime: `${closingTime}:00`,
-          description: description.trim() || undefined,
-        }),
+      const CATEGORY_MAP: Record<string, string> = {
+        clinic: 'clinics',
+        clinics: 'clinics',
+        salon: 'salons',
+        salons: 'salons',
+        gaming: 'gaming',
+        restaurant: 'restaurants',
+        restaurants: 'restaurants',
+        pet: 'pets',
+        pets: 'pets',
+      };
+      const dbCategoryId = CATEGORY_MAP[categoryId.toLowerCase()] || categoryId;
+
+      const user = (await supabase.auth.getUser()).data?.user;
+      const { error } = await supabase.rpc('admin_create_venue', {
+        p_name: name.trim(),
+        p_category_id: dbCategoryId,
+        p_address: address.trim(),
+        p_phone: phone.trim(),
+        p_opening_time: `${openingTime}:00`,
+        p_closing_time: `${closingTime}:00`,
+        p_description: description.trim() || null,
+        p_email: email.trim() || null,
+        p_owner_id: user?.id || null,
+        p_latitude: null,
+        p_longitude: null,
       });
 
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || 'Failed to create venue');
+      if (error) {
+        throw new Error(error.message || 'Failed to create venue');
       }
 
       setSuccessBanner(`Venue "${name}" onboarded successfully into the Tirupati Hyperlocal Platform!`);

@@ -180,30 +180,20 @@ export default function ShopRegistrationPage() {
     setSuccessMsg(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (sessionData?.session?.access_token) {
-        headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
-      }
-
-      const res = await fetch('/api/merchant/register-shop', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          userId: user.id,
-          fullName: fullName.trim() || user.user_metadata?.full_name || 'Merchant Owner',
-          shopName: shopName.trim(),
-          categoryId: category,
-          phone: phone.trim(),
-          address: address.trim() || 'AIR Bypass Road, Tirupati',
-          photoUrl: (photoUrl && /^https?:\/\//i.test(photoUrl.trim())) ? photoUrl.trim() : null,
-          tosAccepted: true,
-        }),
+      const cleanPhotoUrl = (photoUrl && /^https?:\/\//i.test(photoUrl.trim())) ? photoUrl.trim() : null;
+      const { data, error } = await supabase.rpc('merchant_register_shop_for_user', {
+        p_user_id: user.id,
+        p_shop_name: shopName.trim(),
+        p_category_id: category,
+        p_phone: phone.trim(),
+        p_address: address.trim() || 'AIR Bypass Road, Tirupati',
+        p_full_name: fullName.trim() || user.user_metadata?.full_name || 'Merchant Owner',
+        p_photo_url: cleanPhotoUrl,
       });
 
-      const result = await res.json();
-      if (!res.ok || result.error) {
-        throw new Error(result.error || `${venueLabel} registration failed.`);
+      const result = data as any;
+      if (error || result?.success === false) {
+        throw new Error(error?.message || result?.error || `${venueLabel} registration failed.`);
       }
 
       setSuccessMsg(`"${shopName}" registered successfully! Launching your workspace...`);

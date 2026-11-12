@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { supabase } from '@/lib/supabase';
 import { HospitalAccessContext, calculateArrivalTag } from '@appointments/shared';
 import ConsultationSessionHeader, { FrontDeskStaffMember, DoctorOption } from '@/components/consultation/ConsultationSessionHeader';
 import ActiveConsultationCard, { ActiveConsultationBooking } from '@/components/consultation/ActiveConsultationCard';
@@ -188,9 +189,11 @@ export default function DoctorConsultationWorkspacePage() {
       }
 
       // 2. Fetch Resources / Doctors
-      const resQuery = await fetch('/api/resources');
-      const resJson = await resQuery.json();
-      const docs: any[] = Array.isArray(resJson.data) ? resJson.data : (Array.isArray(resJson) ? resJson : []);
+      let docs: any[] = [];
+      const { data: resourcesData } = await supabase.from('resources').select('*');
+      if (resourcesData) {
+        docs = resourcesData;
+      }
 
       const mappedDocs: DoctorOption[] = docs.map((d: any) => ({
         id: d.id,
@@ -234,10 +237,12 @@ export default function DoctorConsultationWorkspacePage() {
     setRefreshing(true);
     try {
       // 1. Fetch bookings
-      const bookingsRes = await fetch(`/api/bookings?resource_id=${selectedDoctorId}`);
-      if (bookingsRes.ok) {
-        const json = await bookingsRes.json();
-        const list: any[] = Array.isArray(json.bookings) ? json.bookings : (Array.isArray(json) ? json : []);
+      const { data: bookingsData } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('resource_id', selectedDoctorId)
+        .order('slot_start', { ascending: true });
+      const list: any[] = bookingsData || [];
         
         // Enrich with arrival tag
         const enriched: ActiveConsultationBooking[] = list.map((b) => {
