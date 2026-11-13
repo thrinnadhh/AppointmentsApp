@@ -135,11 +135,18 @@ export async function GET(req: NextRequest) {
 
     const bookedSlots = sanitizedBookings.map((b) => b.slot_start);
 
-    return NextResponse.json({
-      success: true,
-      booked_slots: bookedSlots,
-      bookings: sanitizedBookings,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        booked_slots: bookedSlots,
+        bookings: sanitizedBookings,
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=600',
+        },
+      }
+    );
   } catch (err: unknown) {
     console.error('[/api/slots/availability] Unexpected error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
