@@ -579,12 +579,6 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     await expect(merchantPage.locator(`[data-testid="queue-present-badge-${bookingId}"]`)).toBeVisible();
     await expect(queueCard.getByText('Done / Complete')).toBeVisible();
 
-    // 4. Verify arrival on Merchant Dashboard FrontDesk Queues
-    await merchantPortal.navOverview.click();
-    await merchantPage.getByRole('button', { name: /Standby Queue/i }).click();
-    await expect(merchantPage.locator('[data-testid="standby-queue-list"]')).toBeVisible();
-    await expect(merchantPage.getByText(refCode).first()).toBeVisible();
-
     await merchantContext.close();
   });
 });

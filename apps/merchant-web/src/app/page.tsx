@@ -569,7 +569,7 @@ export default function MerchantOverviewPage() {
 
   const hospitalTodayBookings = useMemo(() => {
     return bookings.filter((b) => {
-      const isToday = b.slot_start?.startsWith(today);
+      const isToday = Boolean(b.slot_start && new Date(b.slot_start).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === today);
       if (!isToday) return false;
       if (!merchantSelectedDoctorId) {
         if (hospitalContext?.role === 'front_desk' && hospitalContext.accessibleResourceIds?.length) {
