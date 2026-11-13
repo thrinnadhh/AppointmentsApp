@@ -1109,13 +1109,6 @@ export async function markBookingReached(bookingId: string): Promise<{ success: 
     throw err;
   }
 }
-    if (rpcError) throw rpcError;
-    return { success: Boolean(rpcData ?? true) };
-  } catch (err) {
-    console.error('Error marking booking as reached:', err);
-    throw err;
-  }
-}
 
 /**
  * Upload a customer prescription or medical note to private 'prescriptions-and-records' bucket.

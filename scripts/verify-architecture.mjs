@@ -41,9 +41,11 @@ describe('=== TC-ARCH: ARCHITECTURAL & BUILD INTEGRITY TEST SUITE ===', () => {
     assert.ok(gitignoreContent.includes('.env*'), '.gitignore must block .env*');
     assert.ok(gitignoreContent.includes('!.env.example'), '.gitignore must whitelist !.env.example');
 
-    // 3. Assert canonical Gradle wrapper
-    const backendGradlew = path.join(ROOT_DIR, 'apps/backend/gradlew');
-    assert.ok(fs.existsSync(backendGradlew), 'Canonical backend Gradle wrapper must exist at apps/backend/gradlew');
+    // 3. Assert legacy backend and gradlew are purged
+    const backendDir = path.join(ROOT_DIR, 'apps/backend');
+    assert.strictEqual(fs.existsSync(backendDir), false, 'Legacy Kotlin backend must be purged from apps/backend');
+    const rootGradlew = path.join(ROOT_DIR, 'gradlew');
+    assert.strictEqual(fs.existsSync(rootGradlew), false, 'Root gradlew wrapper must be purged');
   });
 
   it('TC-ARCH-02: Shared Package Deduplication (@appointments/shared)', () => {
