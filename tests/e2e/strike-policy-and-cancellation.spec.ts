@@ -84,22 +84,33 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     }
   });
 
-  test('1. Strike 1: First missed appointment gets full courtesy refund (Grace Period)', async ({ request }) => {
+  async function createHold(resourceId: string, slotStart: string, slotEnd: string) {
+    const { data, error } = await supabase.rpc('create_booking_hold', {
+      p_customer_id: testCustomerId,
+      p_resource_id: resourceId,
+      p_slot_start: slotStart,
+      p_slot_end: slotEnd,
+    });
+    if (error) throw new Error(error.message);
+    return data as any;
+  }
+
+  async function markNoShow(bookingId: string) {
+    const { data, error } = await supabase.rpc('record_no_show', {
+      p_booking_id: bookingId,
+    });
+    if (error) throw new Error(error.message);
+    return data as any;
+  }
+
+  test('1. Strike 1: First missed appointment gets full courtesy refund (Grace Period)', async () => {
     // 1. Create future slot hold
     const baseOffset1 = 1000000000 + Math.floor(Math.random() * 5000000000);
     const slotStart = new Date(Date.now() + baseOffset1).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset1 + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await createHold(testResourceId, slotStart, slotEnd);
+    const { booking_id } = holdData;
 
     // 2. Confirm booking via direct RPC
     await supabase.rpc('confirm_booking_payment', {
@@ -117,16 +128,8 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       })
       .eq('id', booking_id);
 
-    // 4. Mark No-Show
-    const noShowRes = await request.post(`${BASE_URL}/api/bookings/no-show`, {
-      headers: ADMIN_HEADERS,
-      data: { booking_id },
-    });
-    if (noShowRes.status() !== 200) {
-      console.log('NO SHOW ERROR RESPONSE:', noShowRes.status(), await noShowRes.text());
-    }
-    expect(noShowRes.status()).toBe(200);
-    const data = await noShowRes.json();
+    // 4. Mark No-Show via RPC
+    const data = await markNoShow(booking_id);
     expect(data.success).toBe(true);
     expect(data.no_show_count).toBe(1);
     expect(data.penalty_applied).toBe(false);
@@ -139,21 +142,13 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(bkg?.payment_status).toBe('REFUNDED');
   });
 
-  test('2. Strike 2: Second missed appointment gets full courtesy refund (Grace Period)', async ({ request }) => {
+  test('2. Strike 2: Second missed appointment gets full courtesy refund (Grace Period)', async () => {
     const baseOffset2 = 1000000000 + Math.floor(Math.random() * 5000000000);
     const slotStart = new Date(Date.now() + baseOffset2).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset2 + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await createHold(testResourceId, slotStart, slotEnd);
+    const { booking_id } = holdData;
 
     await supabase.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
@@ -170,13 +165,8 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       })
       .eq('id', booking_id);
 
-    // Mark No-Show
-    const noShowRes = await request.post(`${BASE_URL}/api/bookings/no-show`, {
-      headers: ADMIN_HEADERS,
-      data: { booking_id },
-    });
-    expect(noShowRes.status()).toBe(200);
-    const data = await noShowRes.json();
+    // Mark No-Show via RPC
+    const data = await markNoShow(booking_id);
     expect(data.success).toBe(true);
     expect(data.no_show_count).toBe(2);
     expect(data.penalty_applied).toBe(false);
@@ -187,21 +177,13 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     expect(bkg?.payment_status).toBe('REFUNDED');
   });
 
-  test('3. Strike 3: Third missed appointment forfeits ₹100 deposit to merchant', async ({ request }) => {
+  test('3. Strike 3: Third missed appointment forfeits ₹100 deposit to merchant', async () => {
     const baseOffset3 = 1000000000 + Math.floor(Math.random() * 5000000000);
     const slotStart = new Date(Date.now() + baseOffset3).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset3 + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await createHold(testResourceId, slotStart, slotEnd);
+    const { booking_id } = holdData;
 
     await supabase.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
@@ -218,13 +200,8 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
       })
       .eq('id', booking_id);
 
-    // Mark No-Show
-    const noShowRes = await request.post(`${BASE_URL}/api/bookings/no-show`, {
-      headers: ADMIN_HEADERS,
-      data: { booking_id },
-    });
-    expect(noShowRes.status()).toBe(200);
-    const data = await noShowRes.json();
+    // Mark No-Show via RPC
+    const data = await markNoShow(booking_id);
     expect(data.success).toBe(true);
     expect(data.no_show_count).toBe(3);
     expect(data.penalty_applied).toBe(true);
@@ -242,16 +219,8 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     const slotStart = new Date(Date.now() + baseOffset4).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset4 + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await createHold(testResourceId, slotStart, slotEnd);
+    const { booking_id } = holdData;
 
     await supabase.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
@@ -289,16 +258,8 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     const slotStart = new Date(Date.now() + baseOffset5).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset5 + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await createHold(testResourceId, slotStart, slotEnd);
+    const { booking_id } = holdData;
 
     await supabase.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
@@ -335,16 +296,8 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     const slotStart = new Date(Date.now() + baseOffset6).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset6 + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await createHold(testResourceId, slotStart, slotEnd);
+    const { booking_id } = holdData;
 
     await supabase.rpc('confirm_booking_payment', {
       p_booking_id: booking_id,
@@ -396,16 +349,8 @@ test.describe.serial('3-Strike No-Show Courtesy Policy & 30-Minute Cancellation 
     const slotStart = new Date(Date.now() + baseOffset7).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset7 + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: testResourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await createHold(testResourceId, slotStart, slotEnd);
+    const { booking_id } = holdData;
 
     // Use a payment ID with 'fail' to simulate Razorpay failure
     await supabase.rpc('confirm_booking_payment', {

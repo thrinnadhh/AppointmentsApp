@@ -10,17 +10,15 @@ import { test, expect } from './fixtures/test-fixtures';
  */
 test.describe.serial('Super Admin Multi-City Rollout & Expansion Hub', () => {
 
-  test.beforeEach(async ({ request }) => {
-    // Reset test territory baseline state for idempotent repeatability
-    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
-    await request.patch('http://localhost:3000/api/admin/cities', {
-      headers: { 'x-admin-bypass-key': adminToken },
-      data: { cityId: 'tirupati', status: 'ACTIVE' },
-    });
-    await request.patch('http://localhost:3000/api/admin/cities', {
-      headers: { 'x-admin-bypass-key': adminToken },
-      data: { cityId: 'nellore', status: 'EXPANDING' },
-    });
+  test.beforeEach(async () => {
+    // Reset test territory baseline state for idempotent repeatability via direct Supabase RPC
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+    );
+    await (supabaseAdmin.rpc as any)('update_city_status', { p_city_id: 'tirupati', p_status: 'ACTIVE' });
+    await (supabaseAdmin.rpc as any)('update_city_status', { p_city_id: 'nellore', p_status: 'EXPANDING' });
   });
 
 

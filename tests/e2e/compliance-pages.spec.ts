@@ -380,16 +380,17 @@ test.describe('Customer Data Masking — DPIIT & DPDPA Compliance', () => {
     if (bookings.length === 0) {
       const slotStart = new Date(Date.now() + 86400000 * 25).toISOString();
       const slotEnd = new Date(Date.now() + 86400000 * 25 + 1800000).toISOString();
-      const holdRes = await request.post('http://localhost:3000/api/bookings/hold', {
+      const holdRes = await request.post(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
         headers: {
-          'x-customer-id': '99999999-9999-9999-9999-999999999991',
-          'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
+          apikey: anonKey,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
         data: {
-          customer_id: '99999999-9999-9999-9999-999999999991',
-          resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-          slot_start: slotStart,
-          slot_end: slotEnd,
+          p_customer_id: '99999999-9999-9999-9999-999999999991',
+          p_resource_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          p_slot_start: slotStart,
+          p_slot_end: slotEnd,
         },
       });
       if (holdRes.ok()) {

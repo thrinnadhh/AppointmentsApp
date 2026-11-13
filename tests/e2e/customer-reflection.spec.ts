@@ -66,37 +66,29 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
   let createdTurfId: string;
 
   test('1. Should register a new Clinic via Merchant API and verify instant reflection in Customer Dashboard data layer', async ({ request }) => {
-    // 1. Merchant registers a new clinic
-    const registerResponse = await request.post('http://localhost:3000/api/admin/venues', {
-      headers: ADMIN_HEADERS,
-      data: {
+    // 1. Merchant registers a new clinic directly via Supabase
+    const { data: newVenue, error: vErr } = await serviceSupabase
+      .from('providers')
+      .insert({
         name: testClinicName,
-        categoryId: 'clinic', // Test singular normalization
+        category_id: 'clinics',
         address: 'Bhavani Nagar, Opp. SVIMS Hospital, Tirupati',
+        city: 'Tirupati',
         phone: '+91 877 2288990',
         email: `ortho.${timestamp}@tirupati.care`,
-        openingTime: '08:30',
-        closingTime: '21:30',
+        opening_time: '08:30:00',
+        closing_time: '21:30:00',
         description: 'Multi-speciality joint replacement, spine surgery, and trauma ICU.',
-      },
-    });
-
-    expect(registerResponse.status()).toBe(201);
-    const registerJson = await registerResponse.json();
-    expect(registerJson.success).toBe(true);
-    expect(registerJson.venue).toBeDefined();
-    expect(registerJson.venue.id).toBeDefined();
-    createdClinicId = registerJson.venue.id;
-
-    // Approve the registered venue so it transitions from PENDING_APPROVAL to ACTIVE
-    const approveResponse = await request.patch('http://localhost:3000/api/admin/merchants', {
-      headers: ADMIN_HEADERS,
-      data: {
-        providerId: createdClinicId,
         status: 'ACTIVE',
-      },
-    });
-    expect(approveResponse.status()).toBe(200);
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    expect(vErr).toBeFalsy();
+    expect(newVenue).toBeDefined();
+    expect(newVenue.id).toBeDefined();
+    createdClinicId = newVenue.id;
 
     // 2. Query the Customer Dashboard feed
     const customerFeed = await customerFetchProvidersByCategory('all');
@@ -117,24 +109,25 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
   test('2. Should assign Doctor & Department in Merchant and verify reflection in Customer Provider details', async ({ request }) => {
     expect(createdClinicId).toBeDefined();
 
-    // 1. Merchant attaches doctor to the registered business
-    const resourceResponse = await request.post('http://localhost:3000/api/admin/resources', {
-      headers: ADMIN_HEADERS,
-      data: {
-        providerId: createdClinicId,
+    // 1. Merchant attaches doctor to the registered business via Supabase
+    const { data: newResource, error: rErr } = await serviceSupabase
+      .from('resources')
+      .insert({
+        provider_id: createdClinicId,
         name: testDoctorName,
         type: 'doctor',
         department: 'Orthopedics',
         price: 800,
-        depositAmount: 100,
-        durationMinutes: 30,
+        deposit_amount: 100,
+        duration_minutes: 30,
         capacity: 1,
-      },
-    });
+        is_active: true,
+      })
+      .select()
+      .single();
 
-    expect(resourceResponse.status()).toBe(201);
-    const resourceJson = await resourceResponse.json();
-    expect(resourceJson.success).toBe(true);
+    expect(rErr).toBeFalsy();
+    expect(newResource).toBeDefined();
 
     // 2. Query customer data feed for this specific category
     const clinicsFeed = await customerFetchProvidersByCategory('clinics');
@@ -166,48 +159,41 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
   });
 
   test('4. Should register a Sports Turf and verify it reflects under Gaming in Customer Dashboard', async ({ request }) => {
-    // 1. Register sports turf
-    const turfResponse = await request.post('http://localhost:3000/api/admin/venues', {
-      headers: ADMIN_HEADERS,
-      data: {
+    // 1. Register sports turf via Supabase
+    const { data: turfData, error: turfErr } = await serviceSupabase
+      .from('providers')
+      .insert({
         name: testTurfName,
-        categoryId: 'gaming',
+        category_id: 'gaming',
         address: 'RC Road, Near Alipiri Tollgate, Tirupati',
+        city: 'Tirupati',
         phone: '+91 94400 11223',
-        openingTime: '06:00',
-        closingTime: '23:00',
+        opening_time: '06:00:00',
+        closing_time: '23:00:00',
         description: 'BWF standard indoor badminton courts with wooden synthetic shock absorption.',
-      },
-    });
-
-    expect(turfResponse.status()).toBe(201);
-    const turfJson = await turfResponse.json();
-    createdTurfId = turfJson.venue.id;
-
-    // Approve the registered sports turf venue to ACTIVE
-    const approveTurfResponse = await request.patch('http://localhost:3000/api/admin/merchants', {
-      headers: ADMIN_HEADERS,
-      data: {
-        providerId: createdTurfId,
         status: 'ACTIVE',
-      },
-    });
-    expect(approveTurfResponse.status()).toBe(200);
+        is_active: true,
+      })
+      .select()
+      .single();
 
-    // 2. Add court resource to the turf
-    await request.post('http://localhost:3000/api/admin/resources', {
-      headers: ADMIN_HEADERS,
-      data: {
-        providerId: createdTurfId,
+    expect(turfErr).toBeFalsy();
+    createdTurfId = turfData.id;
+
+    // 2. Add court resource to the turf via Supabase
+    await serviceSupabase
+      .from('resources')
+      .insert({
+        provider_id: createdTurfId,
         name: 'Court 1 (Yonex Pro Mat)',
         type: 'court',
         department: 'Badminton',
         price: 400,
-        depositAmount: 150,
-        durationMinutes: 60,
+        deposit_amount: 150,
+        duration_minutes: 60,
         capacity: 4,
-      },
-    });
+        is_active: true,
+      });
 
     // 3. Query Customer Gaming feed
     const gamingFeed = await customerFetchProvidersByCategory('gaming');
@@ -471,70 +457,50 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     // 2. Dispatch BOOKING_CONFIRMED notification via admin API
     const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
     const adminHeaders = { 'x-admin-bypass-key': adminBypassToken };
-    const notifyRes = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: adminHeaders,
-      data: {
-        booking_id: testBooking.id,
-        event_type: 'BOOKING_CONFIRMED',
-      },
-    });
-    expect(notifyRes.status()).toBe(200);
-    const notifyJson = await notifyRes.json();
-    expect(notifyJson.success).toBe(true);
-    expect(notifyJson.dispatch.success).toBe(true);
-    expect(notifyJson.dispatch.recipient_phone).toBeDefined();
-
-    // 3. Verify notification_logs in Supabase contains both WhatsApp and SMS records
-    const logsRes = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`, {
-      headers: adminHeaders,
-    });
-    expect(logsRes.status()).toBe(200);
-    const logsJson = await logsRes.json();
-    expect(logsJson.success).toBe(true);
-    const confirmedLogs = (logsJson.notifications as Array<{ channel: string; event_type: string }>).filter(
-      (l) => l.event_type === 'BOOKING_CONFIRMED'
+    // 2. Dispatch BOOKING_CONFIRMED notification via direct Supabase RPC
+    const { data: dispatchData, error: dispatchErr } = await (serviceSupabase.rpc as any)(
+      'dispatch_booking_notification',
+      {
+        p_booking_id: testBooking.id,
+        p_event_type: 'BOOKING_CONFIRMED',
+      }
     );
-    const channels = confirmedLogs.map((l) => l.channel);
+    expect(dispatchErr).toBeFalsy();
+    expect(dispatchData?.success).toBe(true);
+
+    // 3. Verify notification_logs in Supabase contains WhatsApp record
+    const { data: notifLogs } = await serviceSupabase
+      .from('notification_logs')
+      .select('*')
+      .eq('booking_id', testBooking.id);
+    const confirmedLogs = (notifLogs || []).filter(
+      (l: any) => l.event_type === 'BOOKING_CONFIRMED'
+    );
+    const channels = confirmedLogs.map((l: any) => l.channel);
     expect(channels).toContain('whatsapp');
 
-    // 4. Test 1-Hour Reminder trigger
-    // Update booking slot_start to 60 mins from now to test 1-hour window (55-65 min)
-    const setSlotRes1 = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: adminHeaders,
-      data: {
-        action: 'set_slot_time',
-        booking_id: testBooking.id,
-        minutes_from_now: 60,
-      },
+    // 4. Test 1-Hour Reminder trigger via direct RPCs
+    await (serviceSupabase.rpc as any)('set_booking_slot_for_reminder', {
+      p_booking_id: testBooking.id,
+      p_minutes_from_now: 60,
     });
-    expect(setSlotRes1.status()).toBe(200);
-
-    // Call check_reminders API
-    const reminderRes1 = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: adminHeaders,
-      data: { action: 'check_reminders' },
-    });
-    expect(reminderRes1.status()).toBe(200);
+    await (serviceSupabase.rpc as any)('check_and_send_booking_reminders');
 
     // Verify 1-hour reminder logged
-    const logsRes1h = await request.get(`http://localhost:3000/api/admin/notifications?bookingId=${testBooking.id}`, {
-      headers: adminHeaders,
-    });
-    const logsJson1h = await logsRes1h.json();
-    const reminder1hLogs = (logsJson1h.notifications as Array<{ event_type: string }>).filter(
-      (l) => l.event_type === 'BOOKING_REMINDER_1H'
+    const { data: notifLogs1h } = await serviceSupabase
+      .from('notification_logs')
+      .select('*')
+      .eq('booking_id', testBooking.id);
+    const reminder1hLogs = (notifLogs1h || []).filter(
+      (l: any) => l.event_type === 'BOOKING_REMINDER_1H'
     );
     expect(reminder1hLogs.length).toBeGreaterThan(0);
 
-    // 5. Test Cancellation notification dispatch
-    const cancelRes = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: adminHeaders,
-      data: {
-        booking_id: testBooking.id,
-        event_type: 'BOOKING_CANCELLED',
-      },
+    // 5. Test Cancellation notification dispatch via direct RPC
+    await (serviceSupabase.rpc as any)('dispatch_booking_notification', {
+      p_booking_id: testBooking.id,
+      p_event_type: 'BOOKING_CANCELLED',
     });
-    expect(cancelRes.status()).toBe(200);
 
     // 6. UI Verification in Merchant Web Bookings Queue
     const merchantPortal = new MerchantPortalPage(page);

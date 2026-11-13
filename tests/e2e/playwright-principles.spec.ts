@@ -19,18 +19,6 @@ test.describe.serial('Master Cross-App E2E & Playwright Principles Suite', () =>
         .eq('id', '11111111-1111-1111-1111-111111111111');
     } catch {}
 
-    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
-    await request.patch('http://localhost:3000/api/admin/merchants', {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-bypass-key': adminToken,
-      },
-      data: {
-        providerId: '11111111-1111-1111-1111-111111111111',
-        status: 'ACTIVE',
-      },
-    }).catch(() => null);
-
     try {
       await supabaseClient.rpc('reset_test_provider_strikes', {
         p_provider_id: '11111111-1111-1111-1111-111111111111',

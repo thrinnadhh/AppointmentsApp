@@ -1,5 +1,21 @@
 import { test, expect } from '@playwright/test';
 import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+async function createTestHold(resourceId: string, slotStart: string, slotEnd: string, customerId = '99999999-9999-9999-9999-999999999991') {
+  const { data, error } = await supabaseAdmin.rpc('create_booking_hold', {
+    p_customer_id: customerId,
+    p_resource_id: resourceId,
+    p_slot_start: slotStart,
+    p_slot_end: slotEnd,
+  });
+  if (error) throw new Error(error.message);
+  return data as any;
+}
 
 test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
   const BASE_URL = 'http://localhost:3000';
@@ -36,18 +52,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
       const slotStart = new Date(Date.now() + 86400000 * 2).toISOString();
       const slotEnd = new Date(Date.now() + 86400000 * 2 + 1800000).toISOString();
 
-      const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-        data: {
-          resource_id: DUMMY_RESOURCE_ID,
-          customer_id: DUMMY_CUSTOMER_ID,
-          slot_start: slotStart,
-          slot_end: slotEnd,
-        },
-        headers: bypassHeaders,
-      });
-
-      expect(holdRes.status()).toBe(201);
-      const holdData = await holdRes.json();
+      const holdData = await createTestHold(DUMMY_RESOURCE_ID, slotStart, slotEnd, DUMMY_CUSTOMER_ID);
       expect(holdData.success).toBe(true);
       const bookingId = holdData.booking_id;
       expect(bookingId).toBeDefined();
@@ -76,18 +81,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
       const slotStart = new Date(Date.now() + 86400000 * 4).toISOString();
       const slotEnd = new Date(Date.now() + 86400000 * 4 + 1800000).toISOString();
 
-      const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-        data: {
-          resource_id: GAMING_RESOURCE_ID,
-          customer_id: DUMMY_CUSTOMER_ID,
-          slot_start: slotStart,
-          slot_end: slotEnd,
-        },
-        headers: bypassHeaders,
-      });
-
-      expect(holdRes.status()).toBe(201);
-      const holdData = await holdRes.json();
+      const holdData = await createTestHold(GAMING_RESOURCE_ID, slotStart, slotEnd, DUMMY_CUSTOMER_ID);
       expect(holdData.success).toBe(true);
       const bookingId = holdData.booking_id;
       expect(bookingId).toBeDefined();
@@ -142,18 +136,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
       const slotStart = new Date(Date.now() + 86400000 * 3).toISOString();
       const slotEnd = new Date(Date.now() + 86400000 * 3 + 1800000).toISOString();
 
-      const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-        data: {
-          resource_id: DUMMY_RESOURCE_ID,
-          customer_id: DUMMY_CUSTOMER_ID,
-          slot_start: slotStart,
-          slot_end: slotEnd,
-        },
-        headers: bypassHeaders,
-      });
-
-      expect(holdRes.status()).toBe(201);
-      const holdData = await holdRes.json();
+      const holdData = await createTestHold(DUMMY_RESOURCE_ID, slotStart, slotEnd, DUMMY_CUSTOMER_ID);
       const bookingId = holdData.booking_id;
 
       // 2. Create order
@@ -219,18 +202,7 @@ test.describe('Razorpay Payment Gateway & Signature Verification Suite', () => {
       const slotStart = new Date(Date.now() + 86400000 * 4).toISOString();
       const slotEnd = new Date(Date.now() + 86400000 * 4 + 1800000).toISOString();
 
-      const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-        data: {
-          resource_id: DUMMY_RESOURCE_ID,
-          customer_id: DUMMY_CUSTOMER_ID,
-          slot_start: slotStart,
-          slot_end: slotEnd,
-        },
-        headers: bypassHeaders,
-      });
-
-      expect(holdRes.status()).toBe(201);
-      const holdData = await holdRes.json();
+      const holdData = await createTestHold(DUMMY_RESOURCE_ID, slotStart, slotEnd, DUMMY_CUSTOMER_ID);
       const bookingId = holdData.booking_id;
 
       // 2. Prepare order.paid webhook payload

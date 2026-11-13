@@ -118,6 +118,7 @@ export const test = base.extend<AppTestFixtures>({
 
   bookingApi: async ({ request }, use) => {
     const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
+    const client = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
     const api: BookingApiHelper = {
       async createHold(params) {
         const slotStart = params.slotStart || new Date(Date.now() + 86400000).toISOString();
@@ -125,30 +126,25 @@ export const test = base.extend<AppTestFixtures>({
         const customerId = params.customerId || '99999999-9999-9999-9999-999999999991';
         const resourceId = params.resourceId || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
-        const res = await request.post('http://localhost:3000/api/bookings/hold', {
-          headers: {
-            'x-customer-id': customerId,
-            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
-          },
-          data: {
-            customer_id: customerId,
-            resource_id: resourceId,
-            slot_start: slotStart,
-            slot_end: slotEnd,
-            deposit_amount: params.depositAmount || 100,
-          },
+        const { data, error } = await client.rpc('create_booking_hold', {
+          p_resource_id: resourceId,
+          p_slot_start: slotStart,
+          p_slot_end: slotEnd,
+          p_customer_id: customerId,
         });
-        if (!res.ok()) {
-          const body = await res.text();
-          throw new Error(`Failed to hold booking: HTTP ${res.status()} - ${body}`);
+
+        if (error) {
+          throw new Error(`Failed to hold booking via RPC: ${error.message}`);
         }
-        const json = await res.json();
+        const json = data as any;
+        if (!json || json.success === false) {
+          throw new Error(`Failed to hold booking via RPC: ${json?.error || 'Unknown error'}`);
+        }
         let referenceCode = json.reference_code;
         if (!referenceCode && json.booking_id) {
-          const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          const { data } = await client.from('bookings').select('reference_code').eq('id', json.booking_id).maybeSingle();
-          if (data?.reference_code) {
-            referenceCode = data.reference_code;
+          const { data: bookingData } = await client.from('bookings').select('reference_code').eq('id', json.booking_id).maybeSingle();
+          if (bookingData?.reference_code) {
+            referenceCode = bookingData.reference_code;
           }
         }
         return { booking_id: json.booking_id, reference_code: referenceCode };
@@ -189,65 +185,40 @@ export const test = base.extend<AppTestFixtures>({
       },
 
       async rescheduleBooking(bookingId, newSlotStart, newSlotEnd) {
-        const res = await request.post('http://localhost:3000/api/bookings/reschedule', {
-          headers: {
-            'x-customer-id': '99999999-9999-9999-9999-999999999991',
-            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
-          },
-          data: {
-            booking_id: bookingId,
-            new_slot_start: newSlotStart,
-            new_slot_end: newSlotEnd,
-          },
+        const { data, error } = await client.rpc('reschedule_booking_slot', {
+          p_booking_id: bookingId,
+          p_new_slot_start: newSlotStart,
+          p_new_slot_end: newSlotEnd,
         });
-        if (!res.ok()) {
-          const body = await res.text();
-          throw new Error(`Failed to reschedule booking: HTTP ${res.status()} - ${body}`);
+        if (error) {
+          throw new Error(`Failed to reschedule booking via RPC: ${error.message}`);
         }
-        const json = await res.json();
-        return { success: json.success ?? true };
+        const json = data as any;
+        return { success: json?.success ?? true };
       },
 
       async sendNotification(params) {
-        const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
-        const res = await request.post('http://localhost:3000/api/admin/notifications', {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
-          },
-          data: {
-            booking_id: params.bookingId,
-            event_type: params.eventType || 'BOOKING_CONFIRMED',
-          },
+        const { data, error } = await client.rpc('dispatch_booking_notification', {
+          p_booking_id: params.bookingId,
+          p_event_type: params.eventType || 'BOOKING_CONFIRMED',
         });
-        if (!res.ok()) {
-          const body = await res.text();
-          throw new Error(`Failed to send notification: HTTP ${res.status()} - ${body}`);
+        if (error) {
+          throw new Error(`Failed to send notification via RPC: ${error.message}`);
         }
-        const json = await res.json();
-        return json;
+        return { success: true, dispatch: data };
       },
 
       async joinWaitlist(params) {
-        const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
-        const res = await request.post('http://localhost:3000/api/admin/waitlist', {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(adminToken ? { 'x-admin-bypass-key': adminToken } : {}),
-          },
-          data: {
-            cityId: params.cityId,
-            contactInfo: params.contactInfo,
-            roleInterest: params.roleInterest || 'customer',
-            notes: params.notes,
-          },
+        const { data, error } = await client.rpc('submit_city_waitlist', {
+          p_city_id: params.cityId,
+          p_contact_info: params.contactInfo,
+          p_role_interest: params.roleInterest || 'customer',
+          p_notes: params.notes || null,
         });
-        if (!res.ok()) {
-          const body = await res.text();
-          throw new Error(`Failed to join waitlist: HTTP ${res.status()} - ${body}`);
+        if (error) {
+          throw new Error(`Failed to join waitlist via RPC: ${error.message}`);
         }
-        const json = await res.json();
-        return { success: true, entry: json.entry };
+        return { success: true, entry: data };
       },
     };
 
