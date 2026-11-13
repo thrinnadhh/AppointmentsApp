@@ -194,8 +194,8 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
       headers: serviceHeaders,
     });
     const provs = await provsRes.json();
-    hospA = provs.find((p) => p.name.includes('Apex'));
-    hospB = provs.find((p) => p.name.includes('Balaji'));
+    hospA = provs.find((p) => p.owner_id === m1.user.id || p.name.startsWith('[TEST-HOSP-A]')) || provs.find((p) => p.name.includes('Apex'));
+    hospB = provs.find((p) => p.owner_id === m2.user.id || p.name.startsWith('[TEST-HOSP-B]')) || provs.find((p) => p.name.includes('Balaji'));
 
     assert.ok(hospA, 'Hospital A must exist');
     assert.ok(hospB, 'Hospital B must exist');

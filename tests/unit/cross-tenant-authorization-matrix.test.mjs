@@ -219,8 +219,8 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       headers: serviceHeaders,
     });
     const provs = await provsRes.json();
-    hospA = provs.find((p) => p.name.includes('Apex') || p.owner_id === adminA.user.id);
-    hospB = provs.find((p) => p.name.includes('Balaji') || p.owner_id === adminB.user.id);
+    hospA = provs.find((p) => p.owner_id === adminA.user.id || p.name.startsWith('[TEST-HOSP-A]')) || provs.find((p) => p.name.includes('Apex'));
+    hospB = provs.find((p) => p.owner_id === adminB.user.id || p.name.startsWith('[TEST-HOSP-B]')) || provs.find((p) => p.name.includes('Balaji'));
 
     assert.ok(hospA, 'Hospital A must exist');
     assert.ok(hospB, 'Hospital B must exist');

@@ -87,14 +87,22 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
   };
 
   test.beforeAll(async () => {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('phone', '+919999900001')
-      .order('created_at', { ascending: true })
-      .limit(1);
-    if (profiles?.[0]?.id) {
-      testCustomerId = profiles[0].id;
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const customerUser = users?.users?.find(
+      (u) => u.phone && u.phone.includes('9999900001')
+    );
+    if (customerUser?.id) {
+      testCustomerId = customerUser.id;
+    } else {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', '+919999900001')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (profiles?.[0]?.id) {
+        testCustomerId = profiles[0].id;
+      }
     }
     await cleanUpTestBookings();
   });
@@ -425,6 +433,8 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
         name: newSalonName,
         category_id: 'salons',
         address: 'Chandragiri Road, Opp. Reliance Smart Bazaar, Tirupati',
+        latitude: 13.6288,
+        longitude: 79.4192,
         phone: '+91 877 2299887',
         opening_time: '09:00:00',
         closing_time: '21:00:00',
@@ -551,7 +561,7 @@ test.describe.serial('Customer & Merchant Cross-App Integration Test Suite', () 
     expect(reachError).toBeNull();
     expect((reachData as any)?.success).toBe(true);
     expect((reachData as any)?.is_present).toBe(true);
-    expect(reachJson.customer_arrived_at).toBeTruthy();
+    expect((reachData as any)?.customer_arrived_at).toBeTruthy();
 
     // 3. Merchant Portal verifies arrival in Bookings Queue
     const merchantContext = await browser.newContext();
