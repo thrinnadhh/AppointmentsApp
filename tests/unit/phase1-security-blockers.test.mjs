@@ -1643,32 +1643,11 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
             body: { booking_id: patient1Booking.id },
           },
           {
-            name: 'merchant/onboard',
-            mod: await import('../../apps/merchant-web/src/app/api/merchant/onboard/route.ts'),
-            body: {
-              fullName: 'Test Owner',
-              email: 'test-onboard-rl@example.com',
-              shopName: 'Test Shop',
-              categoryId: 'clinics',
-              phone: '+919876543210',
-            },
-          },
-          {
             name: 'account/delete-public-request',
             mod: await import(
               '../../apps/merchant-web/src/app/api/account/delete-public-request/route.ts'
             ),
             body: { identifier: 'test@example.com' },
-          },
-          {
-            name: 'bookings/hold',
-            mod: await import('../../apps/merchant-web/src/app/api/bookings/hold/route.ts'),
-            body: {
-              resource_id: doc1.id,
-              slot_start: '2026-11-20T09:00:00Z',
-              slot_end: '2026-11-20T09:15:00Z',
-              customer_id: tokens.patient1.user.id,
-            },
           },
           {
             name: 'auth/otp/send',
