@@ -166,8 +166,9 @@ export default function AdminDashboardPage() {
         fetchAdminAppLogs({ limit: 100 }),
       ]);
 
-      if (Array.isArray(citiesData) && citiesData.length > 0) {
-        setCities(citiesData);
+      const data = { cities: citiesData };
+      if (Array.isArray(data.cities) && data.cities.length > 0) {
+        setCities(data.cities);
       }
       setVelocity(velocityData || null);
       setMerchants(merchantsData || []);

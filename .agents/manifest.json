@@ -653,7 +653,7 @@
       "allowedTools": [],
       "path": "skills/codebase-mapper/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "context-compression": {
       "allowedTools": [
@@ -669,19 +669,19 @@
       "allowedTools": [],
       "path": "skills/context-compressor/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "context-fetch": {
       "allowedTools": [],
       "path": "skills/context-fetch/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "context-health-monitor": {
       "allowedTools": [],
       "path": "skills/context-health-monitor/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "coordinator-mode": {
       "allowedTools": [
@@ -715,7 +715,7 @@
       "allowedTools": [],
       "path": "skills/debugger/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "deployment-procedures": {
       "allowedTools": [
@@ -754,13 +754,13 @@
       "allowedTools": [],
       "path": "skills/empirical-validation/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "executor": {
       "allowedTools": [],
       "path": "skills/executor/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "find-security-vulnerabilities-in-code": {
       "allowedTools": [
@@ -877,115 +877,115 @@
       "allowedTools": [],
       "path": "skills/mantis-advise/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-architecture": {
       "allowedTools": [],
       "path": "skills/mantis-architecture/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-calibrate": {
       "allowedTools": [],
       "path": "skills/mantis-calibrate/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-chain": {
       "allowedTools": [],
       "path": "skills/mantis-chain/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-critic": {
       "allowedTools": [],
       "path": "skills/mantis-critic/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-dedupe": {
       "allowedTools": [],
       "path": "skills/mantis-dedupe/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-history": {
       "allowedTools": [],
       "path": "skills/mantis-history/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-meta-agent": {
       "allowedTools": [],
       "path": "skills/mantis-meta-agent/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-patch": {
       "allowedTools": [],
       "path": "skills/mantis-patch/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-pipeline-adapter": {
       "allowedTools": [],
       "path": "skills/mantis-pipeline-adapter/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-plan": {
       "allowedTools": [],
       "path": "skills/mantis-plan/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-reflect": {
       "allowedTools": [],
       "path": "skills/mantis-reflect/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-report": {
       "allowedTools": [],
       "path": "skills/mantis-report/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-reproduce": {
       "allowedTools": [],
       "path": "skills/mantis-reproduce/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-researcher": {
       "allowedTools": [],
       "path": "skills/mantis-researcher/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-review": {
       "allowedTools": [],
       "path": "skills/mantis-review/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-structural-index": {
       "allowedTools": [],
       "path": "skills/mantis-structural-index/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-summarize": {
       "allowedTools": [],
       "path": "skills/mantis-summarize/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mantis-threat-model": {
       "allowedTools": [],
       "path": "skills/mantis-threat-model/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "mcp-builder": {
       "allowedTools": [
@@ -1101,7 +1101,7 @@
       "allowedTools": [],
       "path": "skills/plan-checker/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "plan-writing": {
       "allowedTools": [
@@ -1117,7 +1117,7 @@
       "allowedTools": [],
       "path": "skills/planner/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "python-patterns": {
       "allowedTools": [
@@ -1209,13 +1209,13 @@
         "skills/stack-diagram/scripts/render_png.py",
         "skills/stack-diagram/scripts/share.py"
       ],
-      "version": ""
+      "version": "1.0.0"
     },
     "subagent-delegation": {
       "allowedTools": [],
       "path": "skills/subagent-delegation/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "systematic-debugging": {
       "allowedTools": [
@@ -1271,19 +1271,19 @@
       "allowedTools": [],
       "path": "skills/token-budget/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "untangle-codebase": {
       "allowedTools": [],
       "path": "skills/untangle-codebase/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "verifier": {
       "allowedTools": [],
       "path": "skills/verifier/SKILL.md",
       "scripts": [],
-      "version": ""
+      "version": "1.0.0"
     },
     "verify-changes": {
       "allowedTools": [

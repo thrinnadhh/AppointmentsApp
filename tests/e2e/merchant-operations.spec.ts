@@ -191,8 +191,9 @@ test.describe.serial('Merchant Team Provisioning & Bookings Management E2E', () 
       .eq('id', testProviderId);
     expect(pauseError).toBeNull();
 
-    const slotStart = new Date(Date.now() + 600000000).toISOString();
-    const slotEnd = new Date(Date.now() + 600000000 + 1800000).toISOString();
+    const offsetMs = 600000000 + Math.floor(Math.random() * 100000000);
+    const slotStart = new Date(Date.now() + offsetMs).toISOString();
+    const slotEnd = new Date(Date.now() + offsetMs + 1800000).toISOString();
 
     const { data: holdData, error: holdError } = await supabaseAdmin.rpc('create_booking_hold', {
       p_customer_id: testCustomerId,

@@ -4,6 +4,7 @@ description: >-
   Proactive security advisor and architectural remediation assistant for secure code development.
   Use to query threat models, historical vulnerability lineages, verified patch patterns, triaged false positives, and learned trajectory invariants before code edits or to generate architectural remediation plans for confirmed findings.
   Don't use for automated multi-pass red-team exploitation or fuzzing.
+version: 1.0.0
 ---
 
 # Security Advisor & Remediation Engine (/mantis-advise)

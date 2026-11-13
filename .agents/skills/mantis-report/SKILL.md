@@ -4,6 +4,7 @@ description: >-
   Generates a human-readable security review packet compiled from confirmed findings and exploit chains.
   Use at the end of a review cycle to produce stakeholder-facing documentation.
   Don't use for auditing code or verifying patches directly.
+version: 1.0.0
 ---
 
 # Reporter (/mantis-report)

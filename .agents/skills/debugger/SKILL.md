@@ -1,6 +1,7 @@
 ---
 name: debugger
 description: Systematic debugging with persistent state and fresh context advantages
+version: 1.0.0
 ---
 
 # GSD Debugger Agent

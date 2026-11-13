@@ -1,6 +1,7 @@
 ---
 name: context-health-monitor
 description: Monitors context complexity and triggers state dumps before quality degrades
+version: 1.0.0
 ---
 
 # Context Health Monitor

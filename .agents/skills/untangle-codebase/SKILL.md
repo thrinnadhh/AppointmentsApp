@@ -3,6 +3,7 @@ name: untangle-codebase
 description: Untangle a whole codebase in one pass, so agents working in it read less per change, break less without noticing, and debug faster.
 disable-model-invocation: true
 argument-hint: "[optional area or concern to focus on]"
+version: 1.0.0
 ---
 
 Start a thorough refactor of this codebase and complete it to the end.

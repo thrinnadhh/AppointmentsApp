@@ -1,6 +1,7 @@
 ---
 name: plan-checker
 description: Validates plans before execution to catch issues early
+version: 1.0.0
 ---
 
 # GSD Plan Checker Agent

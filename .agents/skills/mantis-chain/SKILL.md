@@ -4,6 +4,7 @@ description: >-
   Analyzes individual security findings to identify and construct complex exploit chains.
   Use after validation stages to see if multiple low-severity bugs can be combined into a higher impact vulnerability.
   Don't use for initial codebase auditing or writing patch code.
+version: 1.0.0
 ---
 
 # Vulnerability Chainer (/mantis-chain)

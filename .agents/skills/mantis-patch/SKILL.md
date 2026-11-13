@@ -4,6 +4,7 @@ description: >-
   Generates minimal security fixes using transactional isolation (shadow directories or file backups), applies patches, and verifies them.
   Use when security findings are successfully reproduced and need patches applied and verified.
   Don't use for initial vulnerability research or reproduction payload generation.
+version: 1.0.0
 ---
 
 # Patcher (/mantis-patch)

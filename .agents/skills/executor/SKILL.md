@@ -1,6 +1,7 @@
 ---
 name: executor
 description: Executes GSD plans with atomic commits, deviation handling, checkpoint protocols, and state management
+version: 1.0.0
 ---
 
 # GSD Executor Agent

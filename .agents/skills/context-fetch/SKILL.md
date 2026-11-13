@@ -1,6 +1,7 @@
 ---
 name: context-fetch
 description: Search-first skill to reduce unnecessary file reads by searching before loading
+version: 1.0.0
 ---
 
 # Context Fetch Skill

@@ -228,8 +228,8 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
     test('2.9 RPC release_expired_holds executes cleanly with $0 compute', async () => {
       const { data, error } = await supabaseAdmin.rpc('release_expired_holds');
       expect(error).toBeNull();
-      expect(typeof data).toBe('number');
-    });
+      expect((data as any).success).toBe(true);
+      expect(typeof (data as any).released_count).toBe('number');
     });
 
     test('2.10 POST /api/webhooks/razorpay should reject invalid JSON with 400', async ({ request }) => {

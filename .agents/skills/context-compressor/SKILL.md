@@ -1,6 +1,7 @@
 ---
 name: context-compressor
 description: Strategies for compressing context to maximize token efficiency
+version: 1.0.0
 ---
 
 # Context Compressor Skill
