@@ -48,9 +48,9 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     expect(holdError).toBeNull();
     const booking_id = (holdData as any).booking_id;
 
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
-      data: { booking_id, gateway_payment_id: `pay_cancel_then_complete_${Date.now()}` },
+    await supabaseAdmin.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_cancel_then_complete_${Date.now()}`,
     });
     await request.post(`${BASE}/api/bookings/cancel`, {
       headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
@@ -83,13 +83,17 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     expect(holdError).toBeNull();
     const booking_id = (holdData as any).booking_id;
 
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
-      data: { booking_id, gateway_payment_id: `pay_complete_then_noshow_${Date.now()}` },
+    const { data: confirmData, error: confirmError } = await supabaseAdmin.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_test_complete_then_noshow_${Date.now()}`,
     });
-    await supabaseAdmin.rpc('complete_booking', {
+    expect(confirmError).toBeNull();
+    expect((confirmData as any)?.success).toBe(true);
+    const { data: completeData, error: completeError } = await supabaseAdmin.rpc('complete_booking', {
       p_booking_id: booking_id,
     });
+    expect(completeError).toBeNull();
+    expect((completeData as any)?.success).toBe(true);
 
     // Attempt no-show on already COMPLETED booking via RPC
     const { data: noShowData, error: noShowError } = await supabaseAdmin.rpc('record_no_show', {
@@ -118,10 +122,12 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     expect(holdError).toBeNull();
     const booking_id = (holdData as any).booking_id;
 
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
-      data: { booking_id, gateway_payment_id: `pay_future_noshow_${Date.now()}` },
+    const { data: confirmData, error: confirmError } = await supabaseAdmin.rpc('confirm_booking_payment', {
+      p_booking_id: booking_id,
+      p_gateway_payment_id: `pay_test_future_noshow_${Date.now()}`,
     });
+    expect(confirmError).toBeNull();
+    expect((confirmData as any)?.success).toBe(true);
 
     // Attempt early no-show via RPC
     const { data: noShowData, error: noShowError } = await supabaseAdmin.rpc('record_no_show', {
@@ -183,13 +189,14 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const normalizedEmail = testEmail.toLowerCase();
 
     const targetMerchant =
+      (merchants || []).find((m: any) => m.name?.includes('[TEST-HOSP-A]')) ||
       (merchants || []).find((m: any) => m.email?.toLowerCase() === normalizedEmail) ||
       (normalizedEmail.includes('svims.clinic')
         ? (merchants || []).find(
             (m: any) => m.id === MERCHANT_A_PROVIDER_ID || m.name?.includes('Sri Venkateswara Dental')
           ) || { id: MERCHANT_A_PROVIDER_ID }
         : (merchants || []).find(
-            (m: any) => m.name?.includes('[TEST-HOSP-A]') || m.name?.includes('Apex')
+            (m: any) => m.name?.includes('Apex')
           )) ||
       { id: MERCHANT_A_PROVIDER_ID };
     const targetProviderId = targetMerchant.id;
