@@ -1,3 +1,9 @@
+---
+type: user
+created: 2026-11-05
+updated: 2026-11-13
+---
+
 # User Preferences & Agent Execution Rules
 
 ## Multi-Agent Workflow (`ag-kit`)
