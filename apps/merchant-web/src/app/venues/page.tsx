@@ -29,6 +29,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { fetchAllProviders, uploadVenueAsset, getVenueAssetUrl, supabase, Provider, Resource } from '@/lib/supabase';
+import { compressAndUploadImageClient } from '@/lib/storage';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 type ProviderWithResources = Provider & { resources: Resource[] };
@@ -91,11 +92,11 @@ export default function VenuesPage() {
     setIsUploadingEditPhoto(true);
     setEditModalError(null);
     try {
-      const res = await uploadVenueAsset(editingVenue.id, file, file.name, file.type);
-      if (res.success && res.publicUrl) {
-        setEditStorePhotos((prev) => [res.publicUrl!, ...prev]);
+      const res = await compressAndUploadImageClient(file, { providerId: editingVenue.id });
+      if (!res.error && res.url) {
+        setEditStorePhotos((prev) => [res.url, ...prev]);
       } else {
-        setEditModalError('Failed to upload storefront photo.');
+        setEditModalError(res.error || 'Failed to upload storefront photo.');
       }
     } catch (err) {
       console.error('Photo upload failed:', err);

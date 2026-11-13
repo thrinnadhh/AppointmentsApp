@@ -320,3 +320,85 @@ export async function uploadPrivateDocument(
     return { success: false, error: msg };
   }
 }
+
+/**
+ * Compresses an image client-side to WebP format (max width 1200px, quality 0.8)
+ * to minimize storage footprint and egress bandwidth.
+ */
+export async function compressImageClient(
+  file: File,
+  maxWidth: number = 1200,
+  quality: number = 0.8
+): Promise<{ blob: Blob; ext: 'webp'; mimeType: 'image/webp' }> {
+  if (typeof window === 'undefined') {
+    throw new Error('compressImageClient is only available in the browser');
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return reject(new Error('Canvas 2D context unavailable'));
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            return reject(new Error('Failed to convert canvas to WebP'));
+          }
+          resolve({ blob, ext: 'webp', mimeType: 'image/webp' });
+        },
+        'image/webp',
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image for compression'));
+    };
+
+    img.src = url;
+  });
+}
+
+/**
+ * Compresses an image client-side (WebP, max width 1200px, quality 0.8) and
+ * uploads directly to Supabase Storage bucket ('venue-assets').
+ */
+export async function compressAndUploadImageClient(
+  file: File,
+  options?: { providerId?: string; userId?: string; maxWidth?: number; quality?: number }
+): Promise<{ url: string; path?: string; error?: string }> {
+  try {
+    const { blob } = await compressImageClient(file, options?.maxWidth || 1200, options?.quality || 0.8);
+    const arrayBuffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    const safeBaseName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const result = await uploadMediaAsset(bytes, `${safeBaseName}.webp`, 'image/webp', {
+      providerId: options?.providerId,
+      userId: options?.userId,
+      bucket: 'venue-assets',
+    });
+
+    return { url: result.url, path: result.path };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Image compression or upload failed';
+    return { url: '', error: msg };
+  }
+}

@@ -367,8 +367,8 @@ export function createAppLogger(options: LoggerInitOptions): AppLoggerInstance {
         }
       }
 
-      // Flush to remote storage
-      if (flushHandler) {
+      // Remote flush only for errors and critical exceptions to eliminate database IOPS and serverless overhead
+      if (flushHandler && (entry.level === 'error' || entry.severity === 'CRITICAL')) {
         await flushHandler(entry);
       }
     } catch {

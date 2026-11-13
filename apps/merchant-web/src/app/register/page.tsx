@@ -18,6 +18,7 @@ import {
   User
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { compressAndUploadImageClient } from '@/lib/storage';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 export default function ShopRegistrationPage() {
@@ -128,21 +129,16 @@ export default function ShopRegistrationPage() {
     setUploadingPhoto(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('providerId', user?.id || 'new-merchant');
-
-      const res = await fetch('/api/merchant/upload-image', {
-        method: 'POST',
-        body: formData,
+      const uploadRes = await compressAndUploadImageClient(file, {
+        providerId: user?.id || 'new-merchant',
+        userId: user?.id,
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.publicUrl) {
-        throw new Error(json.error || 'Failed to upload photo to storage.');
+      if (uploadRes.error || !uploadRes.url) {
+        throw new Error(uploadRes.error || 'Failed to upload photo to storage.');
       }
 
-      setPhotoUrl(json.publicUrl);
+      setPhotoUrl(uploadRes.url);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Photo upload failed';
       setPhotoError(msg);

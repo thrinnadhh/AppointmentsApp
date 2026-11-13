@@ -165,48 +165,6 @@ export default function BookingPassModal({
     };
   }, [booking?.id, booking?.status, visible]);
 
-  // Reactive Supabase Realtime update for live check-in and late queue
-  useEffect(() => {
-    if (!booking?.id || !visible) return;
-
-    const channel = supabase
-      .channel(`modal-checkin-${booking.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'bookings',
-          filter: `id=eq.${booking.id}`,
-        },
-        (payload) => {
-          const newRec = payload.new as {
-            status?: string;
-            checked_in_at?: string;
-            queue_position?: number | null;
-            estimated_wait_minutes?: number | null;
-          };
-          if (newRec?.status) {
-            setLiveStatus(newRec.status);
-          }
-          if (newRec?.checked_in_at) {
-            setLiveCheckedInAt(newRec.checked_in_at);
-          }
-          if (newRec?.queue_position !== undefined) {
-            setLiveQueuePosition(newRec.queue_position);
-          }
-          if (newRec?.estimated_wait_minutes !== undefined) {
-            setLiveWaitMinutes(newRec.estimated_wait_minutes);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [booking?.id, visible]);
-
   if (!booking) return null;
 
   const slotDate = new Date(booking.slot_start);
