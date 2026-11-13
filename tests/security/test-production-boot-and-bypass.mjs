@@ -106,8 +106,8 @@ async function runProductionBootTests() {
     console.log('Production server listening on http://127.0.0.1:' + PROD_PORT);
 
     // Test 2.1: Protected API endpoint with x-admin-bypass-key -> MUST BE 401 UNAUTHORIZED
-    console.log('\nTesting x-admin-bypass-key against GET /api/admin/cities...');
-    const bypassRes = await fetch(`http://127.0.0.1:${PROD_PORT}/api/admin/cities`, {
+    console.log('\nTesting x-admin-bypass-key against GET /api/admin/doctor-assignments...');
+    const bypassRes = await fetch(`http://127.0.0.1:${PROD_PORT}/api/admin/doctor-assignments`, {
       headers: {
         'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
         'x-merchant-bypass-key': 'tirupati-superadmin-e2e-2026'

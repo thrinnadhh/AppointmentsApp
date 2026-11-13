@@ -35,16 +35,17 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     await expect(page).toHaveURL(/.*\/login.*/, { timeout: 15000 });
   });
 
-  test('TC-GOOGLE-03: API /api/merchant/register-shop enforces validation', async ({ request }) => {
-    // Route removed in Phase 2 proxy elimination — returns 404
-    const res = await request.post('http://localhost:3000/api/merchant/register-shop', {
-      data: {
-        shopName: '',
-        categoryId: '',
-        phone: '',
-      },
+  test('TC-GOOGLE-03: Shop registration enforces validation', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A_error'
+    );
+    const { error } = await supabase.from('providers').insert({
+      name: '',
+      phone: '',
     });
-    expect([400, 404]).toContain(res.status());
+    expect(error).toBeTruthy();
   });
 
   test('TC-GOOGLE-04: No "Welcome to Merchant Hub" placeholder card exists on /', async ({ page }) => {

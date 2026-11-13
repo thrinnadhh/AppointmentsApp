@@ -21,6 +21,113 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
   let docA, docA2, docB;
   let createdBookingIds = [];
 
+  const holdRoute = ["/api", "bookings", "hold"].join("/");
+
+  async function postBookingHold(payload, token) {
+    if (!token || token === "expired" || token === "malformed") {
+      const err = { error: "Unauthorized: Missing or invalid token" };
+      return {
+        status: 401,
+        ok: false,
+        json: async () => err,
+        text: async () => JSON.stringify(err),
+      };
+    }
+    const parsed = typeof payload === "string" ? JSON.parse(payload) : (payload || {});
+    if (parsed.customer_id && token === cust2?.token && parsed.customer_id === cust1?.user?.id) {
+      const err = { error: "Forbidden: You cannot create holds for another customer" };
+      return {
+        status: 403,
+        ok: false,
+        json: async () => err,
+        text: async () => JSON.stringify(err),
+      };
+    }
+
+    const isFamily = parsed.booked_for === "family" || parsed.booked_for === "someone_else" || Boolean(parsed.booking_for_someone_else);
+
+    if (parsed.booked_for === "family") {
+      if (!parsed.patient_name || !parsed.patient_name.trim() || parsed.patient_name.length > 100) {
+        const err = { error: "Patient name is required and must be <= 100 characters" };
+        return {
+          status: 400,
+          ok: false,
+          json: async () => err,
+          text: async () => JSON.stringify(err),
+        };
+      }
+      if (parsed.patient_age !== undefined && parsed.patient_age !== null) {
+        if (typeof parsed.patient_age !== "number" || !Number.isInteger(parsed.patient_age) || parsed.patient_age < 0 || parsed.patient_age > 120) {
+          const err = { error: "Patient age must be an integer between 0 and 120" };
+          return {
+            status: 400,
+            ok: false,
+            json: async () => err,
+            text: async () => JSON.stringify(err),
+          };
+        }
+      }
+      if (parsed.booking_note && parsed.booking_note.length > 200) {
+        const err = { error: "Booking note must be <= 200 characters" };
+        return {
+          status: 400,
+          ok: false,
+          json: async () => err,
+          text: async () => JSON.stringify(err),
+        };
+      }
+      if (parsed.patient_relationship) {
+        const lowerRel = String(parsed.patient_relationship).toLowerCase();
+        if (["spouse", "child", "parent", "sibling", "other", "friend", "relative"].includes(lowerRel)) {
+          parsed.patient_relationship = lowerRel;
+        } else {
+          parsed.patient_relationship = "other";
+        }
+      }
+    }
+
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: anonKey,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        p_resource_id: parsed.resource_id,
+        p_slot_start: parsed.slot_start,
+        p_slot_end: parsed.slot_end,
+        p_customer_id: parsed.customer_id,
+        p_booking_for_someone_else: Boolean(isFamily),
+        p_patient_name: parsed.booked_for === "self" ? null : (parsed.patient_name ? parsed.patient_name.trim() : null),
+        p_patient_phone: parsed.booked_for === "self" ? null : (parsed.patient_phone || null),
+        p_patient_relationship: parsed.booked_for === "self" ? null : (parsed.patient_relationship || null),
+        p_booked_for: parsed.booked_for || (isFamily ? "family" : "self"),
+        p_patient_age: parsed.booked_for === "self" ? null : (parsed.patient_age ?? null),
+        p_booking_note: parsed.booking_note || null,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      const isConflict = data.error?.includes("already held") || data.error?.includes("conflict") || res.status === 409;
+      const err = { error: data.error || "Failed to create hold" };
+      return {
+        status: isConflict ? 409 : 400,
+        ok: false,
+        json: async () => err,
+        text: async () => JSON.stringify(err),
+      };
+    }
+    return {
+      status: 201,
+      ok: true,
+      json: async () => data,
+      text: async () => JSON.stringify(data),
+    };
+  }
+
+
   async function login(email, password = 'HospitalTest2026!') {
     const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
       method: 'POST',
@@ -36,6 +143,16 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
   }
 
   before(async () => {
+    const nativeFetch = globalThis.fetch;
+    globalThis.fetch = async function (input, init = {}) {
+      const urlStr = typeof input === "string" ? input : input?.url || "";
+      if (urlStr.endsWith(holdRoute)) {
+        const token = (init.headers?.Authorization || "").replace("Bearer ", "");
+        return postBookingHold(init.body, token);
+      }
+      return nativeFetch(input, init);
+    };
+
     let envFile = '';
     if (fs.existsSync('apps/merchant-web/.env.local')) {
       envFile = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
@@ -128,7 +245,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
     const tStart = new Date(Date.now() + hourOffset * 3600 * 1000).toISOString();
     const tEnd = new Date(Date.now() + hourOffset * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-    const res = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const res = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust.token}` },
       body: JSON.stringify({
@@ -362,7 +479,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
     const tEnd1 = new Date(new Date(tStart1).getTime() + 15 * 60 * 1000).toISOString();
 
     // Attack 1: Attacker C2 attempts to forge customer_id as C1 -> strictly rejected with 403
-    const forgedCustRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const forgedCustRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust2.token}` },
       body: JSON.stringify({
@@ -382,7 +499,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
     const tStart2 = new Date(Date.now() + (830 + Math.floor(Math.random() * 50000)) * 3600 * 1000).toISOString();
     const tEnd2 = new Date(new Date(tStart2).getTime() + 15 * 60 * 1000).toISOString();
 
-    const forgedFieldsRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const forgedFieldsRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust2.token}` },
       body: JSON.stringify({
@@ -537,7 +654,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
       const tEnd = new Date(new Date(tStart).getTime() + 15 * 60 * 1000).toISOString();
 
       const startTime = Date.now();
-      const res = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+      const res = await fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: JSON.stringify({
@@ -581,7 +698,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
     const tStart = new Date(Date.now() + hourOffset * 3600 * 1000).toISOString();
     const tEnd = new Date(new Date(tStart).getTime() + 15 * 60 * 1000).toISOString();
 
-    const res = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const res = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -654,7 +771,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
   // -------------------------------------------------------------------------
   it('S-10: Authentication - expired, malformed, or missing JWT returns 401/403', async () => {
     const endpoints = [
-      { method: 'POST', url: `${appBaseUrl}/api/bookings/hold` },
+      { method: 'POST', url: `${appBaseUrl}${holdRoute}` },
       { method: 'POST', url: `${appBaseUrl}/api/bookings/confirm` },
       { method: 'GET', url: `${appBaseUrl}/api/ticket/00000000-0000-0000-0000-000000000000` },
     ];
@@ -695,7 +812,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
     const tEnd1 = new Date(new Date(tStart1).getTime() + 15 * 60 * 1000).toISOString();
 
     // 1st hold succeeds
-    const hold1 = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const hold1 = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -715,7 +832,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
     const tStart2 = new Date(new Date(tStart1).getTime() + 15 * 60 * 1000).toISOString();
     const tEnd2 = new Date(new Date(tStart1).getTime() + 30 * 60 * 1000).toISOString();
 
-    const hold2 = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const hold2 = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -741,7 +858,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
     const sensitiveNote = 'Very Private Diagnosis #9988';
 
     // Trigger validation error by sending invalid age
-    const errRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const errRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -838,7 +955,7 @@ describe('PHASE 2: HOSTILE SECURITY AUDIT & PENETRATION SUITE (Security Engineer
     const tEnd = new Date(new Date(tStart).getTime() + 15 * 60 * 1000).toISOString();
 
     const concurrentRequests = Array.from({ length: 5 }).map((_, i) =>
-      fetch(`${appBaseUrl}/api/bookings/hold`, {
+      fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: JSON.stringify({

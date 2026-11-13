@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/manifest-lock.schema.json",
   "components": {
-    "ARCHITECTURE.md": "2bd3dc251e94944cfbffad07ef97f72db056e3b1fcbcece49e02727971cc4f82",
+    "ARCHITECTURE.md": "5c51b41a11cc1d6ffec0efcf496f95c5605002d9f88e7ec63ad8f0f4d89bdedc",
     "CHANGELOG.md": "c29cb325d278be44ad662d91c86c180cf01c05d008f77cf4b3f0bd42de8c46f8",
     "README.md": "d6a29fbc3367f5ab5739f84bad71710879119d1b697b6a18943dcdad5e2ec654",
     "VERSION": "94bc11e2a5617c66e6d2f849e14be6579c44c90d0f985d80ce4dc96dff46fa94",
@@ -234,6 +234,25 @@
     "skills/server-management/SKILL.md": "4f2e4243a8e1e45482479dd033f654f59c56ada89ebf87ec561f86f79f54662d",
     "skills/simplify-code/SKILL.md": "1e2ab8d06593f6f95381f6b7a7d18e0fa998bb0147fd823c56f4158023d0164b",
     "skills/skillify/SKILL.md": "e95a98f0baba2687c9cf73dbacc89c1abccc572f1ce1f095b7834bc7da99158a",
+    "skills/stack-diagram/LICENSE": "be10012fc23bb7f2e332d62312b80cfca01c3eb7abd8970ebb1cdf8ff5b04faa",
+    "skills/stack-diagram/SKILL.md": "0313262929e5e318994fc23e86f869c57a7368f54c4284f72061cc78e6efb0f3",
+    "skills/stack-diagram/assets/fonts/Geist.woff2": "19f9c92546aa300c312235e3125af1b81394d8db9a4bc4a425cd5b641d2d54e1",
+    "skills/stack-diagram/assets/fonts/JetBrainsMono.woff2": "2c32b9b3ee358c119e210f6f5195f9bd34894d78a785ff2e95d60e718e400af4",
+    "skills/stack-diagram/assets/fonts/OFL-Geist.txt": "c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90",
+    "skills/stack-diagram/assets/fonts/OFL-JetBrainsMono.txt": "8790c0909f720c509810f95268779450cd6b0aa75b6d24e32f0878afe068427c",
+    "skills/stack-diagram/assets/fonts/README.md": "9b858f504cefd75b79970b724dc55c4b8e16ecb3dc59bba059bdea38c5dff551",
+    "skills/stack-diagram/assets/generic/browser.svg": "626b27b7681ff5ff0c25b1d235ca49883bdb59185fe2b4063b44ab9a147f88a8",
+    "skills/stack-diagram/assets/generic/device.svg": "abe1c203068bef6c10727e434614fefcb68d3b02139838fcfd3a9b9d2fac7f91",
+    "skills/stack-diagram/assets/generic/internet.svg": "f28c67cdda8b1b234f4993d1ac557b20fb8e5cb307e398c1cf720f54ef5dc3de",
+    "skills/stack-diagram/assets/generic/server.svg": "81a828c927db27160a7af9d076e541686ae0b6ec96794638b7a265a4e3e26289",
+    "skills/stack-diagram/assets/generic/user.svg": "a383d2e82346d3c14958eab164946898a0cf07f0f33defce7f55532ec1c9f1e9",
+    "skills/stack-diagram/assets/template.html": "ea333400a25e58008e4ef98dd052a7a1de3271cea4f0a5ab2f2f3d3445fad02f",
+    "skills/stack-diagram/references/geometry.md": "0b823440933abb5c1c25dbd19f98e74bf3289e89b4adecb970c5e99c56e09f6e",
+    "skills/stack-diagram/references/tsx.md": "7f39b64a61c64c2860ca78868a99b63c6f1ee909f686efd625d3bfd6d8751053",
+    "skills/stack-diagram/scripts/build.py": "28049a14bbec3a1264a9b61a7d6abe435f1932393ba9b991068ea5690e83d3a7",
+    "skills/stack-diagram/scripts/fetch_icons.py": "d6abcda84a0ed16f8cc1ebd0075dcb06c502bec5c06e5748f2a4774d26c61370",
+    "skills/stack-diagram/scripts/render_png.py": "588873e0441cf4e796a1f916e00f90975c23c952def4a9477f01ef8ebb0f206b",
+    "skills/stack-diagram/scripts/share.py": "a363482a18f6c0b2aab0b690cdb5bc02d6213c54fca158e1814082c5ba0bf4cc",
     "skills/subagent-delegation/SKILL.md": "706ccd7b0e5c10765ae9913965ff043727ee27194e25a76fba4b721bc00f201f",
     "skills/systematic-debugging/SKILL.md": "b41274eb9a63576dedf3df94b7cae59d6e1c62bff522a9114565f5768631f8de",
     "skills/tailwind-patterns/SKILL.md": "01b89bc9fd4750ec293934d343b0f49bc369157bf71a45fd109a0f631ed8e076",
@@ -267,6 +286,6 @@
     "workflows/verify.md": "2dc26bcbe24c7e71571953da75629521ea3d7a0a444a7101e3601b39864971fc"
   },
   "kitVersion": "2026.8.31",
-  "manifestSha256": "cc3706bec146683cc7baad95ecb72c36d96340eef554f6fbf3fa2660d5820f2d",
+  "manifestSha256": "68f39214db2f70bc7ac7a59f83dd390bd6e7519583388db7efe803b42ca4e0b5",
   "schemaVersion": "1.0.0"
 }

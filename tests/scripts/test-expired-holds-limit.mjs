@@ -178,7 +178,7 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
 
   it('3. Verifies slot availability endpoint excludes expired holds from booked_slots', async () => {
     const res = await fetch(
-      `${BASE_URL}/api/slots/booked?resource_id=${resourceId}&date=${todayStr}`,
+      `${BASE_URL}/api/slots/availability?resource_id=${resourceId}&date=${todayStr}`,
       {
         headers: { 'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2' },
       }

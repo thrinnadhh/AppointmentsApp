@@ -188,24 +188,29 @@ export default function AdminLogsDedicatedPage() {
     try {
       setTestingAlert(true);
       setTestAlertFeedback('Emitting test CRITICAL exception...');
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-
-      const res = await fetch('/api/admin/app-logs/test-alert', {
-        method: 'POST',
-        headers,
+      const testFingerprint = 'test_alert_' + Date.now().toString(16);
+      const { error: insertError } = await (supabase.rpc as any)('log_client_event', {
+        p_platform: 'web',
+        p_level: 'error',
+        p_severity: 'CRITICAL',
+        p_category: 'SECURITY',
+        p_source: 'admin-web',
+        p_message: 'CRITICAL ALERT TEST: Verified manual trigger from Super Admin Command Center',
+        p_component: 'AdminAlertTester',
+        p_stack_trace: 'Error: Simulated critical system event\n  at AdminAlertTester (src/app/admin/logs/page.tsx:88)',
+        p_error_code: 'SYS_CRIT_MANUAL_TEST',
+        p_role: 'admin',
+        p_city_id: 'tirupati',
+        p_app_version: '1.0.0',
+        p_environment: process.env.NODE_ENV === 'production' ? 'prod' : 'dev',
+        p_fingerprint: testFingerprint,
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to trigger test alert');
+      if (insertError) {
+        throw new Error(insertError.message || 'Failed to trigger test alert');
       }
 
-      const data = await res.json();
-      setTestAlertFeedback(`✓ Dispatched CRITICAL alert! Fingerprint: ${data.fingerprint}`);
+      setTestAlertFeedback(`✓ Dispatched CRITICAL alert! Fingerprint: ${testFingerprint}`);
       await fetchLogs();
       setTimeout(() => setTestAlertFeedback(null), 5000);
     } catch (err: unknown) {

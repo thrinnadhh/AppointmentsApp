@@ -58,7 +58,7 @@ export default function () {
     errorRate.add(!custOk);
 
   } else if (rand < 0.80) {
-    // 30% Staff/Front Desk Traffic: Next.js /api/slots/booked + PostgREST merchant_bookings view with Front Desk JWT
+    // 30% Staff/Front Desk Traffic: Next.js /api/slots/availability + PostgREST merchant_bookings view with Front Desk JWT
     const merchantHeaders = {
       'Authorization': `Bearer ${config.merchantToken}`,
       'apikey': config.anonKey,
@@ -66,10 +66,10 @@ export default function () {
     };
 
     const slotsRes = http.get(
-      `${NEXT_BASE}/api/slots/booked?resource_id=${config.resourceId}&date=${config.dateStr}`,
-      { headers: merchantHeaders, tags: { name: 'NextJS_Slots_Booked' } }
+      `${NEXT_BASE}/api/slots/availability?resource_id=${config.resourceId}&date=${config.dateStr}`,
+      { headers: merchantHeaders, tags: { name: 'NextJS_Slots_Availability' } }
     );
-    const slotsOk = check(slotsRes, { 'Next.js slots booked returns 200': (r) => r.status === 200 });
+    const slotsOk = check(slotsRes, { 'Next.js slots availability returns 200': (r) => r.status === 200 });
     errorRate.add(!slotsOk);
 
     const fdHeaders = {

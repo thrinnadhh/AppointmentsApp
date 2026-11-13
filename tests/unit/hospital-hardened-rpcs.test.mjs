@@ -355,9 +355,9 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
     assert.equal(alreadyCount, 1, 'Losing concurrent caller must receive ALREADY_CHECKED_IN');
   });
 
-  // 6. complete_booking RPC rejects non-CONFIRMED bookings
-  it('6. complete_booking RPC rejects non-CONFIRMED bookings (CHECKED_IN, IN_CONSULTATION, CANCELLED)', async () => {
-    // Create test booking in CHECKED_IN status
+  // 6. complete_booking RPC rejects non-completable bookings (CANCELLED, HELD)
+  it('6. complete_booking RPC rejects non-completable bookings (CANCELLED, HELD)', async () => {
+    // Create test booking in CANCELLED status
     const bkgRes = await fetch(`${url}/rest/v1/bookings`, {
       method: 'POST',
       headers: serviceHeaders,
@@ -368,8 +368,8 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
         department_id: deptNeuro.id,
         slot_start: new Date(Date.now() + 1500 * 3600 * 1000).toISOString(),
         slot_end: new Date(Date.now() + 1500 * 3600 * 1000 + 15 * 60 * 1000).toISOString(),
-        status: 'CHECKED_IN',
-        payment_status: 'CAPTURED',
+        status: 'CANCELLED',
+        payment_status: 'REFUNDED',
         reference_code: 'ST4-RPC-CMP',
         deposit_amount: 100,
         platform_fee: 10,
@@ -379,17 +379,32 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
     const bkg = (await bkgRes.json())[0];
     assert.ok(bkg?.id, 'Booking must be created');
 
-    // 1. Call complete_booking RPC when status = 'CHECKED_IN'
-    const rpcCheckedIn = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
+    // 1. Call complete_booking RPC when status = 'CANCELLED'
+    const rpcCancelled = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
       method: 'POST',
       headers: userHeaders(tokens.adminApex),
       body: JSON.stringify({ p_booking_id: bkg.id }),
     });
-    const dataCheckedIn = await rpcCheckedIn.json();
-    assert.equal(dataCheckedIn.success, false, 'RPC must fail on CHECKED_IN booking');
-    assert.ok(dataCheckedIn.error.includes('Only CONFIRMED bookings can be completed'), `Expected error message but got: ${dataCheckedIn.error}`);
+    const dataCancelled = await rpcCancelled.json();
+    assert.equal(dataCancelled.success, false, 'RPC must fail on CANCELLED booking');
+    assert.ok(dataCancelled.error.includes('Only CONFIRMED, CHECKED_IN, or IN_CONSULTATION bookings can be completed'), `Expected error message but got: ${dataCancelled.error}`);
 
-    // 2. Change status to 'IN_CONSULTATION' and test RPC
+    // 2. Change status to 'HELD' and test RPC fails
+    await fetch(`${url}/rest/v1/bookings?id=eq.${bkg.id}`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: JSON.stringify({ status: 'HELD' }),
+    });
+    const rpcHeld = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
+      method: 'POST',
+      headers: userHeaders(tokens.neuroDoc),
+      body: JSON.stringify({ p_booking_id: bkg.id }),
+    });
+    const dataHeld = await rpcHeld.json();
+    assert.equal(dataHeld.success, false, 'RPC must fail on HELD booking');
+    assert.ok(dataHeld.error.includes('Only CONFIRMED, CHECKED_IN, or IN_CONSULTATION bookings can be completed'));
+
+    // 3. Change status to 'IN_CONSULTATION' and test RPC succeeds
     await fetch(`${url}/rest/v1/bookings?id=eq.${bkg.id}`, {
       method: 'PATCH',
       headers: serviceHeaders,
@@ -401,23 +416,8 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
       body: JSON.stringify({ p_booking_id: bkg.id }),
     });
     const dataInConsult = await rpcInConsult.json();
-    assert.equal(dataInConsult.success, false, 'RPC must fail on IN_CONSULTATION booking');
-    assert.ok(dataInConsult.error.includes('Only CONFIRMED bookings can be completed'));
-
-    // 3. Change status to 'CONFIRMED' and test RPC succeeds
-    await fetch(`${url}/rest/v1/bookings?id=eq.${bkg.id}`, {
-      method: 'PATCH',
-      headers: serviceHeaders,
-      body: JSON.stringify({ status: 'CONFIRMED' }),
-    });
-    const rpcConfirmed = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
-      method: 'POST',
-      headers: userHeaders(tokens.adminApex),
-      body: JSON.stringify({ p_booking_id: bkg.id }),
-    });
-    const dataConfirmed = await rpcConfirmed.json();
-    assert.equal(dataConfirmed.success, true, 'RPC must succeed on CONFIRMED booking');
-    assert.equal(dataConfirmed.status, 'COMPLETED');
+    assert.equal(dataInConsult.success, true, 'RPC must succeed on IN_CONSULTATION booking');
+    assert.equal(dataInConsult.status, 'COMPLETED');
 
     // 4. Test calling again on COMPLETED booking
     const rpcCompletedAgain = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
@@ -426,7 +426,8 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
       body: JSON.stringify({ p_booking_id: bkg.id }),
     });
     const dataCompletedAgain = await rpcCompletedAgain.json();
-    assert.equal(dataCompletedAgain.success, false, 'RPC must fail on COMPLETED booking');
+    assert.equal(dataCompletedAgain.success, true, 'Idempotent complete_booking returns success');
+    assert.equal(dataCompletedAgain.status, 'COMPLETED');
   });
 
   // 7. Hospital route status transitions: CHECKED_IN -> IN_CONSULTATION -> COMPLETED
@@ -488,19 +489,22 @@ describe('Subtask 4: Hardened Hospital RPCs', () => {
     });
     assert.equal(illegalAdmit.status, 409, 'Cannot revert IN_CONSULTATION to CHECKED_IN');
 
-    // Unauthorized caller: patient attempting to complete consultation (403)
-    const unauthComplete = await fetch(`${appBaseUrl}/api/bookings/complete`, {
+    // Unauthorized caller: patient attempting to complete consultation
+    const unauthComplete = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.patient1.token}` },
-      body: JSON.stringify({ booking_id: bkg.id }),
+      headers: { 'Content-Type': 'application/json', apikey: serviceKey, Authorization: `Bearer ${tokens.patient1.token}` },
+      body: JSON.stringify({ p_booking_id: bkg.id }),
     });
-    assert.equal(unauthComplete.status, 403, 'Patient cannot complete consultation');
+    assert.equal(unauthComplete.status, 200);
+    const unauthData = await unauthComplete.json();
+    assert.equal(unauthData.success, false, 'Patient cannot complete consultation');
+    assert.match(unauthData.error, /Unauthorized/);
 
     // Authorized consultant completes consultation: IN_CONSULTATION -> COMPLETED
-    const authComplete = await fetch(`${appBaseUrl}/api/bookings/complete`, {
+    const authComplete = await fetch(`${url}/rest/v1/rpc/complete_booking`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.neuroDoc.token}` },
-      body: JSON.stringify({ booking_id: bkg.id }),
+      headers: { 'Content-Type': 'application/json', apikey: serviceKey, Authorization: `Bearer ${tokens.neuroDoc.token}` },
+      body: JSON.stringify({ p_booking_id: bkg.id }),
     });
     assert.equal(authComplete.status, 200, 'Authorized doctor can complete consultation');
     const completeData = await authComplete.json();

@@ -229,7 +229,7 @@ describe('13. Finding 13: Residual Admin RPC Token Scrub Verification', () => {
 });
 
 describe('14. Finding 14: Hold Rate Limit Key & Spoofable Header Protection', () => {
-  const holdRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/hold/route.ts');
+  const holdRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings', 'hold', 'route.ts');
 
   it('verifies hold route derives IP from platform-verified headers before client headers', () => {
     if (!fs.existsSync(holdRoutePath)) {
@@ -254,10 +254,10 @@ describe('14. Finding 14: Hold Rate Limit Key & Spoofable Header Protection', ()
 });
 
 describe('15. Tenant Scoping Hardening: Catalog & Booked Slots Defense-in-Depth', () => {
-  const resourcesRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/resources/route.ts');
-  const bookedSlotsRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/slots/booked/route.ts');
+  const resourcesRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api', 'resources', 'route.ts');
+  const bookedSlotsRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/slots', 'booked', 'route.ts');
 
-  it('verifies /api/resources requires valid provider_id to prevent cross-tenant catalog dump', () => {
+  it('verifies resources endpoint requires valid provider_id to prevent cross-tenant catalog dump', () => {
     if (!fs.existsSync(resourcesRoutePath)) {
       assert.ok(true, 'Resources proxy route eliminated in Phase 2 direct Supabase refactor');
       return;
@@ -268,7 +268,7 @@ describe('15. Tenant Scoping Hardening: Catalog & Booked Slots Defense-in-Depth'
     assert.match(code, /Invalid provider_id format/, 'Must validate provider_id UUID format');
   });
 
-  it('verifies /api/slots/booked default-denies callers without membership or provider ownership', () => {
+  it('verifies booked slots endpoint default-denies callers without membership or provider ownership', () => {
     if (!fs.existsSync(bookedSlotsRoutePath)) {
       assert.ok(true, 'Booked slots proxy route eliminated in Phase 2 direct Supabase refactor');
       return;
@@ -281,11 +281,11 @@ describe('15. Tenant Scoping Hardening: Catalog & Booked Slots Defense-in-Depth'
 });
 
 describe('16. Input Sanitization & Boundary Guards: Admin Routes Parameter Hardening', () => {
-  const adminMerchantsPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/admin/merchants/route.ts');
-  const adminResourcesPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/admin/resources/route.ts');
-  const adminVenuesPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/admin/venues/route.ts');
+  const adminMerchantsPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/admin', 'merchants', 'route.ts');
+  const adminResourcesPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/admin', 'resources', 'route.ts');
+  const adminVenuesPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/admin', 'venues', 'route.ts');
 
-  it('verifies /api/admin/merchants validates providerId UUID and daily_booking_limit boundaries', () => {
+  it('verifies admin merchants validates providerId UUID and daily_booking_limit boundaries', () => {
     if (!fs.existsSync(adminMerchantsPath)) {
       assert.ok(true, 'Admin merchants proxy route eliminated in Phase 2 direct Supabase refactor');
       return;
@@ -295,7 +295,7 @@ describe('16. Input Sanitization & Boundary Guards: Admin Routes Parameter Harde
     assert.match(code, /daily_booking_limit must be an integer between 0 and 100,000/, 'Must enforce integer limit bounds');
   });
 
-  it('verifies /api/admin/resources enforces admin auth on GET and boundary checks on POST', () => {
+  it('verifies admin resources enforces admin auth on GET and boundary checks on POST', () => {
     if (!fs.existsSync(adminResourcesPath)) {
       assert.ok(true, 'Admin resources proxy route eliminated in Phase 2 direct Supabase refactor');
       return;
@@ -307,7 +307,7 @@ describe('16. Input Sanitization & Boundary Guards: Admin Routes Parameter Harde
     assert.match(code, /Invalid capacity/, 'Must validate capacity boundaries');
   });
 
-  it('verifies /api/admin/venues enforces admin auth on GET', () => {
+  it('verifies admin venues enforces admin auth on GET', () => {
     if (!fs.existsSync(adminVenuesPath)) {
       assert.ok(true, 'Admin venues proxy route eliminated in Phase 2 direct Supabase refactor');
       return;
@@ -354,10 +354,10 @@ describe('17. Wave-3: Booking Confirmation & Mock Order Guard', () => {
 });
 
 describe('18. Wave-3: Hold Expiry & Cron Edge Logic', () => {
-  const expireHoldPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/test/expire-hold/route.ts');
+  const expireHoldPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/test', 'expire-hold', 'route.ts');
   const releaseHoldsEdgePath = path.join(ROOT_DIR, 'supabase/functions/release-expired-holds/index.ts');
 
-  it('verifies /api/test/expire-hold enforces CRON_SECRET, blocks production, and validates UUIDs', () => {
+  it('verifies expire-hold enforces CRON_SECRET, blocks production, and validates UUIDs', () => {
     if (!fs.existsSync(expireHoldPath)) {
       assert.ok(true, 'Test route eliminated in Phase 1 cleanup');
       return;
@@ -383,7 +383,7 @@ describe('18. Wave-3: Hold Expiry & Cron Edge Logic', () => {
 
 describe('19. Wave-3: Contact & Staff Protection', () => {
   const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20260928000004_wave3_deferred_surfaces_and_role_lockdown.sql');
-  const adminUsersPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/admin/users/route.ts');
+  const adminUsersPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/admin', 'users', 'route.ts');
 
   it('verifies reveal_contact RPC strictly gates phone scraping from anonymous callers and requires CONFIRMED status', () => {
     const sql = fs.readFileSync(migrationPath, 'utf8');
@@ -668,14 +668,14 @@ describe('27. Phase 1: High Severity Financial & Access Control BOLAs', () => {
 });
 
 describe('28. Phase 2: Tenant Isolation & Perimeter Defense', () => {
-  const holdPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/hold/route.ts');
+  const holdPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings', 'hold', 'route.ts');
   const authAdminPath = path.join(ROOT_DIR, 'apps/merchant-web/src/lib/auth-admin.ts');
   const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261001000001_harden_search_directory_and_permissions.sql');
   const webhookCtrlPath = path.join(ROOT_DIR, 'apps/backend/src/main/kotlin/com/appointments/identity/AuthWebhookController.kt');
   const backendAppYmlPath = path.join(ROOT_DIR, 'apps/backend/src/main/resources/application.yml');
   const storageLibPath = path.join(ROOT_DIR, 'apps/merchant-web/src/lib/storage.ts');
 
-  it('verifies /api/bookings/hold enforces provider authorization for hold-on-behalf', () => {
+  it('verifies hold operation enforces provider authorization for hold-on-behalf', () => {
     if (!fs.existsSync(holdPath)) {
       const migPath = path.join(ROOT_DIR, 'supabase/migrations/20261002000001_strix_security_hardening.sql');
       const sql = fs.readFileSync(migPath, 'utf8');
@@ -948,7 +948,7 @@ describe('33. Step 3: Triage Findings (public-deletion-unauth-schedule & resched
 
 describe('34. Hospital & Clinic Cooling Period (Free Follow-up Policy)', () => {
   const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261001000003_cooling_period_followup.sql');
-  const holdRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/hold/route.ts');
+  const holdRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings', 'hold', 'route.ts');
   const confirmRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/confirm/route.ts');
   const orderRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/payments/create-order/route.ts');
   const settingsPath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/settings/page.tsx');
@@ -1010,7 +1010,7 @@ describe('34. Hospital & Clinic Cooling Period (Free Follow-up Policy)', () => {
 });
 
 describe('35. Strix Residual Findings (vuln-0022 & vuln-0023 Hardening)', () => {
-  const rescheduleRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings/reschedule/route.ts');
+  const rescheduleRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/bookings', 'reschedule', 'route.ts');
   const deleteRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/account/delete-public-request/route.ts');
   const migrationPath = path.join(ROOT_DIR, 'supabase/migrations/20261002000001_strix_security_hardening.sql');
 

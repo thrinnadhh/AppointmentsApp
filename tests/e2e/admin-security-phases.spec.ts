@@ -44,8 +44,8 @@ test.describe.serial('Super Admin Security Hardening - Three Phases E2E Suite', 
     });
 
     await test.step('3. Zero-Trust API Guard: Rejects unauthenticated direct requests to /api/admin/*', async () => {
-      const response = await request.get('http://localhost:3000/api/admin/merchants');
-      expect([401, 403, 404]).toContain(response.status());
+      const response = await request.get('http://localhost:3000/api/admin/doctor-assignments');
+      expect([401, 403]).toContain(response.status());
     });
 
     await test.step('4. Super Admin authenticates, reaches dashboard, displays Identity Badge, and signs out', async () => {
@@ -88,10 +88,10 @@ test.describe.serial('Super Admin Security Hardening - Three Phases E2E Suite', 
       await expect(matchingLog).toBeVisible();
     });
 
-    await test.step('3. Zero-Trust API Guard: /api/admin/audit-logs enforces RBAC and returns structured logs', async () => {
-      // Unauthenticated request fails (404 since proxy removed, or 401/403)
-      const unauth = await request.get('http://localhost:3000/api/admin/audit-logs');
-      expect([401, 403, 404]).toContain(unauth.status());
+    await test.step('3. Zero-Trust API Guard: admin endpoints enforce RBAC and return structured data', async () => {
+      // Unauthenticated request fails
+      const unauth = await request.get('http://localhost:3000/api/admin/refunds');
+      expect([401, 403]).toContain(unauth.status());
 
       // Direct audit log verification via Supabase PostgREST
       const { createClient } = await import('@supabase/supabase-js');

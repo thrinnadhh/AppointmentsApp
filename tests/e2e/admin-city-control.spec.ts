@@ -17,8 +17,11 @@ test.describe.serial('Super Admin Multi-City Rollout & Expansion Hub', () => {
       process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321',
       process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
     );
-    await (supabaseAdmin.rpc as any)('update_city_status', { p_city_id: 'tirupati', p_status: 'ACTIVE' });
-    await (supabaseAdmin.rpc as any)('update_city_status', { p_city_id: 'nellore', p_status: 'EXPANDING' });
+    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+    await (supabaseAdmin.rpc as any)('update_city_status', { p_city_id: 'tirupati', p_status: 'ACTIVE', p_admin_token: adminToken });
+    await (supabaseAdmin.rpc as any)('update_city_status', { p_city_id: 'nellore', p_status: 'EXPANDING', p_admin_token: adminToken });
+    await supabaseAdmin.from('cities').update({ status: 'ACTIVE' }).eq('id', 'tirupati');
+    await supabaseAdmin.from('cities').update({ status: 'EXPANDING' }).eq('id', 'nellore');
   });
 
 

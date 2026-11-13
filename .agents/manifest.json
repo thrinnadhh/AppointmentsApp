@@ -1200,6 +1200,17 @@
       "scripts": [],
       "version": "1.0.0"
     },
+    "stack-diagram": {
+      "allowedTools": [],
+      "path": "skills/stack-diagram/SKILL.md",
+      "scripts": [
+        "skills/stack-diagram/scripts/build.py",
+        "skills/stack-diagram/scripts/fetch_icons.py",
+        "skills/stack-diagram/scripts/render_png.py",
+        "skills/stack-diagram/scripts/share.py"
+      ],
+      "version": ""
+    },
     "subagent-delegation": {
       "allowedTools": [],
       "path": "skills/subagent-delegation/SKILL.md",

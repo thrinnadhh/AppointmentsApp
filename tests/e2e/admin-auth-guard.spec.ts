@@ -74,11 +74,11 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
   });
 
   test('TC-ADMIN-AUTH-04: Zero-Trust API Gate blocks unauthenticated requests to /api/admin/*', async ({ request }) => {
-    // Unauthenticated GET request to /api/admin/merchants without tokens
-    const response = await request.get('http://localhost:3000/api/admin/merchants');
+    // Unauthenticated GET request to admin endpoints without tokens
+    const response = await request.get('http://localhost:3000/api/admin/doctor-assignments');
 
-    // Must be rejected (404 since proxy removed, or 401/403)
-    expect([401, 403, 404]).toContain(response.status());
+    // Must be rejected
+    expect([401, 403]).toContain(response.status());
   });
 
   test('TC-ADMIN-AUDIT-01: Immutable Audit Trail UI displays cryptographically verifiable admin logs', async ({ page, request }) => {
@@ -126,10 +126,10 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     await adminPage.auditSearchInput.fill('');
   });
 
-  test('TC-ADMIN-AUDIT-02: Zero-Trust API Gate protects /api/admin/audit-logs with RBAC verification', async ({ request }) => {
-    // 1. Unauthenticated request must fail (404 since proxy removed, or 401/403)
-    const unauthResponse = await request.get('http://localhost:3000/api/admin/audit-logs');
-    expect([401, 403, 404]).toContain(unauthResponse.status());
+  test('TC-ADMIN-AUDIT-02: Zero-Trust API Gate protects admin endpoints with RBAC verification', async ({ request }) => {
+    // 1. Unauthenticated request must fail
+    const unauthResponse = await request.get('http://localhost:3000/api/admin/refunds');
+    expect([401, 403]).toContain(unauthResponse.status());
 
     // 2. Direct audit log verification via Supabase PostgREST
     const { createClient } = await import('@supabase/supabase-js');

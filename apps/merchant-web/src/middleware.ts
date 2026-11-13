@@ -27,10 +27,7 @@ const PUBLIC_API_ROUTES = [
   '/api/bookings',
   '/api/health',
   '/api/cities/',
-  '/api/merchant/onboard',
-  '/api/merchant/register-shop',
   '/api/account/delete-public-request',
-  '/api/logs/ingest',
   '/api/ticket/',
   '/api/customer/',
   '/api/queue/',
@@ -243,8 +240,7 @@ export async function middleware(req: NextRequest) {
     }
 
     const isPublicApi =
-      PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route)) ||
-      (pathname === '/api/admin/waitlist' && req.method === 'POST');
+      PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route));
 
     if (!isPublicApi && !isE2EBypass && !isAuthenticated) {
       return NextResponse.json(
