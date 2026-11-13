@@ -185,18 +185,21 @@ test.describe('Merchant — Edge & Boundary Cases', () => {
     const { data: merchants } = await supabaseAdmin.from('providers').select('*');
     expect(Array.isArray(merchants)).toBeTruthy();
     const testEmail = (process.env.TEST_MERCHANT_EMAIL || 'admin.apex@test-tirupati.local').trim();
-    const testPassword = process.env.TEST_MERCHANT_PASSWORD || 'HospitalTest2026!';
+    const testPassword =
+      process.env.TEST_MERCHANT_PASSWORD ||
+      (testEmail.toLowerCase().includes('svims.clinic') ? 'SvimsClinic2026!' : 'HospitalTest2026!');
     const normalizedEmail = testEmail.toLowerCase();
 
+    const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+    const currentUser = (users?.users || []).find((u: any) => u.email?.toLowerCase() === normalizedEmail);
     const targetMerchant =
-      (merchants || []).find((m: any) => m.name?.includes('[TEST-HOSP-A]')) ||
-      (merchants || []).find((m: any) => m.email?.toLowerCase() === normalizedEmail) ||
+      (currentUser && (merchants || []).find((m: any) => m.owner_id === currentUser.id)) ||
       (normalizedEmail.includes('svims.clinic')
         ? (merchants || []).find(
             (m: any) => m.id === MERCHANT_A_PROVIDER_ID || m.name?.includes('Sri Venkateswara Dental')
           ) || { id: MERCHANT_A_PROVIDER_ID }
         : (merchants || []).find(
-            (m: any) => m.name?.includes('Apex')
+            (m: any) => m.name?.includes('[TEST-HOSP-A]') || m.name?.includes('Apex')
           )) ||
       { id: MERCHANT_A_PROVIDER_ID };
     const targetProviderId = targetMerchant.id;

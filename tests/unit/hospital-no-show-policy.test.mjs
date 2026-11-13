@@ -63,9 +63,9 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
     });
   });
 
-  // Helper to create a test booking in CONFIRMED state with ₹100 deposit
+  // Helper to create a test booking in CONFIRMED state with ₹100 deposit (past slot to allow legitimate no-show reporting)
   async function createTestBooking(offsetHours) {
-    const start = new Date(Date.now() + (48 + offsetHours) * 3600000);
+    const start = new Date(Date.now() - (48 + offsetHours) * 3600000);
     const end = new Date(start.getTime() + 15 * 60000);
     const refCode = `NS-TEST-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
