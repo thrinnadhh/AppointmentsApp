@@ -245,30 +245,32 @@ export default function DoctorConsultationWorkspacePage() {
       const list: any[] = bookingsData || [];
         
         // Enrich with arrival tag
-        const enriched: ActiveConsultationBooking[] = list.map((b) => {
-          const tag = calculateArrivalTag(b.slot_start, b.customer_arrived_at || b.checked_in_at);
-          return {
-            ...b,
-            arrival_tag: tag,
-          };
-        });
-        setBookings(enriched);
-      }
+      const enriched: ActiveConsultationBooking[] = list.map((b) => {
+        const tag = calculateArrivalTag(b.slot_start, b.customer_arrived_at || b.checked_in_at);
+        return {
+          ...b,
+          arrival_tag: tag,
+        };
+      });
+      setBookings(enriched);
 
-      // 2. Fetch Front Desk assignments for this doctor
+      // 2. Fetch Front Desk assignments for this doctor via direct Supabase PostgREST
       try {
-        const teamRes = await fetch('/api/admin/doctor-assignments');
-        if (teamRes.ok) {
-          const teamJson = await teamRes.json();
-          const assignments: any[] = teamJson.assignments || [];
-          const matched = assignments.filter((a: any) => a.doctor_id === selectedDoctorId);
+        const { data: assignments } = await (supabase.from('doctor_front_desk_assignments' as any) as any)
+          .select('user_email, id_card_number, staff_role')
+          .eq('doctor_id', selectedDoctorId);
+        if (assignments && assignments.length > 0) {
           setFrontDeskStaff(
-            matched.map((m: any) => ({
-              name: m.user_name || m.user_email || 'Receptionist',
+            assignments.map((m: any) => ({
+              name: m.user_email || 'Receptionist',
               idCardNumber: m.id_card_number,
               email: m.user_email,
             }))
           );
+        } else {
+          setFrontDeskStaff([
+            { name: 'Hospital Reception Desk', idCardNumber: 'HOSP-FD-GEN' }
+          ]);
         }
       } catch (teamErr) {
         setFrontDeskStaff([

@@ -218,11 +218,11 @@ export default function VenuesPage() {
         p_phone: phone.trim(),
         p_opening_time: `${openingTime}:00`,
         p_closing_time: `${closingTime}:00`,
-        p_description: description.trim() || null,
-        p_email: email.trim() || null,
-        p_owner_id: user?.id || null,
-        p_latitude: null,
-        p_longitude: null,
+        p_description: description.trim() || undefined,
+        p_email: email.trim() || undefined,
+        p_owner_id: user?.id || undefined,
+        p_latitude: undefined,
+        p_longitude: undefined,
       });
 
       if (error) {

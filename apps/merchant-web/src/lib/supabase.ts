@@ -603,11 +603,11 @@ export async function adminCreateVenue(params: {
     p_phone: params.phone,
     p_opening_time: params.openingTime || '09:00:00',
     p_closing_time: params.closingTime || '21:00:00',
-    p_description: params.description || null,
-    p_email: params.email || null,
-    p_owner_id: params.ownerId || null,
-    p_latitude: null,
-    p_longitude: null,
+    p_description: params.description || undefined,
+    p_email: params.email || undefined,
+    p_owner_id: params.ownerId || undefined,
+    p_latitude: undefined,
+    p_longitude: undefined,
   });
   if (error) {
     throw new Error(error.message || 'Failed to create venue');
@@ -816,7 +816,6 @@ export async function fetchTenantContextData(): Promise<{
         // Fallback query failed, activeProvider remains null
       }
     }
-  }
   }
 
   return {

@@ -184,7 +184,7 @@ export default function ShopRegistrationPage() {
         p_phone: phone.trim(),
         p_address: address.trim() || 'AIR Bypass Road, Tirupati',
         p_full_name: fullName.trim() || user.user_metadata?.full_name || 'Merchant Owner',
-        p_photo_url: cleanPhotoUrl,
+        p_photo_url: cleanPhotoUrl || undefined,
       });
 
       const result = data as any;
