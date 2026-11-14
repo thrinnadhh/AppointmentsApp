@@ -51,6 +51,13 @@ test.describe('Admin — Edge & Boundary Cases', () => {
 
   // ─── EC-ADMIN-02: Blocking merchant with live bookings ─────────────────────
   test('EC-ADMIN-02: Blocking a merchant with CONFIRMED bookings — bookings remain, not auto-cancelled', async ({ request }) => {
+    // Clear any stale holds for test customer to ensure available hold budget
+    await supabaseAdmin
+      .from('bookings')
+      .update({ hold_expires_at: new Date(Date.now() - 60000).toISOString() })
+      .eq('customer_id', '99999999-9999-9999-9999-999999999991')
+      .eq('status', 'HELD');
+
     // 1. Create a CONFIRMED booking for Merchant A with random offset to prevent collisions
     const randomOffset = 86400000 * 12 + Math.floor(Math.random() * 864000000);
     const slotStart = new Date(Date.now() + randomOffset).toISOString();

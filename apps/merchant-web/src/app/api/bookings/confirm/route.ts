@@ -208,7 +208,9 @@ export async function POST(req: NextRequest) {
       gateway_payment_id.startsWith('cf_mock_') ||
       gateway_payment_id.startsWith('pay_mock_') ||
       gateway_payment_id.startsWith('pay_test_') ||
-      gateway_payment_id.toLowerCase().includes('mock');
+      gateway_payment_id.startsWith('pay_fixture_') ||
+      gateway_payment_id.toLowerCase().includes('mock') ||
+      gateway_payment_id.toLowerCase().includes('fixture');
 
     const effectiveTargetOrderId = body.order_id || (body as any).cf_order_id || razorpay_order_id;
     const isMockOrder = Boolean(

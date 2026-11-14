@@ -4,6 +4,8 @@
 --              2. Advisory lock in check_rate_limit to eliminate cold start / concurrent races
 --              3. Atomic slot reclamation RPC (reclaim_expired_hold_or_refund) for late Cashfree webhooks
 --              4. Enforce strict customer hold limit without role-based bypasses
+--              5. Trigger & backfill: inherit department_id from resource on bookings
+--              6. Hardening legacy storage buckets against Stored XSS and cap file sizes
 
 BEGIN;
 
@@ -626,8 +628,23 @@ WHERE b.resource_id = r.id
   AND b.department_id IS NULL
   AND r.department_id IS NOT NULL;
 
-COMMIT;
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 6. HARDEN legacy storage buckets against Stored XSS and cap file sizes
+-- ══════════════════════════════════════════════════════════════════════════════
 -- Remove Stored XSS vector (image/svg+xml) and cap size on legacy buckets
+UPDATE storage.buckets
+SET file_size_limit = 2097152,
+    allowed_mime_types = ARRAY['image/webp', 'image/jpeg', 'image/png']
+WHERE id = 'venue-assets';
+
+UPDATE storage.buckets
+SET file_size_limit = 5242880,
+    allowed_mime_types = ARRAY['image/webp', 'image/jpeg', 'image/png', 'application/pdf']
+WHERE id = 'prescriptions-and-records';
+
+COMMIT;
+
+
 UPDATE storage.buckets
 SET file_size_limit = 2097152,
     allowed_mime_types = ARRAY['image/webp', 'image/jpeg', 'image/png']

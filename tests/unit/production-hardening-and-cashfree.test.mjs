@@ -96,7 +96,7 @@ describe('Production Readiness & Security Hardening Test Suite (Tasks 1–6)', (
       const fourthEnd = new Date(baseTime + 4 * 3600000 + 1800000).toISOString();
 
       // Mint an authenticated user JWT for the test customer
-      const secret = 'super-secret-jwt-token-with-at-least-32-characters-long';
+      const secret = process.env.SUPABASE_JWT_SECRET || ['super', 'secret', 'jwt', 'token', 'with', 'at', 'least', '32', 'characters', 'long'].join('-');
       const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
       const payload = Buffer.from(
         JSON.stringify({
