@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { RazorpayWebhookPayload } from '@appointments/shared';
 import { assertSafePayloadStructure, PayloadLimitExceededError } from '@/lib/validation-limits';
 
@@ -186,14 +187,12 @@ export async function POST(req: NextRequest) {
             .eq('id', booking.id);
 
           try {
-            const { initiateRazorpayRefund } = await import('@/lib/razorpay');
-            const refundResult = await initiateRazorpayRefund({
+            const cfAdapter = getPaymentGateway('cashfree');
+            const refundResult = await cfAdapter.refundOrder({
+              orderId: orderId || booking.id,
               paymentId,
-              amount: Math.round(depositInInr * 100),
-              notes: {
-                booking_id: booking.id,
-                reason: 'Hold expired before payment completion',
-              },
+              amountInPaise: Math.round(depositInInr * 100),
+              reason: 'Hold expired before payment completion',
             });
 
             await supabaseAdmin
@@ -206,7 +205,7 @@ export async function POST(req: NextRequest) {
 
             await supabaseAdmin.from('payments').insert({
               booking_id: booking.id,
-              gateway_payment_id: refundResult.id,
+              gateway_payment_id: refundResult.refundId,
               amount: depositInInr,
               currency: paymentCurrency,
               status: 'REFUNDED',

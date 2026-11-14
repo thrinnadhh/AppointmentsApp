@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { initiateRazorpayRefund } from '@/lib/razorpay';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { validateBookingStatusTransition } from '@/lib/hospital-access';
@@ -165,28 +164,15 @@ export async function POST(req: NextRequest) {
           let refundId = '';
           let refundAmount: number;
 
-          if (bkg.gateway_provider !== 'razorpay') {
-            const cfAdapter = getPaymentGateway('cashfree');
-            const refundResult = await cfAdapter.refundOrder({
-              orderId: bkg.gateway_order_id || booking_id,
-              paymentId: bkg.gateway_payment_id || undefined,
-              amountInPaise: refundAmountPaise,
-              reason: reason || 'Policy-eligible cancellation refund',
-            });
-            refundId = refundResult.refundId;
-            refundAmount = refundResult.amountInPaise;
-          } else {
-            const refundResult = await initiateRazorpayRefund({
-              paymentId: bkg.gateway_payment_id!,
-              amount: refundAmountPaise,
-              notes: {
-                booking_id,
-                reason: reason || 'Policy-eligible cancellation refund',
-              },
-            });
-            refundId = refundResult.id;
-            refundAmount = refundResult.amount;
-          }
+          const cfAdapter = getPaymentGateway('cashfree');
+          const refundResult = await cfAdapter.refundOrder({
+            orderId: bkg.gateway_order_id || booking_id,
+            paymentId: bkg.gateway_payment_id || undefined,
+            amountInPaise: refundAmountPaise,
+            reason: reason || 'Policy-eligible cancellation refund',
+          });
+          refundId = refundResult.refundId;
+          refundAmount = refundResult.amountInPaise;
 
           // Refund succeeded -> promote to REFUNDED
           finalPaymentStatus = 'REFUNDED';
