@@ -48,7 +48,6 @@ const webPages = [
 const webComponents = [
   { screen: 'Bookings Contact Badge', path: 'apps/merchant-web/src/components/CustomerContactBadge.tsx', role: 'Hospital Admin, Front Desk' },
   { screen: 'Main Navigation Bar', path: 'apps/merchant-web/src/components/Navigation.tsx', role: 'Merchant Staff' },
-  { screen: 'Tenant Switcher', path: 'apps/merchant-web/src/components/TenantSelector.tsx', role: 'Hospital Admin' },
   { screen: 'Consultation: Active Card', path: 'apps/merchant-web/src/components/consultation/ActiveConsultationCard.tsx', role: 'Consultant, Hospital Admin' },
   { screen: 'Consultation: Urgency Override Modal', path: 'apps/merchant-web/src/components/consultation/MedicalUrgencyOverrideModal.tsx', role: 'Consultant, Hospital Admin' },
   { screen: 'Consultation: Up Next Card', path: 'apps/merchant-web/src/components/consultation/UpNextPatientCard.tsx', role: 'Consultant, Hospital Admin' },
