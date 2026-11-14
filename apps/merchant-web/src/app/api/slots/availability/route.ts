@@ -1,26 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser, getClientIp } from '@/lib/auth-admin';
+import { checkRateLimit } from '@/lib/redis';
 import { ACTIVE_SLOT_BOOKING_STATUSES } from '@appointments/shared';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const YYYY_MM_DD_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-const availabilityRateBuckets = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
-  const now = Date.now();
-  const bucket = availabilityRateBuckets.get(key);
-  if (!bucket || now >= bucket.resetAt) {
-    availabilityRateBuckets.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-  if (bucket.count >= maxRequests) {
-    return false;
-  }
-  bucket.count += 1;
-  return true;
-}
 
 /**
  * GET /api/slots/availability?resource_id=<uuid>&date=<YYYY-MM-DD or ISO-8601>
@@ -41,7 +26,8 @@ export async function GET(req: NextRequest) {
 
     const ip = getClientIp(req);
     if (ip) {
-      if (!checkRateLimit(`slots-availability-ip:${ip}`, 60, 60_000)) {
+      const ipLimit = await checkRateLimit(`slots-availability-ip:${ip}`, 60, 60);
+      if (!ipLimit.allowed) {
         return NextResponse.json(
           { error: 'Too many availability requests from this IP. Please wait a moment.' },
           { status: 429 }
@@ -51,7 +37,8 @@ export async function GET(req: NextRequest) {
       console.warn('[RateLimit] missing_trusted_client_ip on /api/slots/availability');
     }
 
-    if (!checkRateLimit(`slots-availability-user:${caller.id}`, 60, 60_000)) {
+    const userLimit = await checkRateLimit(`slots-availability-user:${caller.id}`, 60, 60);
+    if (!userLimit.allowed) {
       return NextResponse.json(
         { error: 'Too many availability requests for this account. Please wait a moment.' },
         { status: 429 }

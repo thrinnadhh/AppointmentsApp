@@ -97,12 +97,12 @@ describe('Subtask 3: Hospital Bookings RLS Lockdown', () => {
       })
     });
 
-    // Create test bookings for Doctor 1 and Doctor 2
-    const now = new Date();
-    const slotStart1 = new Date(now.getTime() + 180 * 60 * 1000).toISOString();
-    const slotEnd1 = new Date(now.getTime() + 195 * 60 * 1000).toISOString();
-    const slotStart2 = new Date(now.getTime() + 200 * 60 * 1000).toISOString();
-    const slotEnd2 = new Date(now.getTime() + 215 * 60 * 1000).toISOString();
+    // Create test bookings for Doctor 1 and Doctor 2 far in future to prevent slot collisions
+    const baseOffset = 86400000 * 25;
+    const slotStart1 = new Date(Date.now() + baseOffset).toISOString();
+    const slotEnd1 = new Date(Date.now() + baseOffset + 15 * 60 * 1000).toISOString();
+    const slotStart2 = new Date(Date.now() + baseOffset + 30 * 60 * 1000).toISOString();
+    const slotEnd2 = new Date(Date.now() + baseOffset + 45 * 60 * 1000).toISOString();
 
     await fetch(`${url}/rest/v1/bookings?reference_code=in.(RLS-TEST-DOC1,RLS-TEST-DOC2,RLS-TEST-SALON)`, {
       method: 'DELETE',

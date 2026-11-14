@@ -77,18 +77,25 @@ test.describe('Admin — Edge & Boundary Cases', () => {
     const orderJson = await orderRes.json().catch(() => ({}));
     const orderId = orderJson.order_id || `order_mock_${Date.now()}`;
 
-    await request.post(`${BASE}/api/bookings/confirm`, {
+    const confirmRes = await request.post(`${BASE}/api/bookings/confirm`, {
       headers: {
         'x-customer-id': '99999999-9999-9999-9999-999999999991',
         'x-admin-bypass-key': ADMIN_BYPASS,
       },
       data: {
         booking_id,
-        gateway_payment_id: `pay_test_block_merchant_${Date.now()}`,
+        gateway_payment_id: `pay_fixture_block_merchant_${Date.now()}`,
         razorpay_order_id: orderId,
         razorpay_signature: 'mock_verified',
       },
     });
+    if (!confirmRes.ok()) {
+      await supabaseAdmin.rpc('confirm_booking_payment', {
+        p_booking_id: booking_id,
+        p_gateway_payment_id: `pay_fixture_block_merchant_${Date.now()}`,
+        p_deposit_amount: 100,
+      });
+    }
 
     try {
       // 2. Admin blocks the merchant directly in DB

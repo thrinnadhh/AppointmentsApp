@@ -805,7 +805,7 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
       order_id: json.order_id,
       cf_order_id: json.cf_order_id,
       payment_session_id: json.payment_session_id,
-      gateway_provider: json.gateway_provider || 'razorpay',
+      gateway_provider: json.gateway_provider || 'cashfree',
       key_id: json.key_id,
       amount: json.amount,
       currency: json.currency,

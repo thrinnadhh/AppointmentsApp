@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getRazorpayKeyId } from '@/lib/razorpay';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { checkRateLimit } from '@/lib/redis';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking, getClientIp } from '@/lib/auth-admin';
@@ -144,7 +143,7 @@ export async function POST(req: NextRequest) {
         {
           success: true,
           order_id: freeOrderId,
-          key_id: getRazorpayKeyId(),
+          key_id: process.env.CASHFREE_APP_ID || '',
           amount: 0,
           currency: 'INR',
           is_mock: true,
@@ -175,15 +174,14 @@ export async function POST(req: NextRequest) {
       (Number(booking.total_amount) === onlineAmountInInr || Number(booking.platform_fee_amount) === onlineAmountInInr) &&
       (!isCashfreeActive || booking.payment_session_id)
     ) {
-      const provider = (booking.gateway_provider as 'cashfree' | 'razorpay') || 'razorpay';
       return NextResponse.json<CreateRazorpayOrderResponse & { payment_session_id?: string; cf_order_id?: string; gateway_provider?: string }>(
         {
           success: true,
           order_id: booking.gateway_order_id,
           cf_order_id: booking.gateway_order_id,
           payment_session_id: booking.payment_session_id || undefined,
-          gateway_provider: provider,
-          key_id: provider === 'cashfree' ? (process.env.CASHFREE_APP_ID || '') : getRazorpayKeyId(),
+          gateway_provider: 'cashfree',
+          key_id: process.env.CASHFREE_APP_ID || '',
           amount: amountInPaise,
           currency: 'INR',
           is_mock: booking.gateway_order_id.startsWith('order_mock_') || booking.gateway_order_id.startsWith('mock_'),
@@ -264,8 +262,8 @@ export async function POST(req: NextRequest) {
         order_id: orderResult.gatewayOrderId,
         cf_order_id: orderResult.gatewayOrderId,
         payment_session_id: orderResult.paymentSessionId,
-        gateway_provider: orderResult.gatewayProvider,
-        key_id: orderResult.gatewayProvider === 'cashfree' ? (process.env.CASHFREE_APP_ID || '') : getRazorpayKeyId(),
+        gateway_provider: 'cashfree',
+        key_id: process.env.CASHFREE_APP_ID || '',
         amount: orderResult.amountInPaise,
         currency: orderResult.currency,
         is_mock: orderResult.isMock,

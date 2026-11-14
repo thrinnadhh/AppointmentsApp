@@ -1,5 +1,25 @@
 import crypto from 'crypto';
 
+/**
+ * Hard kill-switch for mock payments.
+ * Returns false unconditionally when any production signal is detected:
+ *   1. VERCEL_ENV === 'production'
+ *   2. CASHFREE_ENV (uppercased) === 'PRODUCTION'
+ *   3. CASHFREE_SECRET_KEY starts with 'cfsk_ma_prod_'
+ * In all other environments, returns true only when ALLOW_MOCK_PAYMENTS=true.
+ */
+export function canMockPayments(): boolean {
+  const isProductionEnv =
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.CASHFREE_ENV?.toUpperCase() === 'PRODUCTION' ||
+    process.env.CASHFREE_SECRET_KEY?.startsWith('cfsk_ma_prod_') === true;
+
+  if (isProductionEnv) {
+    return false;
+  }
+  return process.env.ALLOW_MOCK_PAYMENTS === 'true';
+}
+
 export interface CashfreeConfig {
   appId?: string;
   secretKey?: string;
@@ -91,11 +111,22 @@ export class CashfreeClient {
     };
   }
 
-  private shouldMock(): boolean {
-    if (process.env.NODE_ENV === 'production') {
+  private shouldMock(orderId?: string): boolean {
+    const isProduction =
+      process.env.NODE_ENV === 'production' ||
+      process.env.VERCEL_ENV === 'production' ||
+      process.env.CASHFREE_ENV?.toUpperCase() === 'PRODUCTION' ||
+      process.env.CASHFREE_SECRET_KEY?.startsWith('cfsk_ma_prod_') === true;
+
+    if (isProduction) {
       return false;
     }
-    return !this.isConfigured() || process.env.ALLOW_MOCK_PAYMENTS === 'true';
+
+    if (orderId && (orderId.startsWith('mock_') || orderId.startsWith('order_mock_') || orderId.startsWith('cf_test_'))) {
+      return true;
+    }
+
+    return !this.isConfigured() || canMockPayments();
   }
 
   async createOrder(payload: {
@@ -115,7 +146,7 @@ export class CashfreeClient {
     order_expiry_time?: string;
     order_note?: string;
   }): Promise<CashfreeOrderResponse> {
-    if (this.shouldMock()) {
+    if (this.shouldMock(payload.order_id)) {
       if (process.env.NODE_ENV === 'production') {
         throw new Error('CRITICAL SECURITY ERROR: Cashfree credentials missing in production.');
       }
@@ -149,7 +180,7 @@ export class CashfreeClient {
   }
 
   async getOrder(orderId: string): Promise<CashfreeOrderResponse | null> {
-    if (this.shouldMock() || orderId.startsWith('mock_') || orderId.startsWith('order_mock_')) {
+    if (this.shouldMock(orderId)) {
       return null;
     }
 
@@ -176,7 +207,7 @@ export class CashfreeClient {
     refund_note?: string;
     refund_speed?: 'STANDARD' | 'INSTANT';
   }): Promise<CashfreeRefundResponse> {
-    if (this.shouldMock() || orderId.startsWith('mock_') || orderId.startsWith('order_mock_')) {
+    if (this.shouldMock(orderId)) {
       return {
         cf_refund_id: `mock_cfr_${Date.now()}`,
         refund_id: payload.refund_id,

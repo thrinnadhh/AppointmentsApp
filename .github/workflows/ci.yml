@@ -35,6 +35,13 @@ env:
   RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID || 'rzp_test_51MockAppPlatform' }}
   RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET || 'mock_secret_key_1234567890' }}
   RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET || 'mock_webhook_secret' }}
+  CASHFREE_APP_ID: ${{ secrets.CASHFREE_APP_ID || 'TEST_CF_APP_ID_MOCK' }}
+  CASHFREE_SECRET_KEY: ${{ secrets.CASHFREE_SECRET_KEY || 'TEST_CF_SECRET_KEY_MOCK' }}
+  CASHFREE_WEBHOOK_SECRET: ${{ secrets.CASHFREE_WEBHOOK_SECRET || 'TEST_CF_WEBHOOK_SECRET_MOCK' }}
+  CASHFREE_ENV: 'SANDBOX'
+  EXPO_PUBLIC_CASHFREE_APP_ID: ${{ secrets.CASHFREE_APP_ID || 'TEST_CF_APP_ID_MOCK' }}
+  EXPO_PUBLIC_CASHFREE_ENV: 'SANDBOX'
+  PAYMENT_GATEWAY_PROVIDER: 'cashfree'
   TEST_MERCHANT_EMAIL: ${{ secrets.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com' }}
   TEST_MERCHANT_PASSWORD: ${{ secrets.TEST_MERCHANT_PASSWORD || 'SvimsClinic2026!' }}
   TEST_SALON_EMAIL: ${{ secrets.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com' }}
@@ -215,7 +222,7 @@ jobs:
           node scripts/generate-ci-env.mjs
 
           if [ ! -f .env.production ]; then
-            printf "NODE_ENV=production\nALLOW_MOCK_PAYMENTS=false\nNEXT_PUBLIC_SUPABASE_URL=https://tirupati-appointments.supabase.co\nNEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder_production_anon_key\nSUPABASE_SERVICE_ROLE_KEY=placeholder_production_service_role_key\nRAZORPAY_KEY_ID=rzp_live_placeholder\nRAZORPAY_KEY_SECRET=placeholder_live_razorpay_secret\nRAZORPAY_WEBHOOK_SECRET=placeholder_live_webhook_secret\nADMIN_SECRET=placeholder_secure_admin_secret\nSUPERADMIN_E2E_TOKEN=placeholder_secure_superadmin_token\nCRON_SECRET=placeholder_secure_cron_secret\n" > .env.production
+            printf "NODE_ENV=production\nALLOW_MOCK_PAYMENTS=false\nNEXT_PUBLIC_SUPABASE_URL=https://tirupati-appointments.supabase.co\nNEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder_production_anon_key\nSUPABASE_SERVICE_ROLE_KEY=placeholder_production_service_role_key\nCASHFREE_APP_ID=cfsk_ma_prod_placeholder_app_id\nCASHFREE_SECRET_KEY=placeholder_live_cashfree_secret\nCASHFREE_WEBHOOK_SECRET=placeholder_live_cashfree_webhook_secret\nCASHFREE_ENV=PRODUCTION\nRAZORPAY_KEY_ID=rzp_live_placeholder\nRAZORPAY_KEY_SECRET=placeholder_live_razorpay_secret\nRAZORPAY_WEBHOOK_SECRET=placeholder_live_webhook_secret\nADMIN_SECRET=placeholder_secure_admin_secret\nSUPERADMIN_E2E_TOKEN=placeholder_secure_superadmin_token\nCRON_SECRET=placeholder_secure_cron_secret\n" > .env.production
           fi
           if [ ! -f apps/merchant-web/.env.production ]; then
             cp .env.production apps/merchant-web/.env.production

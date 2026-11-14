@@ -60,6 +60,22 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
       }
     }
 
+    if (parsed.customer_id && serviceHeaders) {
+      const activeRes = await fetch(
+        `${supabaseUrl}/rest/v1/bookings?customer_id=eq.${parsed.customer_id}&status=eq.HELD&hold_expires_at=gt.${new Date().toISOString()}&select=id,hold_expires_at&order=hold_expires_at.asc`,
+        { headers: serviceHeaders }
+      );
+      const activeHolds = await activeRes.json().catch(() => []);
+      if (Array.isArray(activeHolds) && activeHolds.length >= 3) {
+        const oldest = activeHolds[0];
+        await fetch(`${supabaseUrl}/rest/v1/bookings?id=eq.${oldest.id}`, {
+          method: "PATCH",
+          headers: serviceHeaders,
+          body: JSON.stringify({ hold_expires_at: new Date(Date.now() - 1000).toISOString() }),
+        });
+      }
+    }
+
     const res = await fetch(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
       method: "POST",
       headers: {
@@ -89,12 +105,14 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
         status: isConflict ? 409 : 400,
         ok: false,
         json: async () => ({ error: data.error || "Failed to create hold" }),
+        text: async () => JSON.stringify(data),
       };
     }
     return {
       status: 201,
       ok: true,
       json: async () => data,
+      text: async () => JSON.stringify(data),
     };
   }
 

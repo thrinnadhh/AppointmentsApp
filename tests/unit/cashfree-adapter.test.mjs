@@ -91,9 +91,9 @@ describe('Payment Gateway Abstraction & Cashfree Adapter (Phase 2)', () => {
     assert.match(result.error || '', /replay|timestamp/i, 'Error message should cite timestamp tolerance');
   });
 
-  it('6. RazorpayAdapter provides provider = "razorpay" and satisfies adapter contract', () => {
+  it('6. RazorpayAdapter transparently delegates to CashfreeAdapter (Cashfree-Only)', () => {
     const adapter = new RazorpayAdapter();
-    assert.equal(adapter.provider, 'razorpay');
+    assert.equal(adapter.provider, 'cashfree');
     assert.equal(typeof adapter.createOrder, 'function');
     assert.equal(typeof adapter.verifyPayment, 'function');
     assert.equal(typeof adapter.fetchOrder, 'function');
@@ -101,7 +101,7 @@ describe('Payment Gateway Abstraction & Cashfree Adapter (Phase 2)', () => {
     assert.equal(typeof adapter.verifyWebhook, 'function');
   });
 
-  it('7. getPaymentGateway factory resolves configured adapter based on environment variable', () => {
+  it('7. getPaymentGateway factory standardizes on CashfreeAdapter as the sole gateway provider', () => {
     const originalProvider = process.env.PAYMENT_GATEWAY_PROVIDER;
     try {
       process.env.PAYMENT_GATEWAY_PROVIDER = 'cashfree';
@@ -110,17 +110,56 @@ describe('Payment Gateway Abstraction & Cashfree Adapter (Phase 2)', () => {
 
       process.env.PAYMENT_GATEWAY_PROVIDER = 'razorpay';
       const rzGateway = getPaymentGateway();
-      assert.equal(rzGateway.provider, 'razorpay');
+      assert.equal(rzGateway.provider, 'cashfree', 'Legacy razorpay config must resolve to cashfree');
 
       delete process.env.PAYMENT_GATEWAY_PROVIDER;
       const defaultGateway = getPaymentGateway();
-      assert.equal(defaultGateway.provider, 'razorpay', 'Default provider must be razorpay');
+      assert.equal(defaultGateway.provider, 'cashfree', 'Default provider must be cashfree');
     } finally {
       if (originalProvider !== undefined) {
         process.env.PAYMENT_GATEWAY_PROVIDER = originalProvider;
       } else {
         delete process.env.PAYMENT_GATEWAY_PROVIDER;
       }
+    }
+  });
+
+  it('8. canMockPayments returns false unconditionally in production environments (Kill-Switch)', async () => {
+    const { canMockPayments } = await import('../../apps/merchant-web/src/lib/cashfree.ts');
+    const origVercel = process.env.VERCEL_ENV;
+    const origCfEnv = process.env.CASHFREE_ENV;
+    const origCfSecret = process.env.CASHFREE_SECRET_KEY;
+    const origAllowMock = process.env.ALLOW_MOCK_PAYMENTS;
+
+    try {
+      process.env.ALLOW_MOCK_PAYMENTS = 'true';
+
+      // 1. VERCEL_ENV = production
+      process.env.VERCEL_ENV = 'production';
+      assert.equal(canMockPayments(), false, 'Must be false when VERCEL_ENV === production');
+      delete process.env.VERCEL_ENV;
+
+      // 2. CASHFREE_ENV = PRODUCTION
+      process.env.CASHFREE_ENV = 'PRODUCTION';
+      assert.equal(canMockPayments(), false, 'Must be false when CASHFREE_ENV === PRODUCTION');
+      delete process.env.CASHFREE_ENV;
+
+      // 3. CASHFREE_SECRET_KEY starts with cfsk_ma_prod_
+      process.env.CASHFREE_SECRET_KEY = 'cfsk_ma_prod_' + 'mock_test_key_sample';
+      assert.equal(canMockPayments(), false, 'Must be false when CASHFREE_SECRET_KEY starts with cfsk_ma_prod_');
+      delete process.env.CASHFREE_SECRET_KEY;
+
+      // 4. In dev with ALLOW_MOCK_PAYMENTS=true
+      assert.equal(canMockPayments(), true, 'Must be true in dev when ALLOW_MOCK_PAYMENTS === true');
+
+      // 5. In dev with ALLOW_MOCK_PAYMENTS=false
+      process.env.ALLOW_MOCK_PAYMENTS = 'false';
+      assert.equal(canMockPayments(), false, 'Must be false when ALLOW_MOCK_PAYMENTS === false');
+    } finally {
+      if (origVercel !== undefined) process.env.VERCEL_ENV = origVercel; else delete process.env.VERCEL_ENV;
+      if (origCfEnv !== undefined) process.env.CASHFREE_ENV = origCfEnv; else delete process.env.CASHFREE_ENV;
+      if (origCfSecret !== undefined) process.env.CASHFREE_SECRET_KEY = origCfSecret; else delete process.env.CASHFREE_SECRET_KEY;
+      if (origAllowMock !== undefined) process.env.ALLOW_MOCK_PAYMENTS = origAllowMock; else delete process.env.ALLOW_MOCK_PAYMENTS;
     }
   });
 });

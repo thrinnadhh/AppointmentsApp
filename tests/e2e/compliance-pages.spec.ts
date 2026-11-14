@@ -86,7 +86,9 @@ test.describe('Privacy Policy Page — DPDPA 2023 Content', () => {
   });
 
   test('CP-08: Grievance Officer email is present and within 48-hour commitment', async ({ page }) => {
-    await expect(page.getByText(/grievance@appointments4u\.in/).first()).toBeVisible();
+    const expectedEmail = process.env.NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL || 'grievance@appointments4u.in';
+    const emailPattern = new RegExp(expectedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '|grievance@appointments4u\\.in', 'i');
+    await expect(page.getByText(emailPattern).first()).toBeVisible();
     await expect(page.getByText(/48 hours/i).first()).toBeVisible();
   });
 

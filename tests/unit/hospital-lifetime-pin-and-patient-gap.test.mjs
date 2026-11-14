@@ -524,6 +524,13 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
   });
 
   it('9. Direct RPC: create_booking_hold accepts family/friend booking without 1-hour gap', async () => {
+    // Expire earlier holds for testCustomerId from previous tests so test 9 starts with clean hold budget
+    await fetch(`${supabaseUrl}/rest/v1/bookings?customer_id=eq.${testCustomerId}&status=eq.HELD`, {
+      method: 'PATCH',
+      headers: { ...serviceHeaders, Prefer: 'return=minimal' },
+      body: JSON.stringify({ hold_expires_at: new Date(Date.now() - 60000).toISOString() }),
+    });
+
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 7);
     const dateStr = futureDate.toISOString().split('T')[0];

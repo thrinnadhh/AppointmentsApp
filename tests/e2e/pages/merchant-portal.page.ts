@@ -251,20 +251,21 @@ export class MerchantPortalPage {
     await expect(this.page.getByRole('heading', { name: /Venues, Clinics & Centers|Venues & Businesses|My Business & Venue Controls/i })).toBeVisible({ timeout: 15000 });
   }
 
-  async gotoResources() {
+  async gotoResources(email?: string, password?: string) {
     await this.page.goto('http://localhost:3000/resources', { waitUntil: 'domcontentloaded' });
-    await this.ensureAuthenticated();
+    await this.ensureAuthenticated(email, password);
+    if (!this.page.url().includes('/resources')) {
+      await this.page.goto('http://localhost:3000/resources', { waitUntil: 'domcontentloaded' });
+    }
     await expect(this.page.getByRole('heading', { name: /Departments & Services|Doctors|Stylists|Staff/i })).toBeVisible({ timeout: 15000 });
   }
 
-  async gotoSchedule() {
-    try {
-      await this.page.goto('http://localhost:3000/schedule', { waitUntil: 'domcontentloaded' });
-    } catch {
-      await this.page.waitForLoadState('domcontentloaded').catch(() => null);
+  async gotoSchedule(email?: string, password?: string) {
+    await this.page.goto('http://localhost:3000/schedule', { waitUntil: 'domcontentloaded' });
+    await this.ensureAuthenticated(email, password);
+    if (!this.page.url().includes('/schedule')) {
       await this.page.goto('http://localhost:3000/schedule', { waitUntil: 'domcontentloaded' });
     }
-    await this.ensureAuthenticated();
     await expect(this.page.getByRole('heading', { name: /Weekly Availability & Hours/i })).toBeVisible({ timeout: 15000 });
   }
 

@@ -288,30 +288,50 @@ export async function checkRateLimit(
     }
   }
 
-  // In production, missing Upstash credentials MUST fail-closed to protect OTP, checkout, and critical routes
+  // In production without Upstash credentials, fail closed to prevent brute-force attacks
   if (process.env.NODE_ENV === 'production') {
     console.error('[Redis] Upstash Redis credentials missing in production: rate limiter failing closed');
     return { allowed: false, remaining: 0, reset: Math.floor(now / 1000) + windowSeconds };
   }
 
-  // ── Local dev in-memory fallback (Upstash not configured) ──────────────────
+  // ── Local memory tracking + PostgreSQL check_rate_limit RPC fallback ───────
+  // Persists across serverless cold starts; uses SECURITY DEFINER check_rate_limit RPC.
   const entry = memoryStore.get(key);
+  let localCount = 1;
+  let resetTime = Math.floor((now + windowSeconds * 1000) / 1000);
   if (!entry || entry.expiresAt <= now) {
     memoryStore.set(key, { value: '1', expiresAt: now + windowSeconds * 1000 });
-    return {
-      allowed: true,
-      remaining: limit - 1,
-      reset: Math.floor((now + windowSeconds * 1000) / 1000),
-    };
+  } else {
+    localCount = parseInt(entry.value, 10) + 1;
+    entry.value = localCount.toString();
+    resetTime = Math.floor(entry.expiresAt / 1000);
   }
 
-  const count = parseInt(entry.value, 10) + 1;
-  entry.value = count.toString();
-  const allowed = count <= limit;
+  try {
+    const { getSupabaseAdmin } = await import('@/lib/supabase');
+    const { data, error } = await (getSupabaseAdmin() as any).rpc('check_rate_limit', {
+      p_key: key,
+      p_max_hits: limit,
+      p_window_seconds: windowSeconds,
+    });
+    if (!error) {
+      const allowed = Boolean(data) && localCount <= limit;
+      return {
+        allowed,
+        remaining: Math.max(0, limit - localCount),
+        reset: resetTime,
+      };
+    }
+    console.warn('[Redis] PostgreSQL check_rate_limit RPC failed, falling through:', error);
+  } catch (pgErr) {
+    console.warn('[Redis] PostgreSQL RPC unavailable, using in-memory fallback:', pgErr);
+  }
+
+  const allowed = localCount <= limit;
   return {
     allowed,
-    remaining: Math.max(0, limit - count),
-    reset: Math.floor(entry.expiresAt / 1000),
+    remaining: Math.max(0, limit - localCount),
+    reset: resetTime,
   };
 }
 

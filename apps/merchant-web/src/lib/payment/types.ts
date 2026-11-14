@@ -22,7 +22,7 @@ export interface GatewayOrderResult {
   amountInPaise: number;
   currency: string;
   status: string;
-  gatewayProvider: 'cashfree' | 'razorpay';
+  gatewayProvider: 'cashfree';
   isMock: boolean;
 }
 
@@ -38,7 +38,7 @@ export interface GatewayPaymentDetails {
   status: 'PAID' | 'FAILED' | 'PENDING' | 'USER_DROPPED';
   amountInPaise: number;
   currency: string;
-  gatewayProvider: 'cashfree' | 'razorpay';
+  gatewayProvider: 'cashfree';
 }
 
 export interface GatewayRefundParams {
@@ -55,7 +55,7 @@ export interface GatewayRefundResult {
   orderId: string;
   amountInPaise: number;
   status: 'SUCCESS' | 'PENDING' | 'FAILED';
-  gatewayProvider: 'cashfree' | 'razorpay';
+  gatewayProvider: 'cashfree';
   isMock: boolean;
   error?: string;
 }
@@ -73,7 +73,7 @@ export interface WebhookVerificationResult {
 }
 
 export interface PaymentGatewayAdapter {
-  readonly provider: 'cashfree' | 'razorpay';
+  readonly provider: 'cashfree';
   createOrder(params: CreateGatewayOrderParams): Promise<GatewayOrderResult>;
   verifyPayment(params: VerifyPaymentParams): Promise<boolean>;
   fetchOrder(orderId: string): Promise<GatewayPaymentDetails | null>;

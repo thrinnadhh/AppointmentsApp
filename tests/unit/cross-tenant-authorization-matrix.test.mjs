@@ -2190,7 +2190,7 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
 
         // Assert no duplicates in cron jobs, queues, vault secrets, triggers
         const cronRes = await pgClient.query('SELECT count(*)::int as cnt FROM cron.job');
-        assert.equal(cronRes.rows[0].cnt, 10, 'Expected exactly 10 cron jobs after re-running migrations');
+        assert.equal(cronRes.rows[0].cnt, 11, 'Expected exactly 11 cron jobs after re-running migrations (including prune-rate-limit-buckets)');
 
         const queuesRes = await pgClient.query('SELECT count(*)::int as cnt FROM pgmq.list_queues()');
         assert.equal(queuesRes.rows[0].cnt, 4, 'Expected exactly 4 queues after re-running migrations');
