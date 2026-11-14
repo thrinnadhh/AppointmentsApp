@@ -4,6 +4,7 @@ description: >-
   Extracts learnings from execution trajectories at the end of a Mantis loop.
   Use to parse agent conversations, extract successes, failures, and false assumptions, and append them to workspace/learnings.jsonl.
   Don't use for analyzing source code or writing patches.
+version: 1.0.0
 ---
 
 # Reflector (/mantis-reflect)

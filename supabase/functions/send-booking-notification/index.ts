@@ -11,6 +11,10 @@
 // in notification titles or body text.
 // Logs Expo push tickets and receipts into notification_logs.
 // Automatically prunes stale tokens via remove_stale_push_token RPC.
+//
+// DLQ Cap (TASK 6):
+// Poison push tokens that have already been dead-lettered (notification_logs.status = 'FAILED_DLQ')
+// are skipped before dispatch so they never loop infinitely.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
@@ -366,7 +370,74 @@ serve(async (req: Request) => {
 
     // ── 5. Dispatch to Expo Push API & Process Tickets ───────────────────────
     if (validTokensToSend.length > 0) {
-      const messages = validTokensToSend.map((tok) => ({
+      // ── DLQ Cap Guard (TASK 6) ──────────────────────────────────────────────
+      // Skip tokens whose push logs for this booking are already FAILED_DLQ
+      // so poison push tokens/messages never loop back into the dispatch pipeline.
+      const DLQ_STATUS = 'FAILED_DLQ';
+      const DLQ_MAX_ATTEMPTS = 3;
+
+      // Fetch existing failure counts per token for this booking
+      const { data: dlqLogs } = await supabase
+        .from('notification_logs')
+        .select('provider_response, status')
+        .eq('booking_id', booking.id)
+        .eq('channel', 'push');
+
+      // Build a set of tokens that have exhausted their retry budget
+      const poisonTokens = new Set<string>();
+      if (dlqLogs && dlqLogs.length > 0) {
+        // Count failures per token
+        const failureCount: Record<string, number> = {};
+        for (const row of dlqLogs) {
+          if (row.status === DLQ_STATUS) {
+            // Already explicitly marked as dead-lettered — always skip
+            const tok = row.provider_response?.token as string | undefined;
+            if (tok) poisonTokens.add(tok);
+          } else if (row.status === 'FAILED') {
+            const tok = row.provider_response?.token as string | undefined;
+            if (tok) {
+              failureCount[tok] = (failureCount[tok] ?? 0) + 1;
+              if (failureCount[tok] >= DLQ_MAX_ATTEMPTS) {
+                poisonTokens.add(tok);
+              }
+            }
+          }
+        }
+      }
+
+      const safeTokensToSend = validTokensToSend.filter((tok) => {
+        if (poisonTokens.has(tok)) {
+          console.warn(
+            '[send-booking-notification] Skipping DLQ-capped poison token:',
+            tok,
+            'booking_id:',
+            booking.id,
+          );
+          return false;
+        }
+        return true;
+      });
+
+      if (safeTokensToSend.length === 0) {
+        // All tokens are DLQ-capped — return early to avoid an empty Expo call
+        return new Response(
+          JSON.stringify({
+            success: true,
+            booking_id,
+            event_type,
+            tokens_targeted: 0,
+            push_results: [],
+            stale_tokens_removed: staleTokensRemoved,
+            notification: notificationContent,
+            dlq_skipped: validTokensToSend.length,
+            processed_at: new Date().toISOString(),
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+        );
+      }
+      // ── End DLQ Cap Guard ───────────────────────────────────────────────────
+
+      const messages = safeTokensToSend.map((tok) => ({
         to: tok,
         sound: 'default',
         title: notificationContent.title,
@@ -391,7 +462,7 @@ serve(async (req: Request) => {
 
           for (let i = 0; i < tickets.length; i++) {
             const ticket = tickets[i];
-            const tokenUsed = validTokensToSend[i];
+            const tokenUsed = safeTokensToSend[i];
 
             if (ticket.status === 'ok') {
               pushResults.push({ sent: true, token: tokenUsed, ticket_id: ticket.id });
@@ -455,7 +526,7 @@ serve(async (req: Request) => {
         success: true,
         booking_id,
         event_type,
-        tokens_targeted: validTokensToSend.length,
+        tokens_targeted: safeTokensToSend.length,
         push_results: pushResults,
         stale_tokens_removed: staleTokensRemoved,
         notification: notificationContent,

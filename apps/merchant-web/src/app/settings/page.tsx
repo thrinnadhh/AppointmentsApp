@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const [gstin, setGstin] = useState('37AAAAA0000A1Z5');
 
   // Payment & Payout State
-  const [razorpayKeyId, setRazorpayKeyId] = useState('');
+  const [cashfreeAppId, setCashfreeAppId] = useState('');
   const [webhookSecretConfigured, setWebhookSecretConfigured] = useState(true);
   const [payoutUpi, setPayoutUpi] = useState('merchant.ops@upi');
   const [bankAccount] = useState('•••• •••• 9821 (SBI Tirupati Main Branch)');
@@ -334,18 +334,19 @@ export default function SettingsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label htmlFor="razorpay-key-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Razorpay API Key ID
+                <label htmlFor="cashfree-app-id-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Cashfree PG App ID
                 </label>
                 <div className="relative">
                   <Key className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                   <input
-                    id="razorpay-key-input"
-                    name="razorpayKey"
-                    aria-label="Razorpay API Key ID"
+                    id="cashfree-app-id-input"
+                    name="cashfreeAppId"
+                    aria-label="Cashfree PG App ID"
                     type="text"
-                    value={razorpayKeyId}
-                    onChange={(e) => setRazorpayKeyId(e.target.value)}
+                    value={cashfreeAppId}
+                    onChange={(e) => setCashfreeAppId(e.target.value)}
+                    placeholder="cf_app_live_..."
                     className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>

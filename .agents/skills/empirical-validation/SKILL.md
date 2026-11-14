@@ -1,6 +1,7 @@
 ---
 name: empirical-validation
 description: Requires proof before marking work complete — no "trust me, it works"
+version: 1.0.0
 ---
 
 # Empirical Validation

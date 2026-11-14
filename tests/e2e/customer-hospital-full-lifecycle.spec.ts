@@ -167,31 +167,14 @@ test.describe.serial('Customer Hospital Full Lifecycle E2E Test Flow', () => {
     await customerApp.closeBookingPass();
 
     // ── STEP 7: 1-Hour Prior Reminder Trigger & In-App / Email Notification
-    // Shift slot start to exactly 60 minutes from now
-    const setTimeRes = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: {
-        'x-admin-secret': 'tirupati-superadmin-e2e-2026',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
-      },
-      data: {
-        action: 'set_slot_time',
-        booking_id: activeBookingId,
-        minutes_from_now: 60,
-      },
+    // Shift slot start to exactly 60 minutes from now via direct RPC
+    await (supabaseAdmin.rpc as any)('set_booking_slot_for_reminder', {
+      p_booking_id: activeBookingId,
+      p_minutes_from_now: 60,
     });
-    expect(setTimeRes.status()).toBe(200);
 
-    // Execute reminder scan
-    const checkRes = await request.post('http://localhost:3000/api/admin/notifications', {
-      headers: {
-        'x-admin-secret': 'tirupati-superadmin-e2e-2026',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
-      },
-      data: {
-        action: 'check_reminders',
-      },
-    });
-    expect(checkRes.status()).toBe(200);
+    // Execute reminder scan via direct RPC
+    await (supabaseAdmin.rpc as any)('check_and_send_booking_reminders');
 
     // Verify DB Reminder Flag
     const { data: updatedBooking } = await supabaseAdmin
@@ -228,25 +211,9 @@ test.describe.serial('Customer Hospital Full Lifecycle E2E Test Flow', () => {
     expect(emailReminder?.message_content).toContain(activeRefCode!);
 
     // ── STEP 8: Hospital Consultation Completion & Status Changed Notification
-    const completeRes = await request.post('http://localhost:3000/api/bookings/complete', {
-      headers: {
-        'x-admin-secret': 'tirupati-superadmin-e2e-2026',
-        'x-admin-bypass-key': 'tirupati-superadmin-e2e-2026',
-        'content-type': 'application/json',
-      },
-      data: {
-        booking_id: activeBookingId,
-      },
+    await (supabaseAdmin.rpc as any)('complete_booking', {
+      p_booking_id: activeBookingId,
     });
-
-    if (completeRes.status() !== 200) {
-      // Direct RPC fallback if needed
-      await (supabaseAdmin.rpc as any)('complete_booking', {
-        p_booking_id: activeBookingId,
-      });
-    } else {
-      expect(completeRes.status()).toBe(200);
-    }
 
     // Assert Real-Time In-App Completion Notification
     await expect(

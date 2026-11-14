@@ -4,6 +4,7 @@ description: >-
   Calculates the final risk score based on empirical evidence and architectural impact.
   Use when findings have been fully processed by previous stages and you need to append final risk scores to the finding files.
   Don't use for discovering new vulnerabilities or writing patches.
+version: 1.0.0
 ---
 
 # Risk Calibrator (/mantis-calibrate)

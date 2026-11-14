@@ -179,13 +179,13 @@ serve(async (req: Request) => {
       }
     }
 
-    // 3. Read messages using read_queue_with_dlq helper (visibility timeout = 30s, qty = 10, max_reads = 5)
+    // 3. Read messages using read_queue_with_dlq helper (visibility timeout = 30s, qty = 10, max_reads = 3)
     const { data: messages, error: readErr } = await supabase.rpc('read_queue_with_dlq', {
       p_queue: 'notifications',
       p_dlq: 'notifications_dlq',
       p_vt: 30,
       p_qty: 10,
-      p_max_reads: 5,
+      p_max_reads: 3,
     });
 
     if (readErr) {

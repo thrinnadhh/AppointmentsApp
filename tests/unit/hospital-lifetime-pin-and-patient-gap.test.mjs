@@ -523,7 +523,14 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     assert.equal(apiData.refund_amount, 110, '100% full refund includes deposit (100) + platform fee (10)');
   });
 
-  it('9. API Route: /api/bookings/hold accepts family/friend booking without 1-hour gap', async () => {
+  it('9. Direct RPC: create_booking_hold accepts family/friend booking without 1-hour gap', async () => {
+    // Expire earlier holds for testCustomerId from previous tests so test 9 starts with clean hold budget
+    await fetch(`${supabaseUrl}/rest/v1/bookings?customer_id=eq.${testCustomerId}&status=eq.HELD`, {
+      method: 'PATCH',
+      headers: { ...serviceHeaders, Prefer: 'return=minimal' },
+      body: JSON.stringify({ hold_expires_at: new Date(Date.now() - 60000).toISOString() }),
+    });
+
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 7);
     const dateStr = futureDate.toISOString().split('T')[0];
@@ -534,19 +541,18 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     const slot2End = `${dateStr}T12:00:00Z`;
 
     // Hold 1: for self
-    const h1Res = await fetch('http://localhost:3000/api/bookings/hold', {
+    const h1Res = await fetch(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        ...serviceHeaders,
         Authorization: `Bearer ${customerToken}`,
-        'x-customer-id': testCustomerId,
       },
       body: JSON.stringify({
-        customer_id: testCustomerId,
-        resource_id: neuroDocId,
-        slot_start: slot1Start,
-        slot_end: slot1End,
-        booking_for_someone_else: false,
+        p_customer_id: testCustomerId,
+        p_resource_id: neuroDocId,
+        p_slot_start: slot1Start,
+        p_slot_end: slot1End,
+        p_booking_for_someone_else: false,
       }),
     });
     const h1Data = await h1Res.json();
@@ -554,22 +560,21 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     createdBookingIds.push(h1Data.booking_id);
 
     // Hold 2: for a family member / friend (back-to-back, 0 gap)
-    const h2Res = await fetch('http://localhost:3000/api/bookings/hold', {
+    const h2Res = await fetch(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        ...serviceHeaders,
         Authorization: `Bearer ${customerToken}`,
-        'x-customer-id': testCustomerId,
       },
       body: JSON.stringify({
-        customer_id: testCustomerId,
-        resource_id: cardioDocId,
-        slot_start: slot2Start,
-        slot_end: slot2End,
-        booking_for_someone_else: true,
-        patient_name: 'Lakshmi Mother',
-        patient_phone: '+919876543219',
-        patient_relationship: 'parent',
+        p_customer_id: testCustomerId,
+        p_resource_id: cardioDocId,
+        p_slot_start: slot2Start,
+        p_slot_end: slot2End,
+        p_booking_for_someone_else: true,
+        p_patient_name: 'Lakshmi Mother',
+        p_patient_phone: '+919876543219',
+        p_patient_relationship: 'parent',
       }),
     });
     const h2Data = await h2Res.json();

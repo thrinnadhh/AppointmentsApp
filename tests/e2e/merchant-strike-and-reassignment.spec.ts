@@ -67,41 +67,38 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     });
   }
 
+  async function createHold(resourceId: string, slotStart: string, slotEnd: string) {
+    const { data, error } = await supabase.rpc('create_booking_hold', {
+      p_customer_id: testCustomerId,
+      p_resource_id: resourceId,
+      p_slot_start: slotStart,
+      p_slot_end: slotEnd,
+    });
+    if (error) throw new Error(error.message);
+    return data as any;
+  }
+
   test('1. Emergency Staff Reassignment: transfers booking to substitute specialist without penalty', async ({ request }) => {
     // 1. Create a confirmed booking for Resource A
     const baseOffset = 1000000000 + Math.floor(Math.random() * 5000000000);
     const slotStart = new Date(Date.now() + baseOffset).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset + 1800000).toISOString();
 
-    const holdRes = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: resourceAId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    expect(holdRes.status()).toBe(201);
-    const { booking_id } = await holdRes.json();
+    const holdData = await createHold(resourceAId, slotStart, slotEnd);
+    const { booking_id } = holdData;
 
     await confirmBooking(booking_id, 'pay_reassign');
 
-    // 2. Call emergency reassignment API to switch from Dr. Murthy (A) to Dr. Reddy (B)
-    const reassignRes = await request.post(`${BASE_URL}/api/bookings/reassign`, {
-      headers: ADMIN_HEADERS,
-      data: {
-        booking_id,
-        new_resource_id: resourceBId,
-        reason: 'Dr. Murthy emergency surgery delay',
-      },
+    // 2. Call emergency reassignment RPC to switch from Dr. Murthy (A) to Dr. Reddy (B)
+    const { data: reassignData, error: reassignError } = await supabase.rpc('reassign_booking_resource', {
+      p_booking_id: booking_id,
+      p_new_resource_id: resourceBId,
+      p_reason: 'Dr. Murthy emergency surgery delay',
     });
-    if (reassignRes.status() !== 200) {
-      console.log('REASSIGN FAILED STATUS:', reassignRes.status(), await reassignRes.text());
-    }
-    expect(reassignRes.status()).toBe(200);
-    const reassignData = await reassignRes.json();
-    expect(reassignData.success).toBe(true);
-    expect(reassignData.new_resource_id).toBe(resourceBId);
+    expect(reassignError).toBeNull();
+    const result = reassignData as any;
+    expect(result.success).toBe(true);
+    expect(result.new_resource_id).toBe(resourceBId);
 
     // 3. Verify booking resource in DB
     const { data: updatedBooking } = await supabase
@@ -128,42 +125,25 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     const slotEnd = new Date(Date.now() + baseOffset + 1800000).toISOString();
 
     // 1. Create booking for Resource A
-    const holdA = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: resourceAId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    const { booking_id: bookingAId } = await holdA.json();
+    const holdA = await createHold(resourceAId, slotStart, slotEnd);
+    const { booking_id: bookingAId } = holdA;
     await confirmBooking(bookingAId, 'pay_conf_a');
 
     // 2. Create conflicting booking for Resource B at the SAME slot
-    const holdB = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: {
-        customer_id: testCustomerId,
-        resource_id: resourceBId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-      },
-    });
-    const { booking_id: bookingBId } = await holdB.json();
+    const holdB = await createHold(resourceBId, slotStart, slotEnd);
+    const { booking_id: bookingBId } = holdB;
     await confirmBooking(bookingBId, 'pay_conf_b');
 
-    // 3. Attempt to reassign booking A to Resource B -> MUST return 409
-    const conflictRes = await request.post(`${BASE_URL}/api/bookings/reassign`, {
-      headers: ADMIN_HEADERS,
-      data: {
-        booking_id: bookingAId,
-        new_resource_id: resourceBId,
-        reason: 'Attempting conflict swap',
-      },
+    // 3. Attempt to reassign booking A to Resource B -> MUST return conflict error
+    const { data: conflictData, error: conflictError } = await supabase.rpc('reassign_booking_resource', {
+      p_booking_id: bookingAId,
+      p_new_resource_id: resourceBId,
+      p_reason: 'Attempting conflict swap',
     });
-    expect(conflictRes.status()).toBe(409);
-    const errData = await conflictRes.json();
-    expect(errData.success).toBe(false);
-    expect(errData.error).toContain('already has a booking during this slot');
+    const hasError = Boolean(conflictError || (conflictData && !(conflictData as any).success));
+    expect(hasError).toBe(true);
+    const errMsg = conflictError ? conflictError.message : (conflictData as any).error;
+    expect(errMsg).toContain('already has a booking during this slot');
   });
 
   test('3. Merchant Strike 1 & 2: Emergency cancellations refund 100% with no penalty (Grace Period)', async ({ request }) => {
@@ -174,10 +154,8 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     const baseOffset1 = 1000000000 + Math.floor(Math.random() * 5000000000);
     const slot1Start = new Date(Date.now() + baseOffset1).toISOString();
     const slot1End = new Date(Date.now() + baseOffset1 + 1800000).toISOString();
-    const hold1 = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: { customer_id: testCustomerId, resource_id: resourceAId, slot_start: slot1Start, slot_end: slot1End },
-    });
-    const { booking_id: b1Id } = await hold1.json();
+    const hold1 = await createHold(resourceAId, slot1Start, slot1End);
+    const { booking_id: b1Id } = hold1;
     await confirmBooking(b1Id, 'pay_m1');
 
     // Merchant cancels > 30m in advance
@@ -202,10 +180,8 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     const baseOffset2 = 1000000000 + Math.floor(Math.random() * 5000000000);
     const slot2Start = new Date(Date.now() + baseOffset2).toISOString();
     const slot2End = new Date(Date.now() + baseOffset2 + 1800000).toISOString();
-    const hold2 = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: { customer_id: testCustomerId, resource_id: resourceAId, slot_start: slot2Start, slot_end: slot2End },
-    });
-    const { booking_id: b2Id } = await hold2.json();
+    const hold2 = await createHold(resourceAId, slot2Start, slot2End);
+    const { booking_id: b2Id } = hold2;
     await confirmBooking(b2Id, 'pay_m2');
 
     const cancel2Res = await request.post(`${BASE_URL}/api/bookings/cancel`, {
@@ -230,10 +206,8 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     const baseOffset3 = 1000000000 + Math.floor(Math.random() * 5000000000);
     const slot3Start = new Date(Date.now() + baseOffset3).toISOString();
     const slot3End = new Date(Date.now() + baseOffset3 + 1800000).toISOString();
-    const hold3 = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: { customer_id: testCustomerId, resource_id: resourceAId, slot_start: slot3Start, slot_end: slot3End },
-    });
-    const { booking_id: b3Id } = await hold3.json();
+    const hold3 = await createHold(resourceAId, slot3Start, slot3End);
+    const { booking_id: b3Id } = hold3;
     await confirmBooking(b3Id, 'pay_m3');
 
     const cancel3Res = await request.post(`${BASE_URL}/api/bookings/cancel`, {
@@ -269,10 +243,8 @@ test.describe.serial('Merchant 3-Strike Policy & Emergency Staff Reassignment', 
     const baseOffset = 1000000000 + Math.floor(Math.random() * 5000000000);
     const slotStart = new Date(Date.now() + baseOffset).toISOString();
     const slotEnd = new Date(Date.now() + baseOffset + 1800000).toISOString();
-    const hold = await request.post(`${BASE_URL}/api/bookings/hold`, {
-      data: { customer_id: testCustomerId, resource_id: resourceAId, slot_start: slotStart, slot_end: slotEnd },
-    });
-    const { booking_id } = await hold.json();
+    const hold = await createHold(resourceAId, slotStart, slotEnd);
+    const { booking_id } = hold;
     await confirmBooking(booking_id, 'pay_mock_lastmin');
 
     // Backdate slot to exactly 15 minutes from now (<= 30 minutes)

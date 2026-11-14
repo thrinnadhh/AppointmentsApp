@@ -1,37 +1,6 @@
 version: "3.9"
 
 services:
-  # ── Spring Boot API ──────────────────────────────────────────────────────
-  api:
-    image: ghcr.io/${GITHUB_REPO:-thrinnadhh/appointments}/appointments-api:${APP_VERSION:-1.0.0}
-    build:
-      context: ./apps/backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
-    networks:
-      - edge_network
-      - internal_network
-    ports:
-      - "127.0.0.1:8080:8080"   # Only Caddy reaches this; not exposed to internet
-    environment:
-      DATABASE_URL:    ${DATABASE_URL}
-      JWT_SECRET:      ${JWT_SECRET}
-      JWT_ISSUER:      ${JWT_ISSUER}
-      REDIS_URL:       redis://redis:6379
-      NOVU_API_KEY:    ${NOVU_API_KEY}
-      NOVU_BASE_URL:   https://api.novu.co
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
-
   # ── Redis (Valkey — 100% Redis-compatible, ARM64 native) ─────────────────
   redis:
     image: valkey/valkey:8.0.2-alpine
@@ -49,55 +18,11 @@ services:
       timeout: 3s
       retries: 3
 
-  # ── Caddy (reverse proxy + auto-HTTPS via Cloudflare DNS) ───────────────
-  caddy:
-    image: caddy:2.9.1-alpine
-    restart: unless-stopped
-    networks:
-      - edge_network
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"   # HTTP/3
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    environment:
-      CF_API_TOKEN: ${CF_API_TOKEN}
-
-  # ── Watchtower (auto-deploy on new image push to GHCR) ──────────────────
-  watchtower:
-    image: containrrr/watchtower:1.7.1@sha256:6dd50763bbd632a83cb154d5451700530d1e44200b268a4e9488fefdfcf2b038
-    restart: unless-stopped
-    networks:
-      - management_network
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      WATCHTOWER_POLL_INTERVAL: 300
-      WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_INCLUDE_STOPPED: "true"
-      WATCHTOWER_LABEL_ENABLE: "true"
-
-
 networks:
-  edge_network:
-    driver: bridge
-    labels:
-      com.appointments.network: "edge-proxy"
   internal_network:
     driver: bridge
     labels:
       com.appointments.network: "app-internal"
-  management_network:
-    driver: bridge
-    labels:
-      com.appointments.network: "watchtower-isolated"
 
 volumes:
   redis_data:
-  caddy_data:
-  caddy_config:

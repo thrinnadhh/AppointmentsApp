@@ -4,6 +4,7 @@ description: >-
   Formulates a targeted defensive security reviewing plan based on the active threat model and historical learnings.
   Use when starting a security review campaign to map the codebase boundaries and generate a roadmap (workspace/plan.json).
   Don't use for executing code reviews, writing test scripts, or patching code.
+version: 1.0.0
 ---
 
 # Strategist (/mantis-plan)

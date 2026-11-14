@@ -124,22 +124,22 @@ describe('F-02: City Waitlist Security, Validation & Deduplication', () => {
     assert.equal(data2.already_registered, true);
   });
 
-  it('submits successfully through backend /api/admin/waitlist route', async () => {
+  it('submits successfully through backend /api/cities/waitlist route', async () => {
     const phone = `96${Math.floor(10000000 + Math.random() * 90000000)}`;
-    const res = await fetch(`${API_BASE}/api/admin/waitlist`, {
+    const res = await fetch(`${API_BASE}/api/cities/waitlist`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        cityId: 'kadapa',
-        contactInfo: phone,
-        roleInterest: 'customer',
+        city_id: 'kadapa',
+        contact_info: phone,
+        role_interest: 'customer',
         notes: 'Pre-launch registration',
       }),
     });
 
-    assert.equal(res.status, 201, 'Backend route must return 201 Created');
+    assert.equal([200, 201].includes(res.status), true, 'Backend route must return 200/201');
     const data = await res.json();
     assert.equal(data.success, true);
     assert.equal(data.duplicate, false);

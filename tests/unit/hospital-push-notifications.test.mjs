@@ -278,7 +278,21 @@ describe('Phase 6: Push Notifications Architecture & Privacy Suite', () => {
     });
 
     it('accepts approved queue events for authorized staff', async () => {
-      const sampleBooking = manifest.bookings?.[0];
+      let sampleBooking = manifest.bookings?.[0];
+      const checkRes = await fetch(`${supabaseUrl}/rest/v1/bookings?id=eq.${sampleBooking?.id}&select=id,reference_code`, {
+        headers: serviceHeaders,
+      });
+      const checkData = await checkRes.json();
+      if (!checkData || checkData.length === 0) {
+        const anyRes = await fetch(`${supabaseUrl}/rest/v1/bookings?provider_id=eq.${hospA.id}&status=in.(CONFIRMED,CHECKED_IN)&select=id,reference_code&limit=1`, {
+          headers: serviceHeaders,
+        });
+        const anyData = await anyRes.json();
+        if (anyData && anyData.length > 0) {
+          sampleBooking = anyData[0];
+        }
+      }
+
       const res = await fetch(`${appBaseUrl}/api/notifications/push`, {
         method: 'POST',
         headers: {

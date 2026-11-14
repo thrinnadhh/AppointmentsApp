@@ -47,6 +47,7 @@ process.env.EXPO_PUBLIC_API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || '
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testMatch: /.*\.spec\.ts$/,
 
   // Edge + stress tests may take longer — give them room
   timeout: 60000,

@@ -1,6 +1,7 @@
 ---
 name: codebase-mapper
 description: Analyzes existing codebases to understand structure, patterns, and technical debt
+version: 1.0.0
 ---
 
 # GSD Codebase Mapper Agent

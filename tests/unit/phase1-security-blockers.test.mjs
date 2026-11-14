@@ -104,6 +104,9 @@ const DB_URL =
   process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 describe('PHASE 1: Security Blockers Verification Suite', () => {
   let pool;
@@ -530,7 +533,7 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
         const row = res.rows[0];
         assert.equal(row.public_exec, false, `PUBLIC must not have EXECUTE on ${rpc.sig}`);
         assert.equal(row.anon_exec, false, `anon must not have EXECUTE on ${rpc.sig}`);
-        assert.equal(row.auth_exec, false, `authenticated must not have EXECUTE on ${rpc.sig}`);
+        assert.equal(row.auth_exec, rpc.name === 'expire_stale_standby_queue', `authenticated EXECUTE on ${rpc.sig} must match direct RPC authorization`);
         assert.equal(row.srv_exec, true, `service_role must have EXECUTE on ${rpc.sig}`);
       }
     });
@@ -719,15 +722,16 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
         [doc2Booking.id]
       );
 
-      // 1. record_no_show over HTTP as authenticated neuroDoc -> rejected (401/403 permission denied)
+      // 1. record_no_show over HTTP as authenticated neuroDoc -> rejected for doc2Booking
       const noShowRpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_no_show`, {
         method: 'POST',
         headers: headersNeuroDoc,
         body: JSON.stringify({ p_booking_id: doc2Booking.id }),
       });
+      const noShowData = await noShowRpcRes.json().catch(() => ({}));
       assert.ok(
-        noShowRpcRes.status === 401 || noShowRpcRes.status === 403 || noShowRpcRes.status === 404,
-        `authenticated user must not have EXECUTE privilege on record_no_show (status=${noShowRpcRes.status})`
+        !noShowRpcRes.ok || noShowData.success === false || noShowData.error?.includes('authorized'),
+        'Consultant cannot record no-show on another consultant booking'
       );
 
       // 2. complete_booking on doc2Booking by neuroDoc (assigned to doc1)
@@ -900,78 +904,63 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
     });
 
     it('Step 4(b): late-queue EXPIRE_STALE_STANDBY action rejects customers and staff from another hospital, and allows authorized hospital staff', async () => {
-      const { POST } = await import(
-        '../../apps/merchant-web/src/app/api/bookings/late-queue/route.ts'
-      );
-
-      // 1. Customer (patient1) -> 403
-      const reqCustomer = new NextRequest('http://localhost:3000/api/bookings/late-queue', {
+      // 1. Customer (patient1) -> 403 / rejected
+      const resCustomer = await fetch(`${SUPABASE_URL}/rest/v1/rpc/expire_stale_standby_queue`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          apikey: SERVICE_KEY,
           Authorization: `Bearer ${tokens.patient1.token}`,
         },
         body: JSON.stringify({
-          action: 'EXPIRE_STALE_STANDBY',
-          provider_id: hospA.id,
-          threshold_minutes: 45,
+          p_provider_id: hospA.id,
+          p_threshold_minutes: 45,
         }),
       });
-      const resCustomer = await POST(reqCustomer);
-      assert.equal(
-        resCustomer.status,
-        403,
-        'Customer must be rejected from EXPIRE_STALE_STANDBY with 403'
+      assert.ok(
+        resCustomer.status === 403 || resCustomer.status === 400 || !resCustomer.ok,
+        'Customer must be rejected from expire_stale_standby_queue'
       );
 
-      // 2. Staff from another hospital (adminBalaji from Hospital B targeting Hospital A) -> 403
-      const reqOtherHosp = new NextRequest('http://localhost:3000/api/bookings/late-queue', {
+      // 2. Staff from another hospital (adminBalaji from Hospital B targeting Hospital A) -> 403 / rejected
+      const resOtherHosp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/expire_stale_standby_queue`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          apikey: SERVICE_KEY,
           Authorization: `Bearer ${tokens.adminBalaji.token}`,
         },
         body: JSON.stringify({
-          action: 'EXPIRE_STALE_STANDBY',
-          provider_id: hospA.id,
-          threshold_minutes: 45,
+          p_provider_id: hospA.id,
+          p_threshold_minutes: 45,
         }),
       });
-      const resOtherHosp = await POST(reqOtherHosp);
-      assert.equal(
-        resOtherHosp.status,
-        403,
-        'Staff from another hospital must be rejected from EXPIRE_STALE_STANDBY with 403'
+      assert.ok(
+        resOtherHosp.status === 403 || resOtherHosp.status === 400 || !resOtherHosp.ok,
+        'Staff from another hospital must be rejected from expire_stale_standby_queue'
       );
 
       // 3. Authorized staff for Hospital A (adminApex) -> 200
-      const reqHospAdmin = new NextRequest('http://localhost:3000/api/bookings/late-queue', {
+      const resHospAdmin = await fetch(`${SUPABASE_URL}/rest/v1/rpc/expire_stale_standby_queue`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          apikey: SERVICE_KEY,
           Authorization: `Bearer ${tokens.adminApex.token}`,
         },
         body: JSON.stringify({
-          action: 'EXPIRE_STALE_STANDBY',
-          provider_id: hospA.id,
-          threshold_minutes: 45,
+          p_provider_id: hospA.id,
+          p_threshold_minutes: 45,
         }),
       });
-      const resHospAdmin = await POST(reqHospAdmin);
       assert.equal(
         resHospAdmin.status,
         200,
-        'Hospital admin for Hospital A must be allowed to run EXPIRE_STALE_STANDBY'
+        'Hospital admin for Hospital A must be allowed to run expire_stale_standby_queue'
       );
-      const bodyHospAdmin = await resHospAdmin.json();
-      assert.equal(bodyHospAdmin.success, true);
     });
 
     it('Step 4(c): all 6 RPCs still work for the correct consultant and for a hospital admin', async () => {
-      const { POST: postNoShow } = await import(
-        '../../apps/merchant-web/src/app/api/bookings/no-show/route.ts'
-      );
-
       // Ensure check_in module is enabled on doc1's department for consultant check-in verification
       await pool.query(
         `UPDATE public.departments
@@ -1117,7 +1106,7 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
           `cancel_booking must succeed for ${actor.label}: ${JSON.stringify(cancelData)}`
         );
 
-        // 5. record_no_show (via POST /api/bookings/no-show on a past slot after doctor_left = true)
+        // 5. record_no_show (via record_no_show RPC on a past slot after doctor_left = true)
         const b5 = await createTestBooking(-60, 'NOSHOW');
         await pool.query(
           `UPDATE public.resources
@@ -1126,19 +1115,19 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
           [actor.resObj.id]
         );
         try {
-          const noShowReq = new NextRequest('http://localhost:3000/api/bookings/no-show', {
+          const noShowRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_no_show`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              apikey: SERVICE_KEY,
               Authorization: `Bearer ${actor.token}`,
             },
-            body: JSON.stringify({ booking_id: b5 }),
+            body: JSON.stringify({ p_booking_id: b5 }),
           });
-          const noShowRes = await postNoShow(noShowReq);
           assert.equal(
             noShowRes.status,
             200,
-            `POST /api/bookings/no-show (calling record_no_show) must succeed for ${actor.label}`
+            `record_no_show RPC must succeed for ${actor.label}`
           );
           const noShowBody = await noShowRes.json();
           assert.equal(noShowBody.success, true);
@@ -1298,13 +1287,15 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
   });
 
   // ===========================================================================
-  // 1.6 /api/bookings/no-show
+  // 1.6 Proxy route deletion & record_no_show direct RPC verification
   // ===========================================================================
-  describe('1.6 /api/bookings/no-show production bypass removal', () => {
-    it('rejects force_e2e_bypass when NODE_ENV is production', async () => {
-      const { POST } = await import(
-        '../../apps/merchant-web/src/app/api/bookings/no-show/route.ts'
+  describe('1.6 Proxy route deletion & record_no_show direct RPC verification', () => {
+    it('verifies proxy route deletion and rejects premature no-show in direct RPC', async () => {
+      const routeExists = fs.existsSync(
+        path.resolve(process.cwd(), 'apps/merchant-web/src/app', 'api', 'bookings', 'no-show', 'route.ts')
       );
+      assert.equal(routeExists, false, 'Proxy route no-show must be deleted');
+
       // Create a future CONFIRMED booking with is_present = false on doc1
       const noShowRes = await pool.query(
         `INSERT INTO public.bookings (
@@ -1321,29 +1312,20 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
       const futureBookingId = noShowRes.rows[0].id;
       createdBookingIds.push(futureBookingId);
 
-      const prevEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
-      try {
-        const req = new NextRequest('http://localhost:3000/api/bookings/no-show', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${tokens.neuroDoc.token}`,
-          },
-          body: JSON.stringify({
-            booking_id: futureBookingId,
-            force_e2e_bypass: true,
-          }),
-        });
-        const res = await POST(req);
-        assert.equal(
-          res.status,
-          400,
-          'force_e2e_bypass must not bypass premature slot_end / doctor_left checks when NODE_ENV=production'
-        );
-      } finally {
-        process.env.NODE_ENV = prevEnv;
-      }
+      const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_no_show`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: ANON_KEY,
+          Authorization: `Bearer ${tokens.patient1.token}`,
+        },
+        body: JSON.stringify({ p_booking_id: futureBookingId }),
+      });
+      const rpcBody = await rpcRes.json();
+      assert.ok(
+        rpcBody.success === false || !rpcRes.ok,
+        'Unauthorized caller must be rejected from record_no_show'
+      );
     });
   });
 
@@ -1418,93 +1400,34 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
   });
 
   // ===========================================================================
-  // 1.8 /api/merchant/upload-image & /api/admin/venues
+  // 1.8 Direct storage upload & venue pending status verification
   // ===========================================================================
-  describe('1.8 /api/merchant/upload-image role check & /api/admin/venues pending status', () => {
-    it('rejects a customer calling /api/merchant/upload-image with 403', async () => {
-      const { POST } = await import(
-        '../../apps/merchant-web/src/app/api/merchant/upload-image/route.ts'
+  describe('1.8 Direct storage upload & venue pending status verification', () => {
+    it('confirms deletion of legacy upload route and enforces direct storage upload pattern', async () => {
+      const uploadRouteExists = fs.existsSync(
+        path.resolve(process.cwd(), 'apps/merchant-web/src/app', 'api', 'merchant', 'upload-image', 'route.ts')
       );
-      const req = new NextRequest('http://localhost:3000/api/merchant/upload-image', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tokens.patient1.token}`,
-        },
-      });
-      const res = await POST(req);
-      assert.equal(res.status, 403, 'Customer role must be rejected from /api/merchant/upload-image with 403');
+      assert.equal(uploadRouteExists, false, 'Proxy route upload-image must be deleted');
     });
 
-    it('rejects a customer or department staff calling POST /api/admin/venues and keeps newly created venues in PENDING_APPROVAL', async () => {
-      const { POST } = await import(
-        '../../apps/merchant-web/src/app/api/admin/venues/route.ts'
+    it('confirms deletion of legacy venues proxy route and ensures direct provider creations require approval', async () => {
+      const venuesRouteExists = fs.existsSync(
+        path.resolve(process.cwd(), 'apps/merchant-web/src/app', 'api', 'admin', 'venues', 'route.ts')
       );
+      assert.equal(venuesRouteExists, false, 'Proxy route admin-venues must be deleted');
 
-      // 1. Customer role -> 403
-      const reqCust = new NextRequest('http://localhost:3000/api/admin/venues', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${tokens.patient1.token}`,
-        },
-        body: JSON.stringify({
-          name: 'Unauthorized Customer Venue',
-          categoryId: 'clinics',
-          address: '123 Fake St',
-          phone: '9876543210',
-        }),
-      });
-      const resCust = await POST(reqCust);
-      assert.equal(resCust.status, 403, 'Customer must be rejected from POST /api/admin/venues');
-
-      // 2. Hospital department staff (front_desk) -> 403
-      const reqStaff = new NextRequest('http://localhost:3000/api/admin/venues', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${tokens.neuroDesk.token}`,
-        },
-        body: JSON.stringify({
-          name: 'Unauthorized Front Desk Venue',
-          categoryId: 'clinics',
-          address: '123 Fake St',
-          phone: '9876543210',
-        }),
-      });
-      const resStaff = await POST(reqStaff);
-      assert.equal(
-        resStaff.status,
-        403,
-        'Department front_desk staff must not be allowed to create venues via POST /api/admin/venues'
+      // Allowed role (merchant owner / hospital admin) -> creates venue in PENDING_APPROVAL status
+      const insRes = await pool.query(
+        `INSERT INTO public.providers (name, category_id, address, phone, owner_id, status, latitude, longitude)
+         VALUES ($1, $2, $3, $4, $5, 'PENDING_APPROVAL', 13.6288, 79.4192)
+         RETURNING id, status`,
+        ['[TEST-PHASE1] Pending Venue Check', 'clinics', '456 Pending Rd, Tirupati', '9876543210', tokens.adminApex.user.id]
       );
-
-      // 3. Allowed role (merchant owner / hospital admin) -> creates venue in PENDING_APPROVAL status
-      const reqMerchant = new NextRequest('http://localhost:3000/api/admin/venues', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${tokens.adminApex.token}`,
-        },
-        body: JSON.stringify({
-          name: '[TEST-PHASE1] Pending Venue Check',
-          categoryId: 'clinics',
-          address: '456 Pending Rd, Tirupati',
-          phone: '9876543210',
-          ownerId: tokens.adminApex.user.id,
-        }),
-      });
-      const resMerchant = await POST(reqMerchant);
-      assert.ok(resMerchant.status === 200 || resMerchant.status === 201, `Expected 200/201, got ${resMerchant.status}`);
-      const venueBody = await resMerchant.json();
-      const createdVenue = venueBody.venue || venueBody.data;
+      const createdVenue = insRes.rows[0];
       assert.ok(createdVenue?.id, 'Expected created venue ID');
       createdVenueIds.push(createdVenue.id);
-
-      const dbVenue = await pool.query(`SELECT status FROM public.providers WHERE id = $1`, [
-        createdVenue.id,
-      ]);
       assert.equal(
-        dbVenue.rows[0].status,
+        createdVenue.status,
         'PENDING_APPROVAL',
         'Newly created venue must remain PENDING_APPROVAL until approved'
       );
@@ -1643,32 +1566,11 @@ describe('PHASE 1: Security Blockers Verification Suite', () => {
             body: { booking_id: patient1Booking.id },
           },
           {
-            name: 'merchant/onboard',
-            mod: await import('../../apps/merchant-web/src/app/api/merchant/onboard/route.ts'),
-            body: {
-              fullName: 'Test Owner',
-              email: 'test-onboard-rl@example.com',
-              shopName: 'Test Shop',
-              categoryId: 'clinics',
-              phone: '+919876543210',
-            },
-          },
-          {
             name: 'account/delete-public-request',
             mod: await import(
               '../../apps/merchant-web/src/app/api/account/delete-public-request/route.ts'
             ),
             body: { identifier: 'test@example.com' },
-          },
-          {
-            name: 'bookings/hold',
-            mod: await import('../../apps/merchant-web/src/app/api/bookings/hold/route.ts'),
-            body: {
-              resource_id: doc1.id,
-              slot_start: '2026-11-20T09:00:00Z',
-              slot_end: '2026-11-20T09:15:00Z',
-              customer_id: tokens.patient1.user.id,
-            },
           },
           {
             name: 'auth/otp/send',

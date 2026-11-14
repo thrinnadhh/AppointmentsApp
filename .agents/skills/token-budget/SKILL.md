@@ -1,6 +1,7 @@
 ---
 name: token-budget
 description: Manages token budget estimation and tracking to prevent context overflow
+version: 1.0.0
 ---
 
 # Token Budget Skill

@@ -13,9 +13,9 @@ const ROOT_DIR = process.cwd();
 describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
 
   // =========================================================================
-  // 1. SPEC Late Arrival Queue Calculation Logic (/api/bookings/reach)
+  // 1. SPEC Late Arrival Queue Calculation Logic (Customer Reach)
   // =========================================================================
-  describe('1. Late Arrival Queue Calculation Logic (/api/bookings/reach)', () => {
+  describe('1. Late Arrival Queue Calculation Logic (Customer Reach)', () => {
     function evaluateReachArrival({ slotStart, arrivedAt, todayBookings = [] }) {
       const arrivalTag = calculateArrivalTag(slotStart, arrivedAt);
       const isLateArrival = arrivalTag === 'Late';
@@ -114,9 +114,9 @@ describe('Dynamic Late-Arrival Queue & Customer Dashboard Suite', () => {
   });
 
   // =========================================================================
-  // 2. Merchant Desk Late Actions (/api/bookings/late-queue)
+  // 2. Merchant Desk Late Actions (Late Queue)
   // =========================================================================
-  describe('2. Merchant Desk Late Actions (/api/bookings/late-queue)', () => {
+  describe('2. Merchant Desk Late Actions (Late Queue)', () => {
     function simulateMerchantLateAction(action, { todayBookings = [] }) {
       if (action === 'MOVE_TO_STANDBY') {
         return {

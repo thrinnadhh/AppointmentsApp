@@ -35,17 +35,17 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     await expect(page).toHaveURL(/.*\/login.*/, { timeout: 15000 });
   });
 
-  test('TC-GOOGLE-03: API /api/merchant/register-shop enforces validation', async ({ request }) => {
-    const res = await request.post('http://localhost:3000/api/merchant/register-shop', {
-      data: {
-        shopName: '',
-        categoryId: '',
-        phone: '',
-      },
+  test('TC-GOOGLE-03: Shop registration enforces validation', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A_error'
+    );
+    const { error } = await supabase.from('providers').insert({
+      name: '',
+      phone: '',
     });
-    expect(res.status()).toBe(400);
-    const json = await res.json();
-    expect(json.error).toContain('Please provide shop name, category, and contact phone number');
+    expect(error).toBeTruthy();
   });
 
   test('TC-GOOGLE-04: No "Welcome to Merchant Hub" placeholder card exists on /', async ({ page }) => {
@@ -114,24 +114,19 @@ test.describe('Google Auth Verification & First-Time Shop Registration', () => {
     });
     const targetUserId = newUser?.user?.id || '88888888-8888-8888-8888-888888888883';
 
-    // 1. Register a shop with the photo URL using a valid user ID (provisioned by admin)
-    const regRes = await request.post('http://localhost:3000/api/merchant/register-shop', {
-      headers: { 'x-admin-bypass-key': adminBypass },
-      data: {
-        userId: targetUserId,
-        fullName: `Dr. Tester ${uniqueSuffix}`,
-        shopName: `Storefront Photo Test Clinic ${uniqueSuffix}`,
-        categoryId: 'clinics',
-        phone: '+919848011223',
-        address: 'Alipiri Road, Tirupati',
-        photoUrl: testPhotoUrl,
-      },
+    // 1. Register a shop with the photo URL using a valid user ID via direct RPC
+    const { data: regData, error: regError } = await (supabaseAdmin.rpc as any)('merchant_register_shop_for_user', {
+      p_user_id: targetUserId,
+      p_shop_name: `Storefront Photo Test Clinic ${uniqueSuffix}`,
+      p_category_id: 'clinics',
+      p_phone: '+919848011223',
+      p_address: 'Alipiri Road, Tirupati',
+      p_full_name: `Dr. Tester ${uniqueSuffix}`,
+      p_photo_url: testPhotoUrl,
     });
 
-    expect(regRes.status()).toBe(200);
-    const regData = await regRes.json();
-    expect(regData.success).toBe(true);
-    expect(regData.data.photos).toContain(testPhotoUrl);
+    expect(regError).toBeFalsy();
+    expect(regData?.photos).toContain(testPhotoUrl);
 
     // Clean up created test shop to prevent multi-tenant test bleed
     const providerId = regData.data?.provider_id || regData.data?.id;

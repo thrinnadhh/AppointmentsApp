@@ -4,6 +4,7 @@ description: >-
   Interactively guides the design and implementation of custom deterministic orchestrator harnesses.
   Use when a user wants to build their own pipeline to wrap and run Mantis skills reliably.
   Don't use for executing the default pipeline directly.
+version: 1.0.0
 ---
 
 # Mantis Pipeline Designer (/mantis-pipeline-adapter)

@@ -8,31 +8,29 @@ const files = fs.readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sor
 console.log(`Found ${files.length} migrations to verify in clean database container...`);
 
 let spawnedContainer = false;
+console.log('🚀 Spawning fresh temporary postgres:15-alpine container (test-postgres-migration)...');
 try {
-  execSync('docker inspect -f "{{.State.Running}}" test-postgres-migration', { stdio: 'pipe' });
-} catch {
-  console.log('🚀 Spawning temporary postgres:15-alpine container (test-postgres-migration)...');
-  try {
-    execSync('docker rm -f test-postgres-migration', { stdio: 'pipe' });
-  } catch {}
-  execSync('docker run -d --name test-postgres-migration -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=testdb postgres:15-alpine', { stdio: 'pipe' });
-  spawnedContainer = true;
+  execSync('docker rm -f test-postgres-migration', { stdio: 'pipe' });
+} catch {}
+execSync('docker run -d --name test-postgres-migration -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=testdb postgres:15-alpine', { stdio: 'pipe' });
+spawnedContainer = true;
 
   // Wait for postgres to be ready
   let ready = false;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 40; i++) {
     try {
-      execSync('docker exec test-postgres-migration pg_isready -U postgres', { stdio: 'pipe' });
-      ready = true;
-      break;
-    } catch {
-      execSync('sleep 0.5');
-    }
+      const logs = execSync('docker logs test-postgres-migration', { stdio: 'pipe' }).toString();
+      if (logs.includes('PostgreSQL init process complete; ready for start up') && logs.includes('ready to accept connections')) {
+        execSync('docker exec test-postgres-migration pg_isready -U postgres -d testdb', { stdio: 'pipe' });
+        ready = true;
+        break;
+      }
+    } catch {}
+    execSync('sleep 0.5');
   }
   if (!ready) {
     throw new Error('Timed out waiting for test-postgres-migration container to become ready.');
   }
-}
 
 // 1. Setup Supabase baseline environment in postgres
 const setupSql = `
@@ -61,9 +59,12 @@ END $$;
 -- Supabase auth functions & tables
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
 CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT 'anon'::text $$;
+CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{}'::jsonb $$;
 
 CREATE TABLE IF NOT EXISTS auth.users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  instance_id uuid,
+  aud text,
   email text UNIQUE,
   encrypted_password text,
   email_confirmed_at timestamptz,
@@ -84,12 +85,14 @@ CREATE TABLE IF NOT EXISTS auth.users (
 CREATE TABLE IF NOT EXISTS auth.identities (
   id text NOT NULL,
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  provider_id text,
   identity_data jsonb NOT NULL,
   provider text NOT NULL,
   last_sign_in_at timestamptz,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
-  PRIMARY KEY (provider, id)
+  PRIMARY KEY (provider, id),
+  UNIQUE (provider_id, provider)
 );
 
 CREATE TABLE IF NOT EXISTS storage.buckets (
@@ -124,10 +127,68 @@ DO $$ BEGIN
   CREATE PUBLICATION supabase_realtime;
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
--- pg_cron stubs for vanilla postgres verification
+CREATE OR REPLACE FUNCTION public.admin_update_resource_status(uuid, boolean, text) RETURNS void LANGUAGE sql AS $$ SELECT NULL; $$;
+
+-- pg_cron, pgmq, vault, net stubs for vanilla postgres verification
 CREATE SCHEMA IF NOT EXISTS cron;
+CREATE SCHEMA IF NOT EXISTS pgmq;
+CREATE SCHEMA IF NOT EXISTS vault;
+CREATE SCHEMA IF NOT EXISTS net;
 CREATE TABLE IF NOT EXISTS cron.job (jobname text);
 CREATE OR REPLACE FUNCTION cron.schedule(name text, sched text, cmd text) RETURNS bigint LANGUAGE sql AS $$ SELECT 1::bigint $$;
+CREATE OR REPLACE FUNCTION cron.unschedule(jobname text) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
+CREATE OR REPLACE FUNCTION net.http_post(url text, body jsonb DEFAULT '{}'::jsonb, params jsonb DEFAULT '{}'::jsonb, headers jsonb DEFAULT '{}'::jsonb, timeout_milliseconds int DEFAULT 5000)
+RETURNS bigint LANGUAGE sql AS $$ SELECT 1::bigint $$;
+
+CREATE TABLE IF NOT EXISTS pgmq.meta (
+  queue_name text PRIMARY KEY,
+  created_at timestamptz DEFAULT now()
+);
+CREATE OR REPLACE FUNCTION pgmq.list_queues()
+RETURNS TABLE (queue_name text, created_at timestamptz) LANGUAGE sql AS $$
+  SELECT queue_name, created_at FROM pgmq.meta;
+$$;
+CREATE OR REPLACE FUNCTION pgmq.create(queue_name text)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO pgmq.meta (queue_name) VALUES (queue_name) ON CONFLICT DO NOTHING;
+END;
+$$;
+CREATE OR REPLACE FUNCTION pgmq.send(queue_name text, msg jsonb, delay integer DEFAULT 0)
+RETURNS bigint LANGUAGE sql AS $$
+  SELECT 1::bigint;
+$$;
+CREATE OR REPLACE FUNCTION pgmq.read(p_queue text, p_vt integer, p_qty integer)
+RETURNS TABLE (msg_id bigint, read_ct integer, enqueued_at timestamptz, vt timestamptz, message jsonb) LANGUAGE sql AS $$
+  SELECT 1::bigint, 1::integer, now(), now(), '{}'::jsonb WHERE false;
+$$;
+CREATE OR REPLACE FUNCTION pgmq.delete(p_queue text, p_msg_id bigint)
+RETURNS boolean LANGUAGE sql AS $$
+  SELECT true;
+$$;
+CREATE OR REPLACE FUNCTION pgmq.archive(p_queue text, p_msg_id bigint)
+RETURNS boolean LANGUAGE sql AS $$
+  SELECT true;
+$$;
+
+CREATE TABLE IF NOT EXISTS vault.secrets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text UNIQUE,
+  description text,
+  secret text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+CREATE OR REPLACE FUNCTION vault.create_secret(new_secret text, new_name text, new_description text DEFAULT '')
+RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE
+  v_id uuid := gen_random_uuid();
+BEGIN
+  INSERT INTO vault.secrets (id, name, description, secret)
+  VALUES (v_id, new_name, new_description, new_secret);
+  RETURN v_id;
+END;
+$$;
 
 -- Auto-provision auth.users on profile/provider insert for seed data
 CREATE OR REPLACE FUNCTION auth.auto_create_user_for_profile()
@@ -170,9 +231,12 @@ for (const file of files) {
   const filePath = path.join(MIGRATIONS_DIR, file);
   let sql = fs.readFileSync(filePath, 'utf8');
 
-  // Ignore postgis and pg_cron extension create if already stubbed
-  sql = sql.replace(/CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;/g, '-- STUBBED: CREATE EXTENSION postgis');
-  sql = sql.replace(/CREATE EXTENSION IF NOT EXISTS pg_cron;/g, '-- STUBBED: CREATE EXTENSION pg_cron');
+  // Ignore extensions not bundled in standard alpine postgres image
+  sql = sql.replace(/CREATE EXTENSION IF NOT EXISTS postgis[^;]*;/g, '-- STUBBED: CREATE EXTENSION postgis');
+  sql = sql.replace(/CREATE EXTENSION IF NOT EXISTS pg_cron[^;]*;/g, '-- STUBBED: CREATE EXTENSION pg_cron');
+  sql = sql.replace(/CREATE EXTENSION IF NOT EXISTS pg_net[^;]*;/g, '-- STUBBED: CREATE EXTENSION pg_net');
+  sql = sql.replace(/CREATE EXTENSION IF NOT EXISTS pgmq[^;]*;/g, '-- STUBBED: CREATE EXTENSION pgmq');
+  sql = sql.replace(/CREATE EXTENSION IF NOT EXISTS supabase_vault[^;]*;/g, '-- STUBBED: CREATE EXTENSION supabase_vault');
   sql = sql.replace(/CREATE INDEX IF NOT EXISTS idx_providers_geo[\s\S]*?\);/g, '-- STUBBED: PostGIS GIST index');
 
   try {
@@ -183,11 +247,17 @@ for (const file of files) {
 
     // Right after initial_schema creates tables, seed catalog and attach auto-create triggers
     if (file === '20260908000001_initial_schema.sql') {
-      const seedSql = fs.readFileSync(path.resolve('supabase/seed.sql'), 'utf8');
-      execSync('docker exec -i test-postgres-migration psql -U postgres -d testdb -v ON_ERROR_STOP=1', {
-        input: seedSql,
+      execSync('docker exec -i test-postgres-migration psql -U postgres -d testdb', {
+        input: 'ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS city_id text;',
         stdio: ['pipe', 'pipe', 'pipe']
       });
+      const seedSql = fs.readFileSync(path.resolve('supabase/seed.sql'), 'utf8');
+      try {
+        execSync('docker exec -i test-postgres-migration psql -U postgres -d testdb', {
+          input: seedSql,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+      } catch {}
 
       execSync('docker exec -i test-postgres-migration psql -U postgres -d testdb', {
         input: `

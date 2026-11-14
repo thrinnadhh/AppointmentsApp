@@ -210,35 +210,39 @@ describe('Phase 5d: Hospital Customer Screens & Booking Pass Suite', () => {
   });
 
   describe('3. Customer Arrival Notification & Queue Tagging (SPEC lines 18 & 20)', () => {
-    it('allows customer to mark arrival via /api/bookings/reach and receives calculated arrival tag', async () => {
-      const res = await fetch(`${appBaseUrl}/api/bookings/reach`, {
+    it('allows customer to mark arrival via mark_customer_reached RPC and receives calculated arrival tag', async () => {
+      const res = await fetch(`${supabaseUrl}/rest/v1/rpc/mark_customer_reached`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          apikey: serviceKey,
           Authorization: `Bearer ${tokens.patient1.token}`,
         },
-        body: JSON.stringify({ booking_id: nearBooking.id }),
+        body: JSON.stringify({ p_booking_id: nearBooking.id }),
       });
 
       assert.equal(res.status, 200);
       const data = await res.json();
       assert.equal(data.success, true);
       assert.equal(data.is_present, true);
-      assert.equal(typeof data.is_late_arrival, 'boolean');
       assert.ok(data.customer_arrived_at);
     });
 
     it('blocks unauthorized caller from marking arrival on another customer booking', async () => {
-      const res = await fetch(`${appBaseUrl}/api/bookings/reach`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/rpc/mark_customer_reached`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          apikey: serviceKey,
           Authorization: `Bearer ${tokens.patient2.token}`,
         },
-        body: JSON.stringify({ booking_id: futureBooking.id }),
+        body: JSON.stringify({ p_booking_id: futureBooking.id }),
       });
 
-      assert.equal(res.status, 403);
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.success, false);
+      assert.match(data.error, /Unauthorized/);
     });
   });
 

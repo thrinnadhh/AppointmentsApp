@@ -42,6 +42,15 @@ import {
   unenrollAdminMfaFactor,
   AppLogEntry,
   supabase,
+  fetchAdminCityStats,
+  fetchAdminVelocity,
+  updateAdminCityStatus,
+  fetchAdminMerchants,
+  updateAdminMerchantStatus,
+  fetchAdminCityWaitlist,
+  fetchAdminAuditLogs,
+  fetchAdminAppLogs,
+  purgeAdminAppLogs,
 } from '@/lib/supabase';
 
 interface MerchantItem {
@@ -147,44 +156,25 @@ export default function AdminDashboardPage() {
   const loadDashboardData = useCallback(async (windowFilter = selectedWindow, cityFilter = selectedCityFilter) => {
     try {
       setRefreshing(true);
-      const headers = await getAdminAuthHeaders(false);
-
-      const cityParam = cityFilter !== 'all' ? `&cityId=${cityFilter}` : '';
-      const [citiesRes, velocityRes, merchantsRes, waitlistRes, auditLogsRes, appLogsRes] = await Promise.all([
-        fetch('/api/admin/cities', { headers }),
-        fetch(`/api/admin/analytics?window=${windowFilter}${cityParam}`, { headers }),
-        fetch(`/api/admin/merchants${cityFilter !== 'all' ? `?cityId=${cityFilter}` : ''}`, { headers }),
-        fetch(`/api/admin/waitlist${cityFilter !== 'all' ? `?cityId=${cityFilter}` : ''}`, { headers }),
-        fetch('/api/admin/audit-logs?limit=50', { headers }),
-        fetch('/api/admin/app-logs?limit=100', { headers }),
+      const cityId = cityFilter !== 'all' ? cityFilter : undefined;
+      const [citiesData, velocityData, merchantsData, waitlistData, auditLogsData, appLogsData] = await Promise.all([
+        fetchAdminCityStats(),
+        fetchAdminVelocity(windowFilter, cityId),
+        fetchAdminMerchants(cityId),
+        fetchAdminCityWaitlist(cityId),
+        fetchAdminAuditLogs(50),
+        fetchAdminAppLogs({ limit: 100 }),
       ]);
 
-      if (citiesRes.ok) {
-        const data = await citiesRes.json();
-        if (Array.isArray(data.cities) && data.cities.length > 0) {
-          setCities(data.cities);
-        }
+      const data = { cities: citiesData };
+      if (Array.isArray(data.cities) && data.cities.length > 0) {
+        setCities(data.cities);
       }
-      if (velocityRes.ok) {
-        const data = await velocityRes.json();
-        setVelocity(data.analytics || null);
-      }
-      if (merchantsRes.ok) {
-        const data = await merchantsRes.json();
-        setMerchants(data.merchants || []);
-      }
-      if (waitlistRes.ok) {
-        const data = await waitlistRes.json();
-        setWaitlist(data.waitlist || []);
-      }
-      if (auditLogsRes.ok) {
-        const data = await auditLogsRes.json();
-        setAuditLogs(data.logs || []);
-      }
-      if (appLogsRes.ok) {
-        const data = await appLogsRes.json();
-        setAppLogs(data.logs || []);
-      }
+      setVelocity(velocityData || null);
+      setMerchants(merchantsData || []);
+      setWaitlist(waitlistData || []);
+      setAuditLogs(auditLogsData || []);
+      setAppLogs(appLogsData || []);
     } catch (err) {
       console.error('Failed to load admin dashboard data:', err);
     } finally {
@@ -233,15 +223,14 @@ export default function AdminDashboardPage() {
 
         let profile: { id: string; email?: string | null; full_name?: string | null; role?: string | null } | null = null;
         try {
-          const meRes = await fetch('/api/auth/me', {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          });
-          if (meRes.ok) {
-            const meData = await meRes.json();
-            profile = meData.profile;
-          }
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, role')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          profile = profileData;
         } catch (e) {
-          console.warn('[Admin] Failed to fetch /api/auth/me:', e);
+          console.warn('[Admin] Failed to fetch profile:', e);
         }
 
         // Safe fallback for platform Super Admin if client RLS propagation lagged
@@ -363,16 +352,9 @@ export default function AdminDashboardPage() {
         prev.map((c) => (c.city_id === cityId ? { ...c, status: newStatus } : c))
       );
 
-      const headers = await getAdminAuthHeaders(true);
-      const res = await fetch('/api/admin/cities', {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ cityId, status: newStatus }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update city status');
+      const res = await updateAdminCityStatus(cityId, newStatus);
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to update city status');
       }
 
       setActionFeedback(`✓ City ${cityId.toUpperCase()} transitioned to ${newStatus}`);
@@ -398,16 +380,9 @@ export default function AdminDashboardPage() {
         prev.map((m) => (m.id === providerId ? { ...m, status: newStatus } : m))
       );
 
-      const headers = await getAdminAuthHeaders(true);
-      const res = await fetch('/api/admin/merchants', {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ providerId, status: newStatus }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update merchant');
+      const res = await updateAdminMerchantStatus(providerId, newStatus);
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to update merchant');
       }
 
       setActionFeedback(`✓ Merchant ${newStatus === 'ACTIVE' ? 'Activated & Visible' : 'Blocked & Suspended'}`);
@@ -428,25 +403,19 @@ export default function AdminDashboardPage() {
 
     try {
       setIsSubmittingCity(true);
-      const headers = await getAdminAuthHeaders(true);
-      const res = await fetch('/api/admin/cities', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          id: newCityId.toLowerCase().trim(),
-          name: newCityName.trim(),
-          state: newCityState,
-          status: newCityStatus,
-          latitude: parseFloat(newCityLat),
-          longitude: parseFloat(newCityLng),
-          radiusKm: parseFloat(newCityRadius),
-          merchantTarget: parseInt(newCityTarget, 10),
-        }),
+      const { error } = await supabase.from('cities').insert({
+        id: newCityId.toLowerCase().trim(),
+        name: newCityName.trim(),
+        state: newCityState,
+        status: newCityStatus,
+        latitude: parseFloat(newCityLat),
+        longitude: parseFloat(newCityLng),
+        radius_km: parseFloat(newCityRadius) || 25,
+        merchant_target: parseInt(newCityTarget, 10) || 10,
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to create city');
+      if (error) {
+        throw new Error(error.message || 'Failed to create city');
       }
 
       setShowAddCityModal(false);
@@ -468,18 +437,13 @@ export default function AdminDashboardPage() {
   const handleRefreshAppLogs = async () => {
     try {
       setAppLogsLoading(true);
-      const headers = await getAdminAuthHeaders(false);
-      const params = new URLSearchParams({
-        limit: '100',
-        platform: appLogPlatformFilter,
-        level: appLogLevelFilter,
+      const logs = await fetchAdminAppLogs({
+        limit: 100,
+        platform: (appLogPlatformFilter !== 'all' ? appLogPlatformFilter : undefined) as any,
+        level: (appLogLevelFilter !== 'all' ? appLogLevelFilter : undefined) as any,
+        search: appLogSearchQuery || undefined,
       });
-      if (appLogSearchQuery) params.set('search', appLogSearchQuery);
-      const res = await fetch(`/api/admin/app-logs?${params.toString()}`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setAppLogs(data.logs || []);
-      }
+      setAppLogs(logs || []);
     } catch (err) {
       console.warn('Error refreshing app logs:', err);
     } finally {
@@ -492,17 +456,12 @@ export default function AdminDashboardPage() {
     if (!confirm('Are you sure you want to prune application logs older than 30 days?')) return;
     try {
       setPurgingLogs(true);
-      const headers = await getAdminAuthHeaders(false);
-      const res = await fetch('/api/admin/app-logs?retentionDays=30', {
-        method: 'DELETE',
-        headers,
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setActionFeedback(`✓ Pruned ${data.deleted_count ?? 0} application log records older than 30 days.`);
+      const res = await purgeAdminAppLogs(30);
+      if (!res.error) {
+        setActionFeedback(`✓ Pruned ${res.count ?? 0} application log records older than 30 days.`);
         await handleRefreshAppLogs();
       } else {
-        setActionFeedback(`⚠️ Prune failed: ${data.error}`);
+        setActionFeedback(`⚠️ Prune failed: ${res.error}`);
       }
     } catch {
       setActionFeedback('⚠️ Failed to prune application logs.');

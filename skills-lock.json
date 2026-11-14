@@ -1,185 +1,191 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "api-security-testing": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/api-security-testing/SKILL.md",
-      "computedHash": "4baa317508f5e01e72a0c292d3c9ea6a71249cfa3414971e97aa6e0fabae25f5"
+      "computedHash": ""
     },
     "application-security-testing": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/application-security-testing/SKILL.md",
-      "computedHash": "5963d33bb6f5cfb0ce2657daa20090c922f68c309aa5906b9c80d1761fb33e05"
+      "computedHash": ""
     },
     "ci-security-scanning-with-strix": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/ci-security-scanning-with-strix/SKILL.md",
-      "computedHash": "9ad6b041d6854ea5a200f6bfb4d3ed60ad78f833b919388c7bf2a28a18f98032"
+      "computedHash": ""
     },
     "find-security-vulnerabilities-in-code": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/find-security-vulnerabilities-in-code/SKILL.md",
-      "computedHash": "551afea3693d77172cc83278bd6185cfb232be75e5c683506fd00b9630691272"
+      "computedHash": ""
     },
     "fix-security-vulnerabilities-with-strix": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/fix-security-vulnerabilities-with-strix/SKILL.md",
-      "computedHash": "f5fcf1365bbaa650b246c9a0e6338db2e40ecc46fba60ff64fd2f6311eed901c"
+      "computedHash": ""
     },
     "managed-pentesting-with-strix": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/managed-pentesting-with-strix/SKILL.md",
-      "computedHash": "2e429eaafeb1471a01718b094b215bfff34605ffb5fc090ea665d9fcfc96d8ff"
+      "computedHash": ""
     },
     "mantis-advise": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-advise/SKILL.md",
-      "computedHash": "7096692089f3621cbc2e3d959cd033fdd7af316cc6e8b8735507d92fc1770230"
+      "computedHash": "59e54cedcd2b84863f3ca6c7f76d96e72b6fc6a761e1dbce60ae45441ada8a1f"
     },
     "mantis-architecture": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-architecture/SKILL.md",
-      "computedHash": "253351cbbd563abca2b9d487b3518c99b39e9b19f2e4c5fbadba1bac71af7a16"
+      "computedHash": "7a96a69910cfaabd817fce7af804ae3e8e465cc96f1a926950938ae7fb34d79d"
     },
     "mantis-calibrate": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-calibrate/SKILL.md",
-      "computedHash": "bc60c82ee639c2f6b4402bc7b95ce8d918c7c1b88f038e2e68a89a027a745bbe"
+      "computedHash": "aaf932b5fc2f2625f6743f7e2c1f72287a6401181252d129f6cc8ef2fe11897a"
     },
     "mantis-chain": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-chain/SKILL.md",
-      "computedHash": "154f5ed3610489cf1159f6d341d8ab13e936bce94546ba2716a72bd3d0901b17"
+      "computedHash": "b8cb4f0a409643a084d47597a2961463f636530f921871c84664132047f6480b"
     },
     "mantis-critic": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-critic/SKILL.md",
-      "computedHash": "d1875a50e7e3643b22ef2490b5eb989a6e585f509de206a429eadc15f561d122"
+      "computedHash": "87d67b25553eb5977ed00e441049390be6ec4cd6ecda710fa0bcfabe7571fb8a"
     },
     "mantis-dedupe": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-dedupe/SKILL.md",
-      "computedHash": "84a05756105652e23a460ad28572ad43e6074d3141d73c7e4f2f23b0bec8467b"
+      "computedHash": "47f7ee6dc892de001ca2a7ce7b5234fcca6b5389ecd177d9998b1124398625b2"
     },
     "mantis-history": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-history/SKILL.md",
-      "computedHash": "515f077bcaef0843b5fedb6ab652e41391c9e81c99ef3f9110b66565acfb8d10"
+      "computedHash": "90ccf8bfa1214fa9494d9aa035f3ec46aba26e39324ce2b5cf757d5174d4b2d4"
     },
     "mantis-meta-agent": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-meta-agent/SKILL.md",
-      "computedHash": "970aca46869b0c805831d9b11146aaaef0b00a854ab794ff1b9493aae0fdd2a9"
+      "computedHash": "5398bdc94a4988f84d10364f150a6552f14571c5bd4ea876d56ff12a3cf6e2d8"
     },
     "mantis-patch": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-patch/SKILL.md",
-      "computedHash": "3e2a3eb3d77059c319d0f6b0adab3f3f28e99e779cad7cbd61662889e1c05d97"
+      "computedHash": "24e8f2cf2ec9e366c517087111a22d8548ef5c28f452629ae79c3fa3b2431013"
     },
     "mantis-pipeline-adapter": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-pipeline-adapter/SKILL.md",
-      "computedHash": "471179aba5f29513c0188d78de185bbbd526a539aabf318d0ee074b2b32c87b9"
+      "computedHash": "edb510b9e395b5d2581d65218c76dc2c4516a3002705888e4001b1c6618e491e"
     },
     "mantis-plan": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-plan/SKILL.md",
-      "computedHash": "422c16467e432c8d74be13036e86fdf4edbec3231738810051a41e22437ffe78"
+      "computedHash": "c98d2e3d9a1e3af9948eb1783dad372c5156ff6d906e55073c8898bcf9a82cdd"
     },
     "mantis-reflect": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-reflect/SKILL.md",
-      "computedHash": "3057c8c36d639739f46ee6586faa2c77a8f53372a4c0ca2be9663f3daf5424f9"
+      "computedHash": "11bb2e61aa5f52ad1645c4f3790ed90146191a37df143e5c96950be3bb47ca76"
     },
     "mantis-report": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-report/SKILL.md",
-      "computedHash": "0be6165887e244bbb224bdcbfb75905282d356878b862bd5d922e7ac8f6fa842"
+      "computedHash": "92a4e76a91e755c54176281a3637a298cf933a607405c05573fb441ef9e52233"
     },
     "mantis-reproduce": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-reproduce/SKILL.md",
-      "computedHash": "b2c3ba51c4f1b1d3c7734a4525f9c9ee0dabbcbca1aae13edb7f93659a7426c0"
+      "computedHash": "a3648458c944ead9f606fcab28575081b46b72f58e5ccddc61fe4f37a735e50b"
     },
     "mantis-researcher": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-researcher/SKILL.md",
-      "computedHash": "025b43b2a984395add14e1eb80a152149966a9f68a734ae569fb194b81815b59"
+      "computedHash": "5b8b20912626650a328272e57a769c3e5dc3813ee41ded4803b2df33f0542e42"
     },
     "mantis-review": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-review/SKILL.md",
-      "computedHash": "c88e55fbad0b2a88de3266a3d7644dc9e2933e88767920b04de85bf9c49a001c"
+      "computedHash": "cecd44e3176e6afff45dab3717c085a8fbcab331ec51fa46117353e437e67e9b"
     },
     "mantis-structural-index": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-structural-index/SKILL.md",
-      "computedHash": "3399dc453f04cb2e21a58bd30e7556d0232e172944d5e9e2705358e62dec8c0b"
+      "computedHash": "e2e2f8b5776e79a2cdbd2c2f80c2878e778decc10850e00d656f384addccdc52"
     },
     "mantis-summarize": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-summarize/SKILL.md",
-      "computedHash": "38bfb08add00eceb11df53f91155c88536b473b517acd4e2f8b5924314a92687"
+      "computedHash": "5d588aaace3099fc0b57ca4ebc60b3a6e35e18cd3ef1f8b436651b140526d7e3"
     },
     "mantis-threat-model": {
       "source": "google/mantis",
       "sourceType": "github",
       "skillPath": "skills/mantis-threat-model/SKILL.md",
-      "computedHash": "82cf16a79dc69bda21d20a85ec773343c8204f4f8d027c454f827ba34af98d1d"
+      "computedHash": "bc8570b4ce01eb2c8379eb066736871ca587b945484c847ee88ca9c67c7386a6"
     },
     "owasp-top-10-testing": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/owasp-top-10-testing/SKILL.md",
-      "computedHash": "da33339f2d052ea5445b9fb7fc75e3fe4dd9eafc51ea8141e2b3ceab722fbe0e"
+      "computedHash": ""
     },
     "penetration-testing-with-strix": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/penetration-testing-with-strix/SKILL.md",
-      "computedHash": "6a61bdd56cb2cc05c5003810d5bb9e9ef8b3db96c663cac2f976b9d1a6f47704"
+      "computedHash": ""
     },
     "security-audit": {
       "source": "cloudflare/security-audit-skill",
       "sourceType": "github",
       "skillPath": "skills/security-audit/SKILL.md",
-      "computedHash": "98b97aad2873b3b9a8e064007c25e7827b493ba27fda8bfbdb41dab586767973"
+      "computedHash": ""
+    },
+    "stack-diagram": {
+      "source": "caru-ini/stack-diagram",
+      "sourceType": "github",
+      "skillPath": "skills/stack-diagram/SKILL.md",
+      "computedHash": "40a6112d6aa8b76e07a98bd64699a1979bd2f6b7eaef41236e4ea69986af9dd3"
     },
     "untangle-codebase": {
       "source": "caldoai/skills",
       "sourceType": "github",
       "skillPath": "skills/untangle-codebase/SKILL.md",
-      "computedHash": "d5e9e1c4a1f30f34c0120dea773d0170004d6c19ef5e8f236c35773bd6c5bdbc"
+      "computedHash": "73791c30d4da2e001bc095732771966338b764e2e7b57bb30a81439cff85aef4"
     },
     "web-app-penetration-testing": {
       "source": "usestrix/strix",
       "sourceType": "github",
       "skillPath": "skills/web-app-penetration-testing/SKILL.md",
-      "computedHash": "734aaa972fd526b3962ff3ff29ef701c2eae6191f27c8dc479f9c37f9445de69"
+      "computedHash": ""
     }
   }
 }

@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 import { MerchantPortalPage } from './pages/merchant-portal.page';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
@@ -181,88 +186,50 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
 
     const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 
-    test('2.2 GET /api/admin/venues should return 200 with venues array', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/admin/venues', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-      });
-      expect(res.status()).toBe(200);
-      const data = await res.json();
-      expect(Array.isArray(data.venues)).toBe(true);
+    test('2.2 Direct PostgREST venues query should return venues array', async () => {
+      const { data: venues, error } = await supabaseAdmin.from('providers').select('*');
+      expect(error).toBeNull();
+      expect(Array.isArray(venues)).toBe(true);
     });
 
-    test('2.3 POST /api/admin/venues should reject missing fields with 400', async ({ request }) => {
-      const res = await request.post('http://localhost:3000/api/admin/venues', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-        data: { name: 'Incomplete Clinic' },
-      });
-      expect(res.status()).toBe(400);
-      const data = await res.json();
-      expect(data.error).toBeDefined();
+    test('2.3 PostgREST venues insert should reject missing fields', async () => {
+      const { error } = await supabaseAdmin.from('providers').insert({ name: 'Incomplete Clinic' } as any);
+      expect(error).toBeDefined();
     });
 
-    test('2.4 GET /api/admin/resources should return 200 and support providerId filter', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/admin/resources', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-      });
-      expect(res.status()).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(Array.isArray(data.resources)).toBe(true);
+    test('2.4 Direct PostgREST resources query should return resources and support providerId filter', async () => {
+      const { data: resources, error } = await supabaseAdmin.from('resources').select('*');
+      expect(error).toBeNull();
+      expect(Array.isArray(resources)).toBe(true);
     });
 
-    test('2.5 POST /api/admin/resources should reject missing providerId with 400', async ({ request }) => {
-      const res = await request.post('http://localhost:3000/api/admin/resources', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-        data: { name: 'Dr. Test', type: 'doctor' },
-      });
-      expect(res.status()).toBe(400);
-      const data = await res.json();
-      expect(data.error).toBeDefined();
+    test('2.5 PostgREST resources insert should reject missing providerId', async () => {
+      const { error } = await supabaseAdmin.from('resources').insert({ name: 'Dr. Test', type: 'doctor' } as any);
+      expect(error).toBeDefined();
     });
 
-    test('2.6 GET /api/admin/bookings should return 200 with bookings list', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/admin/bookings', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-      });
-      expect(res.status()).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(Array.isArray(data.bookings)).toBe(true);
+    test('2.6 Direct PostgREST bookings query should return bookings list', async () => {
+      const { data: bookings, error } = await supabaseAdmin.from('bookings').select('*');
+      expect(error).toBeNull();
+      expect(Array.isArray(bookings)).toBe(true);
     });
 
-    test('2.7 GET /api/admin/users should return 200 with user profiles', async ({ request }) => {
-      const res = await request.get('http://localhost:3000/api/admin/users', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-      });
-      expect(res.status()).toBe(200);
-      const data = await res.json();
-      expect(Array.isArray(data.users)).toBe(true);
+    test('2.7 Direct PostgREST users query should return user profiles', async () => {
+      const { data: users, error } = await supabaseAdmin.from('profiles').select('*');
+      expect(error).toBeNull();
+      expect(Array.isArray(users)).toBe(true);
     });
 
-    test('2.8 POST /api/admin/users should reject missing email/password with 400', async ({ request }) => {
-      const res = await request.post('http://localhost:3000/api/admin/users', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-        data: { fullName: 'Incomplete Staff' },
-      });
-      expect(res.status()).toBe(400);
-      const data = await res.json();
-      expect(data.error).toBeDefined();
+    test('2.8 PostgREST profiles insert should reject missing id', async () => {
+      const { error } = await supabaseAdmin.from('profiles').insert({ full_name: 'Incomplete Staff' } as any);
+      expect(error).toBeDefined();
     });
 
-    test('2.9 GET /api/cron/release-holds rejects unauthenticated requests and executes with CRON_SECRET', async ({ request }) => {
-      // Defense-in-depth: unauthenticated request must be blocked with 401
-      const unauthRes = await request.get('http://localhost:3000/api/cron/release-holds');
-      expect(unauthRes.status()).toBe(401);
-
-      // Authorized request with CRON_SECRET must succeed
-      const cronSecret = process.env.CRON_SECRET || 'test_cron_secret_2026';
-      const res = await request.get('http://localhost:3000/api/cron/release-holds', {
-        headers: { authorization: `Bearer ${cronSecret}` },
-      });
-      expect(res.status()).toBe(200);
-      const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(typeof data.released_count).toBe('number');
+    test('2.9 RPC release_expired_holds executes cleanly with $0 compute', async () => {
+      const { data, error } = await supabaseAdmin.rpc('release_expired_holds');
+      expect(error).toBeNull();
+      expect((data as any).success).toBe(true);
+      expect(typeof (data as any).released_count).toBe('number');
     });
 
     test('2.10 POST /api/webhooks/razorpay should reject invalid JSON with 400', async ({ request }) => {
@@ -275,14 +242,15 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBeDefined();
     });
 
-    test('2.11 POST /api/bookings/hold should reject missing fields with 400', async ({ request }) => {
-      const res = await request.post('http://localhost:3000/api/bookings/hold', {
-        data: { resource_id: 'invalid-uuid' },
+    test('2.11 RPC create_booking_hold should reject invalid parameters', async () => {
+      const { data, error } = await supabaseAdmin.rpc('create_booking_hold', {
+        p_resource_id: '00000000-0000-0000-0000-000000000000',
+        p_customer_id: '00000000-0000-0000-0000-000000000000',
+        p_slot_start: new Date().toISOString(),
+        p_slot_end: new Date().toISOString(),
       });
-      expect(res.status()).toBe(400);
-      const data = await res.json();
-      expect(data.success).toBe(false);
-      expect(data.error).toBeDefined();
+      const hasError = Boolean(error || (data && !(data as any).success));
+      expect(hasError).toBe(true);
     });
 
     test('2.12 POST /api/bookings/confirm should return 404 for non-existent booking', async ({ request }) => {
@@ -309,29 +277,22 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(data.error).toBe('Booking not found');
     });
 
-    test('2.14 POST /api/bookings/reschedule should return 404 for non-existent booking', async ({ request }) => {
-      const res = await request.post('http://localhost:3000/api/bookings/reschedule', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-        data: {
-          booking_id: '00000000-0000-0000-0000-000000000000',
-          new_slot_start: '2026-09-10T10:00:00.000Z',
-          new_slot_end: '2026-09-10T10:30:00.000Z',
-        },
+    test('2.14 RPC reschedule_booking_slot should return error for non-existent booking', async () => {
+      const { data, error } = await supabaseAdmin.rpc('reschedule_booking_slot', {
+        p_booking_id: '00000000-0000-0000-0000-000000000000',
+        p_new_slot_start: '2026-09-10T10:00:00.000Z',
+        p_new_slot_end: '2026-09-10T10:30:00.000Z',
       });
-      expect(res.status()).toBe(404);
-      const data = await res.json();
-      expect(data.success).toBe(false);
-      expect(data.error).toBe('Booking not found');
+      const hasError = Boolean(error || (data && !(data as any).success));
+      expect(hasError).toBe(true);
     });
 
-    test('2.15 POST /api/bookings/no-show should reject non-existent booking with error', async ({ request }) => {
-      const res = await request.post('http://localhost:3000/api/bookings/no-show', {
-        headers: { 'x-admin-bypass-key': adminBypassToken },
-        data: { booking_id: '00000000-0000-0000-0000-000000000000' },
+    test('2.15 RPC record_no_show should reject non-existent booking with error', async () => {
+      const { data, error } = await supabaseAdmin.rpc('record_no_show', {
+        p_booking_id: '00000000-0000-0000-0000-000000000000',
       });
-      expect([400, 404, 500]).toContain(res.status());
-      const data = await res.json();
-      expect(data.success).toBe(false);
+      const hasError = Boolean(error || (data && !(data as any).success));
+      expect(hasError).toBe(true);
     });
   });
 

@@ -101,7 +101,7 @@ function prepareStorageUpload({ user, filename, fileBuffer, claimedMimeType }) {
 
 // --- Test Suites ---
 
-describe('1. Cron Route Guard (/api/cron/release-holds)', () => {
+describe('1. Cron Route Guard (Cron Release)', () => {
   const CRON_SECRET = 'super-secure-cron-secret-2026';
 
   it('rejects calls without an Authorization header', () => {
@@ -129,7 +129,7 @@ describe('1. Cron Route Guard (/api/cron/release-holds)', () => {
   });
 });
 
-describe('2. Slot Enumeration Guard (/api/slots/booked)', () => {
+describe('2. Slot Enumeration Guard (Slot Availability & Booked)', () => {
   const mockDb = {
     getVenuesForMerchant: (userId) => (userId === 'merchant_1' ? ['venue_abc', 'venue_xyz'] : []),
     fetchBookedSlots: (venueId) => [{ slotId: 'slot_1', time: '10:00 AM', venueId }]
@@ -161,7 +161,7 @@ describe('2. Slot Enumeration Guard (/api/slots/booked)', () => {
   });
 });
 
-describe('3. Upload Security Guard (/api/merchant/upload-image)', () => {
+describe('3. Upload Security Guard (Merchant Upload)', () => {
   const user = { id: 'merchant_usr_99' };
 
   it('rejects uploads from unauthenticated requests', () => {
@@ -749,7 +749,7 @@ describe('7. Payment Verification & Anti-Tampering Guards (/api/payments/verify)
   });
 });
 
-describe('8. Merchant Registration Privilege Escalation Guard (/api/merchant/register-shop)', () => {
+describe('8. Merchant Registration Privilege Escalation Guard (Register Shop)', () => {
   const validPayload = { shopName: 'Sri Balaji Dental', categoryId: 'clinics', phone: '+919988776655' };
   const normalMerchant = { id: 'usr_merchant_01', role: 'customer' };
   const adminCaller = { id: 'usr_admin_01', role: 'admin' };
@@ -863,7 +863,7 @@ describe('9. Payment Order Creation & Idempotency Guards (/api/payments/create-o
   });
 });
 
-describe('10. Merchant Provider Info Tenant Guard (/api/merchant/provider)', () => {
+describe('10. Merchant Provider Info Tenant Guard (Merchant Provider)', () => {
   const providerAlpha = { id: 'prov_alpha', owner_id: 'merch_alpha_owner' };
   const providerBeta = { id: 'prov_beta', owner_id: 'merch_beta_owner' };
 
@@ -933,7 +933,7 @@ describe('11. Database SECURITY DEFINER Function search_path Audit', () => {
   });
 });
 
-describe('12. Merchant Onboarding Account Takeover & Duplicate Email Prevention (/api/merchant/onboard)', () => {
+describe('12. Merchant Onboarding Account Takeover & Duplicate Email Prevention (Merchant Onboard)', () => {
   const existingProfiles = [
     { id: 'user_victim', email: 'registered.owner@tirupati.com' }
   ];

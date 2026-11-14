@@ -21,12 +21,6 @@ import {
   AppLogsFilter,
   VerifyCheckinCodeResult,
 } from '@appointments/shared';
-import {
-  SALON_MERCHANT_PROVIDER,
-  SALON_RESOURCES,
-  INITIAL_MERCHANT_PROVIDER,
-  INITIAL_RESOURCES,
-} from './mock-data';
 
 import { authEnv } from './env';
 export type {
@@ -185,14 +179,38 @@ export async function manageLateQueueBooking(
   error?: string;
 }> {
   try {
-    const res = await fetch('/api/bookings/late-queue', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ booking_id: bookingId, action, buffer_offset: bufferOffset }),
-    });
-    return await res.json();
+    if (action === 'MOVE_TO_STANDBY') {
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          is_present: false,
+          skipped_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq('id', bookingId);
+      if (error) return { success: false, error: error.message };
+      return { success: true, message: 'Patient moved to Standby Queue' };
+    }
+
+    if (action === 'CHECKIN_LATE') {
+      const arrivedAt = new Date().toISOString();
+      const { data, error } = await (supabase.rpc as any)('atomic_assign_checkin_arrival', {
+        p_booking_id: bookingId,
+        p_arrived_at: arrivedAt,
+      });
+      if (error) return { success: false, error: error.message };
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        success: true,
+        queue_position: row?.queue_position || 1,
+        message: 'Checked in late',
+      };
+    }
+
+    return { success: false, error: 'Unsupported action' };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Network error';
+    const msg = err instanceof Error ? err.message : 'Error managing queue';
     return { success: false, error: msg };
   }
 }
@@ -336,21 +354,6 @@ export async function updateProviderCoolingPeriod(
       return { success: true };
     }
 
-    // Fallback to server API route
-    try {
-      const resp = await fetch('/api/merchant/provider', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider_id: providerId,
-          cooling_period_days: coolingPeriodDays,
-        }),
-      });
-      if (resp.ok) {
-        return { success: true };
-      }
-    } catch {}
-
     if (error) {
       const { error: directErr } = await (supabase as any)
         .from('providers')
@@ -427,24 +430,6 @@ export async function updateBookingStatus(
   }
 
   if (status === 'COMPLETED') {
-    try {
-      const resp = await fetch('/api/bookings/complete', {
-        method: 'POST',
-        headers: authHeaders,
-        credentials: 'include',
-        body: JSON.stringify({ booking_id: bookingId, ...(paymentStatus ? { payment_status: paymentStatus } : {}) }),
-      });
-      const json = await resp.json().catch(() => null);
-      if (resp.ok && json?.success) {
-        return json;
-      }
-      if (json && typeof json === 'object' && json.error) {
-        console.warn('API /api/bookings/complete returned error:', json.error);
-      }
-    } catch (fetchErr) {
-      console.warn('Fetch to /api/bookings/complete threw:', fetchErr);
-    }
-
     const { data, error } = await (supabase.rpc as any)('complete_booking', {
       p_booking_id: bookingId,
     });
@@ -456,17 +441,13 @@ export async function updateBookingStatus(
   }
 
   if (status === 'CHECKED_IN') {
-    const resp = await fetch('/api/bookings/reach', {
-      method: 'POST',
-      headers: authHeaders,
-      credentials: 'include',
-      body: JSON.stringify({ booking_id: bookingId }),
+    const { data, error } = await (supabase.rpc as any)('mark_customer_reached', {
+      p_booking_id: bookingId,
     });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok || json?.success === false) {
-      throw new Error(json?.error || 'Failed to check in booking');
+    if (error) {
+      throw new Error(error.message || 'Failed to check in booking');
     }
-    return json;
+    return { success: true, data };
   }
 
   if (status === 'IN_PROGRESS' || (status as string) === 'IN_CONSULTATION') {
@@ -484,17 +465,13 @@ export async function updateBookingStatus(
   }
 
   if (status === 'NO_SHOW') {
-    const resp = await fetch('/api/bookings/no-show', {
-      method: 'POST',
-      headers: authHeaders,
-      credentials: 'include',
-      body: JSON.stringify({ booking_id: bookingId }),
+    const { data, error } = await (supabase.rpc as any)('record_no_show', {
+      p_booking_id: bookingId,
     });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok || json?.success === false) {
-      throw new Error(json?.error || 'Failed to record no-show');
+    if (error) {
+      throw new Error(error.message || 'Failed to record no-show');
     }
-    return json;
+    return data;
   }
 
   throw new Error(`Unsupported direct booking status transition: ${status}`);
@@ -558,35 +535,30 @@ export async function reassignBookingResource(bookingId: string, newResourceId: 
 }
 
 export async function recordMerchantNoShow(bookingId: string) {
-  const resp = await fetch('/api/bookings/no-show', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ booking_id: bookingId }),
+  const { data, error } = await (supabase.rpc as any)('record_no_show', {
+    p_booking_id: bookingId,
   });
-  const json = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    throw new Error(json.error || 'Failed to record no-show');
+  if (error) {
+    throw new Error(error.message || 'Failed to record no-show');
   }
-  return json;
+  return data;
 }
 
 export async function fetchAllProfiles() {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
   try {
-    const res = await fetch('/api/admin/users', {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (res.ok) {
-      const json = await res.json();
-      return json.users || [];
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.warn('Error fetching profiles:', error.message);
+      return [];
     }
+    return data || [];
   } catch (e) {
-    console.error('Error fetching profiles via /api/admin/users:', e);
+    console.error('Error fetching profiles:', e);
+    return [];
   }
-  return [];
 }
 
 export async function adminCreateStaffUser(params: {
@@ -596,21 +568,21 @@ export async function adminCreateStaffUser(params: {
   role?: 'admin' | 'merchant' | 'customer';
   phone?: string;
 }) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  const res = await fetch('/api/admin/users', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const { data, error } = await supabase.auth.signUp({
+    email: params.email,
+    password: params.password,
+    options: {
+      data: {
+        role: params.role || 'merchant',
+        full_name: params.fullName,
+        phone: params.phone,
+      },
     },
-    body: JSON.stringify(params),
   });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to create user');
+  if (error) {
+    throw new Error(error.message || 'Failed to create user');
   }
-  return data;
+  return { success: true, user: data.user };
 }
 
 export async function adminCreateVenue(params: {
@@ -624,21 +596,23 @@ export async function adminCreateVenue(params: {
   email?: string;
   ownerId?: string;
 }) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  const res = await fetch('/api/admin/venues', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(params),
+  const { data, error } = await supabase.rpc('admin_create_venue', {
+    p_name: params.name,
+    p_category_id: params.categoryId,
+    p_address: params.address,
+    p_phone: params.phone,
+    p_opening_time: params.openingTime || '09:00:00',
+    p_closing_time: params.closingTime || '21:00:00',
+    p_description: params.description || undefined,
+    p_email: params.email || undefined,
+    p_owner_id: params.ownerId || undefined,
+    p_latitude: undefined,
+    p_longitude: undefined,
   });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to create venue');
+  if (error) {
+    throw new Error(error.message || 'Failed to create venue');
   }
-  return data;
+  return { success: true, venue: data };
 }
 
 export async function adminCreateDoctorResource(params: {
@@ -651,21 +625,26 @@ export async function adminCreateDoctorResource(params: {
   durationMinutes?: number;
   capacity?: number;
 }) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  const res = await fetch('/api/admin/resources', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(params),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to create doctor/resource');
+  const { data, error } = await supabase
+    .from('resources')
+    .insert({
+      provider_id: params.providerId,
+      name: params.name,
+      type: params.type,
+      department: params.department || 'General',
+      price: params.price,
+      deposit_amount: params.depositAmount,
+      duration_minutes: params.durationMinutes || 30,
+      capacity: params.capacity || 1,
+      is_active: true,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to create doctor/resource');
   }
-  return data;
+  return { success: true, resource: data };
 }
 
 export async function getCurrentUserProfile() {
@@ -816,18 +795,11 @@ export async function fetchTenantContextData(): Promise<{
   if (!activeProvider && !isSuperAdmin && userProfile.user.email) {
     const userEmail = userProfile.user.email.toLowerCase().trim();
     let fallbackId: string | null = null;
-    let fallbackMock: any = null;
 
     if (userEmail.includes('salon') || userEmail.includes('naturals')) {
       fallbackId = '44444444-4444-4444-4444-444444444444';
-      if (process.env.NODE_ENV !== 'production') {
-        fallbackMock = { ...SALON_MERCHANT_PROVIDER, resources: SALON_RESOURCES };
-      }
     } else if (userEmail.includes('svims') || userEmail.includes('clinic') || userEmail.includes('dental')) {
       fallbackId = '11111111-1111-1111-1111-111111111111';
-      if (process.env.NODE_ENV !== 'production') {
-        fallbackMock = { ...INITIAL_MERCHANT_PROVIDER, resources: INITIAL_RESOURCES };
-      }
     }
 
     if (fallbackId) {
@@ -839,13 +811,9 @@ export async function fetchTenantContextData(): Promise<{
           .single();
         if (fallbackProv) {
           activeProvider = fallbackProv as unknown as (Provider & { resources?: Resource[] });
-        } else if (process.env.NODE_ENV !== 'production' && fallbackMock) {
-          activeProvider = fallbackMock;
         }
       } catch {
-        if (process.env.NODE_ENV !== 'production' && fallbackMock) {
-          activeProvider = fallbackMock;
-        }
+        // Fallback query failed, activeProvider remains null
       }
     }
   }
@@ -1015,7 +983,7 @@ export async function fetchBookingNotifications(bookingId: string): Promise<Noti
  */
 export async function fetchAdminCityStats(): Promise<CityAdminStats[]> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     const { data, error } = await supabaseAdmin.rpc('get_admin_city_stats');
     if (error) {
       console.warn('get_admin_city_stats error, falling back to direct table query:', error.message);
@@ -1048,7 +1016,7 @@ export async function fetchAdminVelocity(
   cityId?: string | null
 ): Promise<AdminVelocityMetrics | null> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     const { data, error } = await supabaseAdmin.rpc('get_admin_velocity_analytics', {
       p_time_window: timeWindow,
       p_city_id: cityId || undefined,
@@ -1074,7 +1042,7 @@ export async function updateAdminCityStatus(
   adminToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     const { data, error } = await (supabaseAdmin.rpc as any)('update_city_status', {
       p_city_id: cityId,
       p_status: status,
@@ -1096,7 +1064,7 @@ export async function updateAdminCityStatus(
  */
 export async function fetchAdminMerchants(cityId?: string) {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     // Try SECURITY DEFINER RPC first to bypass RLS and retrieve all merchants including SUSPENDED
     const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('admin_fetch_merchants', {
       p_city_id: cityId && cityId !== 'all' ? cityId : null,
@@ -1136,7 +1104,7 @@ export async function updateAdminMerchantStatus(
   adminToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     const { data: prevProvider } = await supabaseAdmin
       .from('providers')
       .select('name, status')
@@ -1185,7 +1153,7 @@ export async function updateAdminMerchantStatus(
  */
 export async function fetchAdminCityWaitlist(cityId?: string): Promise<CityWaitlistEntry[]> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     let query = supabaseAdmin
       .from('city_waitlist')
       .select('*')
@@ -1224,7 +1192,7 @@ export async function fetchAdminAuditLogs(
   adminToken?: string
 ): Promise<AdminAuditLogEntry[]> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     const { data, error } = await (supabaseAdmin.rpc as any)('get_admin_audit_logs', {
       p_limit: limit,
       p_admin_token: adminToken || undefined,
@@ -1327,7 +1295,7 @@ export async function fetchAdminAppLogs(
   filter: AppLogsFilter = {}
 ): Promise<AppLogEntry[]> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     let query = supabaseAdmin
       .from('app_logs' as any)
       .select('id, created_at, platform, level, severity, category, source, component, message, stack_trace, error_code, metadata, device_info, user_id, session_id, role, city_id, vertical, appointment_id, app_version, platform_os, device_model, environment, fingerprint')
@@ -1418,7 +1386,7 @@ export async function purgeAdminAppLogs(
   retentionDays: number = 30
 ): Promise<{ count: number; error?: string }> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
     const { data, error } = await (supabaseAdmin.rpc as any)('purge_old_app_logs', {
       p_retention_days: retentionDays,
     });

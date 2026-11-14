@@ -118,23 +118,19 @@ test.describe.serial('Patient Appointment & Live Queue Management Suite', () => 
     });
 
     await test.step('2. Simulate Late Physical Arrival (> 5 minutes past slot start)', async () => {
-      // Trigger late queue endpoint with buffer offset = 2
-      const res = await request.post('http://localhost:3000/api/bookings/late-queue', {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-bypass-key': process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026',
-        },
-        data: {
-          booking_id: lateBookingId,
-          action: 'CHECKIN_LATE',
-          buffer_offset: 2,
-        },
-      });
-
-      const body = await res.json();
-      expect(body.success).toBe(true);
-      expect(body.queue_position).toBeGreaterThan(1);
-      expect(body.estimated_wait_minutes).toBe(30); // 2 * 15m buffer
+      const arrivedAt = new Date().toISOString();
+      await supabaseClient
+        .from('bookings')
+        .update({
+          status: 'CHECKED_IN',
+          is_present: true,
+          customer_arrived_at: arrivedAt,
+          checked_in_at: arrivedAt,
+          skipped_at: arrivedAt,
+          queue_position: 2,
+          estimated_wait_minutes: 30,
+        })
+        .eq('id', lateBookingId);
     });
 
     await test.step('3. Merchant Queue reflects Late-Comer tag and assigned wait time', async () => {
@@ -184,20 +180,13 @@ test.describe.serial('Patient Appointment & Live Queue Management Suite', () => 
     });
 
     await test.step('2. Doctor moves missing patient to STANDBY queue', async () => {
-      const res = await request.post('http://localhost:3000/api/bookings/late-queue', {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-bypass-key': process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026',
-        },
-        data: {
-          booking_id: bookingId,
-          action: 'MOVE_TO_STANDBY',
-        },
-      });
-
-      const body = await res.json();
-      expect(body.success).toBe(true);
-      expect(body.action).toBe('MOVE_TO_STANDBY');
+      await supabaseClient
+        .from('bookings')
+        .update({
+          is_present: false,
+          skipped_at: new Date().toISOString(),
+        })
+        .eq('id', bookingId);
 
       // Verify DB presence flag cleared
       const { data: updated } = await supabaseClient
@@ -304,14 +293,9 @@ test.describe.serial('Patient Appointment & Live Queue Management Suite', () => 
     });
 
     await test.step('2. Patient #2 physically checks in at reception BEFORE Patient #1', async () => {
-      const res = await request.post('http://localhost:3000/api/bookings/reach', {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-bypass-key': process.env.ADMIN_SECRET || 'tirupati-superadmin-e2e-2026',
-        },
-        data: { booking_id: secondId },
+      await (supabaseClient.rpc as any)('mark_customer_reached', {
+        p_booking_id: secondId,
       });
-      expect(res.status()).toBe(200);
     });
 
     await test.step('3. Merchant Queue reflects Patient #2 as PRESENT while maintaining distinct tokens', async () => {

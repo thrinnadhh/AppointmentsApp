@@ -18,6 +18,7 @@ import {
   IndianRupee 
 } from 'lucide-react';
 import { DoctorWithAssignments } from './AssignFrontDeskModal';
+import { supabase } from '@/lib/supabase';
 
 export interface DepartmentOption {
   id: string;
@@ -150,24 +151,20 @@ export function UnifiedAddStaffModal({
       // 2. If Consultant, create or link doctor resource
       if (role === 'consultant' && providerId) {
         const docDeptName = selectedDepartment?.name || 'General';
-        const res = await fetch('/api/resources', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            provider_id: providerId,
-            name: fullName.trim(),
-            type: 'doctor',
-            department: docDeptName,
-            deposit_amount: Number(consultationFee) || 500,
-            duration_minutes: Number(durationMinutes) || 15,
-            capacity: 1,
-            doctor_email: email.trim().toLowerCase(),
-            is_active: true,
-          }),
+        const { error: resError } = await (supabase.from('resources') as any).insert({
+          provider_id: providerId,
+          name: fullName.trim(),
+          type: 'doctor',
+          department: docDeptName,
+          price: Number(consultationFee) || 500,
+          deposit_amount: Number(consultationFee) || 500,
+          duration_minutes: Number(durationMinutes) || 15,
+          capacity: 1,
+          doctor_email: email.trim().toLowerCase(),
+          is_active: true,
         });
-        const resJson = await res.json();
-        if (!res.ok) {
-          console.warn('Consultant resource registration notice:', resJson);
+        if (resError) {
+          console.warn('Consultant resource registration notice:', resError);
         }
       }
 

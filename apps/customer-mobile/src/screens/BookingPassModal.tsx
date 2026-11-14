@@ -186,18 +186,10 @@ export default function BookingPassModal({
             queue_position?: number | null;
             estimated_wait_minutes?: number | null;
           };
-          if (newRec?.status) {
-            setLiveStatus(newRec.status);
-          }
-          if (newRec?.checked_in_at) {
-            setLiveCheckedInAt(newRec.checked_in_at);
-          }
-          if (newRec?.queue_position !== undefined) {
-            setLiveQueuePosition(newRec.queue_position);
-          }
-          if (newRec?.estimated_wait_minutes !== undefined) {
-            setLiveWaitMinutes(newRec.estimated_wait_minutes);
-          }
+          if (newRec?.status) setLiveStatus(newRec.status);
+          if (newRec?.checked_in_at) setLiveCheckedInAt(newRec.checked_in_at);
+          if (newRec?.queue_position !== undefined) setLiveQueuePosition(newRec.queue_position);
+          if (newRec?.estimated_wait_minutes !== undefined) setLiveWaitMinutes(newRec.estimated_wait_minutes);
         }
       )
       .subscribe();

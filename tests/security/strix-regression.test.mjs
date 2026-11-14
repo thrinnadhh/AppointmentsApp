@@ -78,7 +78,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
   // ==========================================
   describe('1. vuln-0005: Forged Supabase JWT via Default Demo Secret', () => {
     
-    it('1.1 Exploit Replay: Mint HS256 JWT with demo secret (sub = admin UID) -> GET /api/admin/cities returns 401/403', async () => {
+    it('1.1 Exploit Replay: Mint HS256 JWT with demo secret (sub = admin UID) -> GET /api/admin/doctor-assignments returns 401/403', async () => {
       // Admin UID in local database
       const adminUid = '9a9a3d58-3941-4945-abdb-0fed30dee106';
       const forgedAdminToken = mintHs256Jwt({
@@ -89,7 +89,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         exp: Math.floor(Date.now() / 1000) + 3600
       }, DEMO_JWT_SECRET);
 
-      const res = await fetch(`${APP_URL}/api/admin/cities`, {
+      const res = await fetch(`${APP_URL}/api/admin/doctor-assignments`, {
         headers: {
           'Authorization': `Bearer ${forgedAdminToken}`
         }
@@ -150,7 +150,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       );
     });
 
-    it('1.3 Non-admin check: Regular customer valid session token on /api/admin/cities returns 403 Forbidden', async () => {
+    it('1.3 Non-admin check: Regular customer valid session token on admin endpoint returns 403 Forbidden', async () => {
       const email = `test-cust-${Date.now()}@example.com`;
       const password = 'CustSecurePass2026!';
 
@@ -179,8 +179,8 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       const session = await loginRes.json();
       assert.ok(session.access_token, 'Customer login failed');
 
-      // Attempt to access admin cities endpoint
-      const citiesRes = await fetch(`${APP_URL}/api/admin/cities`, {
+      // Attempt to access admin endpoint
+      const citiesRes = await fetch(`${APP_URL}/api/admin/doctor-assignments`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -189,13 +189,13 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       assert.strictEqual(
         citiesRes.status,
         403,
-        `Regular customer token on /api/admin/cities must return 403 Forbidden, got HTTP ${citiesRes.status}`
+        `Regular customer token on admin endpoint must return 403 Forbidden, got HTTP ${citiesRes.status}`
       );
       const data = await citiesRes.json();
       assert.ok(data.error?.includes('Forbidden') || data.error?.includes('Administrator'), 'Must state admin authority required');
     });
 
-    it('1.4 Positive Control: Real admin logged in via Supabase auth returns 200 OK with cities', async () => {
+    it('1.4 Positive Control: Real admin logged in via Supabase auth returns 200 OK', async () => {
       const email = `test-real-admin-${Date.now()}@example.com`;
       const password = 'AdminSecurePass2026!';
 
@@ -236,8 +236,8 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       const session = await loginRes.json();
       assert.ok(session.access_token, 'Admin login failed');
 
-      // Call /api/admin/cities with genuine admin token
-      const citiesRes = await fetch(`${APP_URL}/api/admin/cities`, {
+      // Call /api/admin/doctor-assignments with genuine admin token
+      const citiesRes = await fetch(`${APP_URL}/api/admin/doctor-assignments`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }

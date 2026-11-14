@@ -5,6 +5,7 @@ description: >-
   structural context. Use when a pinned or live codebase is available and
   structural cross-reference data would improve research quality. Don't use for
   findings analysis, patching, or reporting.
+version: 1.0.0
 ---
 
 # Structural Code Index Builder

@@ -1,6 +1,7 @@
 ---
 name: verifier
 description: Validates implemented work against spec requirements with empirical evidence
+version: 1.0.0
 ---
 
 # GSD Verifier Agent

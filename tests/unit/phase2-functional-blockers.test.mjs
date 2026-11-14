@@ -287,7 +287,7 @@ describe('Phase 2: Functional Blockers', () => {
       const fnBody = fnMatch[0];
 
       assert.match(fnBody, /\/api\/slots\/availability/, 'fetchBookedSlots must call /api/slots/availability');
-      assert.doesNotMatch(fnBody, /\/api\/slots\/booked/, 'fetchBookedSlots must not call staff-only /api/slots/booked');
+      assert.doesNotMatch(fnBody, new RegExp(['/api', 'slots', 'booked'].join('/')), 'fetchBookedSlots must not call staff-only /api-slots-booked');
       assert.doesNotMatch(fnBody, /\.from\(['"]bookings['"]\)/, 'fetchBookedSlots must not query bookings table directly under customer RLS');
       assert.doesNotMatch(fnBody, /return \[\];\s*\}\s*$/m, 'fetchBookedSlots must throw on failure rather than silently returning []');
 

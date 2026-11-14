@@ -1,3 +1,9 @@
+---
+type: project
+created: 2026-11-05
+updated: 2026-11-13
+---
+
 # Project Conventions & Governance
 
 ## Branch & Git Hygiene

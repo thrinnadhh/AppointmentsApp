@@ -364,11 +364,47 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
       assert.ok(member?.id, 'Found active neuro.desk member');
 
       // 1. As active staff, neuroDesk CAN query hospital bookings
-      const activeQuery = await fetch(
+      let activeQuery = await fetch(
         `${url}/rest/v1/bookings?provider_id=eq.${hospA.id}`,
         { headers: userHeaders(tokens.neuroDesk) }
       );
-      const activeData = await activeQuery.json();
+      let activeData = await activeQuery.json();
+
+      // If prior test suites cleaned up bookings, provision a booking for neuroDesk's assigned doctor
+      if (!Array.isArray(activeData) || activeData.length === 0) {
+        const dfdaRes = await fetch(
+          `${url}/rest/v1/doctor_front_desk_assignments?user_id=eq.${tokens.neuroDesk.user.id}&provider_id=eq.${hospA.id}`,
+          { headers: serviceHeaders }
+        );
+        const dfdas = await dfdaRes.json();
+        const docId = dfdas[0]?.doctor_id;
+        const neuroDeptId = hospA.departments.find(d => d.name === 'Neurology').id;
+
+        await fetch(`${url}/rest/v1/bookings`, {
+          method: 'POST',
+          headers: serviceHeaders,
+          body: JSON.stringify({
+            customer_id: tokens.patient1.user.id,
+            provider_id: hospA.id,
+            resource_id: docId,
+            department_id: neuroDeptId,
+            slot_start: new Date(Date.now() + 86400000 * 30).toISOString(),
+            slot_end: new Date(Date.now() + 86400000 * 30 + 15 * 60 * 1000).toISOString(),
+            status: 'CONFIRMED',
+            payment_status: 'CAPTURED',
+            deposit_amount: 100,
+            total_amount: 500,
+            reference_code: `TEST-RBAC-${Date.now()}`
+          })
+        });
+
+        activeQuery = await fetch(
+          `${url}/rest/v1/bookings?provider_id=eq.${hospA.id}`,
+          { headers: userHeaders(tokens.neuroDesk) }
+        );
+        activeData = await activeQuery.json();
+      }
+
       assert.ok(Array.isArray(activeData) && activeData.length > 0, 'Active staff reads bookings');
 
       // 2. Admin revokes the staff member

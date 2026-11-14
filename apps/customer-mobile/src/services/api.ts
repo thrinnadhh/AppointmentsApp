@@ -437,36 +437,6 @@ export async function fetchCustomerBookingsFromSupabase(
       }));
     }
 
-    // Fall back to server API endpoint with 2s timeout
-    const baseUrl = getApiBaseUrl();
-    if (baseUrl) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      try {
-        const session = (await supabase.auth.getSession()).data?.session;
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'x-customer-id': customerId,
-        };
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-        const resp = await fetch(`${baseUrl}/api/bookings?customer_id=${encodeURIComponent(customerId)}`, {
-          headers,
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json.success && Array.isArray(json.bookings)) {
-            return json.bookings as (Booking & { provider_name?: string; resource_name?: string })[];
-          }
-        }
-      } catch {
-        clearTimeout(timeoutId);
-      }
-    }
-
     return [];
   } catch (err) {
     console.warn('Failed to query bookings:', err);
@@ -607,66 +577,64 @@ export async function createHoldOnSupabase(
   // Direct client-side unmetered RPC access is disallowed to enforce Redis concurrency locks, rate limits, and business logic.
   try {
     const session = (await supabase.auth.getSession()).data?.session;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
-    }
     const resolvedCustomerId = customerId || (await supabase.auth.getUser()).data?.user?.id;
     if (!resolvedCustomerId) {
       return { success: false, error: 'Authentication required to create a booking hold' };
     }
-    headers['x-customer-id'] = resolvedCustomerId;
     const isFamily = bookedFor === 'family' || Boolean(bookingForSomeoneElse);
-    const resp = await fetch(`${API_BASE_URL}/api/bookings/hold`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        customer_id: resolvedCustomerId,
-        resource_id: resourceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-        booking_for_someone_else: isFamily,
-        booked_for: isFamily ? 'family' : 'self',
-        patient_name: patientName || null,
-        patient_phone: patientPhone || null,
-        patient_relationship: patientRelationship || null,
-        patient_age: patientAge !== undefined ? patientAge : null,
-        booking_note: bookingNote || null,
-      }),
+
+    const { data, error } = await supabase.rpc('create_booking_hold', {
+      p_resource_id: resourceId,
+      p_slot_start: slotStart,
+      p_slot_end: slotEnd,
+      p_customer_id: resolvedCustomerId,
+      p_booking_for_someone_else: isFamily,
+      p_patient_name: patientName || null,
+      p_patient_phone: patientPhone || null,
+      p_patient_relationship: patientRelationship || null,
+      p_booked_for: isFamily ? 'family' : 'self',
+      p_patient_age: patientAge !== undefined ? patientAge : null,
+      p_booking_note: bookingNote || null,
     });
 
-    const json = await resp.json().catch(() => ({}));
+    if (error) {
+      return {
+        success: false,
+        error: error.message || 'Booking hold failed',
+      };
+    }
 
-    if (resp.ok && json.success) {
+    const rpcResult = data as any;
+    if (rpcResult && rpcResult.success) {
       return {
         success: true,
-        booking_id: json.booking_id,
-        reference_code: json.reference_code,
-        deposit_amount: json.deposit_amount,
-        platform_fee: json.platform_fee,
-        total_amount: json.total_amount,
-        platform_fee_amount: json.platform_fee_amount ?? json.platform_fee,
-        consultation_fee_amount: json.consultation_fee_amount,
-        platform_payment_status: json.platform_payment_status,
-        consultation_payment_status: json.consultation_payment_status,
-        is_followup: json.is_followup,
-        followup_original_booking_id: json.followup_original_booking_id,
-        booked_for: json.booked_for,
-        patient_name: json.patient_name,
-        patient_age: json.patient_age,
-        is_minor: json.is_minor,
-        booking_note: json.booking_note,
+        booking_id: rpcResult.booking_id,
+        reference_code: rpcResult.reference_code,
+        deposit_amount: rpcResult.deposit_amount,
+        platform_fee: rpcResult.platform_fee,
+        total_amount: rpcResult.total_amount,
+        platform_fee_amount: rpcResult.platform_fee_amount ?? rpcResult.platform_fee,
+        consultation_fee_amount: rpcResult.consultation_fee_amount,
+        platform_payment_status: rpcResult.platform_payment_status,
+        consultation_payment_status: rpcResult.consultation_payment_status,
+        is_followup: rpcResult.is_followup,
+        followup_original_booking_id: rpcResult.followup_original_booking_id,
+        booked_for: rpcResult.booked_for,
+        patient_name: rpcResult.patient_name,
+        patient_age: rpcResult.patient_age,
+        is_minor: rpcResult.is_minor,
+        booking_note: rpcResult.booking_note,
       };
     }
 
     return {
       success: false,
-      error: json.error || `Booking failed (${resp.status})`,
+      error: rpcResult?.error || 'Unable to reserve slot',
     };
   } catch (networkErr: unknown) {
     const msg = networkErr instanceof Error ? networkErr.message : 'Network error';
-    console.error('Backend /api/bookings/hold request failed:', networkErr);
-    mobileLogger.forComponent('MobileApi').error('Booking hold request failed', networkErr, { endpoint: '/api/bookings/hold' });
+    console.error('Direct create_booking_hold RPC failed:', networkErr);
+    mobileLogger.forComponent('MobileApi').error('Booking hold request failed', networkErr, { endpoint: 'create_booking_hold' });
     return {
       success: false,
       error: `Unable to reserve slot: ${msg}`,
@@ -837,7 +805,7 @@ export async function createRazorpayOrder(bookingId: string, customerId?: string
       order_id: json.order_id,
       cf_order_id: json.cf_order_id,
       payment_session_id: json.payment_session_id,
-      gateway_provider: json.gateway_provider || 'razorpay',
+      gateway_provider: json.gateway_provider || 'cashfree',
       key_id: json.key_id,
       amount: json.amount,
       currency: json.currency,
@@ -1113,36 +1081,6 @@ export async function rescheduleBookingOnSupabase(
   newSlotEnd: string
 ) {
   try {
-    if (API_BASE_URL) {
-      try {
-        const session = (await supabase.auth.getSession()).data?.session;
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-        const customerId = (await supabase.auth.getUser()).data?.user?.id;
-        if (customerId) {
-          headers['x-customer-id'] = customerId;
-        }
-
-        const resp = await fetch(`${API_BASE_URL}/api/bookings/reschedule`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            booking_id: bookingId,
-            new_slot_start: newSlotStart,
-            new_slot_end: newSlotEnd,
-          }),
-        });
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json.success) return json;
-        }
-      } catch {
-        // Fallback directly to RPC or Supabase update
-      }
-    }
-
     const { data: rpcData, error: rpcError } = await supabase.rpc('reschedule_booking_slot', {
       p_booking_id: bookingId,
       p_new_slot_start: newSlotStart,
@@ -1161,32 +1099,6 @@ export async function rescheduleBookingOnSupabase(
  */
 export async function markBookingReached(bookingId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    if (API_BASE_URL) {
-      try {
-        const session = (await supabase.auth.getSession()).data?.session;
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-        const customerId = (await supabase.auth.getUser()).data?.user?.id;
-        if (customerId) {
-          headers['x-customer-id'] = customerId;
-        }
-
-        const resp = await fetch(`${API_BASE_URL}/api/bookings/reach`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ booking_id: bookingId }),
-        });
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json.success) return json;
-        }
-      } catch {
-        // Fallback directly to RPC
-      }
-    }
-
     const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('mark_customer_reached', {
       p_booking_id: bookingId,
     });
@@ -1648,24 +1560,6 @@ export async function joinCityWaitlist(
       p_notes: notes || null,
     });
 
-    if (!error && data?.success) {
-      return { success: true };
-    }
-
-    // 2. Server API route fallback
-    if (API_BASE_URL) {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/waitlist`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cityId, contactInfo, roleInterest, notes }),
-        });
-        if (res.ok) return { success: true };
-      } catch (fErr) {
-        console.warn('Waitlist fallback fetch failed:', fErr);
-      }
-    }
-
     if (error) {
       return { success: false, error: error.message };
     }
@@ -1725,26 +1619,15 @@ export async function reassignBookingResourceApi(
   reason?: string
 ) {
   try {
-    const session = (await supabase.auth.getSession()).data?.session;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
-    }
-    const customerId = (await supabase.auth.getUser()).data?.user?.id;
-    if (customerId) {
-      headers['x-customer-id'] = customerId;
-    }
-
-    const resp = await fetch(`${API_BASE_URL}/api/bookings/reassign`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        booking_id: bookingId,
-        new_resource_id: newResourceId,
-        reason: reason || 'Emergency staff substitution',
-      }),
+    const { data, error } = await supabase.rpc('reassign_booking_resource', {
+      p_booking_id: bookingId,
+      p_new_resource_id: newResourceId,
+      p_reason: reason || 'Emergency staff substitution',
     });
-    return await resp.json();
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return data as any;
   } catch (err) {
     console.warn('Reassign resource error:', err);
     return { success: false, error: 'Reassignment failed' };

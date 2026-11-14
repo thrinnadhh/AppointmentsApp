@@ -18,6 +18,7 @@ import {
   User
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { compressAndUploadImageClient } from '@/lib/storage';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
 
 export default function ShopRegistrationPage() {
@@ -128,21 +129,16 @@ export default function ShopRegistrationPage() {
     setUploadingPhoto(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('providerId', user?.id || 'new-merchant');
-
-      const res = await fetch('/api/merchant/upload-image', {
-        method: 'POST',
-        body: formData,
+      const uploadRes = await compressAndUploadImageClient(file, {
+        providerId: user?.id || 'new-merchant',
+        userId: user?.id,
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.publicUrl) {
-        throw new Error(json.error || 'Failed to upload photo to storage.');
+      if (uploadRes.error || !uploadRes.url) {
+        throw new Error(uploadRes.error || 'Failed to upload photo to storage.');
       }
 
-      setPhotoUrl(json.publicUrl);
+      setPhotoUrl(uploadRes.url);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Photo upload failed';
       setPhotoError(msg);
@@ -180,30 +176,20 @@ export default function ShopRegistrationPage() {
     setSuccessMsg(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (sessionData?.session?.access_token) {
-        headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
-      }
-
-      const res = await fetch('/api/merchant/register-shop', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          userId: user.id,
-          fullName: fullName.trim() || user.user_metadata?.full_name || 'Merchant Owner',
-          shopName: shopName.trim(),
-          categoryId: category,
-          phone: phone.trim(),
-          address: address.trim() || 'AIR Bypass Road, Tirupati',
-          photoUrl: (photoUrl && /^https?:\/\//i.test(photoUrl.trim())) ? photoUrl.trim() : null,
-          tosAccepted: true,
-        }),
+      const cleanPhotoUrl = (photoUrl && /^https?:\/\//i.test(photoUrl.trim())) ? photoUrl.trim() : null;
+      const { data, error } = await supabase.rpc('merchant_register_shop_for_user', {
+        p_user_id: user.id,
+        p_shop_name: shopName.trim(),
+        p_category_id: category,
+        p_phone: phone.trim(),
+        p_address: address.trim() || 'AIR Bypass Road, Tirupati',
+        p_full_name: fullName.trim() || user.user_metadata?.full_name || 'Merchant Owner',
+        p_photo_url: cleanPhotoUrl || undefined,
       });
 
-      const result = await res.json();
-      if (!res.ok || result.error) {
-        throw new Error(result.error || `${venueLabel} registration failed.`);
+      const result = data as any;
+      if (error || result?.success === false) {
+        throw new Error(error?.message || result?.error || `${venueLabel} registration failed.`);
       }
 
       setSuccessMsg(`"${shopName}" registered successfully! Launching your workspace...`);

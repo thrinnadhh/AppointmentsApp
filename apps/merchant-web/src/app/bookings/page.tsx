@@ -112,18 +112,13 @@ export default function BookingsManagementPage() {
   const handleExpireStaleStandby = async () => {
     try {
       const targetProvider = selectedProviderId !== 'ALL' ? selectedProviderId : undefined;
-      const response = await fetch('/api/bookings/late-queue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'EXPIRE_STALE_STANDBY',
-          threshold_minutes: 45,
-          provider_id: targetProvider,
-        }),
+      const { data, error } = await (supabase.rpc as any)('expire_stale_standby_queue', {
+        p_threshold_minutes: 45,
+        p_provider_id: targetProvider || null,
       });
-      const res = await response.json();
-      if (!response.ok || !res.success) {
-        setFeedbackToast(`⚠️ ${res.error || 'Failed to run standby sweep'}`);
+      const res = data as any;
+      if (error || !res?.success) {
+        setFeedbackToast(`⚠️ ${error?.message || res?.error || 'Failed to run standby sweep'}`);
       } else {
         setFeedbackToast(`🧹 Standby Sweep: Expired ${res.expired_count ?? 0} overdue patients (>45m wait).`);
         await loadData();
@@ -447,19 +442,18 @@ export default function BookingsManagementPage() {
 
   const handleTriggerNotification = async (bookingId: string, eventType: string) => {
     try {
-      const res = await fetch('/api/admin/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: bookingId, event_type: eventType }),
+      const { data, error } = await supabase.rpc('dispatch_booking_notification', {
+        p_booking_id: bookingId,
+        p_event_type: eventType,
       });
-      const data = await res.json();
-      if (data.success) {
+      const res = data as any;
+      if (!error && res?.success) {
         setFeedbackToast(`Notification dispatched: ${eventType}`);
         const updatedLogs = await fetchBookingNotifications(bookingId);
         setBookingNotificationLogs(updatedLogs);
         loadData();
       } else {
-        alert(data.error || 'Failed to dispatch notification');
+        alert(error?.message || res?.error || 'Failed to dispatch notification');
       }
     } catch (err) {
       console.error('Error triggering notification:', err);

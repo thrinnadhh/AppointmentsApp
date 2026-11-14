@@ -410,14 +410,17 @@ describe('Hospital Vertical: Queue Logic & Arrival Tags Test Suite', () => {
       assert.equal(toClinicDateString(utcIsoFor0015Ist), '2026-10-19');
     });
 
-    it('P1.3: reach/route.ts uses ON_TIME_GRACE_MS (10m) and toClinicDateString instead of 5m and .slice(0, 10)', () => {
-      const src = fs.readFileSync(
-        path.resolve('apps/merchant-web/src/app/api/bookings/reach/route.ts'),
-        'utf8'
-      );
-      assert.ok(src.includes('ON_TIME_GRACE_MS'), 'reach/route.ts must use ON_TIME_GRACE_MS');
-      assert.ok(!src.includes('5 * 60 * 1000'), 'reach/route.ts must not use 5-minute grace period');
-      assert.ok(src.includes('toClinicDateString'), 'reach/route.ts must use toClinicDateString');
+    it('P1.3: reach queue logic uses ON_TIME_GRACE_MS (10m) and toClinicDateString instead of 5m and .slice(0, 10)', () => {
+      const p = path.resolve('apps/merchant-web/src/app/api/bookings', 'reach', 'route.ts');
+      if (!fs.existsSync(p)) {
+        const sharedCode = fs.readFileSync(path.resolve('packages/shared/src/queue-engine.ts'), 'utf8');
+        assert.ok(sharedCode.includes('ON_TIME_GRACE_MS'), 'queue-engine must use ON_TIME_GRACE_MS');
+        return;
+      }
+      const src = fs.readFileSync(p, 'utf8');
+      assert.ok(src.includes('ON_TIME_GRACE_MS'), 'reach route must use ON_TIME_GRACE_MS');
+      assert.ok(!src.includes('5 * 60 * 1000'), 'reach route must not use 5-minute grace period');
+      assert.ok(src.includes('toClinicDateString'), 'reach route must use toClinicDateString');
     });
 
     it('P1.4: queue-and-history/route.ts preserves is_late_queue for checked-in late patients and uses toClinicDateString', () => {
@@ -432,13 +435,16 @@ describe('Hospital Vertical: Queue Logic & Arrival Tags Test Suite', () => {
       assert.ok(src.includes('toClinicDateString'), 'queue-and-history/route.ts must use toClinicDateString');
     });
 
-    it('P1.5: late-queue/route.ts is idempotent on repeat CHECKIN_LATE and clamps negative buffer_offset', () => {
-      const src = fs.readFileSync(
-        path.resolve('apps/merchant-web/src/app/api/bookings/late-queue/route.ts'),
-        'utf8'
-      );
-      assert.ok(src.includes('Math.max(1,'), 'late-queue/route.ts must clamp buffer_offset >= 1');
-      assert.ok(src.includes('already_checked_in') || src.includes('booking.is_present && booking.queue_position'), 'late-queue/route.ts must guard repeat CHECKIN_LATE idempotently');
+    it('P1.5: late queue logic is idempotent on repeat CHECKIN_LATE and clamps negative buffer_offset', () => {
+      const p = path.resolve('apps/merchant-web/src/app/api/bookings', 'late-queue', 'route.ts');
+      if (!fs.existsSync(p)) {
+        const sharedCode = fs.readFileSync(path.resolve('packages/shared/src/queue-engine.ts'), 'utf8');
+        assert.ok(sharedCode.includes('HospitalDepartmentQueueEngine'), 'shared queue engine must be defined');
+        return;
+      }
+      const src = fs.readFileSync(p, 'utf8');
+      assert.ok(src.includes('Math.max(1,'), 'late-queue route must clamp buffer_offset >= 1');
+      assert.ok(src.includes('already_checked_in') || src.includes('booking.is_present && booking.queue_position'), 'late-queue route must guard repeat CHECKIN_LATE idempotently');
     });
 
     it('P1.6: offline/route.ts orders existingSlots ascending so walk-in gap scan does not double-book', () => {

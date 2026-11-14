@@ -4,6 +4,7 @@ description: >-
   Assesses the production viability of findings, filtering out debug-only features and assertion traps.
   Use when findings have been validated and you need to confirm they are triggerable in production release builds (with assertions disabled).
   Don't use for writing reproduction scripts or patches.
+version: 1.0.0
 ---
 
 # Critic (/mantis-critic)

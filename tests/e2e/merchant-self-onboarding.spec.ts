@@ -52,20 +52,22 @@ test.describe('Merchant Self-Service Onboarding & Admin Monitoring', () => {
     // Verify 2-step onboarding explanation is shown instead
     await expect(page.getByText(/Two-Step Business Registration/i)).toBeVisible();
 
-    // 6. Complete self-registration via the onboarding API
-    const onboardRes = await page.request.post('http://localhost:3000/api/merchant/onboard', {
-      data: {
-        fullName: 'Trinadh Founder',
-        phone: testPhone,
-        email: testEmail,
-        password: testPassword,
-        shopName: shopName,
-        categoryId: 'salons',
-        address: 'AIR Bypass Road, Tirupati',
-        tosAccepted: true,
-      },
+    // 6. Complete self-registration via direct Supabase RPC
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+    );
+    const { data: onboardData, error: onboardErr } = await (supabaseAdmin.rpc as any)('merchant_self_register', {
+      p_full_name: 'Trinadh Founder',
+      p_email: testEmail,
+      p_password: testPassword,
+      p_phone: testPhone,
+      p_shop_name: shopName,
+      p_category_id: 'salons',
+      p_address: 'AIR Bypass Road, Tirupati',
     });
-    expect(onboardRes.ok()).toBeTruthy();
+    expect(onboardErr).toBeFalsy();
 
     // 7. Log in on the front page using the newly created credentials
     await page.getByTestId('auth-tab-signin').click();

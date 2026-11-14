@@ -4,6 +4,7 @@ description: >-
   Synthesizes raw learnings and codebase analysis into an interlinked Markdown Knowledge Base (KB).
   Use at the beginning of a loop to build or update architecture.md, entities, and vulnerabilities.
   Don't use for generating threat models or formulating execution plans.
+version: 1.0.0
 ---
 
 # Architect (/mantis-architecture)

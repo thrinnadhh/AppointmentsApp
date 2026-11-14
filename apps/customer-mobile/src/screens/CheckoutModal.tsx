@@ -833,9 +833,9 @@ export default function CheckoutModal({
             ) : (
               <View style={styles.card} testID="payment-method-card">
                 <View style={styles.methodHeader}>
-                  <Text style={styles.cardTitle}>Payment Method (Razorpay Gateway)</Text>
+                  <Text style={styles.cardTitle}>Payment Method (Cashfree Gateway)</Text>
                   <View style={styles.rzpBadge}>
-                    <Text style={styles.rzpBadgeText}>⚡ Razorpay Secure</Text>
+                    <Text style={styles.rzpBadgeText}>⚡ Cashfree Secure</Text>
                   </View>
                 </View>
 
@@ -915,10 +915,10 @@ export default function CheckoutModal({
 
               {paymentMethod === 'CARD' && (
                 <View style={styles.methodContent}>
-                  <Text style={styles.methodHelpText}>Razorpay Test Card (Auto-populated):</Text>
+                  <Text style={styles.methodHelpText}>Cashfree Test Card (Auto-populated):</Text>
                   <View style={styles.cardInputMock}>
                     <Text style={styles.cardInputLabel}>Card Number</Text>
-                    <Text style={styles.cardInputValue}>•••• •••• •••• 4242 (Razorpay Sandbox)</Text>
+                    <Text style={styles.cardInputValue}>•••• •••• •••• 4242 (Cashfree Sandbox)</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
                     <View style={[styles.cardInputMock, { flex: 1 }]}>
@@ -1111,7 +1111,7 @@ export default function CheckoutModal({
             <Text style={styles.secureText}>
               {isFreeFollowup
                 ? '🔒 Verified Provider Cooling Period Policy'
-                : '🔒 Secured by Razorpay (PCI-DSS Level 1)'}
+                : '🔒 Secured by Cashfree (PCI-DSS Level 1) / Secured by Razorpay (PCI-DSS Level 1)'}
             </Text>
           </View>
         </View>

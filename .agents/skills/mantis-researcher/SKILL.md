@@ -4,6 +4,7 @@ description: >-
   Audits production source code files based on the strategy in workspace/plan.json.
   Use when a review plan exists and you need to perform static analysis and deep-dive reviews of targeted files.
   Don't use for planning, deduplicating, or writing patches.
+version: 1.0.0
 ---
 
 # Mantis Researcher (/mantis-researcher)

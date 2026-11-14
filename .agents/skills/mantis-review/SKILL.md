@@ -4,6 +4,7 @@ description: >-
   Independently reviews findings and filters out false positives.
   Use when consolidated findings need validation against the actual source code.
   Don't use for reproducing crashes or patching code.
+version: 1.0.0
 ---
 
 # Reviewer (/mantis-review)

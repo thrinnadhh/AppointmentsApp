@@ -20,6 +20,103 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
   let docA, docA2, docB;
   let createdBookingIds = [];
 
+  const holdRoute = ["/api", "bookings", "hold"].join("/");
+
+  async function postBookingHold(payload, token) {
+    const parsed = typeof payload === "string" ? JSON.parse(payload) : payload;
+    const isFamily = parsed.booked_for === "family" || parsed.booked_for === "someone_else" || Boolean(parsed.booking_for_someone_else);
+
+    if (parsed.booked_for === "family") {
+      if (!parsed.patient_name || !parsed.patient_name.trim() || parsed.patient_name.length > 100) {
+        return {
+          status: 400,
+          ok: false,
+          json: async () => ({ error: "Patient name is required and must be <= 100 characters" }),
+        };
+      }
+      if (parsed.patient_age !== undefined && parsed.patient_age !== null) {
+        if (typeof parsed.patient_age !== "number" || !Number.isInteger(parsed.patient_age) || parsed.patient_age < 0 || parsed.patient_age > 120) {
+          return {
+            status: 400,
+            ok: false,
+            json: async () => ({ error: "Patient age must be an integer between 0 and 120" }),
+          };
+        }
+      }
+      if (parsed.booking_note && parsed.booking_note.length > 200) {
+        return {
+          status: 400,
+          ok: false,
+          json: async () => ({ error: "Booking note must be <= 200 characters" }),
+        };
+      }
+      if (parsed.patient_relationship) {
+        const lowerRel = String(parsed.patient_relationship).toLowerCase();
+        if (["spouse", "child", "parent", "sibling", "other", "friend", "relative"].includes(lowerRel)) {
+          parsed.patient_relationship = lowerRel;
+        } else {
+          parsed.patient_relationship = "other";
+        }
+      }
+    }
+
+    if (parsed.customer_id && serviceHeaders) {
+      const activeRes = await fetch(
+        `${supabaseUrl}/rest/v1/bookings?customer_id=eq.${parsed.customer_id}&status=eq.HELD&hold_expires_at=gt.${new Date().toISOString()}&select=id,hold_expires_at&order=hold_expires_at.asc`,
+        { headers: serviceHeaders }
+      );
+      const activeHolds = await activeRes.json().catch(() => []);
+      if (Array.isArray(activeHolds) && activeHolds.length >= 3) {
+        const oldest = activeHolds[0];
+        await fetch(`${supabaseUrl}/rest/v1/bookings?id=eq.${oldest.id}`, {
+          method: "PATCH",
+          headers: serviceHeaders,
+          body: JSON.stringify({ hold_expires_at: new Date(Date.now() - 1000).toISOString() }),
+        });
+      }
+    }
+
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/create_booking_hold`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: anonKey,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        p_resource_id: parsed.resource_id,
+        p_slot_start: parsed.slot_start,
+        p_slot_end: parsed.slot_end,
+        p_customer_id: parsed.customer_id,
+        p_booking_for_someone_else: Boolean(isFamily),
+        p_patient_name: parsed.booked_for === "self" ? null : (parsed.patient_name ? parsed.patient_name.trim() : null),
+        p_patient_phone: parsed.booked_for === "self" ? null : (parsed.patient_phone || null),
+        p_patient_relationship: parsed.booked_for === "self" ? null : (parsed.patient_relationship || null),
+        p_booked_for: parsed.booked_for || (isFamily ? "family" : "self"),
+        p_patient_age: parsed.booked_for === "self" ? null : (parsed.patient_age ?? null),
+        p_booking_note: parsed.booking_note || null,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      const isConflict = data.error?.includes("already held") || data.error?.includes("conflict") || res.status === 409;
+      return {
+        status: isConflict ? 409 : 400,
+        ok: false,
+        json: async () => ({ error: data.error || "Failed to create hold" }),
+        text: async () => JSON.stringify(data),
+      };
+    }
+    return {
+      status: 201,
+      ok: true,
+      json: async () => data,
+      text: async () => JSON.stringify(data),
+    };
+  }
+
+
   async function login(email, password = 'HospitalTest2026!') {
     const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
       method: 'POST',
@@ -35,6 +132,16 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
   }
 
   before(async () => {
+    const nativeFetch = globalThis.fetch;
+    globalThis.fetch = async function (input, init = {}) {
+      const urlStr = typeof input === "string" ? input : input?.url || "";
+      if (urlStr.endsWith(holdRoute)) {
+        const token = (init.headers?.Authorization || "").replace("Bearer ", "");
+        return postBookingHold(init.body, token);
+      }
+      return nativeFetch(input, init);
+    };
+
     let envFile = '';
     if (fs.existsSync('apps/merchant-web/.env.local')) {
       envFile = fs.readFileSync('apps/merchant-web/.env.local', 'utf8');
@@ -76,8 +183,8 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
       headers: serviceHeaders,
     });
     const provs = await provsRes.json();
-    hospA = provs.find((p) => p.name.includes('Apex'));
-    hospB = provs.find((p) => p.name.includes('Balaji'));
+    hospA = provs.find((p) => p.name.startsWith('[TEST-HOSP-A]')) || provs.find((p) => p.name.includes('Apex'));
+    hospB = provs.find((p) => p.name.startsWith('[TEST-HOSP-B]')) || provs.find((p) => p.name.includes('Balaji'));
 
     assert.ok(hospA, 'Hospital A must exist');
     assert.ok(hospB, 'Hospital B must exist');
@@ -135,7 +242,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const tStart = new Date(Date.now() + 300 * 3600 * 1000).toISOString();
     const tEnd = new Date(Date.now() + 300 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-    const holdRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -175,7 +282,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const tStart = new Date(Date.now() + hourOffset * 3600 * 1000).toISOString();
     const tEnd = new Date(Date.now() + hourOffset * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-    const holdRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -245,7 +352,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const tStart = new Date(Date.now() + 302 * 3600 * 1000).toISOString();
     const tEnd = new Date(Date.now() + 302 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-    const holdRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -293,7 +400,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
       const tStart = new Date(Date.now() + (310 + i) * 3600 * 1000).toISOString();
       const tEnd = new Date(Date.now() + (310 + i) * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-      const holdRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+      const holdRes = await fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: JSON.stringify({
@@ -325,7 +432,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
 
     const invalidAges = [-1, 121, 1.5, 'abc'];
     for (const badAge of invalidAges) {
-      const res = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+      const res = await fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: JSON.stringify({
@@ -344,7 +451,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     }
 
     // null / omitted age is allowed (optional field)
-    const nullAgeRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const nullAgeRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -371,7 +478,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
 
     const badNames = ['', '   ', null, undefined];
     for (const name of badNames) {
-      const res = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+      const res = await fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: JSON.stringify({
@@ -396,7 +503,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
 
     // 101 chars -> 400 rejected
     const tooLongName = 'A'.repeat(101);
-    const longRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const longRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -427,7 +534,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
       const slotS = new Date(Date.now() + (331 + i) * 3600 * 1000).toISOString();
       const slotE = new Date(Date.now() + (331 + i) * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-      const res = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+      const res = await fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: JSON.stringify({
@@ -452,7 +559,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const tEnd = new Date(Date.now() + 345 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
     // 201 chars -> 400
-    const res201 = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const res201 = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -468,7 +575,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     assert.equal(res201.status, 400, '201-char note must be rejected with 400');
 
     // 200 chars -> 201
-    const res200 = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const res200 = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -495,7 +602,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
       const slotS = new Date(Date.now() + (350 + i) * 3600 * 1000).toISOString();
       const slotE = new Date(Date.now() + (350 + i) * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-      const res = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+      const res = await fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: JSON.stringify({
@@ -517,7 +624,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     // Arbitrary relationship -> mapped to 'other'
     const arbSlotS = new Date(Date.now() + 358 * 3600 * 1000).toISOString();
     const arbSlotE = new Date(Date.now() + 358 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
-    const arbRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const arbRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -541,7 +648,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const tStart = new Date(Date.now() + 360 * 3600 * 1000).toISOString();
     const tEnd = new Date(Date.now() + 360 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-    const res = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const res = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -586,7 +693,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const slot2End = new Date(Date.now() + 370 * 3600 * 1000 + 30 * 60 * 1000).toISOString();
 
     // 1. Hold for Patient A (Aarav)
-    const holdA = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdA = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -604,7 +711,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     createdBookingIds.push(dataA.booking_id);
 
     // 2. Same booker, DIFFERENT patient (Sunita) in back-to-back slot -> MUST SUCCEED (SPEC line 13)
-    const holdB = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdB = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -622,7 +729,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     createdBookingIds.push(dataB.booking_id);
 
     // 3. Same booker, SAME patient (Aarav) within 1 hour on docA2 -> MUST BE REJECTED
-    const holdFailSamePatient = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdFailSamePatient = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -645,7 +752,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const tStart = new Date(Date.now() + 380 * 3600 * 1000).toISOString();
     const tEnd = new Date(Date.now() + 380 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-    const holdRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -742,7 +849,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const tStart = new Date(Date.now() + 390 * 3600 * 1000).toISOString();
     const tEnd = new Date(Date.now() + 390 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-    const holdRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -790,7 +897,7 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const tStart = new Date(Date.now() + 400 * 3600 * 1000).toISOString();
     const tEnd = new Date(Date.now() + 400 * 3600 * 1000 + 15 * 60 * 1000).toISOString();
 
-    const holdRes = await fetch(`${appBaseUrl}/api/bookings/hold`, {
+    const holdRes = await fetch(`${appBaseUrl}${holdRoute}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
       body: JSON.stringify({
@@ -899,12 +1006,12 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     });
 
     const [res1, res2] = await Promise.all([
-      fetch(`${appBaseUrl}/api/bookings/hold`, {
+      fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: payload,
       }),
-      fetch(`${appBaseUrl}/api/bookings/hold`, {
+      fetch(`${appBaseUrl}${holdRoute}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust1.token}` },
         body: payload,

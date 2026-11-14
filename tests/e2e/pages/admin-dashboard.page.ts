@@ -177,15 +177,8 @@ export class AdminDashboardPage {
   }
 
   async goto() {
-    await this.page.goto('http://localhost:3000/admin');
-    const isLogin = await Promise.race([
-      this.page.waitForURL(/\/admin\/login/, { timeout: 4000 }).then(() => true).catch(() => false),
-      this.pageHeading.waitFor({ state: 'visible', timeout: 4000 }).then(() => false).catch(() => false),
-    ]);
-
-    if (isLogin || this.page.url().includes('/admin/login')) {
-      await this.loginAsAdmin();
-    }
+    await this.gotoLoginPage();
+    await this.loginAsAdmin();
     await expect(this.pageHeading).toBeVisible({ timeout: 15000 });
   }
 
@@ -366,7 +359,7 @@ export class AdminDashboardPage {
     await expect(blockBtn).toBeVisible({ timeout: 10000 });
 
     const patchPromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/api/admin/merchants') && resp.request().method() === 'PATCH' && resp.status() === 200,
+      (resp) => (resp.url().includes('admin_update_merchant_status') || resp.url().includes('providers')) && resp.status() === 200,
       { timeout: 15000 }
     ).catch(() => null);
 
@@ -382,7 +375,7 @@ export class AdminDashboardPage {
     await expect(unblockBtn).toBeVisible({ timeout: 10000 });
 
     const patchPromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/api/admin/merchants') && resp.request().method() === 'PATCH' && resp.status() === 200,
+      (resp) => (resp.url().includes('admin_update_merchant_status') || resp.url().includes('providers')) && resp.status() === 200,
       { timeout: 15000 }
     ).catch(() => null);
 
@@ -442,7 +435,7 @@ export class AdminDashboardPage {
 
   async refreshDashboard() {
     const waitlistPromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/api/admin/waitlist') && resp.status() === 200,
+      (resp) => (resp.url().includes('city_waitlist') || resp.url().includes('admin_approve_city_waitlist')) && resp.status() === 200,
       { timeout: 15000 }
     ).catch(() => null);
     await this.refreshBtn.click();

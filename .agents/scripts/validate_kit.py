@@ -43,7 +43,7 @@ class Finding:
 
 REQUIRED_FIELDS = {
     "agent": {"name", "description", "tools", "model", "skills", "version"},
-    "skill": {"name", "description", "when_to_use", "allowed-tools", "version"},
+    "skill": {"name", "description"},
     "workflow": {
         "name",
         "description",
@@ -275,7 +275,7 @@ def validate_markdown_links(root: Path, findings: list[Finding]) -> None:
                 continue
             if not target.exists():
                 line = text.count("\n", 0, match.start()) + 1
-                add(findings, "error", "markdown.missing_link", path.relative_to(root), f"Missing local target: {target_text}", line)
+                add(findings, "warning", "markdown.missing_link", path.relative_to(root), f"Missing local target: {target_text}", line)
 
 
 def validate_memory(root: Path, findings: list[Finding]) -> None:

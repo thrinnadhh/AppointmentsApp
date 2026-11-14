@@ -11,18 +11,15 @@ paths-ignore:
   - '**/.next/**'
   - '**/dist/**'
   - '**/build/**'
-  - 'apps/backend/bin/**'          # Prevents duplicate scanning of tracked Kotlin compiler output
   - '.agents/**'                   # Local AI agent scripts
   - '**/__tests__/**'
   - '**/*.test.ts'
   - '**/*.spec.ts'
   - '**/*.test.tsx'
-  - '**/*Test.kt'
   - 'test-*.mjs'
   - '*.mjs'
   - 'scripts/**'
   - 'tests/**'
-  - 'audit-tests/**'
   - 'playwright.config.ts'
 
 query-filters:

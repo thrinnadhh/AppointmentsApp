@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { supabase } from '@/lib/supabase';
 import { HospitalAccessContext, calculateArrivalTag } from '@appointments/shared';
 import ConsultationSessionHeader, { FrontDeskStaffMember, DoctorOption } from '@/components/consultation/ConsultationSessionHeader';
 import ActiveConsultationCard, { ActiveConsultationBooking } from '@/components/consultation/ActiveConsultationCard';
@@ -188,9 +189,11 @@ export default function DoctorConsultationWorkspacePage() {
       }
 
       // 2. Fetch Resources / Doctors
-      const resQuery = await fetch('/api/resources');
-      const resJson = await resQuery.json();
-      const docs: any[] = Array.isArray(resJson.data) ? resJson.data : (Array.isArray(resJson) ? resJson : []);
+      let docs: any[] = [];
+      const { data: resourcesData } = await supabase.from('resources').select('*');
+      if (resourcesData) {
+        docs = resourcesData;
+      }
 
       const mappedDocs: DoctorOption[] = docs.map((d: any) => ({
         id: d.id,
@@ -234,36 +237,40 @@ export default function DoctorConsultationWorkspacePage() {
     setRefreshing(true);
     try {
       // 1. Fetch bookings
-      const bookingsRes = await fetch(`/api/bookings?resource_id=${selectedDoctorId}`);
-      if (bookingsRes.ok) {
-        const json = await bookingsRes.json();
-        const list: any[] = Array.isArray(json.bookings) ? json.bookings : (Array.isArray(json) ? json : []);
+      const { data: bookingsData } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('resource_id', selectedDoctorId)
+        .order('slot_start', { ascending: true });
+      const list: any[] = bookingsData || [];
         
         // Enrich with arrival tag
-        const enriched: ActiveConsultationBooking[] = list.map((b) => {
-          const tag = calculateArrivalTag(b.slot_start, b.customer_arrived_at || b.checked_in_at);
-          return {
-            ...b,
-            arrival_tag: tag,
-          };
-        });
-        setBookings(enriched);
-      }
+      const enriched: ActiveConsultationBooking[] = list.map((b) => {
+        const tag = calculateArrivalTag(b.slot_start, b.customer_arrived_at || b.checked_in_at);
+        return {
+          ...b,
+          arrival_tag: tag,
+        };
+      });
+      setBookings(enriched);
 
-      // 2. Fetch Front Desk assignments for this doctor
+      // 2. Fetch Front Desk assignments for this doctor via direct Supabase PostgREST
       try {
-        const teamRes = await fetch('/api/admin/doctor-assignments');
-        if (teamRes.ok) {
-          const teamJson = await teamRes.json();
-          const assignments: any[] = teamJson.assignments || [];
-          const matched = assignments.filter((a: any) => a.doctor_id === selectedDoctorId);
+        const { data: assignments } = await (supabase.from('doctor_front_desk_assignments' as any) as any)
+          .select('user_email, id_card_number, staff_role')
+          .eq('doctor_id', selectedDoctorId);
+        if (assignments && assignments.length > 0) {
           setFrontDeskStaff(
-            matched.map((m: any) => ({
-              name: m.user_name || m.user_email || 'Receptionist',
+            assignments.map((m: any) => ({
+              name: m.user_email || 'Receptionist',
               idCardNumber: m.id_card_number,
               email: m.user_email,
             }))
           );
+        } else {
+          setFrontDeskStaff([
+            { name: 'Hospital Reception Desk', idCardNumber: 'HOSP-FD-GEN' }
+          ]);
         }
       } catch (teamErr) {
         setFrontDeskStaff([

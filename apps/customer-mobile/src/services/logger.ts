@@ -2,13 +2,15 @@ import { Platform } from 'react-native';
 import { createAppLogger, AppLoggerInstance, AppLogEntry } from '@appointments/shared';
 import { supabase } from './api';
 
-// Offline resilient queue: Holds up to 50 logs if mobile is offline
-const offlineLogQueue: AppLogEntry[] = [];
-let isFlushingQueue = false;
+async function flushMobileLog(entry: AppLogEntry): Promise<void> {
+  // INFO / DEBUG / WARN logs never trigger remote RPCs or Postgres inserts.
+  // Preserves Postgres strictly for audit logs and eliminates mobile egress / IOPS overhead.
+  if (entry.level !== 'error' && entry.severity !== 'CRITICAL') {
+    return;
+  }
 
-async function sendLogToSupabase(entry: AppLogEntry): Promise<boolean> {
   try {
-    const { error } = await (supabase.rpc as any)('log_client_event', {
+    await (supabase.rpc as any)('log_client_event', {
       p_platform: entry.platform,
       p_level: entry.level,
       p_message: entry.message,
@@ -31,44 +33,6 @@ async function sendLogToSupabase(entry: AppLogEntry): Promise<boolean> {
       p_environment: entry.environment || 'dev',
       p_fingerprint: entry.fingerprint || null,
     });
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
-async function flushOfflineQueue(): Promise<void> {
-  if (isFlushingQueue || offlineLogQueue.length === 0) return;
-  isFlushingQueue = true;
-
-  try {
-    while (offlineLogQueue.length > 0) {
-      const nextLog = offlineLogQueue[0];
-      const success = await sendLogToSupabase(nextLog);
-      if (success) {
-        offlineLogQueue.shift();
-      } else {
-        // Still offline, retry on next interaction
-        break;
-      }
-    }
-  } finally {
-    isFlushingQueue = false;
-  }
-}
-
-async function flushMobileLog(entry: AppLogEntry): Promise<void> {
-  try {
-    const sent = await sendLogToSupabase(entry);
-    if (!sent) {
-      // If network failed, save to offline queue (FIFO max 50)
-      if (offlineLogQueue.length >= 50) {
-        offlineLogQueue.shift();
-      }
-      offlineLogQueue.push(entry);
-    } else if (offlineLogQueue.length > 0) {
-      void flushOfflineQueue();
-    }
   } catch {
     // Non-blocking telemetry — never crash UI on logging failure
   }

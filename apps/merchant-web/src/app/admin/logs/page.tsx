@@ -25,7 +25,7 @@ import {
   Flame,
   Zap,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, fetchAdminAppLogs, purgeAdminAppLogs } from '@/lib/supabase';
 import type {
   AppLogEntry,
   AppPlatform,
@@ -88,15 +88,14 @@ export default function AdminLogsDedicatedPage() {
 
         let profile: { id: string; email?: string | null; full_name?: string | null; role?: string | null } | null = null;
         try {
-          const meRes = await fetch('/api/auth/me', {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          });
-          if (meRes.ok) {
-            const meData = await meRes.json();
-            profile = meData.profile;
-          }
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, role')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          profile = profileData;
         } catch (e) {
-          console.warn('[Admin Logs] Failed to fetch /api/auth/me:', e);
+          console.warn('[Admin Logs] Failed to fetch profile:', e);
         }
 
         if (!profile || profile.role !== 'admin') {
@@ -150,31 +149,15 @@ export default function AdminLogsDedicatedPage() {
     setErrorMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-
-      const params = new URLSearchParams({
-        limit: '150',
+      const data = await fetchAdminAppLogs({
+        limit: 150,
         severity: severityFilter,
         category: categoryFilter,
         source: sourceFilter,
         dateRange: dateFilter,
+        search: searchQuery.trim() || undefined,
       });
-
-      if (searchQuery.trim()) {
-        params.set('search', searchQuery.trim());
-      }
-
-      const res = await fetch(`/api/admin/app-logs?${params.toString()}`, { headers });
-      if (!res.ok) {
-        throw new Error(`Failed to load logs (HTTP ${res.status})`);
-      }
-
-      const data = await res.json();
-      setLogs(data.logs || []);
+      setLogs(data || []);
     } catch (err) {
       console.warn('[AdminLogs] Load error:', err);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to retrieve observability telemetry');
@@ -205,24 +188,29 @@ export default function AdminLogsDedicatedPage() {
     try {
       setTestingAlert(true);
       setTestAlertFeedback('Emitting test CRITICAL exception...');
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-
-      const res = await fetch('/api/admin/app-logs/test-alert', {
-        method: 'POST',
-        headers,
+      const testFingerprint = 'test_alert_' + Date.now().toString(16);
+      const { error: insertError } = await (supabase.rpc as any)('log_client_event', {
+        p_platform: 'web',
+        p_level: 'error',
+        p_severity: 'CRITICAL',
+        p_category: 'SECURITY',
+        p_source: 'admin-web',
+        p_message: 'CRITICAL ALERT TEST: Verified manual trigger from Super Admin Command Center',
+        p_component: 'AdminAlertTester',
+        p_stack_trace: 'Error: Simulated critical system event\n  at AdminAlertTester (src/app/admin/logs/page.tsx:88)',
+        p_error_code: 'SYS_CRIT_MANUAL_TEST',
+        p_role: 'admin',
+        p_city_id: 'tirupati',
+        p_app_version: '1.0.0',
+        p_environment: process.env.NODE_ENV === 'production' ? 'prod' : 'dev',
+        p_fingerprint: testFingerprint,
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to trigger test alert');
+      if (insertError) {
+        throw new Error(insertError.message || 'Failed to trigger test alert');
       }
 
-      const data = await res.json();
-      setTestAlertFeedback(`✓ Dispatched CRITICAL alert! Fingerprint: ${data.fingerprint}`);
+      setTestAlertFeedback(`✓ Dispatched CRITICAL alert! Fingerprint: ${testFingerprint}`);
       await fetchLogs();
       setTimeout(() => setTestAlertFeedback(null), 5000);
     } catch (err: unknown) {
@@ -242,23 +230,11 @@ export default function AdminLogsDedicatedPage() {
 
     setPurging(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+      const result = await purgeAdminAppLogs(30);
+      if (result.error) {
+        throw new Error(result.error);
       }
-
-      const res = await fetch('/api/admin/app-logs?retentionDays=30', {
-        method: 'DELETE',
-        headers,
-      });
-
-      if (!res.ok) {
-        throw new Error(`Prune failed (HTTP ${res.status})`);
-      }
-
-      const result = await res.json();
-      alert(`Pruned ${result.deleted_count ?? 0} application logs matching retention expiration criteria.`);
+      alert(`Pruned ${result.count ?? 0} application logs matching retention expiration criteria.`);
       void fetchLogs();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to prune logs.');

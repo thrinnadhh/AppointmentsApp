@@ -126,7 +126,57 @@ export async function POST(req: NextRequest) {
 
       if (!payableStatuses.includes(booking.status) || isHoldExpired) {
         // Late payment arrived for expired hold or cancelled slot:
-        // Record payment into ledger, mark booking REFUND_PENDING, and trigger automated refund
+        // Check if slot is still free (Case A) or occupied by another confirmed booking (Case B)
+        const { data: conflictingBooking } = await supabaseAdmin
+          .from('bookings')
+          .select('id')
+          .eq('resource_id', booking.resource_id)
+          .eq('slot_start', booking.slot_start)
+          .eq('status', 'CONFIRMED')
+          .neq('id', booking.id)
+          .maybeSingle();
+
+        if (!conflictingBooking) {
+          // Case A: Slot is still free. Atomically reclaim and confirm the booking!
+          await supabaseAdmin
+            .from('bookings')
+            .update({
+              status: 'CONFIRMED',
+              payment_status: 'CAPTURED',
+              gateway_payment_id: paymentId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', booking.id);
+
+          await supabaseAdmin.from('payments').upsert(
+            {
+              booking_id: booking.id,
+              gateway_payment_id: paymentId,
+              amount: rawAmountInRupees,
+              currency: paymentCurrency,
+              status: 'CAPTURED',
+              metadata: {
+                gateway: 'cashfree',
+                order_id: orderId,
+                event: eventType,
+                reclaimed_expired_hold: true,
+                captured_at: new Date().toISOString(),
+              },
+            },
+            { onConflict: 'gateway_payment_id' }
+          );
+
+          return NextResponse.json({
+            status: 'OK',
+            success: true,
+            booking_id: booking.id,
+            reclaimed: true,
+            message: 'Slot reclaimed and confirmed after expired hold',
+          });
+        }
+
+        // Case B: Slot is occupied by a competing booking.
+        // Record payment into ledger, mark booking REFUND_PENDING, trigger Cashfree refund, and write CRITICAL audit log!
         await supabaseAdmin.from('payments').upsert(
           {
             booking_id: booking.id,
@@ -138,7 +188,7 @@ export async function POST(req: NextRequest) {
               gateway: 'cashfree',
               order_id: orderId,
               event: eventType,
-              reason: 'Late payment received after booking hold expired or cancelled',
+              reason: 'Late payment received after booking hold expired and slot was taken',
               captured_at: new Date().toISOString(),
             },
           },
@@ -155,12 +205,28 @@ export async function POST(req: NextRequest) {
           })
           .eq('id', booking.id);
 
+        // Audit log entry: CRITICAL security/financial event
+        await supabaseAdmin.from('admin_audit_logs').insert({
+          action: 'LATE_PAYMENT_REFUND_SLOT_COLLISION',
+          target_type: 'booking',
+          target_id: booking.id,
+          details: {
+            order_id: orderId,
+            payment_id: paymentId,
+            resource_id: booking.resource_id,
+            slot_start: booking.slot_start,
+            conflicting_booking_id: conflictingBooking.id,
+            severity: 'CRITICAL',
+            message: 'Late payment arrived after hold expired; slot taken by competitor. Automated Cashfree refund triggered.',
+          },
+        });
+
         try {
           const refundResult = await adapter.refundOrder({
             orderId: orderId,
             paymentId: paymentId,
             amountInPaise: receivedAmountPaise,
-            reason: 'Hold expired before payment completion',
+            reason: 'Hold expired and slot occupied before payment completion',
           });
 
           await supabaseAdmin
@@ -179,7 +245,7 @@ export async function POST(req: NextRequest) {
             status: 'REFUNDED',
             metadata: {
               original_payment_id: paymentId,
-              reason: 'Hold expired before payment completion',
+              reason: 'Hold expired and slot occupied before payment completion',
             },
           });
         } catch (refundErr) {
