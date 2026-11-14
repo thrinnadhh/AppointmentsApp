@@ -413,7 +413,7 @@ describe('Production Readiness & Security Hardening Test Suite (Tasks 1–6)', (
     const bucketMap = new Map(buckets.map((b) => [b.id, b]));
 
     // Check image buckets: 2 MB (2,097,152 bytes) and web-safe images
-    const imageBuckets = ['merchant-photos', 'venue-images', 'avatars'];
+    const imageBuckets = ['merchant-photos', 'venue-images', 'avatars', 'venue-assets'];
     for (const bId of imageBuckets) {
       const b = bucketMap.get(bId);
       assert.ok(b, `Bucket ${bId} must exist`);
@@ -423,14 +423,19 @@ describe('Production Readiness & Security Hardening Test Suite (Tasks 1–6)', (
       assert.ok(b.allowed_mime_types.includes('image/jpeg'), `Bucket ${bId} must allow image/jpeg`);
       assert.ok(b.allowed_mime_types.includes('image/png'), `Bucket ${bId} must allow image/png`);
       assert.equal(b.allowed_mime_types.includes('application/pdf'), false, `Image bucket ${bId} must not allow PDF`);
+      assert.equal(b.allowed_mime_types.includes('image/svg+xml'), false, `Image bucket ${bId} must not allow SVG`);
     }
 
-    // Check prescription bucket: 5 MB (5,242,880 bytes) and images + PDF
-    const prescBucket = bucketMap.get('prescriptions');
-    assert.ok(prescBucket, 'Prescriptions bucket must exist');
-    assert.equal(prescBucket.file_size_limit, 5242880, 'Prescriptions file_size_limit must be 5242880 (5 MB)');
-    assert.ok(prescBucket.allowed_mime_types.includes('application/pdf'), 'Prescriptions must allow application/pdf');
-    assert.ok(prescBucket.allowed_mime_types.includes('image/webp'), 'Prescriptions must allow image/webp');
+    // Check prescription buckets: 5 MB (5,242,880 bytes) and images + PDF
+    const prescriptionBuckets = ['prescriptions', 'prescriptions-and-records'];
+    for (const pId of prescriptionBuckets) {
+      const p = bucketMap.get(pId);
+      assert.ok(p, `Prescriptions bucket ${pId} must exist`);
+      assert.equal(p.file_size_limit, 5242880, `Prescriptions ${pId} file_size_limit must be 5242880 (5 MB)`);
+      assert.ok(p.allowed_mime_types.includes('application/pdf'), `Prescriptions ${pId} must allow application/pdf`);
+      assert.ok(p.allowed_mime_types.includes('image/webp'), `Prescriptions ${pId} must allow image/webp`);
+      assert.equal(p.allowed_mime_types.includes('image/svg+xml'), false, `Prescriptions ${pId} must not allow SVG`);
+    }
   });
 
   // ───────────────────────────────────────────────────────────────────────────

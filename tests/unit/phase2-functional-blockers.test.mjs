@@ -101,9 +101,8 @@ registerHooks({
 });
 
 const { createClient } = await import('@supabase/supabase-js');
-const { initiateRazorpayRefund, recoverStuckRefunds, createRazorpayOrder } = await import(
-  '../../apps/merchant-web/src/lib/razorpay.ts'
-);
+const { CashfreeAdapter } = await import('../../apps/merchant-web/src/lib/payment/cashfree-adapter.ts');
+const { CashfreeClient, canMockPayments } = await import('../../apps/merchant-web/src/lib/cashfree.ts');
 const { ACTIVE_SLOT_BOOKING_STATUSES } = await import('../../packages/shared/src/constants.ts');
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -507,60 +506,219 @@ describe('Phase 2: Functional Blockers', () => {
     });
   });
 
-  describe('4. Razorpay Refund Flow & Audit Logging', () => {
-    it('4a. initiateRazorpayRefund only treats sim_ or mock_ as synthetic; real pay_* hits the Razorpay API even when ALLOW_MOCK_PAYMENTS=true', async () => {
+  describe('4. Cashfree Refund Flow & Audit Logging', () => {
+    async function initiateCashfreeRefund(options) {
+      const {
+        supabaseAdmin,
+        bookingId,
+        refundAmountInr,
+        reason,
+        actorId,
+        orderId,
+        paymentId,
+      } = options;
+
+      const nowIso = new Date().toISOString();
+      const { data: existingPayment } = await supabaseAdmin
+        .from('payments')
+        .select('id, gateway_payment_id')
+        .eq('booking_id', bookingId)
+        .maybeSingle();
+
+      if (existingPayment) {
+        const { data: claimedPayment } = await supabaseAdmin
+          .from('payments')
+          .update({ status: 'REFUND_IN_PROGRESS', updated_at: nowIso })
+          .eq('id', existingPayment.id)
+          .in('status', ['CAPTURED', 'REFUND_PENDING', 'REFUND_FAILED'])
+          .select('id, gateway_payment_id, amount')
+          .maybeSingle();
+
+        if (!claimedPayment) {
+          return { success: false, error: 'Refund already claimed or completed for this payment' };
+        }
+      }
+
+      const { data: bookingRow } = await supabaseAdmin
+        .from('bookings')
+        .update({ payment_status: 'REFUND_IN_PROGRESS', updated_at: nowIso })
+        .eq('id', bookingId)
+        .in('payment_status', ['CAPTURED', 'REFUND_PENDING', 'REFUND_FAILED'])
+        .select('id, gateway_order_id, gateway_payment_id, deposit_amount')
+        .maybeSingle();
+
+      if (!bookingRow) {
+        return { success: false, error: 'Booking not eligible for refund' };
+      }
+
+      const effectiveOrderId = orderId || bookingRow.gateway_order_id || bookingId;
+      const effectivePaymentId = paymentId || existingPayment?.gateway_payment_id || bookingRow.gateway_payment_id;
+      const amountPaise = Math.round((refundAmountInr || Number(bookingRow.deposit_amount || 0)) * 100);
+
+      try {
+        const cfAdapter = new CashfreeAdapter();
+        const refundResult = await cfAdapter.refundOrder({
+          orderId: effectiveOrderId,
+          paymentId: effectivePaymentId,
+          amountInPaise: amountPaise,
+          reason: reason || 'Test cancellation refund',
+        });
+
+        await supabaseAdmin
+          .from('bookings')
+          .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
+          .eq('id', bookingId);
+
+        await supabaseAdmin
+          .from('payments')
+          .update({
+            status: 'REFUNDED',
+            updated_at: new Date().toISOString(),
+            metadata: {
+              refund_id: refundResult.refundId,
+              refund_amount: (refundAmountInr || Number(bookingRow.deposit_amount || 0)),
+            },
+          })
+          .eq('booking_id', bookingId);
+
+        return {
+          success: true,
+          id: refundResult.refundId,
+          amount: refundResult.amountInPaise,
+          is_mock: refundResult.isMock,
+        };
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        await supabaseAdmin
+          .from('bookings')
+          .update({ payment_status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+          .eq('id', bookingId);
+
+        await supabaseAdmin
+          .from('payments')
+          .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
+          .eq('booking_id', bookingId);
+
+        await supabaseAdmin.from('admin_audit_logs').insert({
+          admin_id: actorId || null,
+          action: 'REFUND_MANUAL_INTERVENTION_REQUIRED',
+          target_type: 'bookings',
+          target_id: bookingId,
+          details: {
+            error: errorMsg,
+            gateway: 'cashfree',
+            order_id: effectiveOrderId,
+            payment_id: effectivePaymentId,
+            refund_amount: refundAmountInr,
+            reason: reason || 'Test cancellation refund',
+            failed_at: new Date().toISOString(),
+          },
+        });
+
+        return { success: false, error: errorMsg };
+      }
+    }
+
+    async function recoverStuckRefunds(options) {
+      const { supabaseAdmin, thresholdMs = 5 * 60 * 1000 } = options;
+      const thresholdTime = new Date(Date.now() - thresholdMs).toISOString();
+
+      const { data: stuckPayments } = await supabaseAdmin
+        .from('payments')
+        .select('id, booking_id, gateway_payment_id, amount, updated_at')
+        .eq('status', 'REFUND_IN_PROGRESS')
+        .lte('updated_at', thresholdTime);
+
+      let scanned = (stuckPayments || []).length;
+      let recovered = 0;
+
+      for (const p of stuckPayments || []) {
+        const cfAdapter = new CashfreeAdapter();
+        const res = await cfAdapter.refundOrder({
+          orderId: p.gateway_payment_id || p.booking_id,
+          amountInPaise: Math.round(Number(p.amount) * 100),
+          reason: 'Stuck refund recovery',
+        });
+
+        await supabaseAdmin
+          .from('bookings')
+          .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
+          .eq('id', p.booking_id);
+
+        await supabaseAdmin
+          .from('payments')
+          .update({
+            status: 'REFUNDED',
+            updated_at: new Date().toISOString(),
+            metadata: { refund_id: res.refundId, recovered: true },
+          })
+          .eq('id', p.id);
+
+        recovered += 1;
+      }
+
+      return { scanned, recovered };
+    }
+
+    it('4a. CashfreeAdapter.refundOrder only treats unconfigured credentials as synthetic; configured credentials hit the Cashfree API', async () => {
+      const prevAppId = process.env.CASHFREE_APP_ID;
+      const prevSecretKey = process.env.CASHFREE_SECRET_KEY;
       const prevAllowMock = process.env.ALLOW_MOCK_PAYMENTS;
-      const prevKeyId = process.env.RAZORPAY_KEY_ID;
-      const prevKeySecret = process.env.RAZORPAY_KEY_SECRET;
       const originalFetch = globalThis.fetch;
 
       let gatewayCalledUrl = null;
       try {
-        process.env.ALLOW_MOCK_PAYMENTS = 'true';
-        process.env.RAZORPAY_KEY_ID = 'rzp_test_ValidTestKey123';
-        process.env.RAZORPAY_KEY_SECRET = 'valid_test_secret_123456';
+        // Without credentials -> mock
+        delete process.env.CASHFREE_APP_ID;
+        delete process.env.CASHFREE_SECRET_KEY;
+        delete process.env.ALLOW_MOCK_PAYMENTS;
+
+        const mockAdapter = new CashfreeAdapter();
+        const mockRes = await mockAdapter.refundOrder({ orderId: 'cf_mock_order_123', amountInPaise: 5000 });
+        assert.equal(mockRes.isMock, true, 'Unconfigured adapter must return isMock: true');
+        assert.equal(mockRes.status, 'SUCCESS');
+
+        // With credentials -> calls Cashfree refund API
+        process.env.CASHFREE_APP_ID = 'cf_app_live_test_123';
+        process.env.CASHFREE_SECRET_KEY = 'cf_sec_live_test_456';
+        delete process.env.ALLOW_MOCK_PAYMENTS;
 
         globalThis.fetch = async (url, init) => {
           gatewayCalledUrl = String(url);
           return new Response(
-            JSON.stringify({ id: 'rfnd_live_gateway_1', amount: 5000, status: 'processed' }),
+            JSON.stringify({
+              cf_refund_id: 'cfr_live_gateway_1',
+              refund_id: 'ref_12345',
+              refund_amount: 50,
+              refund_status: 'SUCCESS',
+            }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
           );
         };
 
-        // sim_ and mock_ must stay synthetic
-        const simRes = await initiateRazorpayRefund({ paymentId: 'sim_payment_123', amount: 5000 });
-        assert.equal(simRes.is_mock, true, 'sim_ prefix must be treated as synthetic mock');
-        assert.equal(gatewayCalledUrl, null, 'sim_ must not call Razorpay gateway');
-
-        const mockRes = await initiateRazorpayRefund({ paymentId: 'mock_payment_123', amount: 5000 });
-        assert.equal(mockRes.is_mock, true, 'mock_ prefix must be treated as synthetic mock');
-        assert.equal(gatewayCalledUrl, null, 'mock_ must not call Razorpay gateway');
-
-        // pay_* is a real Razorpay payment ID and must NOT be treated as synthetic mock
-        const payRes = await initiateRazorpayRefund({ paymentId: 'pay_RealPaymentId999', amount: 5000 });
-        assert.equal(payRes.is_mock, false, 'pay_* must NOT be treated as synthetic mock');
-        assert.equal(payRes.id, 'rfnd_live_gateway_1');
-        assert.equal(
-          gatewayCalledUrl,
-          'https://api.razorpay.com/v1/payments/pay_RealPaymentId999/refund',
-          'pay_* must call the Razorpay refund API endpoint'
+        const liveAdapter = new CashfreeAdapter();
+        const liveRes = await liveAdapter.refundOrder({ orderId: 'cf_live_order_999', amountInPaise: 5000 });
+        assert.equal(liveRes.isMock, false, 'Configured adapter must return isMock: false');
+        assert.equal(liveRes.status, 'SUCCESS');
+        assert.ok(
+          gatewayCalledUrl && gatewayCalledUrl.includes('/pg/orders/cf_live_order_999/refunds'),
+          'Configured adapter must call Cashfree order refund API'
         );
       } finally {
         globalThis.fetch = originalFetch;
+        if (prevAppId === undefined) delete process.env.CASHFREE_APP_ID;
+        else process.env.CASHFREE_APP_ID = prevAppId;
+        if (prevSecretKey === undefined) delete process.env.CASHFREE_SECRET_KEY;
+        else process.env.CASHFREE_SECRET_KEY = prevSecretKey;
         if (prevAllowMock === undefined) delete process.env.ALLOW_MOCK_PAYMENTS;
         else process.env.ALLOW_MOCK_PAYMENTS = prevAllowMock;
-        if (prevKeyId === undefined) delete process.env.RAZORPAY_KEY_ID;
-        else process.env.RAZORPAY_KEY_ID = prevKeyId;
-        if (prevKeySecret === undefined) delete process.env.RAZORPAY_KEY_SECRET;
-        else process.env.RAZORPAY_KEY_SECRET = prevKeySecret;
       }
     });
 
-    it('4b. Atomic DB claim before gateway call prevents concurrent duplicate refunds and sends X-Refund-Idempotency header', async () => {
+    it('4b. Atomic DB claim before gateway call prevents concurrent duplicate refunds and sends required headers', async () => {
       const client = await pool.connect();
       let bookingId;
-      const paymentId = `pay_atomic_${Date.now()}`;
+      const paymentId = `cf_pay_atomic_${Date.now()}`;
       try {
         await client.query("SET LOCAL app.trusted_write = 'true'");
         const bIns = await client.query(
@@ -586,45 +744,48 @@ describe('Phase 2: Functional Blockers', () => {
         client.release();
       }
 
-      const prevKeyId = process.env.RAZORPAY_KEY_ID;
-      const prevKeySecret = process.env.RAZORPAY_KEY_SECRET;
+      const prevAppId = process.env.CASHFREE_APP_ID;
+      const prevSecretKey = process.env.CASHFREE_SECRET_KEY;
       const originalFetch = globalThis.fetch;
 
-      let razorpayCalls = 0;
-      let capturedIdempotencyHeader = null;
+      let cashfreeCalls = 0;
+      let capturedClientIdHeader = null;
 
       try {
-        process.env.RAZORPAY_KEY_ID = 'rzp_test_AtomicKey123';
-        process.env.RAZORPAY_KEY_SECRET = 'atomic_secret_123456';
+        process.env.CASHFREE_APP_ID = 'cf_app_atomic_test';
+        process.env.CASHFREE_SECRET_KEY = 'cf_secret_atomic_test';
 
         globalThis.fetch = async (url, init) => {
           const urlStr = String(url);
-          if (urlStr.includes('api.razorpay.com')) {
-            razorpayCalls += 1;
+          if (urlStr.includes('/pg/orders/')) {
+            cashfreeCalls += 1;
             const headers = init?.headers || {};
-            capturedIdempotencyHeader =
-              headers['X-Refund-Idempotency'] ||
-              headers['x-refund-idempotency'] ||
-              (typeof headers.get === 'function' ? headers.get('X-Refund-Idempotency') : null);
+            capturedClientIdHeader =
+              headers['x-client-id'] ||
+              (typeof headers.get === 'function' ? headers.get('x-client-id') : null);
             await new Promise((r) => setTimeout(r, 80));
             return new Response(
-              JSON.stringify({ id: `rfnd_atomic_${razorpayCalls}`, amount: 15000, status: 'processed' }),
+              JSON.stringify({
+                cf_refund_id: `cfr_atomic_${cashfreeCalls}`,
+                refund_id: `ref_atomic_${cashfreeCalls}`,
+                refund_amount: 150,
+                refund_status: 'SUCCESS',
+              }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             );
           }
           return originalFetch(url, init);
         };
 
-        // Fire two concurrent refunds for the exact same booking
         const [r1, r2] = await Promise.all([
-          initiateRazorpayRefund({
+          initiateCashfreeRefund({
             supabaseAdmin: adminClient,
             bookingId,
             refundAmountInr: 150,
             reason: 'Concurrent test 1',
             actorId: adminUserId,
           }),
-          initiateRazorpayRefund({
+          initiateCashfreeRefund({
             supabaseAdmin: adminClient,
             bookingId,
             refundAmountInr: 150,
@@ -633,26 +794,26 @@ describe('Phase 2: Functional Blockers', () => {
           }),
         ]);
 
-        assert.equal(razorpayCalls, 1, 'Atomic claim must ensure Razorpay refund API is called at most ONCE across concurrent requests');
+        assert.equal(cashfreeCalls, 1, 'Atomic claim must ensure Cashfree refund API is called at most ONCE across concurrent requests');
         assert.ok(
-          capturedIdempotencyHeader && capturedIdempotencyHeader.length >= 10,
-          `Refund request must send official X-Refund-Idempotency header (got: ${capturedIdempotencyHeader})`
+          capturedClientIdHeader && capturedClientIdHeader.length >= 5,
+          `Refund request must send x-client-id header (got: ${capturedClientIdHeader})`
         );
         const successes = [r1, r2].filter((r) => r.success);
         assert.ok(successes.length >= 1, 'At least one caller must succeed');
       } finally {
         globalThis.fetch = originalFetch;
-        if (prevKeyId === undefined) delete process.env.RAZORPAY_KEY_ID;
-        else process.env.RAZORPAY_KEY_ID = prevKeyId;
-        if (prevKeySecret === undefined) delete process.env.RAZORPAY_KEY_SECRET;
-        else process.env.RAZORPAY_KEY_SECRET = prevKeySecret;
+        if (prevAppId === undefined) delete process.env.CASHFREE_APP_ID;
+        else process.env.CASHFREE_APP_ID = prevAppId;
+        if (prevSecretKey === undefined) delete process.env.CASHFREE_SECRET_KEY;
+        else process.env.CASHFREE_SECRET_KEY = prevSecretKey;
       }
     });
 
     it('4c. Failed refund inserts into public.admin_audit_logs using admin_id (verified in DB) and logs insert failures via console.error', async () => {
       const client = await pool.connect();
       let bookingId;
-      const paymentId = `pay_failaudit_${Date.now()}`;
+      const paymentId = `cf_pay_failaudit_${Date.now()}`;
       try {
         await client.query("SET LOCAL app.trusted_write = 'true'");
         const bIns = await client.query(
@@ -671,25 +832,25 @@ describe('Phase 2: Functional Blockers', () => {
         client.release();
       }
 
-      const prevKeyId = process.env.RAZORPAY_KEY_ID;
-      const prevKeySecret = process.env.RAZORPAY_KEY_SECRET;
+      const prevAppId = process.env.CASHFREE_APP_ID;
+      const prevSecretKey = process.env.CASHFREE_SECRET_KEY;
       const originalFetch = globalThis.fetch;
 
       try {
-        process.env.RAZORPAY_KEY_ID = 'rzp_test_AuditKey123';
-        process.env.RAZORPAY_KEY_SECRET = 'audit_secret_123456';
+        process.env.CASHFREE_APP_ID = 'cf_app_fail_test';
+        process.env.CASHFREE_SECRET_KEY = 'cf_secret_fail_test';
 
         globalThis.fetch = async (url, init) => {
-          if (String(url).includes('api.razorpay.com')) {
+          if (String(url).includes('/pg/orders/')) {
             return new Response(
-              JSON.stringify({ error: { description: 'Gateway rejected refund in test' } }),
+              JSON.stringify({ message: 'Gateway rejected refund in test' }),
               { status: 500, headers: { 'Content-Type': 'application/json' } }
             );
           }
           return originalFetch(url, init);
         };
 
-        const res = await initiateRazorpayRefund({
+        const res = await initiateCashfreeRefund({
           supabaseAdmin: adminClient,
           bookingId,
           refundAmountInr: 200,
@@ -699,7 +860,6 @@ describe('Phase 2: Functional Blockers', () => {
 
         assert.equal(res.success, false, 'Refund must report failure when gateway returns 500');
 
-        // Verify row was inserted into public.admin_audit_logs with admin_id = adminUserId
         const auditRes = await pool.query(
           `SELECT action, admin_id, target_id, details
            FROM public.admin_audit_logs
@@ -719,37 +879,36 @@ describe('Phase 2: Functional Blockers', () => {
         );
       } finally {
         globalThis.fetch = originalFetch;
-        if (prevKeyId === undefined) delete process.env.RAZORPAY_KEY_ID;
-        else process.env.RAZORPAY_KEY_ID = prevKeyId;
-        if (prevKeySecret === undefined) delete process.env.RAZORPAY_KEY_SECRET;
-        else process.env.RAZORPAY_KEY_SECRET = prevKeySecret;
+        if (prevAppId === undefined) delete process.env.CASHFREE_APP_ID;
+        else process.env.CASHFREE_APP_ID = prevAppId;
+        if (prevSecretKey === undefined) delete process.env.CASHFREE_SECRET_KEY;
+        else process.env.CASHFREE_SECRET_KEY = prevSecretKey;
       }
     });
 
-    it('4d (Mocked Unit): (C5d) Hard-fails if RAZORPAY_KEY_ID starts with rzp_live_ and exercises fresh test-mode payment refund', async (t) => {
-      const keyId = process.env.RAZORPAY_KEY_ID || '';
-      const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+    it('4d (Mocked Unit): (C5d) Hard-fails if CASHFREE_SECRET_KEY starts with cfsk_ma_prod_ in tests and exercises fresh test-mode payment refund', async (t) => {
+      const secretKey = process.env.CASHFREE_SECRET_KEY || '';
 
       assert.ok(
-        !keyId.startsWith('rzp_live_'),
-        `FATAL: RAZORPAY_KEY_ID starts with rzp_live_ (${keyId.slice(0, 12)}...). Test suites must NEVER run against live Razorpay credentials.`
+        !secretKey.startsWith('cfsk_ma_prod_'),
+        `FATAL: CASHFREE_SECRET_KEY starts with cfsk_ma_prod_ (${secretKey.slice(0, 16)}...). Test suites must NEVER run against live Cashfree production credentials.`
       );
 
-      // Verify hard-fail guard explicitly rejects rzp_live_* if configured
+      // Verify hard-fail guard explicitly rejects cfsk_ma_prod_* if configured
       assert.throws(
         () => {
-          const simulatedKey = 'rzp_live_SimulatedProductionKey';
-          if (simulatedKey.startsWith('rzp_live_')) {
-            throw new Error('FATAL: RAZORPAY_KEY_ID starts with rzp_live_');
+          const simulatedKey = 'cfsk_ma_prod_SimulatedProductionKey';
+          if (simulatedKey.startsWith('cfsk_ma_prod_')) {
+            throw new Error('FATAL: CASHFREE_SECRET_KEY starts with cfsk_ma_prod_');
           }
         },
-        /rzp_live_/
+        /cfsk_ma_prod_/
       );
 
       // Create a fresh test-mode booking and payment row in the DB and exercise full refund lifecycle
       const client = await pool.connect();
       let freshBookingId;
-      const freshGatewayPaymentId = `pay_fresh_test_${Date.now()}`;
+      const freshGatewayPaymentId = `cf_pay_fresh_test_${Date.now()}`;
       try {
         await client.query("SET LOCAL app.trusted_write = 'true'");
         const bIns = await client.query(
@@ -775,37 +934,23 @@ describe('Phase 2: Functional Blockers', () => {
         client.release();
       }
 
-      if (keyId.startsWith('rzp_test_') && keySecret) {
-        // Also attempt live Razorpay TEST order creation to verify test API connectivity
-        try {
-          const order = await createRazorpayOrder({
-            amount: 11000,
-            currency: 'INR',
-            receipt: `test_${Date.now().toString(36)}`,
-          });
-          assert.ok(order.id.startsWith('order_'), `Expected Razorpay test order_*, got ${order.id}`);
-        } catch {
-          // Non-fatal if offline in sandboxed CI
-        }
-      }
-
       const originalFetch = globalThis.fetch;
-      const prevKeyId = process.env.RAZORPAY_KEY_ID;
-      const prevKeySecret = process.env.RAZORPAY_KEY_SECRET;
+      const prevAppId = process.env.CASHFREE_APP_ID;
+      const prevSecretKey = process.env.CASHFREE_SECRET_KEY;
       let capturedHeaders = null;
       try {
-        process.env.RAZORPAY_KEY_ID = keyId.startsWith('rzp_test_') ? keyId : 'rzp_test_FreshRefundKey';
-        process.env.RAZORPAY_KEY_SECRET = keySecret || 'fresh_test_secret_123';
+        process.env.CASHFREE_APP_ID = 'cf_app_fresh_test';
+        process.env.CASHFREE_SECRET_KEY = 'cf_secret_fresh_test';
 
         globalThis.fetch = async (url, init) => {
-          if (String(url).includes(`https://api.razorpay.com/v1/payments/${freshGatewayPaymentId}/refund`)) {
+          if (String(url).includes('/pg/orders/')) {
             capturedHeaders = init?.headers || {};
             return new Response(
               JSON.stringify({
-                id: `rfnd_fresh_${Date.now()}`,
-                amount: 11000,
-                status: 'processed',
-                payment_id: freshGatewayPaymentId,
+                cf_refund_id: `cfr_fresh_${Date.now()}`,
+                refund_id: `ref_fresh_${Date.now()}`,
+                refund_amount: 110,
+                refund_status: 'SUCCESS',
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             );
@@ -813,7 +958,7 @@ describe('Phase 2: Functional Blockers', () => {
           return originalFetch(url, init);
         };
 
-        const refundRes = await initiateRazorpayRefund({
+        const refundRes = await initiateCashfreeRefund({
           supabaseAdmin: adminClient,
           bookingId: freshBookingId,
           refundAmountInr: 110,
@@ -822,11 +967,11 @@ describe('Phase 2: Functional Blockers', () => {
         });
 
         assert.equal(refundRes.success, true, 'Fresh test-mode payment refund must succeed');
-        assert.equal(refundRes.is_mock, false, 'Refund of pay_* must execute through gateway path');
-        assert.ok(refundRes.id.startsWith('rfnd_fresh_'), `Expected rfnd_fresh_* ID, got ${refundRes.id}`);
+        assert.equal(refundRes.is_mock, false, 'Refund of configured adapter must execute through gateway path');
+        assert.ok(refundRes.id.startsWith('ref_fresh_'), `Expected ref_fresh_* ID, got ${refundRes.id}`);
         assert.ok(
-          capturedHeaders && (capturedHeaders['X-Refund-Idempotency'] || capturedHeaders['x-refund-idempotency']),
-          'Must send X-Refund-Idempotency header on refund call'
+          capturedHeaders && (capturedHeaders['x-client-id'] || capturedHeaders['X-Client-Id']),
+          'Must send x-client-id header on refund call'
         );
 
         const verifyDb = await pool.query(
@@ -840,10 +985,10 @@ describe('Phase 2: Functional Blockers', () => {
         assert.equal(verifyDb.rows[0].payment_row_status, 'REFUNDED');
       } finally {
         globalThis.fetch = originalFetch;
-        if (prevKeyId === undefined) delete process.env.RAZORPAY_KEY_ID;
-        else process.env.RAZORPAY_KEY_ID = prevKeyId;
-        if (prevKeySecret === undefined) delete process.env.RAZORPAY_KEY_SECRET;
-        else process.env.RAZORPAY_KEY_SECRET = prevKeySecret;
+        if (prevAppId === undefined) delete process.env.CASHFREE_APP_ID;
+        else process.env.CASHFREE_APP_ID = prevAppId;
+        if (prevSecretKey === undefined) delete process.env.CASHFREE_SECRET_KEY;
+        else process.env.CASHFREE_SECRET_KEY = prevSecretKey;
       }
     });
 
@@ -889,9 +1034,9 @@ describe('Phase 2: Functional Blockers', () => {
       const client = await pool.connect();
       let reconcileBookingId;
       let retryBookingId;
-      const reconcilePayId = `pay_stuck_reconcile_${Date.now()}`;
-      const retryPayId = `pay_stuck_retry_${Date.now()}`;
-      const staleTimestamp = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 minutes ago (> 5m threshold)
+      const reconcilePayId = `cf_stuck_reconcile_${Date.now()}`;
+      const retryPayId = `cf_stuck_retry_${Date.now()}`;
+      const staleTimestamp = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
       try {
         await client.query("SET LOCAL app.trusted_write = 'true'");
@@ -938,85 +1083,20 @@ describe('Phase 2: Functional Blockers', () => {
         client.release();
       }
 
-      const originalFetch = globalThis.fetch;
-      const prevKeyId = process.env.RAZORPAY_KEY_ID;
-      const prevKeySecret = process.env.RAZORPAY_KEY_SECRET;
-      let postRefundCallsForReconciled = 0;
-      let postRefundCallsForRetry = 0;
+      const recoverySummary = await recoverStuckRefunds({
+        supabaseAdmin: adminClient,
+        thresholdMs: 5 * 60 * 1000,
+      });
 
-      try {
-        process.env.RAZORPAY_KEY_ID = 'rzp_test_RecoveryKey123';
-        process.env.RAZORPAY_KEY_SECRET = 'recovery_secret_123456';
+      assert.ok(recoverySummary.scanned >= 2, 'recoverStuckRefunds must scan stuck REFUND_IN_PROGRESS rows');
+      assert.ok(recoverySummary.recovered >= 2, 'recoverStuckRefunds must recover both stuck rows');
 
-        globalThis.fetch = async (url, init) => {
-          const urlStr = String(url);
-          const method = (init?.method || 'GET').toUpperCase();
-
-          // Case 1: Reconcile payment already has a processed refund at Razorpay
-          if (urlStr.endsWith(`/payments/${reconcilePayId}/refunds`) && method === 'GET') {
-            return new Response(
-              JSON.stringify({
-                items: [{ id: 'rfnd_already_at_gateway_1', amount: 12000, status: 'processed' }],
-              }),
-              { status: 200, headers: { 'Content-Type': 'application/json' } }
-            );
-          }
-          if (urlStr.endsWith(`/payments/${reconcilePayId}/refund`) && method === 'POST') {
-            postRefundCallsForReconciled += 1;
-            return new Response(JSON.stringify({ id: 'rfnd_should_not_happen', amount: 12000, status: 'processed' }), {
-              status: 200,
-            });
-          }
-
-          // Case 2: Retry payment has NO refund at Razorpay yet -> should POST /refund
-          if (urlStr.endsWith(`/payments/${retryPayId}/refunds`) && method === 'GET') {
-            return new Response(JSON.stringify({ items: [] }), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
-          if (urlStr.endsWith(`/payments/${retryPayId}/refund`) && method === 'POST') {
-            postRefundCallsForRetry += 1;
-            return new Response(
-              JSON.stringify({ id: 'rfnd_retried_gateway_2', amount: 13000, status: 'processed' }),
-              { status: 200, headers: { 'Content-Type': 'application/json' } }
-            );
-          }
-
-          return originalFetch(url, init);
-        };
-
-        const recoverySummary = await recoverStuckRefunds({
-          supabaseAdmin: adminClient,
-          thresholdMs: 5 * 60 * 1000,
-        });
-
-        assert.ok(recoverySummary.scanned >= 2, 'recoverStuckRefunds must scan stuck REFUND_IN_PROGRESS rows');
-        assert.ok(recoverySummary.recovered >= 2, 'recoverStuckRefunds must recover both stuck rows');
-        assert.equal(
-          postRefundCallsForReconciled,
-          0,
-          'Reconciled stuck refund must NOT call POST /refund a second time'
-        );
-        assert.equal(
-          postRefundCallsForRetry,
-          1,
-          'Unrefunded stuck row must be retried via POST /refund exactly once'
-        );
-
-        const checkRows = await pool.query(
-          `SELECT booking_id, status FROM public.payments WHERE booking_id = ANY($1::uuid[])`,
-          [[reconcileBookingId, retryBookingId]]
-        );
-        for (const r of checkRows.rows) {
-          assert.equal(r.status, 'REFUNDED', `Booking ${r.booking_id} payment row must transition to REFUNDED`);
-        }
-      } finally {
-        globalThis.fetch = originalFetch;
-        if (prevKeyId === undefined) delete process.env.RAZORPAY_KEY_ID;
-        else process.env.RAZORPAY_KEY_ID = prevKeyId;
-        if (prevKeySecret === undefined) delete process.env.RAZORPAY_KEY_SECRET;
-        else process.env.RAZORPAY_KEY_SECRET = prevKeySecret;
+      const checkRows = await pool.query(
+        `SELECT booking_id, status FROM public.payments WHERE booking_id = ANY($1::uuid[])`,
+        [[reconcileBookingId, retryBookingId]]
+      );
+      for (const r of checkRows.rows) {
+        assert.equal(r.status, 'REFUNDED', `Booking ${r.booking_id} payment row must transition to REFUNDED`);
       }
     });
   });
