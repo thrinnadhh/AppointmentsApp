@@ -57,6 +57,13 @@ export const mobileLogger: AppLoggerInstance = createAppLogger({
 
 export const logger = mobileLogger;
 
+export {
+  createAppLogger,
+  sanitizeLogData,
+  computeFingerprint,
+  classifySeverity,
+} from '@appointments/shared';
+
 // Register global React Native ErrorUtils handler to catch unhandled JS crashes
 const globalObj = typeof globalThis !== 'undefined' ? (globalThis as any) : null;
 if (globalObj && globalObj.ErrorUtils) {

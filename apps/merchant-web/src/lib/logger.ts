@@ -48,6 +48,13 @@ export const webLogger: AppLoggerInstance = createAppLogger({
 
 export const logger = webLogger;
 
+export {
+  createAppLogger,
+  sanitizeLogData,
+  computeFingerprint,
+  classifySeverity,
+} from '@appointments/shared';
+
 // Register global window error & unhandled promise rejection listeners on web
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {

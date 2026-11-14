@@ -116,7 +116,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // 2. Fetch Razorpay credentials (env or vault)
+    // 2. Fetch gateway credentials (env or vault)
     let rzpKeyId = Deno.env.get('RAZORPAY_KEY_ID') || '';
     let rzpKeySecret = Deno.env.get('RAZORPAY_KEY_SECRET') || '';
 
@@ -126,6 +126,26 @@ serve(async (req: Request) => {
       });
       if (rzpSecret && rzpSecret !== 'REPLACE_ME') {
         rzpKeySecret = rzpSecret;
+      }
+    }
+
+    let cfAppId = Deno.env.get('CASHFREE_APP_ID') || '';
+    let cfSecretKey = Deno.env.get('CASHFREE_SECRET_KEY') || '';
+
+    if (!cfSecretKey || cfSecretKey === 'REPLACE_ME') {
+      const { data: cfSecret } = await supabase.rpc('get_vault_secret_by_name', {
+        p_secret_name: 'cashfree_secret_key',
+      });
+      if (cfSecret && cfSecret !== 'REPLACE_ME') {
+        cfSecretKey = cfSecret;
+      }
+    }
+    if (!cfAppId || cfAppId === 'REPLACE_ME') {
+      const { data: cfId } = await supabase.rpc('get_vault_secret_by_name', {
+        p_secret_name: 'cashfree_app_id',
+      });
+      if (cfId && cfId !== 'REPLACE_ME') {
+        cfAppId = cfId;
       }
     }
 
@@ -174,7 +194,7 @@ serve(async (req: Request) => {
         // Lookup booking to verify status, amount, and payment gateway id
         const { data: bkg } = await supabase
           .from('bookings')
-          .select('id, payment_status, total_amount, deposit_amount, refund_amount, gateway_payment_id')
+          .select('id, payment_status, total_amount, deposit_amount, refund_amount, gateway_payment_id, gateway_order_id, gateway_provider')
           .eq('id', appointment_id)
           .maybeSingle();
 
@@ -201,13 +221,51 @@ serve(async (req: Request) => {
         }
 
         let refundGatewayId = '';
-        const isMockPayment = paymentId.startsWith('sim_') || paymentId.startsWith('mock_');
+        const isMockPayment = paymentId.startsWith('sim_') || paymentId.startsWith('mock_') || paymentId.startsWith('cf_pay_mock_');
+        const isCashfree = (bkg as any)?.gateway_provider !== 'razorpay';
 
         if (isMockPayment) {
           // Simulated test/mock refund for test bookings only
           refundGatewayId = `rfnd_sim_${Date.now().toString(36)}_${appointment_id?.substring(0, 8)}`;
+        } else if (isCashfree) {
+          // Cashfree Gateway Refund
+          const cfEnv = Deno.env.get('CASHFREE_ENV') || 'TEST';
+          const cfBaseUrl = cfEnv.toUpperCase() === 'PRODUCTION'
+            ? 'https://api.cashfree.com/pg'
+            : 'https://sandbox.cashfree.com/pg';
+          const targetOrderId = (bkg as any)?.gateway_order_id || appointment_id;
+          const refundId = `cfr_${appointment_id.replace(/-/g, '').slice(0, 16)}_${Date.now()}`;
+
+          if (!cfAppId || !cfSecretKey || cfSecretKey === 'REPLACE_ME') {
+            if (Deno.env.get('ENVIRONMENT') === 'test' || Deno.env.get('NODE_ENV') === 'test') {
+              refundGatewayId = `cfr_sim_${Date.now()}`;
+            } else {
+              throw new Error(`Cashfree credentials missing. Refusing to burn real refund for order ${targetOrderId}`);
+            }
+          } else {
+            const cfRes = await fetch(`${cfBaseUrl}/orders/${encodeURIComponent(targetOrderId)}/refunds`, {
+              method: 'POST',
+              headers: {
+                'x-client-id': cfAppId,
+                'x-client-secret': cfSecretKey,
+                'x-api-version': '2023-08-01',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                refund_amount: requestedAmount,
+                refund_id: refundId,
+                refund_note: reason || 'Queue-processed refund',
+              }),
+            });
+
+            const cfData = await cfRes.json();
+            if (!cfRes.ok) {
+              throw new Error(cfData?.message || `Cashfree refund failed (status ${cfRes.status})`);
+            }
+            refundGatewayId = cfData.cf_refund_id ? String(cfData.cf_refund_id) : refundId;
+          }
         } else {
-          // Real payment: fail closed if gateway credentials are unset or placeholder
+          // Legacy Razorpay payment: fail closed if gateway credentials are unset or placeholder
           if (!rzpKeyId || !rzpKeySecret || rzpKeySecret === 'REPLACE_ME') {
             throw new Error(`Razorpay credentials are unconfigured or placeholder. Refusing to burn real refund for ${paymentId}`);
           }

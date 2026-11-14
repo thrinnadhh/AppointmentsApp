@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { isCallerHospitalAdminForProvider, verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { getAccessContext, isHospitalAdmin } from '@/lib/hospital-access';
-import { initiateRazorpayRefund } from '@/lib/razorpay';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 
 export interface DoctorEmergencyCancelRequest {
@@ -111,38 +110,28 @@ export async function POST(req: NextRequest) {
       );
 
       for (const b of refundableBookings) {
-        if (b.gateway_provider === 'cashfree') {
-          const cfAdapter = getPaymentGateway('cashfree');
-          const refundRes = await cfAdapter.refundOrder({
-            orderId: b.gateway_order_id || b.id,
-            paymentId: b.gateway_payment_id || undefined,
-            amountInPaise: Math.round(Number(b.refund_amount ?? b.deposit_amount) * 100),
-            reason: reason || 'Doctor Emergency Cancellation',
-          });
-          await supabaseAdmin
-            .from('bookings')
-            .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
-            .eq('id', b.id);
-          await supabaseAdmin
-            .from('payments')
-            .update({
-              status: 'REFUNDED',
-              updated_at: new Date().toISOString(),
-              metadata: {
-                refund_id: refundRes.refundId,
-                refund_amount: Number(b.refund_amount ?? b.deposit_amount),
-              },
-            })
-            .eq('booking_id', b.id);
-        } else {
-          await initiateRazorpayRefund({
-            supabaseAdmin,
-            bookingId: b.id,
-            refundAmountInr: Number(b.refund_amount ?? b.deposit_amount),
-            reason: reason || 'Doctor Emergency Cancellation',
-            actorId: caller.id,
-          });
-        }
+        const cfAdapter = getPaymentGateway('cashfree');
+        const refundRes = await cfAdapter.refundOrder({
+          orderId: b.gateway_order_id || b.id,
+          paymentId: b.gateway_payment_id || undefined,
+          amountInPaise: Math.round(Number(b.refund_amount ?? b.deposit_amount) * 100),
+          reason: reason || 'Doctor Emergency Cancellation',
+        });
+        await supabaseAdmin
+          .from('bookings')
+          .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
+          .eq('id', b.id);
+        await supabaseAdmin
+          .from('payments')
+          .update({
+            status: 'REFUNDED',
+            updated_at: new Date().toISOString(),
+            metadata: {
+              refund_id: refundRes.refundId,
+              refund_amount: Number(b.refund_amount ?? b.deposit_amount),
+            },
+          })
+          .eq('booking_id', b.id);
       }
     }
 

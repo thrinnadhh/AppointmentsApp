@@ -38,6 +38,17 @@ async function createTestHold(
 ) {
   const customerId = extraParams.customer_id || SEED_CUSTOMER_ID;
   const isFamily = extraParams.booked_for === 'family' || Boolean(extraParams.booking_for_someone_else);
+
+  // Clear any stale holds for customer to ensure available hold budget
+  if (extraParams.clearStaleHolds !== false) {
+    await supabaseAdmin
+      .from('bookings')
+      .update({ hold_expires_at: new Date(Date.now() - 60000).toISOString() })
+      .eq('customer_id', customerId)
+      .eq('status', 'HELD');
+    await supabaseAdmin.rpc('release_expired_holds');
+  }
+
   const { data, error } = await supabaseAdmin.rpc('create_booking_hold', {
     p_customer_id: customerId,
     p_resource_id: resourceId,
@@ -66,6 +77,14 @@ test.describe('Customer — Edge & Boundary Cases', () => {
       .from('profiles')
       .update({ no_show_count: 0, is_flagged: false, blocked_until: null })
       .eq('id', SEED_CUSTOMER_ID);
+
+    // Clear any stale holds for test customer to ensure available hold budget
+    await supabaseAdmin
+      .from('bookings')
+      .update({ hold_expires_at: new Date(Date.now() - 60000).toISOString() })
+      .eq('customer_id', SEED_CUSTOMER_ID)
+      .eq('status', 'HELD');
+    await supabaseAdmin.rpc('release_expired_holds');
   });
 
   // ─── EC-CUST-01: Hold expiry race ──────────────────────────────────────────
@@ -217,9 +236,11 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     });
     expect(holdAError).toBeNull();
     const bookingA = holdAData.booking_id;
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id: bookingA, gateway_payment_id: `pay_a_${Date.now()}` },
+    const { error: confirmAErr } = await supabaseAdmin.rpc('confirm_booking_payment', {
+      p_booking_id: bookingA,
+      p_gateway_payment_id: `pay_mock_a_${Date.now()}`,
     });
+    expect(confirmAErr).toBeNull();
 
     // Book slot B to reschedule
     const { data: holdBData, error: holdBError } = await createTestHold(SEED_RESOURCE_ID, new Date(tomorrow + 3600000).toISOString(), new Date(tomorrow + 5400000).toISOString(), {
@@ -230,9 +251,11 @@ test.describe('Customer — Edge & Boundary Cases', () => {
     });
     expect(holdBError).toBeNull();
     const bookingB = holdBData.booking_id;
-    await request.post(`${BASE}/api/bookings/confirm`, {
-      data: { booking_id: bookingB, gateway_payment_id: `pay_b_${Date.now()}` },
+    const { error: confirmBErr } = await supabaseAdmin.rpc('confirm_booking_payment', {
+      p_booking_id: bookingB,
+      p_gateway_payment_id: `pay_mock_b_${Date.now()}`,
     });
+    expect(confirmBErr).toBeNull();
 
     // Attempt to reschedule B → into the same slot as A via RPC
     const { data: reschedData, error: reschedError } = await supabaseAdmin.rpc('reschedule_booking_slot', {

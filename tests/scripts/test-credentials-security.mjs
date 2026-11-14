@@ -84,44 +84,42 @@ describe('F-05 Credentials & Mock Payments Security Audit', () => {
     assert.ok(threw, 'env.mjs must throw when NODE_ENV=production and ALLOW_MOCK_PAYMENTS=true');
   });
 
-  it('verifies canMockPayments throws in production when ALLOW_MOCK_PAYMENTS=true', async () => {
+  it('verifies canMockPayments returns false in production even when ALLOW_MOCK_PAYMENTS=true', async () => {
     const origNodeEnv = process.env.NODE_ENV;
     const origMock = process.env.ALLOW_MOCK_PAYMENTS;
-    const origSecret = process.env.RAZORPAY_KEY_SECRET;
+    const origCfEnv = process.env.CASHFREE_ENV;
 
     try {
-      process.env.NODE_ENV = 'production';
+      process.env.CASHFREE_ENV = 'PRODUCTION';
       process.env.ALLOW_MOCK_PAYMENTS = 'true';
-      process.env.RAZORPAY_KEY_SECRET = 'live_secret_sample_test_key_xyz123';
 
       const { canMockPayments } = await import(
-        `../../apps/merchant-web/src/lib/razorpay.ts?t=${Date.now()}`
+        `../../apps/merchant-web/src/lib/cashfree.ts?t=${Date.now()}`
       );
 
-      assert.throws(
-        () => canMockPayments(),
-        /FATAL SECURITY VIOLATION/,
-        'canMockPayments must throw in production if ALLOW_MOCK_PAYMENTS is true'
+      assert.equal(
+        canMockPayments(),
+        false,
+        'canMockPayments must return false in production even if ALLOW_MOCK_PAYMENTS is true'
       );
     } finally {
       process.env.NODE_ENV = origNodeEnv;
       process.env.ALLOW_MOCK_PAYMENTS = origMock;
-      process.env.RAZORPAY_KEY_SECRET = origSecret;
+      if (origCfEnv !== undefined) process.env.CASHFREE_ENV = origCfEnv; else delete process.env.CASHFREE_ENV;
     }
   });
 
   it('verifies canMockPayments returns false in production when ALLOW_MOCK_PAYMENTS=false', async () => {
     const origNodeEnv = process.env.NODE_ENV;
     const origMock = process.env.ALLOW_MOCK_PAYMENTS;
-    const origSecret = process.env.RAZORPAY_KEY_SECRET;
+    const origCfEnv = process.env.CASHFREE_ENV;
 
     try {
-      process.env.NODE_ENV = 'production';
+      process.env.CASHFREE_ENV = 'PRODUCTION';
       process.env.ALLOW_MOCK_PAYMENTS = 'false';
-      process.env.RAZORPAY_KEY_SECRET = 'live_secret_sample_test_key_xyz123';
 
       const { canMockPayments } = await import(
-        `../../apps/merchant-web/src/lib/razorpay.ts?t=${Date.now() + 1}`
+        `../../apps/merchant-web/src/lib/cashfree.ts?t=${Date.now() + 1}`
       );
 
       assert.equal(
@@ -132,7 +130,7 @@ describe('F-05 Credentials & Mock Payments Security Audit', () => {
     } finally {
       process.env.NODE_ENV = origNodeEnv;
       process.env.ALLOW_MOCK_PAYMENTS = origMock;
-      process.env.RAZORPAY_KEY_SECRET = origSecret;
+      if (origCfEnv !== undefined) process.env.CASHFREE_ENV = origCfEnv; else delete process.env.CASHFREE_ENV;
     }
   });
 });

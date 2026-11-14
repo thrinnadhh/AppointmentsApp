@@ -2,7 +2,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'crypto';
 import { CashfreeAdapter } from '../../apps/merchant-web/src/lib/payment/cashfree-adapter.ts';
-import { RazorpayAdapter } from '../../apps/merchant-web/src/lib/payment/razorpay-adapter.ts';
 import { getPaymentGateway } from '../../apps/merchant-web/src/lib/payment/index.ts';
 import { normalizePhoneNumber, formatOrderIdForCashfree } from '../../apps/merchant-web/src/lib/cashfree.ts';
 
@@ -89,16 +88,6 @@ describe('Payment Gateway Abstraction & Cashfree Adapter (Phase 2)', () => {
 
     assert.equal(result.isValid, false, 'Expired timestamp must be rejected');
     assert.match(result.error || '', /replay|timestamp/i, 'Error message should cite timestamp tolerance');
-  });
-
-  it('6. RazorpayAdapter transparently delegates to CashfreeAdapter (Cashfree-Only)', () => {
-    const adapter = new RazorpayAdapter();
-    assert.equal(adapter.provider, 'cashfree');
-    assert.equal(typeof adapter.createOrder, 'function');
-    assert.equal(typeof adapter.verifyPayment, 'function');
-    assert.equal(typeof adapter.fetchOrder, 'function');
-    assert.equal(typeof adapter.refundOrder, 'function');
-    assert.equal(typeof adapter.verifyWebhook, 'function');
   });
 
   it('7. getPaymentGateway factory standardizes on CashfreeAdapter as the sole gateway provider', () => {

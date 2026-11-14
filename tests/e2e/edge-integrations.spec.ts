@@ -39,6 +39,14 @@ async function createAndConfirmBooking(request: any, opts: {
 }) {
   const customerId = opts.customerId || SEED_CUSTOMER_ID;
   const resourceId = opts.resourceId || CLINIC_RESOURCE_ID;
+
+  // Clear any stale holds for customer to ensure available hold budget
+  await supabase
+    .from('bookings')
+    .update({ hold_expires_at: new Date(Date.now() - 60000).toISOString() })
+    .eq('customer_id', customerId)
+    .eq('status', 'HELD');
+  await supabase.rpc('release_expired_holds');
   let holdRes: any;
   let booking_id = '';
   let slotStart = opts.slotStart;

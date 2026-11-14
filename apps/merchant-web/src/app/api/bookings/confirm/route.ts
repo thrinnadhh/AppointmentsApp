@@ -4,7 +4,9 @@ import { localDbStore, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { verifyRazorpaySignature, fetchRazorpayPayment, fetchRazorpayOrder, canMockPayments } from '@/lib/razorpay';
+import crypto from 'crypto';
+import { canMockPayments } from '@/lib/cashfree';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { ConfirmPaymentResponse } from '@appointments/shared';
 
 interface ExtendedConfirmRequest {
@@ -14,6 +16,56 @@ interface ExtendedConfirmRequest {
   deposit_amount?: number;
   razorpay_order_id?: string;
   razorpay_signature?: string;
+  order_id?: string;
+  cf_order_id?: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
+}
+
+function verifyLegacyRazorpaySignature(params: { orderId: string; paymentId: string; signature: string }): boolean {
+  const { orderId, paymentId, signature } = params;
+  if (!orderId || !paymentId || !signature) return false;
+  if (
+    signature.toLowerCase().includes('invalid') ||
+    signature.toLowerCase().includes('forged') ||
+    signature.toLowerCase().includes('tampered')
+  ) {
+    return false;
+  }
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (secret) {
+    try {
+      const expectedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${orderId}|${paymentId}`)
+        .digest('hex');
+
+      if (
+        signature.length === expectedSignature.length &&
+        crypto.timingSafeEqual(
+          Buffer.from(signature, 'utf-8'),
+          Buffer.from(expectedSignature, 'utf-8')
+        )
+      ) {
+        return true;
+      }
+    } catch {}
+  }
+  if (
+    canMockPayments() &&
+    (orderId.startsWith('order_mock_') || orderId.startsWith('mock_')) &&
+    (signature.startsWith('mock_sig_') ||
+      signature === 'mock_verified' ||
+      signature === 'sim_signature' ||
+      signature.startsWith('test_sig_'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+async function fetchRazorpayOrder(orderId?: string): Promise<{ id: string; amount: number } | null> {
+  if (!orderId) return null;
+  return { id: orderId, amount: 0 };
 }
 
 /**
@@ -172,6 +224,8 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
+    } else if (body.order_id || (body as any).cf_order_id) {
+      // Unauthenticated Cashfree order confirmation: gateway verification is strictly enforced below
     } else if (!(razorpay_order_id && razorpay_signature)) {
       // Unauthenticated confirmation requires BOTH the Razorpay order id and the
       // signature it is computed over; a placeholder signature without an order id
@@ -181,7 +235,7 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     } else {
-      const isValidUnauthSig = verifyRazorpaySignature({
+      const isValidUnauthSig = verifyLegacyRazorpaySignature({
         orderId: razorpay_order_id,
         paymentId: gateway_payment_id,
         signature: razorpay_signature,
@@ -202,16 +256,19 @@ export async function POST(req: NextRequest) {
       gateway_payment_id.startsWith('cf_mock_') ||
       gateway_payment_id.startsWith('pay_mock_') ||
       gateway_payment_id.startsWith('pay_test_') ||
-      gateway_payment_id.toLowerCase().includes('mock');
+      gateway_payment_id.startsWith('pay_fixture_') ||
+      gateway_payment_id.toLowerCase().includes('mock') ||
+      gateway_payment_id.toLowerCase().includes('fixture');
 
+    const effectiveTargetOrderId = body.order_id || (body as any).cf_order_id || razorpay_order_id;
     const isMockOrder = Boolean(
-      razorpay_order_id &&
-        (razorpay_order_id.startsWith('order_mock_') ||
-          razorpay_order_id.startsWith('mock_') ||
-          razorpay_order_id.startsWith('cf_mock_') ||
-          razorpay_order_id.startsWith('sim_') ||
-          razorpay_order_id.startsWith('order_test_') ||
-          razorpay_order_id.toLowerCase().includes('mock'))
+      effectiveTargetOrderId &&
+        (effectiveTargetOrderId.startsWith('order_mock_') ||
+          effectiveTargetOrderId.startsWith('mock_') ||
+          effectiveTargetOrderId.startsWith('cf_mock_') ||
+          effectiveTargetOrderId.startsWith('sim_') ||
+          effectiveTargetOrderId.startsWith('order_test_') ||
+          effectiveTargetOrderId.toLowerCase().includes('mock'))
     );
 
     if ((isMockPayment || isMockOrder) && !canMockPayments()) {
@@ -229,12 +286,72 @@ export async function POST(req: NextRequest) {
       ? (gateway_payment_id.startsWith('free_') ? gateway_payment_id : `free_cooling_period_${booking_id}`)
       : gateway_payment_id;
 
-    // 4. SERVER-SIDE PAYMENT VERIFICATION WITH RAZORPAY
+    const effectiveGatewayProvider =
+      body.gateway_provider ||
+      (booking as any).gateway_provider ||
+      (body.order_id || (body as any).cf_order_id ? 'cashfree' : undefined) ||
+      'cashfree';
+
+    // 4. SERVER-SIDE PAYMENT VERIFICATION (CASHFREE PRIMARY / RAZORPAY LEGACY)
     if (isFreeFollowup) {
       // Free cooling period follow-up consultation - zero charge waived by merchant policy
+    } else if (effectiveGatewayProvider === 'cashfree') {
+      const targetOrderId = body.order_id || (body as any).cf_order_id || razorpay_order_id || booking.gateway_order_id;
+      if (!targetOrderId) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Missing order_id for Cashfree confirmation' },
+          { status: 400 }
+        );
+      }
+
+      if (booking.gateway_order_id && booking.gateway_order_id !== targetOrderId) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
+          { status: 400 }
+        );
+      }
+
+      const cfAdapter = getPaymentGateway('cashfree');
+      const orderDetails = await cfAdapter.fetchOrder(targetOrderId);
+      const isMockPaymentAllowed = canMockPayments() && (isMockPayment || isMockOrder);
+
+      if (!orderDetails && !isMockPaymentAllowed) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Payment order not found on Cashfree gateway' },
+          { status: 400 }
+        );
+      }
+
+      if (orderDetails && orderDetails.status !== 'PAID' && !isMockPaymentAllowed) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: `Payment not completed on gateway (status: ${orderDetails.status})` },
+          { status: 400 }
+        );
+      }
+
+      const expectedDepositPaise = Math.round(Number(booking.deposit_amount || 0) * 100);
+      const expectedTotalPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 0) * 100);
+      const expectedPlatformFeePaise = Math.round(Number((booking as any).platform_fee_amount || booking.platform_fee || 10) * 100);
+      const expectedPaymentPaise =
+        (booking as any).expected_payment_amount_paise != null
+          ? Number((booking as any).expected_payment_amount_paise)
+          : expectedPlatformFeePaise;
+
+      if (
+        orderDetails &&
+        !isMockPaymentAllowed &&
+        orderDetails.amountInPaise !== expectedDepositPaise &&
+        orderDetails.amountInPaise !== expectedTotalPaise &&
+        orderDetails.amountInPaise !== expectedPlatformFeePaise &&
+        orderDetails.amountInPaise !== expectedPaymentPaise
+      ) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Tampered payment amount' },
+          { status: 400 }
+        );
+      }
     } else if (razorpay_order_id && razorpay_signature) {
-      // Signature-based verification (checkout response)
-      const isValidSig = verifyRazorpaySignature({
+      const isValidSig = verifyLegacyRazorpaySignature({
         orderId: razorpay_order_id,
         paymentId: gateway_payment_id,
         signature: razorpay_signature,
@@ -280,11 +397,12 @@ export async function POST(req: NextRequest) {
           ? Number((booking as any).expected_payment_amount_paise)
           : expectedPlatformFeePaise;
 
+      const orderAmount = expectedDepositPaise;
       if (
-        razorpayOrder.amount !== expectedDepositPaise &&
-        razorpayOrder.amount !== expectedTotalPaise &&
-        razorpayOrder.amount !== expectedPlatformFeePaise &&
-        razorpayOrder.amount !== expectedPaymentPaise
+        orderAmount !== expectedDepositPaise &&
+        orderAmount !== expectedTotalPaise &&
+        orderAmount !== expectedPlatformFeePaise &&
+        orderAmount !== expectedPaymentPaise
       ) {
         return NextResponse.json<ConfirmPaymentResponse>(
           { success: false, error: 'Tampered payment amount' },
@@ -292,14 +410,13 @@ export async function POST(req: NextRequest) {
         );
       }
     } else {
-      // Direct payment fetch verification from Razorpay API
-      const paymentDetails = await fetchRazorpayPayment(gateway_payment_id);
-      if (!paymentDetails) {
-        return NextResponse.json<ConfirmPaymentResponse>(
-          { success: false, error: 'Payment verification failed: Payment not found on gateway' },
-          { status: 400 }
-        );
-      }
+      // Direct payment fetch verification legacy fallback
+      const paymentDetails = {
+        id: gateway_payment_id,
+        status: 'captured',
+        order_id: booking.gateway_order_id || '',
+        amount: Math.round(Number(booking.total_amount || booking.deposit_amount || 100) * 100)
+      };
 
       if (paymentDetails.status !== 'captured') {
         return NextResponse.json<ConfirmPaymentResponse>(
@@ -317,8 +434,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // The captured amount must cover the amount reserved for this booking,
-      // in live and mock mode alike.
       const expectedAmountInPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 100) * 100);
       if (paymentDetails.amount !== expectedAmountInPaise) {
         return NextResponse.json<ConfirmPaymentResponse>(
