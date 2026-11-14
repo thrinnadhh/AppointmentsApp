@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { verifyRazorpaySignature, fetchRazorpayPayment, fetchRazorpayOrder, canMockPayments } from '@/lib/razorpay';
+import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { ConfirmPaymentResponse } from '@appointments/shared';
 
 interface ExtendedConfirmRequest {
@@ -14,6 +15,9 @@ interface ExtendedConfirmRequest {
   deposit_amount?: number;
   razorpay_order_id?: string;
   razorpay_signature?: string;
+  order_id?: string;
+  cf_order_id?: string;
+  gateway_provider?: 'cashfree' | 'razorpay';
 }
 
 /**
@@ -172,6 +176,8 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
+    } else if (body.order_id || (body as any).cf_order_id) {
+      // Unauthenticated Cashfree order confirmation: gateway verification is strictly enforced below
     } else if (!(razorpay_order_id && razorpay_signature)) {
       // Unauthenticated confirmation requires BOTH the Razorpay order id and the
       // signature it is computed over; a placeholder signature without an order id
@@ -204,14 +210,15 @@ export async function POST(req: NextRequest) {
       gateway_payment_id.startsWith('pay_test_') ||
       gateway_payment_id.toLowerCase().includes('mock');
 
+    const effectiveTargetOrderId = body.order_id || (body as any).cf_order_id || razorpay_order_id;
     const isMockOrder = Boolean(
-      razorpay_order_id &&
-        (razorpay_order_id.startsWith('order_mock_') ||
-          razorpay_order_id.startsWith('mock_') ||
-          razorpay_order_id.startsWith('cf_mock_') ||
-          razorpay_order_id.startsWith('sim_') ||
-          razorpay_order_id.startsWith('order_test_') ||
-          razorpay_order_id.toLowerCase().includes('mock'))
+      effectiveTargetOrderId &&
+        (effectiveTargetOrderId.startsWith('order_mock_') ||
+          effectiveTargetOrderId.startsWith('mock_') ||
+          effectiveTargetOrderId.startsWith('cf_mock_') ||
+          effectiveTargetOrderId.startsWith('sim_') ||
+          effectiveTargetOrderId.startsWith('order_test_') ||
+          effectiveTargetOrderId.toLowerCase().includes('mock'))
     );
 
     if ((isMockPayment || isMockOrder) && !canMockPayments()) {
@@ -229,9 +236,70 @@ export async function POST(req: NextRequest) {
       ? (gateway_payment_id.startsWith('free_') ? gateway_payment_id : `free_cooling_period_${booking_id}`)
       : gateway_payment_id;
 
-    // 4. SERVER-SIDE PAYMENT VERIFICATION WITH RAZORPAY
+    const effectiveGatewayProvider =
+      body.gateway_provider ||
+      (booking as any).gateway_provider ||
+      (body.order_id || (body as any).cf_order_id ? 'cashfree' : undefined) ||
+      'cashfree';
+
+    // 4. SERVER-SIDE PAYMENT VERIFICATION (CASHFREE PRIMARY / RAZORPAY LEGACY)
     if (isFreeFollowup) {
       // Free cooling period follow-up consultation - zero charge waived by merchant policy
+    } else if (effectiveGatewayProvider === 'cashfree') {
+      const targetOrderId = body.order_id || (body as any).cf_order_id || razorpay_order_id || booking.gateway_order_id;
+      if (!targetOrderId) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Missing order_id for Cashfree confirmation' },
+          { status: 400 }
+        );
+      }
+
+      if (booking.gateway_order_id && booking.gateway_order_id !== targetOrderId) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Order ID mismatch or unlinked booking: Payment order ID does not match booking reservation' },
+          { status: 400 }
+        );
+      }
+
+      const cfAdapter = getPaymentGateway('cashfree');
+      const orderDetails = await cfAdapter.fetchOrder(targetOrderId);
+      const isMockPaymentAllowed = canMockPayments() && (isMockPayment || isMockOrder);
+
+      if (!orderDetails && !isMockPaymentAllowed) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Payment order not found on Cashfree gateway' },
+          { status: 400 }
+        );
+      }
+
+      if (orderDetails && orderDetails.status !== 'PAID' && !isMockPaymentAllowed) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: `Payment not completed on gateway (status: ${orderDetails.status})` },
+          { status: 400 }
+        );
+      }
+
+      const expectedDepositPaise = Math.round(Number(booking.deposit_amount || 0) * 100);
+      const expectedTotalPaise = Math.round(Number(booking.total_amount || booking.deposit_amount || 0) * 100);
+      const expectedPlatformFeePaise = Math.round(Number((booking as any).platform_fee_amount || booking.platform_fee || 10) * 100);
+      const expectedPaymentPaise =
+        (booking as any).expected_payment_amount_paise != null
+          ? Number((booking as any).expected_payment_amount_paise)
+          : expectedPlatformFeePaise;
+
+      if (
+        orderDetails &&
+        !isMockPaymentAllowed &&
+        orderDetails.amountInPaise !== expectedDepositPaise &&
+        orderDetails.amountInPaise !== expectedTotalPaise &&
+        orderDetails.amountInPaise !== expectedPlatformFeePaise &&
+        orderDetails.amountInPaise !== expectedPaymentPaise
+      ) {
+        return NextResponse.json<ConfirmPaymentResponse>(
+          { success: false, error: 'Tampered payment amount' },
+          { status: 400 }
+        );
+      }
     } else if (razorpay_order_id && razorpay_signature) {
       // Signature-based verification (checkout response)
       const isValidSig = verifyRazorpaySignature({

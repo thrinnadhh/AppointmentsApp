@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
           let refundId = '';
           let refundAmount: number;
 
-          if (bkg.gateway_provider === 'cashfree') {
+          if (bkg.gateway_provider !== 'razorpay') {
             const cfAdapter = getPaymentGateway('cashfree');
             const refundResult = await cfAdapter.refundOrder({
               orderId: bkg.gateway_order_id || booking_id,

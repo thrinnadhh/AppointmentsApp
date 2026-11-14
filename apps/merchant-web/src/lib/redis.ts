@@ -66,7 +66,8 @@ export function getRateLimitSalt(): string {
     return envSalt.trim();
   }
   if (!devRandomSalt) {
-    devRandomSalt = crypto.randomBytes(32).toString('hex');
+    // In dev/test: deterministic salt per repository environment so cross-process/serverless calls align
+    devRandomSalt = crypto.createHash('sha256').update('appointments-dev-salt-deterministic-32b').digest('hex');
   }
   return devRandomSalt;
 }
@@ -315,10 +316,10 @@ export async function checkRateLimit(
       p_window_seconds: windowSeconds,
     });
     if (!error) {
-      const allowed = Boolean(data) && localCount <= limit;
+      const allowed = Boolean(data);
       return {
         allowed,
-        remaining: Math.max(0, limit - localCount),
+        remaining: allowed ? Math.max(0, limit - localCount) : 0,
         reset: resetTime,
       };
     }

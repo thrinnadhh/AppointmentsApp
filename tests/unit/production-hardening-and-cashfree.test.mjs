@@ -131,6 +131,56 @@ describe('Production Readiness & Security Hardening Test Suite (Tasks 1–6)', (
         /rate_limit_exceeded|Maximum 3 concurrent active booking holds allowed/i,
         `Error message must contain rate limit explanation, got: ${errMsg}`
       );
+
+      // ── Concurrency Race Condition Hardening Verification ───────────────────
+      // Launch 5 parallel requests simultaneously for the same customer to verify
+      // that the transactional advisory lock pg_advisory_xact_lock prevents race bypasses.
+      const concurrentCustomerId = '99999999-9999-9999-9999-999999999992';
+      await supabaseAdmin.from('bookings').delete().eq('customer_id', concurrentCustomerId);
+
+      const header2 = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+      const payload2 = Buffer.from(
+        JSON.stringify({
+          sub: concurrentCustomerId,
+          aud: 'authenticated',
+          role: 'authenticated',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        })
+      ).toString('base64url');
+      const sig2 = crypto.createHmac('sha256', secret).update(`${header2}.${payload2}`).digest('base64url');
+      const userToken2 = `${header2}.${payload2}.${sig2}`;
+
+      const concurrentAuthClient = createClient(SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy', {
+        global: {
+          headers: { Authorization: `Bearer ${userToken2}` },
+        },
+      });
+
+      try {
+        const concurrentResults = await Promise.all(
+          [0, 1, 2, 3, 4].map(async (i) => {
+            const start = new Date(baseTime + (100 + i) * 3600000).toISOString();
+            const end = new Date(baseTime + (100 + i) * 3600000 + 1800000).toISOString();
+            const res = await concurrentAuthClient.rpc('create_booking_hold', {
+              p_resource_id: resourceId,
+              p_slot_start: start,
+              p_slot_end: end,
+              p_customer_id: concurrentCustomerId,
+            });
+            const isOk = !res.error && res.data?.success !== false;
+            return { ok: isOk, error: res.error?.message || res.data?.error };
+          })
+        );
+
+        const successfulHolds = concurrentResults.filter((r) => r.ok).length;
+        assert.equal(
+          successfulHolds,
+          3,
+          `Transactional advisory lock MUST restrict concurrent race to exactly 3 successful holds (got ${successfulHolds})`
+        );
+      } finally {
+        await supabaseAdmin.from('bookings').delete().eq('customer_id', concurrentCustomerId);
+      }
     } finally {
       // Cleanup test bookings
       if (holdIds.length > 0) {
@@ -262,16 +312,15 @@ describe('Production Readiness & Security Hardening Test Suite (Tasks 1–6)', (
       .maybeSingle();
     assert.equal(competingNone, null);
 
-    // Reclaim logic: atomically update to CONFIRMED
-    await supabaseAdmin
-      .from('bookings')
-      .update({
-        status: 'CONFIRMED',
-        payment_status: 'CAPTURED',
-        gateway_payment_id: `cf_pay_case_a_${Date.now()}`,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bkgA.id);
+    // Reclaim logic: atomically invoke reclaim_expired_hold_or_refund RPC
+    const { data: rpcA, error: rpcErrA } = await supabaseAdmin.rpc('reclaim_expired_hold_or_refund', {
+      p_booking_id: bkgA.id,
+      p_payment_id: `cf_pay_case_a_${Date.now()}`,
+      p_order_id: `cf_order_case_a_${Date.now()}`,
+      p_amount: 100,
+    });
+    assert.equal(rpcErrA, null, `reclaim_expired_hold_or_refund RPC failed: ${rpcErrA?.message}`);
+    assert.equal(rpcA?.reclaimed, true, 'Case A must reclaim slot to CONFIRMED when free');
 
     const { data: verifiedA } = await supabaseAdmin
       .from('bookings')
@@ -322,24 +371,19 @@ describe('Production Readiness & Security Hardening Test Suite (Tasks 1–6)', (
       .select('id')
       .single();
 
-    // 3. Insert CRITICAL audit log as required for Case B
-    const { error: auditErr } = await supabaseAdmin.from('admin_audit_logs').insert({
-      action: 'LATE_PAYMENT_REFUND_SLOT_COLLISION',
-      target_type: 'booking',
-      target_id: bkgB.id,
-      details: {
-        order_id: lateOrderId,
-        payment_id: latePaymentId,
-        resource_id: resource.id,
-        slot_start: slotStartB,
-        conflicting_booking_id: competitorBkg.id,
-        severity: 'CRITICAL',
-        message: 'Late payment arrived after hold expired; slot taken by competitor. Automated Cashfree refund triggered.',
-      },
+    // 3. Invoke atomic RPC for Case B - must detect collision, trigger refund flag, and write CRITICAL audit log
+    const { data: rpcB, error: rpcErrB } = await supabaseAdmin.rpc('reclaim_expired_hold_or_refund', {
+      p_booking_id: bkgB.id,
+      p_payment_id: latePaymentId,
+      p_order_id: lateOrderId,
+      p_amount: 100,
     });
-    assert.equal(auditErr, null, `CRITICAL audit log must be written: ${auditErr?.message}`);
+    assert.equal(rpcErrB, null, `reclaim_expired_hold_or_refund RPC failed: ${rpcErrB?.message}`);
+    assert.equal(rpcB?.reclaimed, false, 'Case B must not reclaim occupied slot');
+    assert.equal(rpcB?.trigger_refund, true, 'Case B must signal auto-refund required');
+    assert.equal(rpcB?.conflicting_booking_id, competitorBkg.id);
 
-    // Verify audit log exists with severity: 'CRITICAL'
+    // Verify audit log was automatically written by the RPC with severity: 'CRITICAL'
     const { data: auditRecord } = await supabaseAdmin
       .from('admin_audit_logs')
       .select('*')
@@ -352,8 +396,9 @@ describe('Production Readiness & Security Hardening Test Suite (Tasks 1–6)', (
     assert.equal(auditRecord.details?.conflicting_booking_id, competitorBkg.id);
 
     // Cleanup
-    await supabaseAdmin.from('bookings').delete().in('id', [bkgA.id, bkgB.id, competitorBkg.id]);
+    await supabaseAdmin.from('payments').delete().in('booking_id', [bkgA.id, bkgB.id, competitorBkg.id]);
     await supabaseAdmin.from('admin_audit_logs').delete().eq('target_id', bkgB.id);
+    await supabaseAdmin.from('bookings').delete().in('id', [bkgA.id, bkgB.id, competitorBkg.id]);
   });
 
   // ───────────────────────────────────────────────────────────────────────────

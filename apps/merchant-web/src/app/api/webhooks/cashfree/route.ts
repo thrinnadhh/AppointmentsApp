@@ -126,46 +126,23 @@ export async function POST(req: NextRequest) {
 
       if (!payableStatuses.includes(booking.status) || isHoldExpired) {
         // Late payment arrived for expired hold or cancelled slot:
-        // Check if slot is still free (Case A) or occupied by another confirmed booking (Case B)
-        const { data: conflictingBooking } = await supabaseAdmin
-          .from('bookings')
-          .select('id')
-          .eq('resource_id', booking.resource_id)
-          .eq('slot_start', booking.slot_start)
-          .eq('status', 'CONFIRMED')
-          .neq('id', booking.id)
-          .maybeSingle();
+        // Use atomic PostgreSQL RPC with slot-level transactional locking
+        // to eliminate TOCTOU race conditions and double-booking.
+        const { data: rpcData, error: rpcErr } = await (supabaseAdmin.rpc as any)('reclaim_expired_hold_or_refund', {
+          p_booking_id: booking.id,
+          p_payment_id: paymentId,
+          p_order_id: orderId,
+          p_amount: rawAmountInRupees,
+          p_currency: paymentCurrency,
+        });
 
-        if (!conflictingBooking) {
-          // Case A: Slot is still free. Atomically reclaim and confirm the booking!
-          await supabaseAdmin
-            .from('bookings')
-            .update({
-              status: 'CONFIRMED',
-              payment_status: 'CAPTURED',
-              gateway_payment_id: paymentId,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', booking.id);
+        if (rpcErr) {
+          console.error('[Cashfree Webhook] Error in reclaim_expired_hold_or_refund RPC:', rpcErr);
+          return NextResponse.json({ error: rpcErr.message }, { status: 500 });
+        }
 
-          await supabaseAdmin.from('payments').upsert(
-            {
-              booking_id: booking.id,
-              gateway_payment_id: paymentId,
-              amount: rawAmountInRupees,
-              currency: paymentCurrency,
-              status: 'CAPTURED',
-              metadata: {
-                gateway: 'cashfree',
-                order_id: orderId,
-                event: eventType,
-                reclaimed_expired_hold: true,
-                captured_at: new Date().toISOString(),
-              },
-            },
-            { onConflict: 'gateway_payment_id' }
-          );
-
+        if (rpcData?.reclaimed) {
+          // Case A: Slot was free and atomically reclaimed
           return NextResponse.json({
             status: 'OK',
             success: true,
@@ -176,51 +153,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Case B: Slot is occupied by a competing booking.
-        // Record payment into ledger, mark booking REFUND_PENDING, trigger Cashfree refund, and write CRITICAL audit log!
-        await supabaseAdmin.from('payments').upsert(
-          {
-            booking_id: booking.id,
-            gateway_payment_id: paymentId,
-            amount: rawAmountInRupees,
-            currency: paymentCurrency,
-            status: 'CAPTURED',
-            metadata: {
-              gateway: 'cashfree',
-              order_id: orderId,
-              event: eventType,
-              reason: 'Late payment received after booking hold expired and slot was taken',
-              captured_at: new Date().toISOString(),
-            },
-          },
-          { onConflict: 'gateway_payment_id' }
-        );
-
-        await supabaseAdmin
-          .from('bookings')
-          .update({
-            status: 'CANCELLED',
-            payment_status: 'REFUND_PENDING',
-            gateway_payment_id: paymentId,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', booking.id);
-
-        // Audit log entry: CRITICAL security/financial event
-        await supabaseAdmin.from('admin_audit_logs').insert({
-          action: 'LATE_PAYMENT_REFUND_SLOT_COLLISION',
-          target_type: 'booking',
-          target_id: booking.id,
-          details: {
-            order_id: orderId,
-            payment_id: paymentId,
-            resource_id: booking.resource_id,
-            slot_start: booking.slot_start,
-            conflicting_booking_id: conflictingBooking.id,
-            severity: 'CRITICAL',
-            message: 'Late payment arrived after hold expired; slot taken by competitor. Automated Cashfree refund triggered.',
-          },
-        });
-
+        // The RPC atomically set booking to CANCELLED / REFUND_PENDING and created the CRITICAL audit log.
+        // Now trigger the real Cashfree refund API call.
         try {
           const refundResult = await adapter.refundOrder({
             orderId: orderId,
@@ -248,6 +182,15 @@ export async function POST(req: NextRequest) {
               reason: 'Hold expired and slot occupied before payment completion',
             },
           });
+
+          return NextResponse.json({
+            status: 'OK',
+            success: true,
+            booking_id: booking.id,
+            reclaimed: false,
+            refund_id: refundResult.refundId,
+            message: 'Slot was occupied by competitor. Late payment automatically refunded via Cashfree.',
+          });
         } catch (refundErr) {
           const errorMsg = refundErr instanceof Error ? refundErr.message : String(refundErr);
           await supabaseAdmin
@@ -261,12 +204,14 @@ export async function POST(req: NextRequest) {
             .eq('gateway_payment_id', paymentId);
 
           console.error('[Cashfree Webhook] Refund failed for expired hold booking:', booking.id, errorMsg);
+          return NextResponse.json({
+            status: 'ERROR',
+            success: false,
+            booking_id: booking.id,
+            reclaimed: false,
+            error: errorMsg || 'Auto-refund failed; marked REFUND_FAILED for admin reconciliation',
+          }, { status: 500 });
         }
-
-        return NextResponse.json(
-          { status: 'OK', success: false, error: 'Hold expired before payment; refund initiated', booking_id: booking.id },
-          { status: 200 }
-        );
       }
 
       // Valid active hold: settle payment via Supabase RPC confirm_booking_payment
