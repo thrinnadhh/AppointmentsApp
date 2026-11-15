@@ -268,7 +268,7 @@ export default function LoginPage() {
   const isGoogleFullyConfigured =
     isGoogleFlagEnabled &&
     isGoogleAuthConfigured(undefined, {
-      supabaseSettingsGoogle: supabaseGoogleActive === true,
+      supabaseSettingsGoogle: supabaseGoogleActive === null ? undefined : supabaseGoogleActive,
     });
   const missingGoogleVars = getMissingGoogleAuthVars();
 
