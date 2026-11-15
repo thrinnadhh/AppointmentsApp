@@ -467,6 +467,7 @@ export default function LoginPage() {
                     data-testid="login-email"
                     aria-label="Authorized Email"
                     type="email"
+                    autoComplete="username"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -492,6 +493,7 @@ export default function LoginPage() {
                     data-testid="login-password"
                     aria-label="Password"
                     type="password"
+                    autoComplete="current-password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -540,6 +542,7 @@ export default function LoginPage() {
                       data-testid="register-full-name"
                       aria-label="Administrator Full Name"
                       type="text"
+                      autoComplete="name"
                       required
                       value={regFullName}
                       onChange={(e) => setRegFullName(e.target.value)}
@@ -562,6 +565,7 @@ export default function LoginPage() {
                       data-testid="register-email"
                       aria-label="Business Email"
                       type="email"
+                      autoComplete="username"
                       required
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
@@ -587,6 +591,7 @@ export default function LoginPage() {
                       data-testid="register-password"
                       aria-label="Password"
                       type="password"
+                      autoComplete="new-password"
                       required
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
@@ -609,6 +614,7 @@ export default function LoginPage() {
                       data-testid="register-confirm-password"
                       aria-label="Confirm Password"
                       type="password"
+                      autoComplete="new-password"
                       required
                       value={regConfirmPassword}
                       onChange={(e) => setRegConfirmPassword(e.target.value)}

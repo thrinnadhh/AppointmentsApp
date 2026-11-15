@@ -344,3 +344,33 @@ time,
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* ============================================================
+   MODERN WEB GUIDANCE — Baseline Form Field Sizing & Reduced Motion
+   ============================================================ */
+
+/* Baseline: Auto-expanding form fields */
+.field-sizing-content {
+  field-sizing: content;
+  width: 100%;
+  min-block-size: 3lh;
+  max-block-size: 10lh;
+}
+
+/* Accessibility: Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+  .animate-ping,
+  .animate-pulse {
+    animation: none !important;
+  }
+  .animate-spin {
+    animation-duration: 4s !important;
+  }
+  .btn:active {
+    transform: none !important;
+  }
+}
+

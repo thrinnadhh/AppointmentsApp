@@ -201,7 +201,7 @@ export default function ActiveConsultationCard({
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}
           placeholder="Document symptoms, physical examination findings, differential diagnosis, and prescribed medication..."
-          className="w-full text-sm text-slate-800 bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition resize-y"
+          className="w-full text-sm text-slate-800 bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition resize-y field-sizing-content"
         />
 
         {/* Quick Prescription Chips */}

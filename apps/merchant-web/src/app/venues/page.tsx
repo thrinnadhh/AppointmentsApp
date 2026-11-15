@@ -426,7 +426,7 @@ export default function VenuesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredVenues.map((venue) => {
+          {filteredVenues.map((venue, idx) => {
             const resourceCount = venue.resources ? venue.resources.length : 0;
             return (
               <div
@@ -439,6 +439,7 @@ export default function VenuesPage() {
                     alt={venue.name}
                     width={400}
                     height={144}
+                    priority={idx < 2}
                     className="w-full h-36 object-cover border-b border-slate-100"
                     unoptimized
                   />
@@ -897,6 +898,7 @@ export default function VenuesPage() {
                             src={getVenueAssetUrl(photoUrl, { width: 240, quality: 75 })}
                             alt={`Store photo ${idx + 1}`}
                             fill
+                            sizes="(max-width: 768px) 33vw, 120px"
                             className="object-cover"
                             unoptimized
                           />

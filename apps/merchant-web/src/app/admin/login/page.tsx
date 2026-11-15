@@ -402,8 +402,10 @@ function AdminLoginForm() {
                 </div>
                 <input
                   id="admin-login-email"
+                  name="email"
                   data-testid="admin-login-email"
                   type="email"
+                  autoComplete="username"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -426,8 +428,10 @@ function AdminLoginForm() {
                 </div>
                 <input
                   id="admin-login-password"
+                  name="password"
                   data-testid="admin-login-password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -477,9 +481,11 @@ function AdminLoginForm() {
               </label>
               <input
                 id="admin-mfa-code"
+                name="mfaCode"
                 data-testid="admin-mfa-code"
                 type="text"
                 inputMode="numeric"
+                autoComplete="one-time-code"
                 pattern="[0-9]*"
                 maxLength={6}
                 required
@@ -594,9 +600,11 @@ function AdminLoginForm() {
               </label>
               <input
                 id="admin-mfa-code"
+                name="mfaCode"
                 data-testid="admin-mfa-code"
                 type="text"
                 inputMode="numeric"
+                autoComplete="one-time-code"
                 pattern="[0-9]*"
                 maxLength={6}
                 required
