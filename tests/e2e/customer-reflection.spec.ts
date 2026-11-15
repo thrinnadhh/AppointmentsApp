@@ -372,7 +372,18 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     expect(profileRow.role).toBe('customer');
 
     // 3. UI Verification: Customer Mobile App Phone OTP Sign In
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('dpdp_consent_granted', 'true');
+      } catch {}
+    });
     await page.goto('http://localhost:8081');
+    const consentBtn = page.getByRole('button', { name: /Accept & Continue/i })
+      .or(page.getByLabel('Accept and continue'))
+      .or(page.getByText('Accept & Continue'));
+    if (await consentBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await consentBtn.click().catch(() => {});
+    }
     await page.waitForLoadState('networkidle');
 
     // Open Profile Modal

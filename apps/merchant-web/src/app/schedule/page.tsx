@@ -15,6 +15,7 @@ import {
   Plus
 } from 'lucide-react';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
+import { supabase } from '@/lib/supabase';
 import { Resource } from '@appointments/shared';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -46,23 +47,53 @@ export default function ScheduleManagementPage() {
     { day: 5, enabled: true, start: '09:00', end: '20:00' },  // Fri
     { day: 6, enabled: true, start: '09:00', end: '19:00' },  // Sat
   ]);
+  const [slotDuration, setSlotDuration] = useState<number>(15);
   const [saved, setSaved] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   // Leave & Absence management state
-  const [leaves, setLeaves] = useState<DoctorLeave[]>([
-    {
-      id: 'leave-1',
-      doctorId: resources[0]?.id || 'doc-1',
-      doctorName: resources[0]?.name || 'Dr. Ramesh Kumar',
-      date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-      reason: 'Medical Conference Attendance',
-      createdAt: new Date().toISOString(),
-    }
-  ]);
+  const [leaves, setLeaves] = useState<DoctorLeave[]>([]);
   const [leaveDate, setLeaveDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('Planned Leave');
   const [leaveDoctorId, setLeaveDoctorId] = useState('');
   const [leaveSuccess, setLeaveSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeProvider?.weekly_hours && Array.isArray(activeProvider.weekly_hours)) {
+      setSchedule(activeProvider.weekly_hours as any);
+    }
+    if (resources[0]?.duration_minutes) {
+      setSlotDuration(resources[0].duration_minutes);
+    }
+  }, [activeProvider?.weekly_hours, resources]);
+
+  useEffect(() => {
+    if (!activeProvider?.id) return;
+    const fetchLeaves = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('resource_leaves')
+          .select('*')
+          .eq('provider_id', activeProvider.id)
+          .order('leave_date', { ascending: true });
+        if (!error && Array.isArray(data)) {
+          setLeaves(
+            data.map((l: any) => ({
+              id: l.id,
+              doctorId: l.resource_id,
+              doctorName: l.doctor_name,
+              date: typeof l.leave_date === 'string' ? l.leave_date.split('T')[0] : l.leave_date,
+              reason: l.reason,
+              createdAt: l.created_at,
+            }))
+          );
+        }
+      } catch (e) {
+        console.warn('Failed to fetch resource leaves:', e);
+      }
+    };
+    fetchLeaves();
+  }, [activeProvider?.id]);
 
   useEffect(() => {
     if (resources.length > 0 && !leaveDoctorId) {
@@ -78,35 +109,77 @@ export default function ScheduleManagementPage() {
     setSchedule(prev => prev.map(s => s.day === dayIndex ? { ...s, [field]: val } : s));
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    if (!activeProvider?.id) return;
+    setSaveLoading(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)('merchant_save_weekly_schedule', {
+        p_provider_id: activeProvider.id,
+        p_schedule: schedule,
+        p_slot_duration_minutes: slotDuration,
+      });
+      if (error || (data && (data as any).success === false)) {
+        throw new Error(error?.message || (data as any)?.error || 'Failed to save schedule');
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error('Failed to save weekly schedule:', err);
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
-  const handleAddLeave = (e: React.FormEvent) => {
+  const handleAddLeave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!leaveDate) return;
+    if (!leaveDate || !activeProvider?.id) return;
 
     const matchedDoc = resources.find((r) => r.id === leaveDoctorId);
     const docName = matchedDoc ? matchedDoc.name : 'Consultant Doctor';
 
-    const newLeave: DoctorLeave = {
-      id: `leave-${Date.now()}`,
-      doctorId: leaveDoctorId || 'all',
-      doctorName: docName,
-      date: leaveDate,
-      reason: leaveReason.trim() || 'Planned Leave',
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      const { data, error } = await (supabase.rpc as any)('merchant_add_resource_leave', {
+        p_provider_id: activeProvider.id,
+        p_resource_id: leaveDoctorId || 'all',
+        p_doctor_name: docName,
+        p_leave_date: leaveDate,
+        p_reason: leaveReason.trim() || 'Planned Leave',
+      });
 
-    setLeaves((prev) => [newLeave, ...prev]);
-    setLeaveDate('');
-    setLeaveSuccess(`Leave marked for ${docName} on ${leaveDate}. Consultation bookings for this date will be unavailable.`);
-    setTimeout(() => setLeaveSuccess(null), 4000);
+      if (error || (data && (data as any).success === false)) {
+        throw new Error(error?.message || (data as any)?.error || 'Failed to record leave');
+      }
+
+      const created = (data as any)?.leave;
+      const newLeave: DoctorLeave = {
+        id: created?.id || `leave-${Date.now()}`,
+        doctorId: leaveDoctorId || 'all',
+        doctorName: docName,
+        date: leaveDate,
+        reason: leaveReason.trim() || 'Planned Leave',
+        createdAt: new Date().toISOString(),
+      };
+
+      setLeaves((prev) => [newLeave, ...prev]);
+      setLeaveDate('');
+      setLeaveSuccess(`Leave marked for ${docName} on ${leaveDate}. Consultation bookings for this date will be unavailable.`);
+      setTimeout(() => setLeaveSuccess(null), 4000);
+    } catch (err: any) {
+      console.error('Failed to record doctor absence:', err);
+    }
   };
 
-  const handleRemoveLeave = (leaveId: string) => {
-    setLeaves((prev) => prev.filter((l) => l.id !== leaveId));
+  const handleRemoveLeave = async (leaveId: string) => {
+    try {
+      const { data, error } = await (supabase.rpc as any)('merchant_delete_resource_leave', {
+        p_leave_id: leaveId,
+      });
+      if (!error && data !== false) {
+        setLeaves((prev) => prev.filter((l) => l.id !== leaveId));
+      }
+    } catch (err) {
+      console.error('Failed to remove leave:', err);
+    }
   };
 
   const filteredLeaves = useMemo(() => {

@@ -103,20 +103,32 @@ export default function ProviderDetailScreen({
     return `${hour12}:${String(m || 0).padStart(2, '0')} ${period}`;
   };
 
-  const todaySched = provider?.weekly_hours?.[todayDay];
-  const tomorrowSched = provider?.weekly_hours?.[tomorrowDay];
+  const getDaySched = (sched: any) => {
+    if (!sched) return null;
+    const isClosed = sched.is_closed === true || sched.enabled === false;
+    const open = sched.open || sched.start || '09:00';
+    const close = sched.close || sched.end || '20:00';
+    return { isClosed, open, close };
+  };
+
+  const todaySched = getDaySched(provider?.weekly_hours?.[todayDay]);
+  const tomorrowSched = getDaySched(provider?.weekly_hours?.[tomorrowDay]);
+
+  const todayOpen24 = todaySched ? todaySched.open.slice(0, 5) : provider ? provider.opening_time.slice(0, 5) : '09:00';
+  const todayClose24 = todaySched ? todaySched.close.slice(0, 5) : provider ? provider.closing_time.slice(0, 5) : '20:00';
+  const todayHours24Str = `${todayOpen24} - ${todayClose24}`;
 
   const todayHoursStr = todaySched
-    ? (todaySched.is_closed ? 'Closed today' : `${formatTimeStr(todaySched.open)} - ${formatTimeStr(todaySched.close)}`)
+    ? (todaySched.isClosed ? 'Closed today' : `${formatTimeStr(todaySched.open)} - ${formatTimeStr(todaySched.close)}`)
     : provider ? `${provider.opening_time.slice(0, 5)} - ${provider.closing_time.slice(0, 5)}` : '—';
 
   const tomorrowHoursStr = tomorrowSched
-    ? (tomorrowSched.is_closed ? 'Closed' : `${formatTimeStr(tomorrowSched.open)} - ${formatTimeStr(tomorrowSched.close)}`)
+    ? (tomorrowSched.isClosed ? 'Closed' : `${formatTimeStr(tomorrowSched.open)} - ${formatTimeStr(tomorrowSched.close)}`)
     : null;
 
   const selectedDate = dates[selectedDateIndex];
   const selectedDayName = selectedDate ? dayNames[selectedDate.getDay()] : null;
-  const isSelectedDateClosed = Boolean(provider?.weekly_hours && selectedDayName && provider.weekly_hours[selectedDayName]?.is_closed);
+  const isSelectedDateClosed = Boolean(provider?.weekly_hours && selectedDayName && getDaySched(provider.weekly_hours[selectedDayName])?.isClosed);
 
   useEffect(() => {
     if (selectedResource && dates[selectedDateIndex]) {
@@ -255,7 +267,7 @@ export default function ProviderDetailScreen({
           <Text style={styles.name}>{provider.name}</Text>
           <Text style={styles.address}>📍 {provider.address}</Text>
           <Text style={styles.hours} testID="customer-provider-hours">
-            🕒 Today: {todayHoursStr} {tomorrowHoursStr ? `• Tomorrow: ${tomorrowHoursStr}` : ''}
+            🕒 Today: {todayHours24Str} ({todayHoursStr}) {tomorrowHoursStr ? `• Tomorrow: ${tomorrowHoursStr}` : ''}
           </Text>
           <Text style={styles.description}>{provider.description}</Text>
         </View>

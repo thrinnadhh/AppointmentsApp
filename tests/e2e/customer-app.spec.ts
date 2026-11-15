@@ -11,6 +11,12 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
   let customerApp: CustomerAppPage;
 
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('dpdp_consent_granted', 'true');
+      } catch {}
+    });
+
     // Cancel or delete any stale active holds or bookings for the test customer on this resource to prevent slot collision
     if (SUPABASE_KEY) {
       const { data: customerProfiles } = await supabase

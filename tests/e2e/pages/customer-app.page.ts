@@ -175,7 +175,21 @@ export class CustomerAppPage {
   }
 
   async goto() {
+    try {
+      await this.page.addInitScript(() => {
+        try {
+          localStorage.setItem('dpdp_consent_granted', 'true');
+        } catch {}
+      });
+    } catch {}
+
     await this.page.goto('http://localhost:8081', { waitUntil: 'domcontentloaded' });
+    const consentBtn = this.page.getByRole('button', { name: /Accept & Continue/i })
+      .or(this.page.getByLabel('Accept and continue'))
+      .or(this.page.getByText('Accept & Continue'));
+    if (await consentBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await consentBtn.click().catch(() => {});
+    }
     if (await this.cancelModalBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
       await this.cancelModalBtn.click().catch(() => {});
     }
@@ -186,6 +200,9 @@ export class CustomerAppPage {
       if (await this.backButton.isVisible({ timeout: 1000 }).catch(() => false)) {
         await this.backButton.click().catch(() => {});
       }
+    }
+    if (await consentBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await consentBtn.click().catch(() => {});
     }
     await expect(this.appTitle).toBeVisible({ timeout: 20000 });
   }

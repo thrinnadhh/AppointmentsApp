@@ -73,6 +73,11 @@ export const test = base.extend<AppTestFixtures>({
 
   customerApp: async ({ browser }, use) => {
     const context = await browser.newContext();
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem('dpdp_consent_granted', 'true');
+      } catch {}
+    });
     const page = await context.newPage();
     const customer = new CustomerAppPage(page);
     await customer.goto();

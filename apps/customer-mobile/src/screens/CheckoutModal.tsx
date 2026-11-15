@@ -1046,8 +1046,10 @@ export default function CheckoutModal({
                 </Text>
               </View>
               <View style={styles.feeRow}>
-                <Text style={[styles.feeLabel, { color: '#94a3b8', fontSize: 11 }]}>GST on platform fee</Text>
-                <Text style={[styles.feeValue, { color: '#94a3b8', fontSize: 11 }]}>Not applicable*</Text>
+                <Text style={[styles.feeLabel, { color: '#64748b', fontSize: 12 }]}>18% GST on platform fee</Text>
+                <Text style={[styles.feeValue, { color: '#64748b', fontSize: 12 }]}>
+                  {isFreeFollowup ? '₹0.00' : `₹${(platformFee * 0.18).toFixed(2)} (Inclusive)`}
+                </Text>
               </View>
               <View style={[styles.feeRow, styles.feeTotalRow]}>
                 <Text style={styles.feeTotalLabel}>Total charged online now</Text>

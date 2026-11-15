@@ -71,6 +71,9 @@ export interface Provider {
   penalty_balance?: number;
   is_booking_frozen?: boolean;
   cooling_period_days?: number;
+  auto_confirm_holds?: boolean;
+  whatsapp_confirmations?: boolean;
+  reminder_offset_hours?: number;
   created_at: string;
   updated_at: string;
 }

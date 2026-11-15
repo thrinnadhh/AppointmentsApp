@@ -1125,6 +1125,9 @@ export type Database = {
         Row: {
           address: string
           auto_accept_bookings: boolean
+          auto_confirm_holds: boolean | null
+          whatsapp_confirmations: boolean | null
+          reminder_offset_hours: number | null
           cancellation_strikes: number
           category_id: string
           city: string
@@ -1158,6 +1161,9 @@ export type Database = {
         Insert: {
           address: string
           auto_accept_bookings?: boolean
+          auto_confirm_holds?: boolean | null
+          whatsapp_confirmations?: boolean | null
+          reminder_offset_hours?: number | null
           cancellation_strikes?: number
           category_id: string
           city?: string
@@ -1191,6 +1197,9 @@ export type Database = {
         Update: {
           address?: string
           auto_accept_bookings?: boolean
+          auto_confirm_holds?: boolean | null
+          whatsapp_confirmations?: boolean | null
+          reminder_offset_hours?: number | null
           cancellation_strikes?: number
           category_id?: string
           city?: string
@@ -1276,6 +1285,44 @@ export type Database = {
             columns: ["resource_id"]
             isOneToOne: false
             referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_leaves: {
+        Row: {
+          created_at: string
+          doctor_name: string
+          id: string
+          leave_date: string
+          provider_id: string
+          reason: string
+          resource_id: string
+        }
+        Insert: {
+          created_at?: string
+          doctor_name: string
+          id?: string
+          leave_date: string
+          provider_id: string
+          reason: string
+          resource_id: string
+        }
+        Update: {
+          created_at?: string
+          doctor_name?: string
+          id?: string
+          leave_date?: string
+          provider_id?: string
+          reason?: string
+          resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_leaves_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
             referencedColumns: ["id"]
           },
         ]
