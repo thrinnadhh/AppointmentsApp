@@ -300,6 +300,13 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
   // 3. CUSTOMER MOBILE APP FLOW AUDIT (http://localhost:8081)
   // =========================================================================
   test.describe('Customer Mobile Screen Navigation & Flow Audit', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript(() => {
+        try {
+          localStorage.setItem('dpdp_consent_granted', 'true');
+        } catch {}
+      });
+    });
 
     test('3.1 Should verify Customer HomeScreen navigation items, 5 category mini logos, and category search', async ({ page }) => {
       await page.goto('http://localhost:8081');

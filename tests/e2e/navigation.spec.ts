@@ -9,6 +9,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || process
 
 test.describe('Customer Mobile App Comprehensive Forward & Backward Navigation Suite', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('dpdp_consent_granted', 'true');
+      } catch {}
+    });
     await page.goto('http://localhost:8081', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('Instant Appointments')).toBeVisible({ timeout: 20000 });
   });
