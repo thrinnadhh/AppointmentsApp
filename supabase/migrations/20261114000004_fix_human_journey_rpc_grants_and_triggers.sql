@@ -41,7 +41,8 @@ BEGIN
 
   -- 1. Caller Authorization Guard
   IF NOT (
-    auth.role() = 'service_role' 
+    current_user IN ('postgres', 'supabase_admin')
+    OR auth.role() = 'service_role' 
     OR auth.uid() = p_user_id 
     OR public.is_admin(auth.uid())
   ) THEN
@@ -151,7 +152,7 @@ DECLARE
 BEGIN
   PERFORM set_config('app.trusted_write', 'true', true);
 
-  IF auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
     v_is_authorized := true;
   ELSIF EXISTS (SELECT 1 FROM public.providers WHERE id = p_provider_id AND owner_id = v_caller_id) THEN
     v_is_authorized := true;
@@ -210,7 +211,7 @@ BEGIN
     RETURN false;
   END IF;
 
-  IF auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
     v_is_authorized := true;
   ELSIF EXISTS (SELECT 1 FROM public.providers WHERE id = v_provider_id AND owner_id = v_caller_id) THEN
     v_is_authorized := true;
@@ -263,7 +264,7 @@ DECLARE
 BEGIN
   PERFORM set_config('app.trusted_write', 'true', true);
 
-  IF auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
     v_is_authorized := true;
   ELSIF EXISTS (SELECT 1 FROM public.providers WHERE id = p_provider_id AND owner_id = v_caller_id) THEN
     v_is_authorized := true;
@@ -309,7 +310,7 @@ DECLARE
 BEGIN
   PERFORM set_config('app.trusted_write', 'true', true);
 
-  IF auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
     v_is_authorized := true;
   ELSIF EXISTS (SELECT 1 FROM public.providers WHERE id = p_provider_id AND owner_id = v_caller_id) THEN
     v_is_authorized := true;
@@ -393,7 +394,7 @@ DECLARE
 BEGIN
   PERFORM set_config('app.trusted_write', 'true', true);
 
-  IF auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
     v_is_authorized := true;
   ELSIF EXISTS (SELECT 1 FROM public.providers WHERE id = p_provider_id AND owner_id = v_caller_id) THEN
     v_is_authorized := true;
@@ -439,7 +440,7 @@ BEGIN
     RETURN false;
   END IF;
 
-  IF auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
     v_is_authorized := true;
   ELSIF EXISTS (SELECT 1 FROM public.providers WHERE id = v_provider_id AND owner_id = v_caller_id) THEN
     v_is_authorized := true;
@@ -503,7 +504,7 @@ BEGIN
   END IF;
 
   -- Authorize caller
-  IF auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
     v_is_authorized := TRUE;
   ELSIF v_caller_id IS NOT NULL AND (
     v_booking.customer_id = v_caller_id
@@ -524,6 +525,12 @@ BEGIN
   END IF;
 
   v_slot_date_ist := (v_booking.slot_start AT TIME ZONE 'Asia/Kolkata')::date;
+
+  -- Serialize queue_position assignment per consultant (resource_id) + IST date
+  PERFORM pg_advisory_xact_lock(
+    hashtext('checkin_pos:' || v_booking.resource_id::text || ':' || v_slot_date_ist::text)
+  );
+
   v_arrived := COALESCE(v_booking.customer_arrived_at, p_arrived_at, public.get_test_clock(v_booking.provider_id));
 
   v_was_skipped := (v_booking.skipped_at IS NOT NULL) OR EXISTS (
@@ -605,7 +612,7 @@ BEGIN
     RAISE EXCEPTION 'Booking % not found', p_booking_id USING ERRCODE = 'P0002';
   END IF;
 
-  IF auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
+  IF current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id) THEN
     v_is_authorized := true;
   ELSIF v_caller_id IS NOT NULL AND (
     v_booking.provider_id = v_caller_id
@@ -684,7 +691,7 @@ DECLARE
   v_caller_id uuid := auth.uid();
   v_result jsonb;
 BEGIN
-  IF NOT (auth.role() = 'service_role' OR public.is_admin(v_caller_id)) THEN
+  IF NOT (current_user IN ('postgres', 'supabase_admin') OR auth.role() = 'service_role' OR public.is_admin(v_caller_id)) THEN
     RAISE EXCEPTION 'Access Denied: Admins only' USING ERRCODE = '42501';
   END IF;
 
