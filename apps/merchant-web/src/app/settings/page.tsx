@@ -17,7 +17,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useMerchantTenant } from '@/contexts/MerchantTenantContext';
-import { updateProviderCoolingPeriod } from '@/lib/supabase';
+import { updateProviderCoolingPeriod, supabase } from '@/lib/supabase';
 
 type SettingsTab = 'profile' | 'payments' | 'notifications' | 'policies';
 
@@ -64,6 +64,15 @@ export default function SettingsPage() {
       if (activeProvider.cooling_period_days !== undefined) {
         setCoolingPeriodDays(activeProvider.cooling_period_days);
       }
+      if ((activeProvider as any).auto_confirm_holds !== undefined) {
+        setAutoConfirmHolds(Boolean((activeProvider as any).auto_confirm_holds));
+      }
+      if ((activeProvider as any).whatsapp_confirmations !== undefined) {
+        setWhatsappConfirmations(Boolean((activeProvider as any).whatsapp_confirmations));
+      }
+      if ((activeProvider as any).reminder_offset_hours !== undefined) {
+        setReminderOffsetHours(String((activeProvider as any).reminder_offset_hours));
+      }
     }
   }, [activeProvider]);
 
@@ -77,13 +86,24 @@ export default function SettingsPage() {
     }
 
     try {
-      console.log(`[handleSave] Updating cooling_period_days to ${coolingPeriodDays} for provider ${activeProvider.id}`);
-      const res = await updateProviderCoolingPeriod(activeProvider.id, coolingPeriodDays);
-      console.log('[handleSave] update result:', res);
-      if (!res.success) {
-        setSaveError(res.error || 'Failed to update cooling period settings');
-        return;
+      console.log(`[handleSave] Updating settings for provider ${activeProvider.id}`);
+      const { data, error } = await (supabase.rpc as any)('merchant_save_operational_settings', {
+        p_provider_id: activeProvider.id,
+        p_cooling_period_days: coolingPeriodDays,
+        p_auto_confirm_holds: autoConfirmHolds,
+        p_whatsapp_confirmations: whatsappConfirmations,
+        p_reminder_offset_hours: parseInt(reminderOffsetHours, 10) || 2,
+      });
+
+      if (error || (data && (data as any).success === false)) {
+        // Fallback to updateProviderCoolingPeriod
+        const res = await updateProviderCoolingPeriod(activeProvider.id, coolingPeriodDays);
+        if (!res.success) {
+          setSaveError(res.error || 'Failed to update settings');
+          return;
+        }
       }
+
       await refreshTenant();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);

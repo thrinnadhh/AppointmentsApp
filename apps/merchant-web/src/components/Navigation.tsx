@@ -61,15 +61,21 @@ export default function Navigation() {
           setCurrentUser(null);
         }
 
-        // Fetch hospital context
-        try {
-          const res = await fetch('/api/hospital/context');
-          if (res.ok) {
-            const hCtx = await res.json();
-            setHospitalContext(hCtx);
+        // Fetch hospital context only if a user is authenticated
+        if (userProfile?.user) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch('/api/hospital/context', {
+              headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+              credentials: 'include',
+            });
+            if (res.ok) {
+              const hCtx = await res.json();
+              setHospitalContext(hCtx);
+            }
+          } catch (hErr) {
+            console.warn('Failed to fetch hospital access context:', hErr);
           }
-        } catch (hErr) {
-          console.warn('Failed to fetch hospital access context:', hErr);
         }
       } catch (err) {
         console.warn('Auth check fallback:', err);
@@ -85,7 +91,10 @@ export default function Navigation() {
           role: (session.user.user_metadata?.role as string) || 'merchant',
         });
         try {
-          const res = await fetch('/api/hospital/context');
+          const res = await fetch('/api/hospital/context', {
+            headers: session.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+            credentials: 'include',
+          });
           if (res.ok) {
             const hCtx = await res.json();
             setHospitalContext(hCtx);

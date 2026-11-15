@@ -88,12 +88,18 @@ export default function AdminLogsDedicatedPage() {
 
         let profile: { id: string; email?: string | null; full_name?: string | null; role?: string | null } | null = null;
         try {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('id, email, full_name, role')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          profile = profileData;
+          const { data: profileRpc, error: rpcErr } = await (supabase.rpc as any)('admin_get_caller_profile');
+          if (!rpcErr && profileRpc) {
+            profile = profileRpc;
+          } else {
+            const res = await fetch('/api/auth/me', {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            if (res.ok) {
+              const body = await res.json();
+              profile = body.profile;
+            }
+          }
         } catch (e) {
           console.warn('[Admin Logs] Failed to fetch profile:', e);
         }

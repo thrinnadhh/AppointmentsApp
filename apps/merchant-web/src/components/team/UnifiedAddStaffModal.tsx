@@ -151,17 +151,18 @@ export function UnifiedAddStaffModal({
       // 2. If Consultant, create or link doctor resource
       if (role === 'consultant' && providerId) {
         const docDeptName = selectedDepartment?.name || 'General';
-        const { error: resError } = await (supabase.from('resources') as any).insert({
-          provider_id: providerId,
-          name: fullName.trim(),
-          type: 'doctor',
-          department: docDeptName,
-          price: Number(consultationFee) || 500,
-          deposit_amount: Number(consultationFee) || 500,
-          duration_minutes: Number(durationMinutes) || 15,
-          capacity: 1,
-          doctor_email: email.trim().toLowerCase(),
-          is_active: true,
+        const { error: resError } = await (supabase.rpc as any)('merchant_upsert_resource', {
+          p_provider_id: providerId,
+          p_name: fullName.trim(),
+          p_category: 'doctor',
+          p_price: Number(consultationFee) || 500,
+          p_deposit_amount: Number(consultationFee) || 500,
+          p_duration_minutes: Number(durationMinutes) || 15,
+          p_capacity: 1,
+          p_attributes: {
+            department: docDeptName,
+            doctor_email: email.trim().toLowerCase(),
+          },
         });
         if (resError) {
           console.warn('Consultant resource registration notice:', resError);

@@ -28,6 +28,7 @@ import CheckoutModal from './src/screens/CheckoutModal';
 import BookingPassModal from './src/screens/BookingPassModal';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import ConsentScreen from './src/screens/ConsentScreen';
 import DoctorEmergencyModal from './src/components/DoctorEmergencyModal';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import {
@@ -100,6 +101,16 @@ export default function App() {
   const currentScreen = currentEntry.screen;
   const activeCategoryId = currentEntry.categoryId ?? null;
   const selectedProviderId = currentEntry.providerId ?? '';
+
+  // DPDP Consent Gate State
+  const [hasConsent, setHasConsent] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return localStorage.getItem('dpdp_consent_granted') === 'true';
+      } catch {}
+    }
+    return false;
+  });
 
   // Customer Profile State
   const [customerProfile, setCustomerProfile] = useState({
@@ -686,6 +697,26 @@ export default function App() {
   const emergencyBooking = customerBookings.find(
     (b) => b.emergency_cancelled === true && !b.emergency_patient_choice
   );
+
+  if (!hasConsent) {
+    return (
+      <ErrorBoundary>
+        <SafeAreaView style={styles.container}>
+          <StatusBar style="dark" />
+          <ConsentScreen
+            onConsentsGranted={() => {
+              setHasConsent(true);
+              if (typeof window !== 'undefined') {
+                try {
+                  localStorage.setItem('dpdp_consent_granted', 'true');
+                } catch {}
+              }
+            }}
+          />
+        </SafeAreaView>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>

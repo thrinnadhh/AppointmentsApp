@@ -223,22 +223,22 @@ function ResourcesManagementContent() {
     }
 
     try {
-      const { error } = await supabase
-        .from('resources')
-        .insert({
-          provider_id: targetProviderId,
-          name: formData.name.trim(),
+      const { data, error } = await (supabase.rpc as any)('merchant_upsert_resource', {
+        p_provider_id: targetProviderId,
+        p_name: formData.name.trim(),
+        p_category: formData.department.trim() || formData.type || 'doctor',
+        p_price: Number(formData.price),
+        p_deposit_amount: Number(formData.price),
+        p_duration_minutes: Number(formData.duration_minutes),
+        p_capacity: Number(formData.capacity),
+        p_attributes: {
           type: formData.type,
           department: formData.department.trim() || 'General',
-          price: Number(formData.price),
-          deposit_amount: Number(formData.price),
-          duration_minutes: Number(formData.duration_minutes),
-          capacity: Number(formData.capacity),
-          is_active: true,
-        });
+        },
+      });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to create resource');
+      if (error || (data && (data as any).success === false)) {
+        throw new Error(error?.message || (data as any)?.error || 'Failed to create resource');
       }
 
       setFeedbackToast(`${verticalConfig.resourceLabelSingular} "${formData.name}" added successfully.`);
@@ -289,23 +289,25 @@ function ResourcesManagementContent() {
     }
 
     setIsUpdatingResource(true);
+    const targetProviderId = editingResource.provider_id || selectedProviderId || providerParam || tenantProvider?.id;
     try {
-      const { error } = await supabase
-        .from('resources')
-        .update({
-          name: editFormData.name.trim(),
+      const { data, error } = await (supabase.rpc as any)('merchant_upsert_resource', {
+        p_provider_id: targetProviderId,
+        p_resource_id: editingResource.id,
+        p_name: editFormData.name.trim(),
+        p_category: editFormData.department.trim() || editFormData.type || 'doctor',
+        p_price: Number(editFormData.price),
+        p_deposit_amount: Number(editFormData.price),
+        p_duration_minutes: Number(editFormData.duration_minutes),
+        p_capacity: Number(editFormData.capacity),
+        p_attributes: {
           type: editFormData.type,
           department: editFormData.department.trim() || 'General',
-          price: Number(editFormData.price),
-          deposit_amount: Number(editFormData.price),
-          duration_minutes: Number(editFormData.duration_minutes),
-          capacity: Number(editFormData.capacity),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingResource.id);
+        },
+      });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to update resource');
+      if (error || (data && (data as any).success === false)) {
+        throw new Error(error?.message || (data as any)?.error || 'Failed to update resource');
       }
 
       setFeedbackToast(`${verticalConfig.resourceLabelSingular} "${editFormData.name}" updated successfully.`);
@@ -343,13 +345,12 @@ function ResourcesManagementContent() {
       return;
     }
     try {
-      const { error } = await supabase
-        .from('resources')
-        .delete()
-        .eq('id', id);
+      const { data, error } = await (supabase.rpc as any)('merchant_delete_resource', {
+        p_resource_id: id,
+      });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to delete resource');
+      if (error || data === false) {
+        throw new Error(error?.message || 'Failed to delete resource');
       }
       // Optimistically remove from state immediately
       setResources((prev) => prev.filter((r) => r.id !== id));

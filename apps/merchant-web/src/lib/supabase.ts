@@ -180,16 +180,12 @@ export async function manageLateQueueBooking(
 }> {
   try {
     if (action === 'MOVE_TO_STANDBY') {
-      const nowIso = new Date().toISOString();
-      const { error } = await supabase
-        .from('bookings')
-        .update({
-          is_present: false,
-          skipped_at: nowIso,
-          updated_at: nowIso,
-        })
-        .eq('id', bookingId);
-      if (error) return { success: false, error: error.message };
+      const { data, error } = await (supabase.rpc as any)('merchant_move_booking_to_standby', {
+        p_booking_id: bookingId,
+      });
+      if (error || (data && (data as any).success === false)) {
+        return { success: false, error: error?.message || (data as any)?.error || 'Failed to move to standby' };
+      }
       return { success: true, message: 'Patient moved to Standby Queue' };
     }
 
@@ -215,7 +211,7 @@ export async function manageLateQueueBooking(
   }
 }
 
-export const PROVIDER_SELECT_COLUMNS = 'id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, category_id, sub_category_id, weekly_hours, auto_accept_bookings, daily_booking_limit, is_booking_frozen, cooling_period_days, owner_id, created_at, updated_at';
+export const PROVIDER_SELECT_COLUMNS = 'id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, category_id, sub_category_id, weekly_hours, auto_accept_bookings, daily_booking_limit, is_booking_frozen, cooling_period_days, auto_confirm_holds, whatsapp_confirmations, reminder_offset_hours, owner_id, created_at, updated_at';
 
 export async function fetchAllProviders(): Promise<(Provider & { resources: Resource[] })[]> {
   const { data, error } = await supabase
@@ -1154,6 +1150,15 @@ export async function updateAdminMerchantStatus(
 export async function fetchAdminCityWaitlist(cityId?: string): Promise<CityWaitlistEntry[]> {
   try {
     const supabaseAdmin = typeof window !== 'undefined' ? supabase : getSupabaseAdmin();
+    // Try SECURITY DEFINER RPC first to bypass RLS column limits
+    const { data: rpcData, error: rpcError } = await (supabaseAdmin.rpc as any)('admin_fetch_city_waitlist', {
+      p_city_id: cityId && cityId !== 'all' ? cityId : null,
+    });
+
+    if (!rpcError && Array.isArray(rpcData)) {
+      return rpcData as unknown as CityWaitlistEntry[];
+    }
+
     let query = supabaseAdmin
       .from('city_waitlist')
       .select('*')
