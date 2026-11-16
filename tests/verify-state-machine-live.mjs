@@ -90,7 +90,7 @@ async function runLiveVerification() {
     const rescheduleBtn = page.locator('button:has-text("Reschedule")').first();
     if (await rescheduleBtn.isVisible()) {
       await rescheduleBtn.click();
-      const reschedClose = page.locator('[data-testid="reschedule-modal-close"]');
+      const reschedClose = page.locator('[data-testid="close-reschedule-modal"], [data-testid="reschedule-modal-close"]');
       await reschedClose.waitFor({ state: 'visible', timeout: 3000 });
       console.log('  ✓ Reschedule modal opened and close button is visible.');
 

@@ -1046,7 +1046,7 @@ export default function BookingsManagementPage() {
               <h3 className="text-base font-bold text-slate-900">Reschedule Appointment</h3>
               <button
                 type="button"
-                data-testid="reschedule-modal-close"
+                data-testid="close-reschedule-modal"
                 aria-label="Close reschedule modal"
                 onClick={() => setRescheduleModalId(null)}
                 className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
