@@ -211,7 +211,7 @@ export async function manageLateQueueBooking(
   }
 }
 
-export const PROVIDER_SELECT_COLUMNS = 'id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, category_id, sub_category_id, weekly_hours, auto_accept_bookings, daily_booking_limit, is_booking_frozen, cooling_period_days, auto_confirm_holds, whatsapp_confirmations, reminder_offset_hours, owner_id, created_at, updated_at';
+export const PROVIDER_SELECT_COLUMNS = 'id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, category_id, sub_category_id, weekly_hours, auto_accept_bookings, daily_booking_limit, is_booking_frozen, cooling_period_days, auto_confirm_holds, whatsapp_confirmations, reminder_offset_hours, gstin, support_phone, support_email, jurisdiction, payout_upi_id, min_deposit_amount, cancellation_window_hours, cashfree_app_id, cashfree_vendor_id, owner_id, created_at, updated_at';
 
 export async function fetchAllProviders(): Promise<(Provider & { resources: Resource[] })[]> {
   const { data, error } = await supabase
@@ -222,10 +222,10 @@ export async function fetchAllProviders(): Promise<(Provider & { resources: Reso
     console.error('Error fetching providers:', error);
     return [];
   }
-  return (data || []).map((p) => ({
+  return ((data as any[]) || []).map((p: any) => ({
     ...p,
     weekly_hours: p.weekly_hours as unknown as WeeklyHours | null | undefined,
-    resources: (p.resources || []).map((r) => ({
+    resources: ((p.resources as any[]) || []).map((r: any) => ({
       ...r,
       type: r.type as ResourceType,
       department: r.department || 'General',
@@ -1464,11 +1464,13 @@ export async function verifyCheckinCodeRpc(
  * Fallback manual check-in when customer phone is dead
  */
 export async function markPresentManuallyRpc(
-  bookingId: string
+  bookingId: string,
+  reason?: string
 ): Promise<VerifyCheckinCodeResult> {
   try {
     const { data, error } = await (supabase.rpc as any)('mark_present_manually', {
       p_booking_id: bookingId,
+      p_reason: reason || null,
     });
 
     if (error) {

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, Suspense, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, Suspense, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { 
   Building2, 
   RefreshCw, 
@@ -21,8 +21,11 @@ import { StaffRosterTable } from '@/components/team/StaffRosterTable';
 import { UnifiedAddStaffModal } from '@/components/team/UnifiedAddStaffModal';
 
 function TeamManagementContent() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const doctorParam = searchParams.get('doctorId');
+  const handledDoctorParamRef = useRef<string | null>(null);
 
   const { activeProvider, isSuperAdmin, isHospitalAdmin, verticalConfig } = useMerchantTenant();
   
@@ -127,13 +130,24 @@ function TeamManagementContent() {
 
   // Handle URL query parameter ?doctorId=...
   useEffect(() => {
-    if (doctorParam && doctors.length > 0 && !selectedDoctorForAssignment) {
+    if (doctorParam && doctors.length > 0 && !selectedDoctorForAssignment && handledDoctorParamRef.current !== doctorParam) {
       const match = doctors.find((d) => d.id === doctorParam);
       if (match) {
         setSelectedDoctorForAssignment(match);
       }
     }
   }, [doctorParam, doctors, selectedDoctorForAssignment]);
+
+  const handleCloseAssignModal = useCallback(() => {
+    handledDoctorParamRef.current = doctorParam;
+    setSelectedDoctorForAssignment(null);
+    if (doctorParam) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('doctorId');
+      const newQuery = params.toString();
+      router.replace(newQuery ? `${pathname}?${newQuery}` : pathname);
+    }
+  }, [doctorParam, pathname, router, searchParams]);
 
   const handleUnassignFrontDesk = async (
     doctorId: string, 
@@ -430,7 +444,7 @@ function TeamManagementContent() {
           doctor={selectedDoctorForAssignment}
           providerId={activeProvider?.id}
           allRosterMembers={allRosterMembers}
-          onClose={() => setSelectedDoctorForAssignment(null)}
+          onClose={handleCloseAssignModal}
           onSuccess={(msg) => {
             setSuccessBanner(msg);
             loadDoctorAssignments();

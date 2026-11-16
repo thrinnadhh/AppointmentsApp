@@ -149,6 +149,7 @@ export function DoctorAssignmentCard({
             </div>
 
             <button
+              data-testid="add-front-desk-manager-btn"
               onClick={() => onOpenAssignModal(doctor)}
               disabled={isFull}
               className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${

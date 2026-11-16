@@ -884,7 +884,7 @@ export default function MerchantOverviewPage() {
   const handleFrontDeskManualCheckin = async (bookingId: string, reason: string) => {
     setIsProcessingFrontDeskAction(true);
     try {
-      const res = await markPresentManuallyRpc(bookingId);
+      const res = await markPresentManuallyRpc(bookingId, reason);
       if (!res.success) {
         throw new Error(res.message || 'Failed to mark present');
       }
@@ -1287,7 +1287,7 @@ export default function MerchantOverviewPage() {
       if (version !== loadVersion.current) return;
 
       const activeList = (fetchedProviders && fetchedProviders.length > 0)
-        ? (fetchedProviders as (Provider & { resources?: Resource[] })[])
+        ? (fetchedProviders as unknown as (Provider & { resources?: Resource[] })[])
         : isDemoMode
         ? [DEMO_PROVIDER]
         : [];
@@ -3076,10 +3076,14 @@ export default function MerchantOverviewPage() {
       {/* ========================================================================= */}
       {showSettingsModal && (
         <div 
+          onClick={() => setShowSettingsModal(false)}
           data-testid="booking-settings-modal"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
         >
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
@@ -3206,10 +3210,14 @@ export default function MerchantOverviewPage() {
 
         return (
           <div 
+            onClick={() => setShowHoursModal(false)}
             data-testid="shop-hours-modal"
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
           >
-            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-8">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-8"
+            >
               {/* Modal Header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2.5">
@@ -3620,10 +3628,14 @@ export default function MerchantOverviewPage() {
       {/* ========================================================================= */}
       {showOfflineModal && (
         <div 
+          onClick={() => setShowOfflineModal(false)}
           data-testid="offline-patient-modal"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
         >
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">

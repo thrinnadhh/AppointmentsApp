@@ -288,11 +288,12 @@ export default function LoginPage() {
       const redirectOrigin = typeof window !== 'undefined' && window.location?.origin
         ? window.location.origin
         : '';
+      const targetNext = authMode === 'register' ? '/register' : (new URLSearchParams(window.location.search).get('redirect') || '/');
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${redirectOrigin}/auth/callback`,
+          redirectTo: `${redirectOrigin}/auth/callback?next=${encodeURIComponent(targetNext)}`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
