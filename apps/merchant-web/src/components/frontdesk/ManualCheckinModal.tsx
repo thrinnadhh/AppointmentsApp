@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
   UserCheck, 
@@ -50,6 +50,16 @@ export default function ManualCheckinModal({
   const [customReason, setCustomReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
 
   // Filter bookings by search query
   const filteredBookings = useMemo(() => {
@@ -282,7 +292,7 @@ export default function ManualCheckinModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !selectedBookingId}
+              disabled={isSubmitting}
               className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               {isSubmitting ? (

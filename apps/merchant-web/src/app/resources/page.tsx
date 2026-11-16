@@ -148,6 +148,21 @@ function ResourcesManagementContent() {
     }
   };
 
+  // Escape key modal dismissal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isAdding) setIsAdding(false);
+        if (editingResource) setEditingResource(null);
+        if (emergencyResource) setEmergencyResource(null);
+      }
+    };
+    if (isAdding || editingResource || emergencyResource) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isAdding, editingResource, emergencyResource]);
+
   // Keep selectedProviderId and formData in sync with tenant context
   useEffect(() => {
     const activeId = providerParam || tenantProvider?.id;

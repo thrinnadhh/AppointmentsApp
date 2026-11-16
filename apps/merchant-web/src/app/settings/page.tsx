@@ -227,11 +227,10 @@ export default function SettingsPage() {
         <button
           data-testid="tab-profile"
           onClick={() => setActiveTab('profile')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'profile'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'profile'
+            ? 'border-emerald-600 text-emerald-700'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Building2 className="w-4 h-4" />
           Business Profile
@@ -239,11 +238,10 @@ export default function SettingsPage() {
         <button
           data-testid="tab-payments"
           onClick={() => setActiveTab('payments')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'payments'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'payments'
+            ? 'border-emerald-600 text-emerald-700'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <CreditCard className="w-4 h-4" />
           Payments & Gateway
@@ -251,11 +249,10 @@ export default function SettingsPage() {
         <button
           data-testid="tab-notifications"
           onClick={() => setActiveTab('notifications')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'notifications'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'notifications'
+            ? 'border-emerald-600 text-emerald-700'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Bell className="w-4 h-4" />
           Notifications & Alerts
@@ -263,11 +260,10 @@ export default function SettingsPage() {
         <button
           data-testid="tab-policies"
           onClick={() => setActiveTab('policies')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'policies'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'policies'
+            ? 'border-emerald-600 text-emerald-700'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <ShieldCheck className="w-4 h-4" />
           Deposit & Refund Rules
@@ -671,11 +667,10 @@ export default function SettingsPage() {
                         key={preset.days}
                         type="button"
                         onClick={() => setCoolingPeriodDays(preset.days)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${
-                          coolingPeriodDays === preset.days
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${coolingPeriodDays === preset.days
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'
+                          }`}
                       >
                         {preset.label}
                       </button>

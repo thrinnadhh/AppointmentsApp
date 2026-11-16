@@ -167,8 +167,8 @@ export interface MerchantBookingWithDetails {
 }
 
 export async function manageLateQueueBooking(
-  bookingId: string, 
-  action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE', 
+  bookingId: string,
+  action: 'MOVE_TO_STANDBY' | 'CHECKIN_LATE',
   bufferOffset?: number
 ): Promise<{
   success: boolean;
@@ -1360,7 +1360,7 @@ export async function fetchAdminAppLogs(
     // Fetch duplicate occurrences from crash_alert_dedup for badges
     const rawLogs = (data || []) as unknown as AppLogEntry[];
     const fingerprints = Array.from(new Set(rawLogs.map((l) => l.fingerprint).filter(Boolean))) as string[];
-    
+
     let dedupMap: Record<string, number> = {};
     if (fingerprints.length > 0) {
       const { data: dedupRows } = await supabaseAdmin
