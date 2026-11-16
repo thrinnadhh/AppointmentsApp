@@ -332,6 +332,7 @@ export type Database = {
           patient_age: number | null
           is_minor: boolean
           booking_note: string | null
+          manual_checkin_reason: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           platform_fee: number | null
           platform_fee_amount: number | null
@@ -392,6 +393,7 @@ export type Database = {
           patient_age?: number | null
           is_minor?: boolean
           booking_note?: string | null
+          manual_checkin_reason?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
           platform_fee_amount?: number | null
@@ -452,6 +454,7 @@ export type Database = {
           patient_age?: number | null
           is_minor?: boolean
           booking_note?: string | null
+          manual_checkin_reason?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           platform_fee?: number | null
           platform_fee_amount?: number | null
@@ -1157,6 +1160,15 @@ export type Database = {
           tos_version: string | null
           updated_at: string
           weekly_hours: Json | null
+          gstin: string | null
+          support_phone: string | null
+          support_email: string | null
+          jurisdiction: string | null
+          payout_upi_id: string | null
+          min_deposit_amount: number | null
+          cancellation_window_hours: number | null
+          cashfree_app_id: string | null
+          cashfree_vendor_id: string | null
         }
         Insert: {
           address: string
@@ -1193,6 +1205,15 @@ export type Database = {
           tos_version?: string | null
           updated_at?: string
           weekly_hours?: Json | null
+          gstin?: string | null
+          support_phone?: string | null
+          support_email?: string | null
+          jurisdiction?: string | null
+          payout_upi_id?: string | null
+          min_deposit_amount?: number | null
+          cancellation_window_hours?: number | null
+          cashfree_app_id?: string | null
+          cashfree_vendor_id?: string | null
         }
         Update: {
           address?: string
@@ -1229,6 +1250,15 @@ export type Database = {
           tos_version?: string | null
           updated_at?: string
           weekly_hours?: Json | null
+          gstin?: string | null
+          support_phone?: string | null
+          support_email?: string | null
+          jurisdiction?: string | null
+          payout_upi_id?: string | null
+          min_deposit_amount?: number | null
+          cancellation_window_hours?: number | null
+          cashfree_app_id?: string | null
+          cashfree_vendor_id?: string | null
         }
         Relationships: [
           {
