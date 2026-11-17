@@ -43,6 +43,10 @@ export function generateCiEnv() {
     `EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS="Balaji Colony, Tirupati, AP 517502"`,
     `EXPO_PUBLIC_EAS_PROJECT_ID="27a9b4e1-8c3d-4f6a-9b2e-1d5c7a8f9e0b"`,
     `EXPO_PUBLIC_SUPABASE_URL="${supabaseUrl}"`,
+    `NEXT_PUBLIC_ENABLE_GOOGLE_AUTH="true"`,
+    `NEXT_PUBLIC_GOOGLE_CLIENT_ID="${process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '108394829104-apps-tirupati-web.apps.googleusercontent.com'}"`,
+    `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID="${process.env.SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID || '108394829104-apps-tirupati-web.apps.googleusercontent.com'}"`,
+    `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET="${process.env.SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET || '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upati_2026'}"`,
     `EXPO_PUBLIC_SUPABASE_ANON_KEY="${anonKey}"`,
   ].join('\n') + '\n';
 
@@ -50,6 +54,7 @@ export function generateCiEnv() {
     path.resolve('apps/merchant-web/.env.local'),
     path.resolve('.env.local'),
     path.resolve('apps/customer-mobile/.env.local'),
+    path.resolve('supabase/.env'),
   ];
 
   for (const targetPath of targetPaths) {

@@ -84,7 +84,21 @@ export default function ShopRegistrationPage() {
         }
 
         setUser(authUser);
-        setFullName(authUser.user_metadata?.full_name || authUser.user_metadata?.name || '');
+        setFullName((prev) => prev.trim() ? prev : (authUser.user_metadata?.full_name || authUser.user_metadata?.name || ''));
+
+        // Ensure public.profiles has a row for the authenticated user to prevent 403 or foreign key errors
+        if (authUser.id && authUser.email) {
+          const profileName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Merchant Owner';
+          try {
+            await supabase.from('profiles').upsert({
+              id: authUser.id,
+              email: authUser.email.toLowerCase().trim(),
+              full_name: profileName,
+              role: 'merchant',
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'id', ignoreDuplicates: true });
+          } catch {}
+        }
 
         // Check if this user already has a registered shop
         const userEmail = authUser.email ? authUser.email.toLowerCase().trim() : '';
@@ -107,6 +121,17 @@ export default function ShopRegistrationPage() {
     }
 
     checkAuthAndShop();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setFullName((prev) => prev.trim() ? prev : (session.user.user_metadata?.full_name || session.user.user_metadata?.name || ''));
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,6 +201,21 @@ export default function ShopRegistrationPage() {
     setSuccessMsg(null);
 
     try {
+      // Ensure profile row exists prior to registration RPC
+      const resolvedFullName = fullName.trim() || user.user_metadata?.full_name || user.user_metadata?.name || 'Merchant Owner';
+      if (user.email) {
+        try {
+          await supabase.from('profiles').upsert({
+            id: user.id,
+            email: user.email.toLowerCase().trim(),
+            full_name: resolvedFullName,
+            phone: phone.trim(),
+            role: 'merchant',
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
+        } catch {}
+      }
+
       const cleanPhotoUrl = (photoUrl && /^https?:\/\//i.test(photoUrl.trim())) ? photoUrl.trim() : null;
       const { data, error } = await supabase.rpc('merchant_register_shop_for_user', {
         p_user_id: user.id,
@@ -183,7 +223,7 @@ export default function ShopRegistrationPage() {
         p_category_id: category,
         p_phone: phone.trim(),
         p_address: address.trim() || 'AIR Bypass Road, Tirupati',
-        p_full_name: fullName.trim() || user.user_metadata?.full_name || 'Merchant Owner',
+        p_full_name: resolvedFullName,
         p_photo_url: cleanPhotoUrl || undefined,
       });
 

@@ -74,6 +74,15 @@ export interface Provider {
   auto_confirm_holds?: boolean;
   whatsapp_confirmations?: boolean;
   reminder_offset_hours?: number;
+  gstin?: string | null;
+  support_phone?: string | null;
+  support_email?: string | null;
+  jurisdiction?: string | null;
+  payout_upi_id?: string | null;
+  min_deposit_amount?: number;
+  cancellation_window_hours?: number;
+  cashfree_app_id?: string | null;
+  cashfree_vendor_id?: string | null;
   created_at: string;
   updated_at: string;
 }

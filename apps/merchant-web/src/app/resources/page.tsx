@@ -148,6 +148,21 @@ function ResourcesManagementContent() {
     }
   };
 
+  // Escape key modal dismissal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isAdding) setIsAdding(false);
+        if (editingResource) setEditingResource(null);
+        if (emergencyResource) setEmergencyResource(null);
+      }
+    };
+    if (isAdding || editingResource || emergencyResource) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isAdding, editingResource, emergencyResource]);
+
   // Keep selectedProviderId and formData in sync with tenant context
   useEffect(() => {
     const activeId = providerParam || tenantProvider?.id;
@@ -616,8 +631,14 @@ function ResourcesManagementContent() {
 
       {/* Add Resource Modal */}
       {isAdding && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150">
+        <div 
+          onClick={() => setIsAdding(false)}
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
@@ -856,8 +877,14 @@ function ResourcesManagementContent() {
 
       {/* Edit Doctor / Resource Modal */}
       {editingResource && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150">
+        <div 
+          onClick={() => setEditingResource(null)}
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
@@ -1213,8 +1240,14 @@ function ResourcesManagementContent() {
 
       {/* Doctor Emergency Cancellation Confirmation Modal */}
       {emergencyResource && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div 
+          onClick={() => setEmergencyResource(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4"
+          >
             <div className="flex items-start gap-3">
               <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
                 <AlertTriangle className="w-6 h-6" />

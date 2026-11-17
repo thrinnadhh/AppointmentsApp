@@ -3,13 +3,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { evaluateConsultantQueue, ON_TIME_GRACE_MS } from '@/lib/queue-scheduler';
-import { 
-  Clock, 
-  CheckCircle2, 
-  TrendingUp, 
-  Users, 
-  ArrowRight, 
-  ShieldCheck, 
+import {
+  Clock,
+  CheckCircle2,
+  TrendingUp,
+  Users,
+  ArrowRight,
+  ShieldCheck,
   MapPin,
   RefreshCw,
   Sparkles,
@@ -30,9 +30,9 @@ import {
   Ticket,
   ShieldAlert
 } from 'lucide-react';
-import { 
-  supabase, 
-  updateBookingStatus, 
+import {
+  supabase,
+  updateBookingStatus,
   recordMerchantNoShow,
   manageLateQueueBooking,
   verifyCheckinCodeRpc,
@@ -305,12 +305,12 @@ function getKolkataDayKeys(): { todayKey: DayOfWeek; tomorrowKey: DayOfWeek } {
 }
 
 export default function MerchantOverviewPage() {
-  const { 
-    activeProvider: tenantProvider, 
-    verticalConfig, 
-    isSuperAdmin, 
+  const {
+    activeProvider: tenantProvider,
+    verticalConfig,
+    isSuperAdmin,
     isHospitalAdmin,
-    isLocked, 
+    isLocked,
     switchActiveProvider,
     refreshTenant,
     isLoading: isTenantLoading,
@@ -499,7 +499,7 @@ export default function MerchantOverviewPage() {
   }, [activeResources, selectedDepartmentFilter]);
 
   const isHospitalVenue = Boolean(
-    activeProvider?.category_id === 'hospital' || 
+    activeProvider?.category_id === 'hospital' ||
     verticalConfig?.venueLabel === 'Hospital'
   );
 
@@ -515,7 +515,7 @@ export default function MerchantOverviewPage() {
   const frontDeskAssignedDoctors: AssignedDoctor[] = useMemo(() => {
     if (!isHospitalVenue) return [];
     const resources = (activeProvider?.resources as Resource[]) || [];
-    
+
     // Explicit test/demo parameter check: ?assigned=none
     const isExplicitlyUnassigned = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('assigned') === 'none';
     if (isExplicitlyUnassigned) {
@@ -884,7 +884,7 @@ export default function MerchantOverviewPage() {
   const handleFrontDeskManualCheckin = async (bookingId: string, reason: string) => {
     setIsProcessingFrontDeskAction(true);
     try {
-      const res = await markPresentManuallyRpc(bookingId);
+      const res = await markPresentManuallyRpc(bookingId, reason);
       if (!res.success) {
         throw new Error(res.message || 'Failed to mark present');
       }
@@ -1242,11 +1242,11 @@ export default function MerchantOverviewPage() {
       todayClosed: false,
       openFormatted: format12h(todaySched.open),
       closeFormatted: format12h(todaySched.close),
-      badgeText: isOpen 
+      badgeText: isOpen
         ? `Open Now (${format12h(todaySched.open)} - ${format12h(todaySched.close)})`
         : nowMinutes < openMinutes
-        ? `Closed (Opens ${format12h(todaySched.open)} Today)`
-        : `Closed for Today (Opens ${format12h(tomorrowSched.open)} ${tomorrowName})`,
+          ? `Closed (Opens ${format12h(todaySched.open)} Today)`
+          : `Closed for Today (Opens ${format12h(tomorrowSched.open)} ${tomorrowName})`,
       tomorrowPreview: tomorrowSched.is_closed
         ? `${tomorrowName}: Closed`
         : `${tomorrowName}: ${format12h(tomorrowSched.open)} - ${format12h(tomorrowSched.close)}`,
@@ -1287,10 +1287,10 @@ export default function MerchantOverviewPage() {
       if (version !== loadVersion.current) return;
 
       const activeList = (fetchedProviders && fetchedProviders.length > 0)
-        ? (fetchedProviders as (Provider & { resources?: Resource[] })[])
+        ? (fetchedProviders as unknown as (Provider & { resources?: Resource[] })[])
         : isDemoMode
-        ? [DEMO_PROVIDER]
-        : [];
+          ? [DEMO_PROVIDER]
+          : [];
 
       setProviders(activeList);
       const targetProviderId = selectedProviderId || activeList[0]?.id;
@@ -1437,12 +1437,12 @@ export default function MerchantOverviewPage() {
           prev.map((b) =>
             b.id === bookingId
               ? {
-                  ...b,
-                  is_present: true,
-                  status: 'CHECKED_IN',
-                  customer_arrived_at: new Date().toISOString(),
-                  checked_in_at: new Date().toISOString(),
-                }
+                ...b,
+                is_present: true,
+                status: 'CHECKED_IN',
+                customer_arrived_at: new Date().toISOString(),
+                checked_in_at: new Date().toISOString(),
+              }
               : b
           )
         );
@@ -1466,7 +1466,7 @@ export default function MerchantOverviewPage() {
   };
 
   const handleStatusChange = async (
-    bookingId: string, 
+    bookingId: string,
     newStatus: 'COMPLETED' | 'NO_SHOW' | 'CANCELLED'
   ) => {
     if (pendingBookingId) return;
@@ -1479,10 +1479,10 @@ export default function MerchantOverviewPage() {
           prev.map((b) =>
             b.id === bookingId
               ? {
-                  ...b,
-                  status: newStatus,
-                  is_present: newStatus === 'COMPLETED' ? b.is_present : false,
-                }
+                ...b,
+                status: newStatus,
+                is_present: newStatus === 'COMPLETED' ? b.is_present : false,
+              }
               : b
           )
         );
@@ -1490,8 +1490,8 @@ export default function MerchantOverviewPage() {
           newStatus === 'COMPLETED'
             ? '✓ Consultation marked as Completed.'
             : newStatus === 'NO_SHOW'
-            ? '✕ Marked as No-Show.'
-            : '✓ Status updated.'
+              ? '✕ Marked as No-Show.'
+              : '✓ Status updated.'
         );
         return;
       }
@@ -1501,10 +1501,10 @@ export default function MerchantOverviewPage() {
         : await updateBookingStatus(bookingId, newStatus);
       const confirmed = Array.isArray(result)
         ? (result as Array<Record<string, unknown>>).some(
-            (row) => row && typeof row === 'object' && row.id === bookingId && row.status === newStatus
-          )
+          (row) => row && typeof row === 'object' && row.id === bookingId && row.status === newStatus
+        )
         : Boolean(result) && typeof result === 'object' && 'success' in (result as Record<string, unknown>) &&
-          (result as Record<string, unknown>).success === true;
+        (result as Record<string, unknown>).success === true;
       if (!confirmed) {
         throw new Error('The booking update was not confirmed.');
       }
@@ -1512,8 +1512,8 @@ export default function MerchantOverviewPage() {
         newStatus === 'COMPLETED'
           ? '✓ Consultation marked as Completed.'
           : newStatus === 'NO_SHOW'
-          ? '✕ Marked as No-Show.'
-          : '✓ Status updated.'
+            ? '✕ Marked as No-Show.'
+            : '✓ Status updated.'
       );
       await loadData();
     } catch {
@@ -1533,11 +1533,11 @@ export default function MerchantOverviewPage() {
           prev.map((b) =>
             b.id === bookingId
               ? {
-                  ...b,
-                  is_present: true,
-                  queue_position: action === 'CHECKIN_LATE' ? (b.queue_position || 1) : undefined,
-                  customer_arrived_at: new Date().toISOString(),
-                }
+                ...b,
+                is_present: true,
+                queue_position: action === 'CHECKIN_LATE' ? (b.queue_position || 1) : undefined,
+                customer_arrived_at: new Date().toISOString(),
+              }
               : b
           )
         );
@@ -1872,7 +1872,7 @@ export default function MerchantOverviewPage() {
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Provider Space Badge */}
           {isLocked ? (
-            <div 
+            <div
               data-testid="locked-tenant-badge"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800"
             >
@@ -1951,7 +1951,7 @@ export default function MerchantOverviewPage() {
       {/* ========================================================================= */}
       {/* OPERATIONAL STATUS & CAPACITY CONTROL BAR (DARK ZONE)                    */}
       {/* ========================================================================= */}
-      <div 
+      <div
         className="rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4 border"
         style={{
           backgroundColor: '#0f1f17',
@@ -1971,27 +1971,24 @@ export default function MerchantOverviewPage() {
               aria-checked={isShopActive}
               disabled={isUpdatingOperational}
               onClick={handleToggleShopActive}
-              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
-                isShopActive ? 'bg-emerald-600' : 'bg-slate-700'
-              }`}
+              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${isShopActive ? 'bg-emerald-600' : 'bg-slate-700'
+                }`}
             >
               <span className="sr-only">Toggle {venueLabel} active status</span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out flex items-center justify-center ${
-                  isShopActive ? 'translate-x-5' : 'translate-x-0'
-                }`}
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out flex items-center justify-center ${isShopActive ? 'translate-x-5' : 'translate-x-0'
+                  }`}
               >
                 <Power className={`w-3.5 h-3.5 ${isShopActive ? 'text-emerald-700' : 'text-slate-400'}`} />
               </span>
             </button>
             <span
               data-testid="shop-status-text"
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono tracking-wide ${
-                isShopActive
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono tracking-wide ${isShopActive
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                }`}
             >
               <span className={`w-2 h-2 rounded-full ${isShopActive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
               {isShopActive ? `${venueLabel} Active (Accepting)` : `${venueLabel} Paused (Offline)`}
@@ -2004,16 +2001,15 @@ export default function MerchantOverviewPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div
               data-testid="shop-hours-badge"
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium border ${
-                hoursStatus.isOpen
-                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
-                  : 'bg-amber-950/80 text-amber-300 border-amber-700/60'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium border ${hoursStatus.isOpen
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
+                : 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+                }`}
             >
               <Clock className="w-3.5 h-3.5" />
               <span>{hoursStatus.badgeText}</span>
             </div>
-            <span 
+            <span
               data-testid="shop-tomorrow-preview"
               className="text-[11px] text-emerald-400/70 hidden sm:inline-block font-mono"
             >
@@ -2224,850 +2220,836 @@ export default function MerchantOverviewPage() {
             <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmed</span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{confirmedCount}</span>
-            <span className="text-xs text-slate-500">slots booked</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-amber-500/30 transition duration-150">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hold In-Flight</span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
-              <Clock className="w-5 h-5 text-amber-600" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{heldCount}</span>
-            <span className="text-xs text-amber-600 font-medium">checkout now</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Deposits Captured</span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">₹{totalDepositCollected.toLocaleString('en-IN')}</span>
-            <span className="text-xs text-emerald-600 font-medium">secured funds</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-slate-300 transition duration-150">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active {verticalConfig.resourceLabelSingular}s</span>
-            <div className="p-2 rounded-xl bg-slate-100 text-slate-700">
-              <Users className="w-5 h-5 text-slate-600" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{activeResources.length}</span>
-            <span className="text-xs text-slate-500">in rotation</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* RECEPTION CHECK-IN DESK (RAPIDO-STYLE CODE VERIFICATION)                 */}
-      {/* ========================================================================= */}
-      <div 
-        data-testid="reception-checkin-panel"
-        className="bg-white rounded-2xl border-2 border-emerald-500/30 p-5 sm:p-6 shadow-xs relative overflow-hidden"
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-                <Ticket className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  Reception Check-In Desk
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider font-mono">
-                    Fast Pass OTP
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Ask arriving customer for their 4-digit booking code to verify and mark present.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Form */}
-          <form 
-            onSubmit={handleVerifyCheckinCode} 
-            className="flex items-center gap-2.5 w-full md:w-auto"
-          >
-            <div className="relative flex-1 md:w-56">
-              <input
-                ref={checkinInputRef}
-                type="text"
-                data-testid="checkin-code-input"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                value={checkinCodeInput}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setCheckinCodeInput(val);
-                  if (checkinErrorMessage) setCheckinErrorMessage(null);
-                }}
-                placeholder="4-digit code"
-                autoFocus
-                className="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-300 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-center font-mono text-lg font-bold tracking-widest text-slate-900 placeholder:text-slate-400 placeholder:tracking-normal placeholder:font-sans placeholder:text-sm transition outline-none"
-              />
-            </div>
-            <button
-              type="submit"
-              data-testid="verify-checkin-btn"
-              disabled={isVerifyingCheckin || !checkinCodeInput.trim()}
-              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs flex items-center gap-1.5 shrink-0"
-            >
-              {isVerifyingCheckin ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Verifying…</span>
-                </>
-              ) : (
-                <>
-                  <UserCheck className="w-4 h-4" />
-                  <span>Verify Code</span>
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Success Banner */}
-        {checkinSuccessData && (
-          <div
-            role="status"
-            data-testid="checkin-success-banner"
-            className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn"
-          >
-            <div className="flex items-start sm:items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-200 text-emerald-800 shrink-0">
-                <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-bold text-emerald-950">
-                    {checkinSuccessData.patient_name || 'Patient'} successfully checked in!
-                  </p>
-                  {checkinSuccessData.is_late ? (
-                    <span 
-                      data-testid="checkin-late-badge"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300"
-                    >
-                      <Clock className="w-3 h-3 text-amber-700" />
-                      <span>Arrived Late (&gt;10m after slot)</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900">
-                      <span>On Time</span>
-                    </span>
-                  )}
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                 </div>
-                <p className="text-xs text-emerald-800 mt-0.5">
-                  {checkinSuccessData.service_doctor ? `${checkinSuccessData.service_doctor} • ` : ''}
-                  {checkinSuccessData.slot_time ? `Slot: ${checkinSuccessData.slot_time} • ` : ''}
-                  Checked in at {checkinSuccessData.checked_in_at ? new Date(checkinSuccessData.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}
-                </p>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{confirmedCount}</span>
+                <span className="text-xs text-slate-500">slots booked</span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setCheckinSuccessData(null)}
-              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline underline-offset-2 self-end sm:self-center"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
 
-        {/* Error Banner */}
-        {checkinErrorMessage && (
-          <div
-            role="alert"
-            data-testid="checkin-error-banner"
-            className="mt-4 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-center justify-between gap-3 animate-fadeIn"
-          >
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <p className="text-xs font-semibold text-rose-900">{checkinErrorMessage}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCheckinErrorMessage(null)}
-              className="text-xs font-bold text-rose-700 hover:text-rose-900 p-1"
-              aria-label="Dismiss error"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Main Content Layout: Live Queue & Operations */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left 2 Cols: Live Bookings Queue */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Queue Header & Live Status Metrics */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Today&apos;s Live Appointments &amp; {venueLabel} Queue</span>
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                    Tokens #1 to #{todaysBookings.length || 0}
-                  </span>
-                </h2>
-                <p className="text-xs text-slate-500">Live service roster with attendance presence states &amp; late queue tracking</p>
-              </div>
-              <span className="text-xs font-semibold text-slate-500 self-start sm:self-center font-mono">
-                Total: {todaysBookings.length} appointments
-              </span>
-            </div>
-
-            {/* Quick Metrics Bar: Green, Red, Amber */}
-            <div className="grid grid-cols-3 gap-2.5 pt-1">
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="text-[11px] font-bold">Present &amp; Ready</span>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-amber-500/30 transition duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hold In-Flight</span>
+                <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
+                  <Clock className="w-5 h-5 text-amber-600" />
                 </div>
-                <span className="text-sm font-black font-mono">
-                  {todaysBookings.filter((b) => b.is_present || b.status === 'CHECKED_IN').length}
-                </span>
               </div>
-
-              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-                  <span className="text-[11px] font-bold">Not Present</span>
-                </div>
-                <span className="text-sm font-black font-mono">
-                  {todaysBookings.filter((b) => !b.is_present && b.status !== 'CHECKED_IN' && !b.queue_position).length}
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                  <span className="text-[11px] font-bold">Late Comers Queue</span>
-                </div>
-                <span className="text-sm font-black font-mono">
-                  {todaysBookings.filter((b) => Boolean(b.queue_position)).length}
-                </span>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{heldCount}</span>
+                <span className="text-xs text-amber-600 font-medium">checkout now</span>
               </div>
             </div>
 
-
-            {/* Attendance Matrix Subheader & Resource / Department Filter */}
-            <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
-                  <Users className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Live Queue &amp; Service Matrix ({todaysBookings.length} Tokens)</span>
-                </span>
-                {isHospitalAdmin && (
-                  <Link
-                    href="/departments"
-                    className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition"
-                  >
-                    <span>Manage Departments</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </Link>
-                )}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-emerald-500/30 transition duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Deposits Captured</span>
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                </div>
               </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">₹{totalDepositCollected.toLocaleString('en-IN')}</span>
+                <span className="text-xs text-emerald-600 font-medium">secured funds</span>
+              </div>
+            </div>
 
-              {/* Resource & Department filter dropdowns */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {availableDepartments.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-bold text-slate-500">Department:</span>
-                    <select
-                      value={selectedDepartmentFilter}
-                      onChange={(e) => {
-                        setSelectedDepartmentFilter(e.target.value);
-                        setMerchantSelectedDoctorId('');
-                      }}
-                      className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                    >
-                      <option value="">All Departments ({availableDepartments.length})</option>
-                      {availableDepartments.map((dept: string) => (
-                        <option key={dept} value={dept}>
-                          {dept}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {activeResources.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-bold text-slate-500">{verticalConfig.resourceLabelSingular}:</span>
-                    <select
-                      value={merchantSelectedDoctorId}
-                      onChange={(e) => setMerchantSelectedDoctorId(e.target.value)}
-                      className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                    >
-                      <option value="">All {verticalConfig.resourceLabelSingular}s ({departmentFilteredResources.length})</option>
-                      {departmentFilteredResources.map((doc: Resource) => (
-                        <option key={doc.id} value={doc.id}>
-                          {doc.name} ({doc.department || 'Active'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-slate-300 transition duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active {verticalConfig.resourceLabelSingular}s</span>
+                <div className="p-2 rounded-xl bg-slate-100 text-slate-700">
+                  <Users className="w-5 h-5 text-slate-600" />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tabular-nums">{activeResources.length}</span>
+                <span className="text-xs text-slate-500">in rotation</span>
               </div>
             </div>
           </div>
 
           {/* ========================================================================= */}
-          {/* QUEUE NUMBER SEQUENCE STRIP (Green = Present, Yellow = Waiting, Red = Absent) */}
+          {/* RECEPTION CHECK-IN DESK (RAPIDO-STYLE CODE VERIFICATION)                 */}
           {/* ========================================================================= */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
-                  <Ticket className="w-4 h-4" />
-                </span>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                    <span>Queue Number Sequence</span>
-                    <span className="text-[10px] font-normal normal-case text-slate-500">
-                      (#1 = Customer 1, #2 = Customer 2)
-                    </span>
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Live glanceable status: click any token number to jump directly to their appointment record.
-                  </p>
-                </div>
-              </div>
-
-              {/* Status Color Legend */}
-              <div className="flex items-center gap-2.5 flex-wrap text-[11px] font-bold">
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300">
-                  <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">1</span>
-                  <span>Green = Present</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-950 border border-amber-300">
-                  <span className="w-4 h-4 rounded-full bg-amber-300 text-amber-950 flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">2</span>
-                  <span>Yellow = Still Waiting</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-rose-100 text-rose-900 border border-rose-300">
-                  <span className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">3</span>
-                  <span>Red = Absent</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-950 border border-amber-300">
-                  <span className="w-5 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center font-mono text-[8px] shadow-2xs font-black">L1</span>
-                  <span>Late Queue</span>
-                </span>
-              </div>
-            </div>
-
-            {/* Sequence Number Badges */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
-              {todaysBookings.length === 0 ? (
-                <span className="text-xs text-slate-400 italic py-1">No customer bookings queued today.</span>
-              ) : (
-                todaysBookings.map((b, idx) => {
-                  const isPresent = Boolean(b.is_present || b.status === 'CHECKED_IN');
-                  const isAbsent = b.status === 'NO_SHOW';
-                  const isLate = Boolean(b.queue_position);
-                  const patientNum = isLate ? `L${b.queue_position}` : `${idx + 1}`;
-                  const patientName = b.customer_name || `Customer #${patientNum}`;
-
-                  return (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedMatrixBookingId(b.id);
-                        const el = document.getElementById(`matrix-tile-${b.id}`);
-                        if (el) {
-                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                      }}
-                      title={`Token #${patientNum}: ${patientName} • ${
-                        isPresent ? 'Present (Green)' : isAbsent ? 'Absent (Red)' : isLate ? 'Late Queue (Yellow)' : 'Still Waiting (Yellow)'
-                      }`}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono font-bold shrink-0 transition-all cursor-pointer shadow-2xs hover:scale-105 border ${
-                        isPresent
-                          ? 'bg-emerald-500 text-white border-emerald-600 ring-1 ring-emerald-300'
-                          : isAbsent
-                          ? 'bg-rose-500 text-white border-rose-600 ring-1 ring-rose-300'
-                          : isLate
-                          ? 'bg-amber-400 text-amber-950 border-amber-500 ring-1 ring-amber-300 font-black'
-                          : 'bg-amber-300 text-amber-950 border-amber-400 ring-1 ring-amber-300'
-                      }`}
-                    >
-                      <span className="w-4 h-4 rounded-full bg-white/25 flex items-center justify-center text-[10px]">
-                        {patientNum}
-                      </span>
-                      <span className="text-[11px] font-sans font-medium truncate max-w-[85px]">
-                        {patientName.split(' ')[0]}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Live Patient Queue Attendance Matrix (Style 3) */}
-          {(() => {
-            const baseBookings = todaysBookings.filter((b) => {
-              if (b.status === 'CANCELLED') return false;
-              if (merchantSelectedDoctorId && b.resource_id !== merchantSelectedDoctorId) return false;
-              if (selectedDepartmentFilter) {
-                const res = activeResources.find((r) => r.id === b.resource_id);
-                if ((res?.department || 'General') !== selectedDepartmentFilter) return false;
-              }
-              return true;
-            });
-            const targetConsultantId = merchantSelectedDoctorId || baseBookings[0]?.resource_id || null;
-
-            const consultantQueueEval = evaluateConsultantQueue(baseBookings, {
-              now: new Date(),
-              resourceId: targetConsultantId,
-            });
-            const standbyIdSet = new Set(consultantQueueEval.standbyQueue.map((s) => s.id));
-
-            const matrixPresentCount = baseBookings.filter((b) => (b.is_present || b.status === 'CHECKED_IN') && b.status !== 'COMPLETED').length;
-            const matrixAbsentCount = baseBookings.filter((b) => b.status === 'NO_SHOW').length;
-            const matrixLateCount = baseBookings.filter((b) => standbyIdSet.has(b.id) || Boolean(b.queue_position && new Date(b.checked_in_at || b.customer_arrived_at || b.slot_start).getTime() - new Date(b.slot_start).getTime() > ON_TIME_GRACE_MS)).length;
-            const matrixWaitingCount = baseBookings.filter((b) => !b.is_present && b.status !== 'CHECKED_IN' && b.status !== 'NO_SHOW' && b.status !== 'COMPLETED').length;
-
-            const filteredMatrixBookings = baseBookings.filter((b) => {
-              const isCompleted = b.status === 'COMPLETED';
-              const isPresent = Boolean(b.is_present || b.status === 'CHECKED_IN') && !isCompleted;
-              const isAbsent = b.status === 'NO_SHOW';
-              const isLate = Boolean(b.queue_position);
-              if (matrixFilter === 'PRESENT') return isPresent;
-              if (matrixFilter === 'WAITING') return !isPresent && !isAbsent && !isCompleted;
-              if (matrixFilter === 'ABSENT') return isAbsent;
-              if (matrixFilter === 'LATE') return isLate;
-              return true;
-            });
-
-            return (
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4" data-testid="live-attendance-matrix-board">
-                {/* Matrix Header & Status Filters */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div
+            data-testid="reception-checkin-panel"
+            className="bg-white rounded-2xl border-2 border-emerald-500/30 p-5 sm:p-6 shadow-xs relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                    <Ticket className="w-5 h-5 text-emerald-600" />
+                  </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
-                        Attendance Matrix
+                    <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      Reception Check-In Desk
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider font-mono">
+                        Fast Pass OTP
                       </span>
-                      <h3 className="font-bold text-slate-900 text-base tracking-tight">
-                        Live {venueLabel} Service Queue Matrix
-                      </h3>
-                    </div>
+                    </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Glanceable matrix grid: 🟢 Green = Present, 🟡 Yellow = Waiting, 🔴 Red = Absent, 🟡 L = Late Queue
+                      Ask arriving customer for their 4-digit booking code to verify and mark present.
                     </p>
                   </div>
+                </div>
+              </div>
 
-                  {/* Filter Pills */}
-                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setMatrixFilter('ALL')}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                        matrixFilter === 'ALL'
-                          ? 'bg-slate-900 text-white shadow-2xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      All ({baseBookings.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMatrixFilter('PRESENT')}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
-                        matrixFilter === 'PRESENT'
-                          ? 'bg-emerald-600 text-white shadow-2xs'
-                          : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                      }`}
-                    >
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      Present ({matrixPresentCount})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMatrixFilter('WAITING')}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
-                        matrixFilter === 'WAITING'
-                          ? 'bg-amber-500 text-white shadow-2xs'
-                          : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
-                      }`}
-                    >
-                      <span className="w-2 h-2 rounded-full bg-amber-400" />
-                      Waiting ({matrixWaitingCount})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMatrixFilter('ABSENT')}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
-                        matrixFilter === 'ABSENT'
-                          ? 'bg-rose-600 text-white shadow-2xs'
-                          : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
-                      }`}
-                    >
-                      <span className="w-2 h-2 rounded-full bg-rose-500" />
-                      Absent ({matrixAbsentCount})
-                    </button>
-                    {matrixLateCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setMatrixFilter('LATE')}
-                        className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
-                          matrixFilter === 'LATE'
-                            ? 'bg-amber-600 text-white shadow-2xs'
-                            : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
-                        }`}
+              {/* Form */}
+              <form
+                onSubmit={handleVerifyCheckinCode}
+                className="flex items-center gap-2.5 w-full md:w-auto"
+              >
+                <div className="relative flex-1 md:w-56">
+                  <input
+                    ref={checkinInputRef}
+                    type="text"
+                    data-testid="checkin-code-input"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={checkinCodeInput}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setCheckinCodeInput(val);
+                      if (checkinErrorMessage) setCheckinErrorMessage(null);
+                    }}
+                    placeholder="4-digit code"
+                    autoFocus
+                    className="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-300 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-center font-mono text-lg font-bold tracking-widest text-slate-900 placeholder:text-slate-400 placeholder:tracking-normal placeholder:font-sans placeholder:text-sm transition outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  data-testid="verify-checkin-btn"
+                  disabled={isVerifyingCheckin || !checkinCodeInput.trim()}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs flex items-center gap-1.5 shrink-0"
+                >
+                  {isVerifyingCheckin ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Verifying…</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="w-4 h-4" />
+                      <span>Verify Code</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* Success Banner */}
+            {checkinSuccessData && (
+              <div
+                role="status"
+                data-testid="checkin-success-banner"
+                className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn"
+              >
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-200 text-emerald-800 shrink-0">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-bold text-emerald-950">
+                        {checkinSuccessData.patient_name || 'Patient'} successfully checked in!
+                      </p>
+                      {checkinSuccessData.is_late ? (
+                        <span
+                          data-testid="checkin-late-badge"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300"
+                        >
+                          <Clock className="w-3 h-3 text-amber-700" />
+                          <span>Arrived Late (&gt;10m after slot)</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900">
+                          <span>On Time</span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-emerald-800 mt-0.5">
+                      {checkinSuccessData.service_doctor ? `${checkinSuccessData.service_doctor} • ` : ''}
+                      {checkinSuccessData.slot_time ? `Slot: ${checkinSuccessData.slot_time} • ` : ''}
+                      Checked in at {checkinSuccessData.checked_in_at ? new Date(checkinSuccessData.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCheckinSuccessData(null)}
+                  className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline underline-offset-2 self-end sm:self-center"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {/* Error Banner */}
+            {checkinErrorMessage && (
+              <div
+                role="alert"
+                data-testid="checkin-error-banner"
+                className="mt-4 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-center justify-between gap-3 animate-fadeIn"
+              >
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <p className="text-xs font-semibold text-rose-900">{checkinErrorMessage}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCheckinErrorMessage(null)}
+                  className="text-xs font-bold text-rose-700 hover:text-rose-900 p-1"
+                  aria-label="Dismiss error"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Main Content Layout: Live Queue & Operations */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left 2 Cols: Live Bookings Queue */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* Queue Header & Live Status Metrics */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      <span>Today&apos;s Live Appointments &amp; {venueLabel} Queue</span>
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                        Tokens #1 to #{todaysBookings.length || 0}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-500">Live service roster with attendance presence states &amp; late queue tracking</p>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-500 self-start sm:self-center font-mono">
+                    Total: {todaysBookings.length} appointments
+                  </span>
+                </div>
+
+                {/* Quick Metrics Bar: Green, Red, Amber */}
+                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="text-[11px] font-bold">Present &amp; Ready</span>
+                    </div>
+                    <span className="text-sm font-black font-mono">
+                      {todaysBookings.filter((b) => b.is_present || b.status === 'CHECKED_IN').length}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                      <span className="text-[11px] font-bold">Not Present</span>
+                    </div>
+                    <span className="text-sm font-black font-mono">
+                      {todaysBookings.filter((b) => !b.is_present && b.status !== 'CHECKED_IN' && !b.queue_position).length}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                      <span className="text-[11px] font-bold">Late Comers Queue</span>
+                    </div>
+                    <span className="text-sm font-black font-mono">
+                      {todaysBookings.filter((b) => Boolean(b.queue_position)).length}
+                    </span>
+                  </div>
+                </div>
+
+
+                {/* Attendance Matrix Subheader & Resource / Department Filter */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                      <Users className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Live Queue &amp; Service Matrix ({todaysBookings.length} Tokens)</span>
+                    </span>
+                    {isHospitalAdmin && (
+                      <Link
+                        href="/departments"
+                        className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition"
                       >
-                        <span className="w-2 h-2 rounded-full bg-amber-500" />
-                        Late ({matrixLateCount})
-                      </button>
+                        <span>Manage Departments</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    )}
+                  </div>
+
+                  {/* Resource & Department filter dropdowns */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {availableDepartments.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-slate-500">Department:</span>
+                        <select
+                          value={selectedDepartmentFilter}
+                          onChange={(e) => {
+                            setSelectedDepartmentFilter(e.target.value);
+                            setMerchantSelectedDoctorId('');
+                          }}
+                          className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                        >
+                          <option value="">All Departments ({availableDepartments.length})</option>
+                          {availableDepartments.map((dept: string) => (
+                            <option key={dept} value={dept}>
+                              {dept}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {activeResources.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-slate-500">{verticalConfig.resourceLabelSingular}:</span>
+                        <select
+                          value={merchantSelectedDoctorId}
+                          onChange={(e) => setMerchantSelectedDoctorId(e.target.value)}
+                          className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                        >
+                          <option value="">All {verticalConfig.resourceLabelSingular}s ({departmentFilteredResources.length})</option>
+                          {departmentFilteredResources.map((doc: Resource) => (
+                            <option key={doc.id} value={doc.id}>
+                              {doc.name} ({doc.department || 'Active'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     )}
                   </div>
                 </div>
+              </div>
 
-                {/* THE MATRIX TILES GRID */}
-                {filteredMatrixBookings.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 text-xs italic bg-slate-50 rounded-xl">
-                    No bookings matching this filter in today&apos;s queue matrix.
+              {/* ========================================================================= */}
+              {/* QUEUE NUMBER SEQUENCE STRIP (Green = Present, Yellow = Waiting, Red = Absent) */}
+              {/* ========================================================================= */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
+                      <Ticket className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                        <span>Queue Number Sequence</span>
+                        <span className="text-[10px] font-normal normal-case text-slate-500">
+                          (#1 = Customer 1, #2 = Customer 2)
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Live glanceable status: click any token number to jump directly to their appointment record.
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                    {filteredMatrixBookings.map((booking) => {
-                      const originalIndex = todaysBookings.findIndex((b) => b.id === booking.id);
-                      const isCompleted = booking.status === 'COMPLETED';
-                      const isPresent = Boolean(booking.is_present || booking.status === 'CHECKED_IN') && !isCompleted;
-                      const isAbsent = booking.status === 'NO_SHOW';
-                      const isLate = Boolean(booking.queue_position);
-                      const patientNumber = isLate ? `L${booking.queue_position}` : `${originalIndex + 1}`;
-                      const patientName = booking.customer_name || `Patient #${patientNumber}`;
-                      const isSelected = selectedMatrixBookingId === booking.id;
+
+                  {/* Status Color Legend */}
+                  <div className="flex items-center gap-2.5 flex-wrap text-[11px] font-bold">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300">
+                      <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">1</span>
+                      <span>Green = Present</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-950 border border-amber-300">
+                      <span className="w-4 h-4 rounded-full bg-amber-300 text-amber-950 flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">2</span>
+                      <span>Yellow = Still Waiting</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-rose-100 text-rose-900 border border-rose-300">
+                      <span className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center font-mono text-[9px] shadow-2xs font-bold">3</span>
+                      <span>Red = Absent</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-950 border border-amber-300">
+                      <span className="w-5 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center font-mono text-[8px] shadow-2xs font-black">L1</span>
+                      <span>Late Queue</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sequence Number Badges */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+                  {todaysBookings.length === 0 ? (
+                    <span className="text-xs text-slate-400 italic py-1">No customer bookings queued today.</span>
+                  ) : (
+                    todaysBookings.map((b, idx) => {
+                      const isPresent = Boolean(b.is_present || b.status === 'CHECKED_IN');
+                      const isAbsent = b.status === 'NO_SHOW';
+                      const isLate = Boolean(b.queue_position);
+                      const patientNum = isLate ? `L${b.queue_position}` : `${idx + 1}`;
+                      const patientName = b.customer_name || `Customer #${patientNum}`;
 
                       return (
-                        <div
-                          key={booking.id}
-                          id={`matrix-tile-${booking.id}`}
-                          data-testid={`matrix-patient-tile-${booking.id}`}
-                          onClick={() => setSelectedMatrixBookingId(isSelected ? null : booking.id)}
-                          className={`rounded-2xl p-3.5 border-2 transition-all flex flex-col justify-between gap-2.5 cursor-pointer shadow-2xs hover:shadow-md ${
-                            isCompleted
-                              ? 'bg-slate-50/70 border-slate-300 hover:border-slate-400 opacity-80'
-                              : isPresent
-                              ? 'bg-emerald-50/70 border-emerald-500 hover:border-emerald-600 ring-1 ring-emerald-400/20'
-                              : isAbsent
-                              ? 'bg-rose-50/70 border-rose-400 hover:border-rose-500 ring-1 ring-rose-300/20'
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedMatrixBookingId(b.id);
+                            const el = document.getElementById(`matrix-tile-${b.id}`);
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                          }}
+                          title={`Token #${patientNum}: ${patientName} • ${isPresent ? 'Present (Green)' : isAbsent ? 'Absent (Red)' : isLate ? 'Late Queue (Yellow)' : 'Still Waiting (Yellow)'
+                            }`}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono font-bold shrink-0 transition-all cursor-pointer shadow-2xs hover:scale-105 border ${isPresent
+                            ? 'bg-emerald-500 text-white border-emerald-600 ring-1 ring-emerald-300'
+                            : isAbsent
+                              ? 'bg-rose-500 text-white border-rose-600 ring-1 ring-rose-300'
                               : isLate
-                              ? 'bg-amber-50/80 border-amber-400 hover:border-amber-500 ring-1 ring-amber-300/30'
-                              : 'bg-amber-50/50 border-amber-300 hover:border-amber-400 ring-1 ring-amber-200/30'
-                          } ${isSelected ? 'ring-4 ring-emerald-500/30 scale-[1.02]' : ''}`}
+                                ? 'bg-amber-400 text-amber-950 border-amber-500 ring-1 ring-amber-300 font-black'
+                                : 'bg-amber-300 text-amber-950 border-amber-400 ring-1 ring-amber-300'
+                            }`}
                         >
-                          {/* Tile Top: Number Badge and Status Tag */}
-                          <div className="flex items-center justify-between gap-1.5">
-                            <span
-                              className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shadow-2xs shrink-0 ${
-                                isCompleted
-                                  ? 'bg-slate-400 text-white'
-                                  : isPresent
-                                  ? 'bg-emerald-500 text-white ring-1 ring-emerald-600'
-                                  : isAbsent
-                                  ? 'bg-rose-500 text-white ring-1 ring-rose-600'
-                                  : isLate
-                                  ? 'bg-amber-400 text-amber-950 font-black ring-1 ring-amber-500'
-                                  : 'bg-amber-300 text-amber-950 font-bold ring-1 ring-amber-400'
-                              }`}
-                            >
-                              {patientNumber}
-                            </span>
+                          <span className="w-4 h-4 rounded-full bg-white/25 flex items-center justify-center text-[10px]">
+                            {patientNum}
+                          </span>
+                          <span className="text-[11px] font-sans font-medium truncate max-w-[85px]">
+                            {patientName.split(' ')[0]}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
 
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 ${
-                                isCompleted
-                                  ? 'bg-slate-200 text-slate-700'
-                                  : isPresent
-                                  ? 'bg-emerald-600 text-white'
-                                  : isAbsent
-                                  ? 'bg-rose-600 text-white'
-                                  : isLate
-                                  ? 'bg-amber-400 text-amber-950 border border-amber-500 font-black'
-                                  : 'bg-amber-300 text-amber-950 font-bold'
+              {/* Live Patient Queue Attendance Matrix (Style 3) */}
+              {(() => {
+                const baseBookings = todaysBookings.filter((b) => {
+                  if (b.status === 'CANCELLED') return false;
+                  if (merchantSelectedDoctorId && b.resource_id !== merchantSelectedDoctorId) return false;
+                  if (selectedDepartmentFilter) {
+                    const res = activeResources.find((r) => r.id === b.resource_id);
+                    if ((res?.department || 'General') !== selectedDepartmentFilter) return false;
+                  }
+                  return true;
+                });
+                const targetConsultantId = merchantSelectedDoctorId || baseBookings[0]?.resource_id || null;
+
+                const consultantQueueEval = evaluateConsultantQueue(baseBookings, {
+                  now: new Date(),
+                  resourceId: targetConsultantId,
+                });
+                const standbyIdSet = new Set(consultantQueueEval.standbyQueue.map((s) => s.id));
+
+                const matrixPresentCount = baseBookings.filter((b) => (b.is_present || b.status === 'CHECKED_IN') && b.status !== 'COMPLETED').length;
+                const matrixAbsentCount = baseBookings.filter((b) => b.status === 'NO_SHOW').length;
+                const matrixLateCount = baseBookings.filter((b) => standbyIdSet.has(b.id) || Boolean(b.queue_position && new Date(b.checked_in_at || b.customer_arrived_at || b.slot_start).getTime() - new Date(b.slot_start).getTime() > ON_TIME_GRACE_MS)).length;
+                const matrixWaitingCount = baseBookings.filter((b) => !b.is_present && b.status !== 'CHECKED_IN' && b.status !== 'NO_SHOW' && b.status !== 'COMPLETED').length;
+
+                const filteredMatrixBookings = baseBookings.filter((b) => {
+                  const isCompleted = b.status === 'COMPLETED';
+                  const isPresent = Boolean(b.is_present || b.status === 'CHECKED_IN') && !isCompleted;
+                  const isAbsent = b.status === 'NO_SHOW';
+                  const isLate = Boolean(b.queue_position);
+                  if (matrixFilter === 'PRESENT') return isPresent;
+                  if (matrixFilter === 'WAITING') return !isPresent && !isAbsent && !isCompleted;
+                  if (matrixFilter === 'ABSENT') return isAbsent;
+                  if (matrixFilter === 'LATE') return isLate;
+                  return true;
+                });
+
+                return (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4" data-testid="live-attendance-matrix-board">
+                    {/* Matrix Header & Status Filters */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
+                            Attendance Matrix
+                          </span>
+                          <h3 className="font-bold text-slate-900 text-base tracking-tight">
+                            Live {venueLabel} Service Queue Matrix
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Glanceable matrix grid: 🟢 Green = Present, 🟡 Yellow = Waiting, 🔴 Red = Absent, 🟡 L = Late Queue
+                        </p>
+                      </div>
+
+                      {/* Filter Pills */}
+                      <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setMatrixFilter('ALL')}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${matrixFilter === 'ALL'
+                            ? 'bg-slate-900 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                          All ({baseBookings.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMatrixFilter('PRESENT')}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${matrixFilter === 'PRESENT'
+                            ? 'bg-emerald-600 text-white shadow-2xs'
+                            : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                            }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          Present ({matrixPresentCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMatrixFilter('WAITING')}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${matrixFilter === 'WAITING'
+                            ? 'bg-amber-500 text-white shadow-2xs'
+                            : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
+                            }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-amber-400" />
+                          Waiting ({matrixWaitingCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMatrixFilter('ABSENT')}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${matrixFilter === 'ABSENT'
+                            ? 'bg-rose-600 text-white shadow-2xs'
+                            : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
+                            }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-rose-500" />
+                          Absent ({matrixAbsentCount})
+                        </button>
+                        {matrixLateCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setMatrixFilter('LATE')}
+                            className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${matrixFilter === 'LATE'
+                              ? 'bg-amber-600 text-white shadow-2xs'
+                              : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
                               }`}
-                            >
-                              {isCompleted
-                                ? 'DONE'
+                          >
+                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                            Late ({matrixLateCount})
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* THE MATRIX TILES GRID */}
+                    {filteredMatrixBookings.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400 text-xs italic bg-slate-50 rounded-xl">
+                        No bookings matching this filter in today&apos;s queue matrix.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                        {filteredMatrixBookings.map((booking) => {
+                          const originalIndex = todaysBookings.findIndex((b) => b.id === booking.id);
+                          const isCompleted = booking.status === 'COMPLETED';
+                          const isPresent = Boolean(booking.is_present || booking.status === 'CHECKED_IN') && !isCompleted;
+                          const isAbsent = booking.status === 'NO_SHOW';
+                          const isLate = Boolean(booking.queue_position);
+                          const patientNumber = isLate ? `L${booking.queue_position}` : `${originalIndex + 1}`;
+                          const patientName = booking.customer_name || `Patient #${patientNumber}`;
+                          const isSelected = selectedMatrixBookingId === booking.id;
+
+                          return (
+                            <div
+                              key={booking.id}
+                              id={`matrix-tile-${booking.id}`}
+                              data-testid={`matrix-patient-tile-${booking.id}`}
+                              onClick={() => setSelectedMatrixBookingId(isSelected ? null : booking.id)}
+                              className={`rounded-2xl p-3.5 border-2 transition-all flex flex-col justify-between gap-2.5 cursor-pointer shadow-2xs hover:shadow-md ${isCompleted
+                                ? 'bg-slate-50/70 border-slate-300 hover:border-slate-400 opacity-80'
                                 : isPresent
-                                ? 'PRESENT'
-                                : isAbsent
-                                ? 'ABSENT'
-                                : isLate
-                                ? 'LATE'
-                                : 'WAITING'}
+                                  ? 'bg-emerald-50/70 border-emerald-500 hover:border-emerald-600 ring-1 ring-emerald-400/20'
+                                  : isAbsent
+                                    ? 'bg-rose-50/70 border-rose-400 hover:border-rose-500 ring-1 ring-rose-300/20'
+                                    : isLate
+                                      ? 'bg-amber-50/80 border-amber-400 hover:border-amber-500 ring-1 ring-amber-300/30'
+                                      : 'bg-amber-50/50 border-amber-300 hover:border-amber-400 ring-1 ring-amber-200/30'
+                                } ${isSelected ? 'ring-4 ring-emerald-500/30 scale-[1.02]' : ''}`}
+                            >
+                              {/* Tile Top: Number Badge and Status Tag */}
+                              <div className="flex items-center justify-between gap-1.5">
+                                <span
+                                  className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shadow-2xs shrink-0 ${isCompleted
+                                    ? 'bg-slate-400 text-white'
+                                    : isPresent
+                                      ? 'bg-emerald-500 text-white ring-1 ring-emerald-600'
+                                      : isAbsent
+                                        ? 'bg-rose-500 text-white ring-1 ring-rose-600'
+                                        : isLate
+                                          ? 'bg-amber-400 text-amber-950 font-black ring-1 ring-amber-500'
+                                          : 'bg-amber-300 text-amber-950 font-bold ring-1 ring-amber-400'
+                                    }`}
+                                >
+                                  {patientNumber}
+                                </span>
+
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 ${isCompleted
+                                    ? 'bg-slate-200 text-slate-700'
+                                    : isPresent
+                                      ? 'bg-emerald-600 text-white'
+                                      : isAbsent
+                                        ? 'bg-rose-600 text-white'
+                                        : isLate
+                                          ? 'bg-amber-400 text-amber-950 border border-amber-500 font-black'
+                                          : 'bg-amber-300 text-amber-950 font-bold'
+                                    }`}
+                                >
+                                  {isCompleted
+                                    ? 'DONE'
+                                    : isPresent
+                                      ? 'PRESENT'
+                                      : isAbsent
+                                        ? 'ABSENT'
+                                        : isLate
+                                          ? 'LATE'
+                                          : 'WAITING'}
+                                </span>
+                              </div>
+
+                              {/* Tile Middle: Patient Name */}
+                              <div className="py-0.5">
+                                <p className="text-xs font-bold text-slate-900 truncate" title={patientName}>
+                                  {patientName}
+                                </p>
+                                <p className="text-[10px] text-slate-500 font-medium font-mono">
+                                  {new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+
+                              {/* Tile Bottom: Contextual Action */}
+                              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
+                                {isCompleted ? (
+                                  <span className="text-[10px] font-bold text-slate-500 text-center w-full flex items-center justify-center gap-1 py-0.5">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Finished</span>
+                                  </span>
+                                ) : isPresent ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
+                                    disabled={pendingBookingId === booking.id}
+                                    className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer flex items-center justify-center gap-1"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>{pendingBookingId === booking.id ? 'Saving…' : 'Done'}</span>
+                                  </button>
+                                ) : isAbsent ? (
+                                  <span className="text-[10px] font-bold text-rose-600 text-center w-full py-0.5">
+                                    ✕ Missed
+                                  </span>
+                                ) : isLate ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLateQueueAction(booking.id, 'CHECKIN_LATE')}
+                                    disabled={pendingBookingId === booking.id}
+                                    className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer"
+                                  >
+                                    Arrived Late
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdmitPatient(booking.id)}
+                                    disabled={pendingBookingId === booking.id}
+                                    className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer flex items-center justify-center gap-1"
+                                  >
+                                    <UserCheck className="w-3 h-3" />
+                                    <span>{pendingBookingId === booking.id ? 'Admitting…' : 'Admit'}</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Selected Patient Drawer / Quick Inspector */}
+                    {selectedMatrixBookingId && (() => {
+                      const b = todaysBookings.find((item) => item.id === selectedMatrixBookingId);
+                      if (!b) return null;
+                      const isC = b.status === 'COMPLETED';
+                      const isP = Boolean(b.is_present || b.status === 'CHECKED_IN') && !isC;
+                      const isA = b.status === 'NO_SHOW';
+                      const isL = Boolean(b.queue_position);
+                      const pIdx = todaysBookings.findIndex((item) => item.id === b.id);
+                      const pNum = isL ? `L${b.queue_position}` : `${pIdx + 1}`;
+
+                      return (
+                        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/95 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-150">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-mono font-black text-sm text-white shadow-2xs ${isC ? 'bg-slate-400' : isP ? 'bg-emerald-600' : isA ? 'bg-rose-500' : isL ? 'bg-amber-500' : 'bg-amber-400 text-amber-950'
+                              }`}>
+                              {pNum}
                             </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-slate-900">{b.customer_name}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isC
+                                  ? 'bg-slate-200 text-slate-700'
+                                  : isP
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : isA
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : isL
+                                        ? 'bg-amber-100 text-amber-900'
+                                        : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                  }`}>
+                                  {isC ? 'Completed' : isP ? 'Present (In OPD)' : isA ? 'Absent (No-Show)' : isL ? 'Late Queue' : 'Still Waiting'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Slot: {new Date(b.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(b.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Doctor: <span className="font-semibold text-slate-700">{b.resource_name}</span>
+                              </p>
+                            </div>
                           </div>
-
-                          {/* Tile Middle: Patient Name */}
-                          <div className="py-0.5">
-                            <p className="text-xs font-bold text-slate-900 truncate" title={patientName}>
-                              {patientName}
-                            </p>
-                            <p className="text-[10px] text-slate-500 font-medium font-mono">
-                              {new Date(booking.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-
-                          {/* Tile Bottom: Contextual Action */}
-                          <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
-                            {isCompleted ? (
-                              <span className="text-[10px] font-bold text-slate-500 text-center w-full flex items-center justify-center gap-1 py-0.5">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>Finished</span>
-                              </span>
-                            ) : isPresent ? (
+                          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                            {!isP && !isA && !isC && (
                               <button
                                 type="button"
-                                onClick={() => handleStatusChange(booking.id, 'COMPLETED')}
-                                disabled={pendingBookingId === booking.id}
-                                className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer flex items-center justify-center gap-1"
+                                onClick={() => handleAdmitPatient(b.id)}
+                                disabled={pendingBookingId === b.id}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
                               >
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>{pendingBookingId === booking.id ? 'Saving…' : 'Done'}</span>
-                              </button>
-                            ) : isAbsent ? (
-                              <span className="text-[10px] font-bold text-rose-600 text-center w-full py-0.5">
-                                ✕ Missed
-                              </span>
-                            ) : isLate ? (
-                              <button
-                                type="button"
-                                onClick={() => handleLateQueueAction(booking.id, 'CHECKIN_LATE')}
-                                disabled={pendingBookingId === booking.id}
-                                className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer"
-                              >
-                                Arrived Late
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleAdmitPatient(booking.id)}
-                                disabled={pendingBookingId === booking.id}
-                                className="w-full py-1 px-2 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 text-center shadow-2xs cursor-pointer flex items-center justify-center gap-1"
-                              >
-                                <UserCheck className="w-3 h-3" />
-                                <span>{pendingBookingId === booking.id ? 'Admitting…' : 'Admit'}</span>
+                                <UserCheck className="w-3.5 h-3.5" />
+                                <span>{pendingBookingId === b.id ? 'Admitting…' : 'Admit Patient'}</span>
                               </button>
                             )}
+                            {isP && !isC && (
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(b.id, 'COMPLETED')}
+                                disabled={pendingBookingId === b.id}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>{pendingBookingId === b.id ? 'Saving…' : 'Done / Complete'}</span>
+                              </button>
+                            )}
+                            {!isP && !isA && !isC && (
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(b.id, 'NO_SHOW')}
+                                disabled={pendingBookingId === b.id}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition disabled:opacity-50 cursor-pointer"
+                              >
+                                No-Show
+                              </button>
+                            )}
+                            <CustomerContactBadge phone={b.customer_phone} bookingId={b.id} bookingStatus={b.status} isArrived={Boolean(b.customer_arrived_at)} />
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMatrixBookingId(null)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition cursor-pointer"
+                              aria-label="Close details"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
                       );
-                    })}
+                    })()}
                   </div>
-                )}
+                );
+              })()}
+            </div>
 
-                {/* Selected Patient Drawer / Quick Inspector */}
-                {selectedMatrixBookingId && (() => {
-                  const b = todaysBookings.find((item) => item.id === selectedMatrixBookingId);
-                  if (!b) return null;
-                  const isC = b.status === 'COMPLETED';
-                  const isP = Boolean(b.is_present || b.status === 'CHECKED_IN') && !isC;
-                  const isA = b.status === 'NO_SHOW';
-                  const isL = Boolean(b.queue_position);
-                  const pIdx = todaysBookings.findIndex((item) => item.id === b.id);
-                  const pNum = isL ? `L${b.queue_position}` : `${pIdx + 1}`;
+            {/* Right 1 Col: Doctor Shift Status & Duty Management */}
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-xl bg-emerald-50 text-emerald-700">
+                      <Users className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <h3 className="font-bold text-slate-900 text-sm">{verticalConfig.resourceLabelSingular} Shift &amp; Duty</h3>
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+                    {activeResources.length} Active
+                  </span>
+                </div>
 
-                  return (
-                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/95 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-150">
-                      <div className="flex items-center gap-3">
-                        <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-mono font-black text-sm text-white shadow-2xs ${
-                          isC ? 'bg-slate-400' : isP ? 'bg-emerald-600' : isA ? 'bg-rose-500' : isL ? 'bg-amber-500' : 'bg-amber-400 text-amber-950'
-                        }`}>
-                          {pNum}
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-slate-900">{b.customer_name}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              isC
+                <p className="text-xs text-slate-500">
+                  Live staff presence and operational duty status for station availability.
+                </p>
+
+                <div className="space-y-3">
+                  {activeResources.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-slate-50 text-center text-xs text-slate-500 border border-slate-100">
+                      No active {verticalConfig.resourceLabelSingular.toLowerCase()}s configured yet.
+                    </div>
+                  ) : (
+                    activeResources.map((doc) => {
+                      const isLeft = Boolean(doctorLeftMap[doc.id] ?? (doc.attributes as Record<string, unknown> | null)?.doctor_left);
+                      const docAppointmentsCount = todaysBookings.filter(
+                        (b) => b.resource_id === doc.id && b.status !== 'CANCELLED'
+                      ).length;
+
+                      return (
+                        <div
+                          key={doc.id}
+                          data-testid={`doctor-shift-card-${doc.id}`}
+                          className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 hover:border-slate-300 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-slate-900 text-xs">{doc.name}</p>
+                              <p className="text-[11px] text-slate-500">
+                                {doc.department || 'Active'} • {docAppointmentsCount} {docAppointmentsCount === 1 ? 'appointment' : 'appointments'} today
+                              </p>
+                            </div>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide shrink-0 ${isLeft
                                 ? 'bg-slate-200 text-slate-700'
-                                : isP
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                : isA
-                                ? 'bg-rose-100 text-rose-800'
-                                : isL
-                                ? 'bg-amber-100 text-amber-900'
-                                : 'bg-amber-100 text-amber-900 border border-amber-300'
-                            }`}>
-                              {isC ? 'Completed' : isP ? 'Present (In OPD)' : isA ? 'Absent (No-Show)' : isL ? 'Late Queue' : 'Still Waiting'}
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                }`}
+                            >
+                              {isLeft ? 'Away / Off' : 'On Duty'}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            Slot: {new Date(b.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(b.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Doctor: <span className="font-semibold text-slate-700">{b.resource_name}</span>
-                          </p>
+
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+                            <span className="text-[11px] text-slate-500">
+                              {isLeft ? 'Currently Away' : 'Available for Service'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDoctorDeparture(doc.id, isLeft)}
+                              data-testid={`toggle-doctor-duty-${doc.id}`}
+                              className={`text-xs font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${isLeft
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
+                                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs'
+                                }`}
+                            >
+                              {isLeft ? 'Mark On Duty' : 'Mark Left'}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                        {!isP && !isA && !isC && (
-                          <button
-                            type="button"
-                            onClick={() => handleAdmitPatient(b.id)}
-                            disabled={pendingBookingId === b.id}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                          >
-                            <UserCheck className="w-3.5 h-3.5" />
-                            <span>{pendingBookingId === b.id ? 'Admitting…' : 'Admit Patient'}</span>
-                          </button>
-                        )}
-                        {isP && !isC && (
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(b.id, 'COMPLETED')}
-                            disabled={pendingBookingId === b.id}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{pendingBookingId === b.id ? 'Saving…' : 'Done / Complete'}</span>
-                          </button>
-                        )}
-                        {!isP && !isA && !isC && (
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(b.id, 'NO_SHOW')}
-                            disabled={pendingBookingId === b.id}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition disabled:opacity-50 cursor-pointer"
-                          >
-                            No-Show
-                          </button>
-                        )}
-                        <CustomerContactBadge phone={b.customer_phone} bookingId={b.id} bookingStatus={b.status} isArrived={Boolean(b.customer_arrived_at)} />
-                        <button
-                          type="button"
-                          onClick={() => setSelectedMatrixBookingId(null)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition cursor-pointer"
-                          aria-label="Close details"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Right 1 Col: Doctor Shift Status & Duty Management */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-xl bg-emerald-50 text-emerald-700">
-                  <Users className="w-4 h-4 text-emerald-600" />
+                      );
+                    })
+                  )}
                 </div>
-                <h3 className="font-bold text-slate-900 text-sm">{verticalConfig.resourceLabelSingular} Shift &amp; Duty</h3>
-              </div>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
-                {activeResources.length} Active
-              </span>
-            </div>
 
-            <p className="text-xs text-slate-500">
-              Live staff presence and operational duty status for station availability.
-            </p>
-
-            <div className="space-y-3">
-              {activeResources.length === 0 ? (
-                <div className="p-4 rounded-xl bg-slate-50 text-center text-xs text-slate-500 border border-slate-100">
-                  No active {verticalConfig.resourceLabelSingular.toLowerCase()}s configured yet.
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                  <Link
+                    href="/schedule"
+                    className="font-bold text-emerald-700 hover:text-emerald-800 transition"
+                  >
+                    Manage Shift Hours →
+                  </Link>
+                  <Link
+                    href="/resources"
+                    className="font-medium text-slate-500 hover:text-slate-700 transition"
+                  >
+                    View {verticalConfig.resourceLabelSingular}s
+                  </Link>
                 </div>
-              ) : (
-                activeResources.map((doc) => {
-                  const isLeft = Boolean(doctorLeftMap[doc.id] ?? (doc.attributes as Record<string, unknown> | null)?.doctor_left);
-                  const docAppointmentsCount = todaysBookings.filter(
-                    (b) => b.resource_id === doc.id && b.status !== 'CANCELLED'
-                  ).length;
-
-                  return (
-                    <div
-                      key={doc.id}
-                      data-testid={`doctor-shift-card-${doc.id}`}
-                      className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 hover:border-slate-300 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-slate-900 text-xs">{doc.name}</p>
-                          <p className="text-[11px] text-slate-500">
-                            {doc.department || 'Active'} • {docAppointmentsCount} {docAppointmentsCount === 1 ? 'appointment' : 'appointments'} today
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide shrink-0 ${
-                            isLeft
-                              ? 'bg-slate-200 text-slate-700'
-                              : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          }`}
-                        >
-                          {isLeft ? 'Away / Off' : 'On Duty'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
-                        <span className="text-[11px] text-slate-500">
-                          {isLeft ? 'Currently Away' : 'Available for Service'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleDoctorDeparture(doc.id, isLeft)}
-                          data-testid={`toggle-doctor-duty-${doc.id}`}
-                          className={`text-xs font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                            isLeft
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
-                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs'
-                          }`}
-                        >
-                          {isLeft ? 'Mark On Duty' : 'Mark Left'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
-              <Link
-                href="/schedule"
-                className="font-bold text-emerald-700 hover:text-emerald-800 transition"
-              >
-                Manage Shift Hours →
-              </Link>
-              <Link
-                href="/resources"
-                className="font-medium text-slate-500 hover:text-slate-700 transition"
-              >
-                View {verticalConfig.resourceLabelSingular}s
-              </Link>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
         </>
       )}
 
@@ -3075,11 +3057,15 @@ export default function MerchantOverviewPage() {
       {/* OPERATIONAL SETTINGS MODAL (Auto-Accept & Daily Limit)                     */}
       {/* ========================================================================= */}
       {showSettingsModal && (
-        <div 
+        <div
+          onClick={() => setShowSettingsModal(false)}
           data-testid="booking-settings-modal"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
         >
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
@@ -3118,15 +3104,13 @@ export default function MerchantOverviewPage() {
                   role="switch"
                   aria-checked={tempAutoAccept}
                   onClick={() => setTempAutoAccept(!tempAutoAccept)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                    tempAutoAccept ? 'bg-emerald-600' : 'bg-slate-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 ${tempAutoAccept ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
                 >
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                      tempAutoAccept ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${tempAutoAccept ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -3161,11 +3145,10 @@ export default function MerchantOverviewPage() {
                       key={preset}
                       type="button"
                       onClick={() => setTempDailyLimit(preset)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer ${
-                        tempDailyLimit === preset
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      }`}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer ${tempDailyLimit === preset
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
                     >
                       {preset}
                     </button>
@@ -3205,11 +3188,15 @@ export default function MerchantOverviewPage() {
         const tomorrowDayObj = DAYS_OF_WEEK.find((d) => d.key === tomorrowKey);
 
         return (
-          <div 
+          <div
+            onClick={() => setShowHoursModal(false)}
             data-testid="shop-hours-modal"
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
           >
-            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-8">
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-8"
+            >
               {/* Modal Header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2.5">
@@ -3237,11 +3224,10 @@ export default function MerchantOverviewPage() {
                   type="button"
                   data-testid="tab-full-week"
                   onClick={() => setHoursActiveTab('full_week')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-                    hoursActiveTab === 'full_week'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${hoursActiveTab === 'full_week'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   📅 Full Week (7 Days)
                 </button>
@@ -3249,11 +3235,10 @@ export default function MerchantOverviewPage() {
                   type="button"
                   data-testid="tab-tomorrow"
                   onClick={() => setHoursActiveTab('tomorrow')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-                    hoursActiveTab === 'tomorrow'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${hoursActiveTab === 'tomorrow'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   🌅 Tomorrow ({tomorrowDayObj?.label})
                 </button>
@@ -3261,11 +3246,10 @@ export default function MerchantOverviewPage() {
                   type="button"
                   data-testid="tab-today"
                   onClick={() => setHoursActiveTab('today')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-                    hoursActiveTab === 'today'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${hoursActiveTab === 'today'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   🕒 Today ({todayDayObj?.label})
                 </button>
@@ -3372,13 +3356,12 @@ export default function MerchantOverviewPage() {
                           <div
                             key={day.key}
                             data-testid={`day-row-${day.key}`}
-                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition ${
-                              isToday
-                                ? 'bg-emerald-50/50 border-emerald-300'
-                                : isTomorrow
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition ${isToday
+                              ? 'bg-emerald-50/50 border-emerald-300'
+                              : isTomorrow
                                 ? 'bg-sky-50/50 border-sky-300'
                                 : 'bg-white border-slate-200 hover:border-slate-300'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-2 w-36 shrink-0 mb-2 sm:mb-0">
                               <span className="font-bold text-slate-900 text-xs">{day.label}</span>
@@ -3400,11 +3383,10 @@ export default function MerchantOverviewPage() {
                                 type="button"
                                 data-testid={`toggle-${day.key}`}
                                 onClick={() => handleDayToggleClosed(day.key)}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${
-                                  sched.is_closed
-                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                }`}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${sched.is_closed
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}
                               >
                                 {sched.is_closed ? 'Closed' : 'Open'}
                               </button>
@@ -3463,11 +3445,10 @@ export default function MerchantOverviewPage() {
                         type="button"
                         data-testid="tomorrow-toggle-closed"
                         onClick={() => handleDayToggleClosed(tomorrowKey)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                          tempWeeklyHours[tomorrowKey]?.is_closed
-                            ? 'bg-rose-100 text-rose-800 border-rose-300'
-                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                        }`}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${tempWeeklyHours[tomorrowKey]?.is_closed
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          }`}
                       >
                         {tempWeeklyHours[tomorrowKey]?.is_closed ? `${venueLabel} Closed Tomorrow` : `${venueLabel} Open Tomorrow`}
                       </button>
@@ -3547,11 +3528,10 @@ export default function MerchantOverviewPage() {
                         type="button"
                         data-testid="today-toggle-closed"
                         onClick={() => handleDayToggleClosed(todayKey)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                          tempWeeklyHours[todayKey]?.is_closed
-                            ? 'bg-rose-100 text-rose-800 border-rose-300'
-                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                        }`}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${tempWeeklyHours[todayKey]?.is_closed
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          }`}
                       >
                         {tempWeeklyHours[todayKey]?.is_closed ? `${venueLabel} Closed Today` : `${venueLabel} Open Today`}
                       </button>
@@ -3619,11 +3599,15 @@ export default function MerchantOverviewPage() {
       {/* OFFLINE / WALK-IN PATIENT BOOKING MODAL                                     */}
       {/* ========================================================================= */}
       {showOfflineModal && (
-        <div 
+        <div
+          onClick={() => setShowOfflineModal(false)}
           data-testid="offline-patient-modal"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
         >
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">

@@ -64,15 +64,15 @@ export function getApiBaseUrl(): string {
 
   // Development environment: use environment variable if set, otherwise local development server
   if (envUrl) {
-    return envUrl;
+    return envUrl.replace('localhost', '127.0.0.1');
   }
 
   if (typeof window !== 'undefined' && window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:3000';
+    return 'http://127.0.0.1:3000';
   }
 
-  // Prohibit hardcoded LAN IPs; default strictly to localhost in development
-  return 'http://localhost:3000';
+  // Prohibit hardcoded LAN IPs; default strictly to 127.0.0.1 IPv4 loopback in development
+  return 'http://127.0.0.1:3000';
 }
 
 
@@ -946,7 +946,7 @@ export async function fetchBookedSlots(resourceId: string, date: Date): Promise<
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
   try {
     const resp = await fetch(
       `${baseUrl}/api/slots/availability?resource_id=${encodeURIComponent(resourceId)}&date=${encodeURIComponent(date.toISOString())}`,

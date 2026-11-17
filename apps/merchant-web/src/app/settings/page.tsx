@@ -58,9 +58,36 @@ export default function SettingsPage() {
   useEffect(() => {
     if (activeProvider) {
       if (activeProvider.name) setBusinessName(activeProvider.name);
-      if (activeProvider.phone) setSupportPhone(activeProvider.phone);
-      if (activeProvider.email) setSupportEmail(activeProvider.email);
-      if (activeProvider.address) setJurisdiction(activeProvider.address);
+      if (activeProvider.support_phone) {
+        setSupportPhone(activeProvider.support_phone);
+      } else if (activeProvider.phone) {
+        setSupportPhone(activeProvider.phone);
+      }
+      if (activeProvider.support_email) {
+        setSupportEmail(activeProvider.support_email);
+      } else if (activeProvider.email) {
+        setSupportEmail(activeProvider.email);
+      }
+      if (activeProvider.jurisdiction) {
+        setJurisdiction(activeProvider.jurisdiction);
+      } else if (activeProvider.address) {
+        setJurisdiction(activeProvider.address);
+      }
+      if (activeProvider.gstin) {
+        setGstin(activeProvider.gstin);
+      }
+      if (activeProvider.payout_upi_id) {
+        setPayoutUpi(activeProvider.payout_upi_id);
+      }
+      if (activeProvider.cashfree_app_id) {
+        setCashfreeAppId(activeProvider.cashfree_app_id);
+      }
+      if (activeProvider.min_deposit_amount !== undefined && activeProvider.min_deposit_amount !== null) {
+        setMinDeposit(String(activeProvider.min_deposit_amount));
+      }
+      if (activeProvider.cancellation_window_hours !== undefined && activeProvider.cancellation_window_hours !== null) {
+        setCancellationWindowHours(String(activeProvider.cancellation_window_hours));
+      }
       if (activeProvider.cooling_period_days !== undefined) {
         setCoolingPeriodDays(activeProvider.cooling_period_days);
       }
@@ -93,6 +120,15 @@ export default function SettingsPage() {
         p_auto_confirm_holds: autoConfirmHolds,
         p_whatsapp_confirmations: whatsappConfirmations,
         p_reminder_offset_hours: parseInt(reminderOffsetHours, 10) || 2,
+        p_business_name: businessName.trim() || null,
+        p_gstin: gstin.trim() || null,
+        p_support_phone: supportPhone.trim() || null,
+        p_support_email: supportEmail.trim() || null,
+        p_jurisdiction: jurisdiction.trim() || null,
+        p_payout_upi_id: payoutUpi.trim() || null,
+        p_min_deposit_amount: parseFloat(minDeposit) || 0,
+        p_cancellation_window_hours: parseInt(cancellationWindowHours, 10) || 1,
+        p_cashfree_app_id: cashfreeAppId.trim() || null,
       });
 
       if (error || (data && (data as any).success === false)) {
@@ -189,45 +225,45 @@ export default function SettingsPage() {
       {/* Settings Navigation Tabs */}
       <div className="flex border-b border-slate-200 space-x-2 sm:space-x-4 overflow-x-auto">
         <button
+          data-testid="tab-profile"
           onClick={() => setActiveTab('profile')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'profile'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'profile'
+            ? 'border-emerald-600 text-emerald-700'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Building2 className="w-4 h-4" />
           Business Profile
         </button>
         <button
+          data-testid="tab-payments"
           onClick={() => setActiveTab('payments')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'payments'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'payments'
+            ? 'border-emerald-600 text-emerald-700'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <CreditCard className="w-4 h-4" />
           Payments & Gateway
         </button>
         <button
+          data-testid="tab-notifications"
           onClick={() => setActiveTab('notifications')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'notifications'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'notifications'
+            ? 'border-emerald-600 text-emerald-700'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Bell className="w-4 h-4" />
           Notifications & Alerts
         </button>
         <button
+          data-testid="tab-policies"
           onClick={() => setActiveTab('policies')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'policies'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'policies'
+            ? 'border-emerald-600 text-emerald-700'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <ShieldCheck className="w-4 h-4" />
           Deposit & Refund Rules
@@ -631,11 +667,10 @@ export default function SettingsPage() {
                         key={preset.days}
                         type="button"
                         onClick={() => setCoolingPeriodDays(preset.days)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${
-                          coolingPeriodDays === preset.days
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${coolingPeriodDays === preset.days
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'
+                          }`}
                       >
                         {preset.label}
                       </button>

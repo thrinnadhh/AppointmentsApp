@@ -127,7 +127,7 @@ export default function App() {
     city: '',
   });
 
-  // Check existing Supabase session on app startup
+  // Check existing Supabase session on app startup & listen to auth state changes
   useEffect(() => {
     async function checkSession() {
       try {
@@ -154,6 +154,41 @@ export default function App() {
       }
     }
     checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setActiveCustomerId('');
+        setIsPhoneVerified(false);
+        setIsEmailVerified(false);
+        setCustomerProfile({
+          name: 'Ravi Teja',
+          phone: '',
+          email: '',
+          city: '',
+        });
+      } else if (session?.user) {
+        const u = session.user;
+        setActiveCustomerId(u.id);
+        setIsAuthenticated(true);
+        const p = u.phone ? (u.phone.startsWith('+') ? u.phone : `+${u.phone}`) : authPhone;
+        if (u.phone) setIsPhoneVerified(true);
+        if (u.email) {
+          setIsEmailVerified(true);
+          setAuthEmail(u.email);
+        }
+        setCustomerProfile((prev) => ({
+          ...prev,
+          phone: p,
+          email: u.email || prev.email,
+          name: (u.user_metadata?.full_name as string) || prev.name || 'Ravi Teja',
+        }));
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Deep-linking listener for push notifications: opens ticket / booking pass on notification tap

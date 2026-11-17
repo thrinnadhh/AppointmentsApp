@@ -136,7 +136,7 @@ export default function MedicalUrgencyOverrideModal({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Patient presents with acute dyspnea / severe vital instability requiring expedited triage."
-              className="w-full text-sm text-slate-800 bg-white border border-slate-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              className="w-full text-sm text-slate-800 bg-white border border-slate-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-rose-500 field-sizing-content"
               required
             />
           </div>

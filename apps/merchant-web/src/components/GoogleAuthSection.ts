@@ -113,6 +113,40 @@ export function GoogleAuthSection({
       },
     },
     React.createElement(
+      'div',
+      {
+        style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 10px',
+          borderRadius: '9999px',
+          background: 'rgba(4, 120, 87, 0.08)',
+          border: '1px solid rgba(4, 120, 87, 0.2)',
+          marginBottom: '12px',
+          fontSize: '12px',
+          fontWeight: 600,
+          color: '#047857',
+        },
+      },
+      React.createElement(
+        'svg',
+        {
+          width: '14',
+          height: '14',
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: '2',
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+        },
+        React.createElement('path', { d: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10' }),
+        React.createElement('path', { d: 'm9 12 2 2 4-4' })
+      ),
+      React.createElement('span', null, 'Google Verified Authentication')
+    ),
+    React.createElement(
       'button',
       {
         'data-testid': 'google-auth-btn',
@@ -161,7 +195,7 @@ export function GoogleAuthSection({
           d: 'M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z',
         })
       ),
-      authMode === 'register' ? 'Sign up with Google' : 'Sign in with Google'
+      authMode === 'register' ? 'Register with Google' : 'Continue with Google'
     ),
     React.createElement(
       'div',
@@ -187,7 +221,7 @@ export function GoogleAuthSection({
             fontWeight: 600,
           },
         },
-        'Or continue with email'
+        'OR USE EMAIL & PASSWORD'
       ),
       React.createElement('div', {
         style: { flex: 1, height: '1px', background: 'var(--color-border, #e5e7eb)' },

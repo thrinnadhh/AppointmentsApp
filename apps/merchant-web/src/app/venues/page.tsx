@@ -83,6 +83,19 @@ export default function VenuesPage() {
     setEditModalError(null);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (editingVenue) setEditingVenue(null);
+        if (isModalOpen) setIsModalOpen(false);
+      }
+    };
+    if (editingVenue || isModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [editingVenue, isModalOpen]);
+
   const handleRemoveEditPhoto = (indexToRemove: number) => {
     setEditStorePhotos((prev) => prev.filter((_, i) => i !== indexToRemove));
   };
@@ -426,7 +439,7 @@ export default function VenuesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredVenues.map((venue) => {
+          {filteredVenues.map((venue, idx) => {
             const resourceCount = venue.resources ? venue.resources.length : 0;
             return (
               <div
@@ -439,6 +452,7 @@ export default function VenuesPage() {
                     alt={venue.name}
                     width={400}
                     height={144}
+                    priority={idx < 2}
                     className="w-full h-36 object-cover border-b border-slate-100"
                     unoptimized
                   />
@@ -573,8 +587,14 @@ export default function VenuesPage() {
 
       {/* Add Business Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150">
+        <div 
+          onClick={() => setIsModalOpen(false)}
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
@@ -785,8 +805,14 @@ export default function VenuesPage() {
 
       {/* Edit Store Profile Modal (Restricted Credentials) */}
       {editingVenue && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+        <div 
+          onClick={() => setEditingVenue(null)}
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-shrink-0">
               <div className="flex items-center gap-2.5">
@@ -897,6 +923,7 @@ export default function VenuesPage() {
                             src={getVenueAssetUrl(photoUrl, { width: 240, quality: 75 })}
                             alt={`Store photo ${idx + 1}`}
                             fill
+                            sizes="(max-width: 768px) 33vw, 120px"
                             className="object-cover"
                             unoptimized
                           />

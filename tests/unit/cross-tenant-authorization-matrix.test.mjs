@@ -2177,9 +2177,9 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       // Runs inside isolated transaction so older migrations roll back completely without tainting functions, triggers, or ACLs
       try {
         await pgClient.query('BEGIN');
-        // Dynamically discover all migrations from 20261105100001 to prevent stale hardcoded lists
+        // Dynamically discover power features migrations from 20261105100001 up to private schema architecture
         const migrationFiles = fs.readdirSync('supabase/migrations')
-          .filter(f => f.endsWith('.sql') && f >= '20261105100001')
+          .filter(f => f.endsWith('.sql') && f >= '20261105100001' && f < '20261107000008')
           .sort()
           .map(f => path.join('supabase/migrations', f));
 

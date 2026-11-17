@@ -298,6 +298,20 @@ export default function AdminDashboardPage() {
     };
   }, [router]);
 
+  // Escape key modal dismissal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAddCityModal) setShowAddCityModal(false);
+        if (showMfaModal) setShowMfaModal(false);
+      }
+    };
+    if (showAddCityModal || showMfaModal) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [showAddCityModal, showMfaModal]);
+
   // Synchronize dashboard intel when authenticated or filters change
   useEffect(() => {
     if (!authChecking && adminUser) {
@@ -1772,8 +1786,14 @@ export default function AdminDashboardPage() {
 
       {/* Modal: Add New City */}
       {showAddCityModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95">
+        <div 
+          onClick={() => setShowAddCityModal(false)}
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95"
+          >
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <MapPin className="w-5 h-5 text-emerald-600" />
               Expand to New Territory
@@ -1891,8 +1911,12 @@ export default function AdminDashboardPage() {
 
       {/* 2FA / MFA Security Management Modal */}
       {showMfaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+        <div 
+          onClick={() => setShowMfaModal(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in"
+        >
           <div
+            onClick={(e) => e.stopPropagation()}
             data-testid="admin-mfa-modal"
             className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 relative animate-in zoom-in-95"
           >

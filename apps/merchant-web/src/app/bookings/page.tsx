@@ -147,7 +147,7 @@ export default function BookingsManagementPage() {
 
       const [fetchedProviders, fetchedBookings, fetchedResources] = await Promise.all([
         isSuperAdmin ? fetchAllProviders() : Promise.resolve(activeProvider ? [activeProvider] : []),
-        targetProviderId ? fetchMerchantBookings(targetProviderId) : Promise.resolve([]),
+        (isSuperAdmin || targetProviderId) ? fetchMerchantBookings(targetProviderId) : Promise.resolve([]),
         targetProviderId ? fetchProviderResources(targetProviderId) : Promise.resolve([])
       ]);
 
@@ -1034,10 +1034,27 @@ export default function BookingsManagementPage() {
 
       {/* Reschedule Modal */}
       {rescheduleModalId && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-200">
-            <h3 className="text-base font-bold text-slate-900">Reschedule Appointment</h3>
-            <p className="text-xs text-slate-500 mt-1">
+        <div 
+          onClick={() => setRescheduleModalId(null)}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-200"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Reschedule Appointment</h3>
+              <button
+                type="button"
+                data-testid="close-reschedule-modal"
+                aria-label="Close reschedule modal"
+                onClick={() => setRescheduleModalId(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
               Select a new time slot today. The customer’s deposit will automatically carry over.
             </p>
             <div className="mt-4">
@@ -1073,8 +1090,14 @@ export default function BookingsManagementPage() {
 
       {/* Emergency Staff Substitution Modal */}
       {reassignModalBooking && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+        <div 
+          onClick={() => setReassignModalBooking(null)}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1157,8 +1180,14 @@ export default function BookingsManagementPage() {
 
       {/* Late Arrival Check-In & Buffer Modal */}
       {lateCheckinBooking && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+        <div 
+          onClick={() => setLateCheckinBooking(null)}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1252,8 +1281,14 @@ export default function BookingsManagementPage() {
 
       {/* WhatsApp Notification Logs Modal */}
       {notificationModalBooking && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[85vh] flex flex-col">
+        <div 
+          onClick={() => setNotificationModalBooking(null)}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[85vh] flex flex-col"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1358,10 +1393,14 @@ export default function BookingsManagementPage() {
       {/* Appointment Detail Modal */}
       {detailModalBooking && (
         <div 
+          onClick={() => setDetailModalBooking(null)}
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
           data-testid="appointment-detail-modal"
         >
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900 text-base">Appointment Details</h3>
