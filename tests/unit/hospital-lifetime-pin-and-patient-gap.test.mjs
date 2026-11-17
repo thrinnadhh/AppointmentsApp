@@ -592,6 +592,115 @@ describe('Hospital Permanent PIN, 1-Hour Patient Gap & Doctor Emergency Policies
     assert.equal(savedBooking.patient_relationship, 'parent');
   });
 
+  it('10. Customer Profile RLS: Signed-in customer can read own permanent_checkin_pin, blocked from other profiles', async () => {
+    // 1. Customer reads their own permanent_checkin_pin
+    const ownRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${testCustomerId}&select=permanent_checkin_pin`, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${customerToken}`,
+      },
+    });
+    assert.equal(ownRes.status, 200);
+    const ownProfiles = await ownRes.json();
+    assert.equal(ownProfiles.length, 1);
+    assert.ok(ownProfiles[0].permanent_checkin_pin, 'Customer must be able to read own permanent_checkin_pin via RLS');
+    assert.match(ownProfiles[0].permanent_checkin_pin, /^[0-9]{4}$/);
+
+    // 2. Customer attempts to read another user's profile
+    const otherUserId = tokens.adminApex.user.id;
+    const otherRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${otherUserId}&select=permanent_checkin_pin`, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${customerToken}`,
+      },
+    });
+    assert.equal(otherRes.status, 200);
+    const otherProfiles = await otherRes.json();
+    assert.equal(otherProfiles.length, 0, 'RLS must block customer from reading another user profile');
+  });
+
+  it('11. Customer Mobile API (fetchCustomerLifetimePin): reads profiles.permanent_checkin_pin, never queries non-existent customer_checkin_pins', async () => {
+    const apiCode = fs.readFileSync('apps/customer-mobile/src/services/api.ts', 'utf8');
+
+    // Must not query non-existent customer_checkin_pins table
+    assert.equal(
+      apiCode.includes("from('customer_checkin_pins')"),
+      false,
+      'fetchCustomerLifetimePin must not query non-existent customer_checkin_pins table'
+    );
+
+    // Must query profiles for permanent_checkin_pin
+    assert.ok(
+      apiCode.includes(".from('profiles')"),
+      'fetchCustomerLifetimePin must query profiles table'
+    );
+    assert.ok(
+      apiCode.includes('permanent_checkin_pin'),
+      'fetchCustomerLifetimePin must select permanent_checkin_pin'
+    );
+    assert.ok(
+      apiCode.includes('get_or_create_customer_checkin_pin'),
+      'fetchCustomerLifetimePin must call get_or_create_customer_checkin_pin when PIN is null'
+    );
+  });
+
+  it('12. MyBookingsScreen UI contract: PIN found -> shown; null or error -> "PIN unavailable" state with retry, never made-up number (e.g. 4821)', async () => {
+    const screenCode = fs.readFileSync('apps/customer-mobile/src/screens/MyBookingsScreen.tsx', 'utf8');
+
+    // Must not contain fake fallback '4821'
+    assert.equal(
+      screenCode.includes("'4821'"),
+      false,
+      "MyBookingsScreen.tsx must not contain hardcoded '4821' fallback"
+    );
+
+    // Must contain "PIN unavailable"
+    assert.ok(
+      screenCode.includes('PIN unavailable'),
+      'MyBookingsScreen.tsx must render "PIN unavailable" when lifetimePin is null'
+    );
+
+    // Must contain retry button
+    assert.ok(
+      screenCode.includes('my-bookings-lifetime-pin-retry'),
+      'MyBookingsScreen.tsx must provide retry button for PIN load failure'
+    );
+    assert.ok(
+      screenCode.includes('loadLifetimePin'),
+      'MyBookingsScreen.tsx must call loadLifetimePin on retry'
+    );
+
+    // Verify simulation of render logic:
+    // When PIN found:
+    const simulateRender = (lifetimePin, isLoadingPin = false) => {
+      if (lifetimePin) {
+        return { digits: lifetimePin, isUnavailable: false, hasRetry: false };
+      }
+      return {
+        digits: 'PIN unavailable',
+        isUnavailable: true,
+        hasRetry: true,
+        retryText: isLoadingPin ? 'Retrying...' : 'Retry',
+      };
+    };
+
+    const foundState = simulateRender('7718');
+    assert.equal(foundState.digits, '7718');
+    assert.equal(foundState.isUnavailable, false);
+    assert.match(foundState.digits, /^[0-9]{4}$/);
+
+    const nullState = simulateRender(null);
+    assert.equal(nullState.digits, 'PIN unavailable');
+    assert.equal(nullState.isUnavailable, true);
+    assert.equal(nullState.hasRetry, true);
+    assert.equal(/^[0-9]+$/.test(nullState.digits), false, 'Must never be a number when unavailable');
+
+    const errorState = simulateRender(null, true);
+    assert.equal(errorState.digits, 'PIN unavailable');
+    assert.equal(errorState.retryText, 'Retrying...');
+    assert.equal(/^[0-9]+$/.test(errorState.digits), false, 'Must never be a number when in retry/error');
+  });
+
   after(async () => {
     const validIds = createdBookingIds.filter(Boolean);
     if (validIds.length > 0) {

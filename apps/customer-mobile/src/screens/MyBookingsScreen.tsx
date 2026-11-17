@@ -40,11 +40,28 @@ export default function MyBookingsScreen({
 }: MyBookingsScreenProps) {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
   const [lifetimePin, setLifetimePin] = useState<string | null>(null);
+  const [isLoadingPin, setIsLoadingPin] = useState<boolean>(false);
   const [selectedPassBooking, setSelectedPassBooking] = useState<
     (Booking & { provider_name?: string; resource_name?: string }) | null
   >(null);
   const [customerStrikes, setCustomerStrikes] = useState<number>(0);
   const [markingReachedId, setMarkingReachedId] = useState<string | null>(null);
+
+  const loadLifetimePin = async () => {
+    if (!customerId) {
+      setLifetimePin(null);
+      return;
+    }
+    setIsLoadingPin(true);
+    try {
+      const pin = await fetchCustomerLifetimePin(customerId);
+      setLifetimePin(pin);
+    } catch {
+      setLifetimePin(null);
+    } finally {
+      setIsLoadingPin(false);
+    }
+  };
 
   const handleReachedClick = (bookingId: string) => {
     Alert.alert(
@@ -82,9 +99,7 @@ export default function MyBookingsScreen({
     fetchCustomerStrikes(customerId).then((res) => {
       setCustomerStrikes(res.strikes);
     });
-    fetchCustomerLifetimePin(customerId).then((pin) => {
-      if (pin) setLifetimePin(pin);
-    });
+    loadLifetimePin();
   }, [customerId]);
 
   const upcomingBookings = bookings.filter((b) =>
@@ -191,9 +206,28 @@ export default function MyBookingsScreen({
             </View>
           </View>
           <View style={styles.lifetimePinBody}>
-            <Text style={styles.lifetimePinDigits} testID="my-bookings-lifetime-pin-digits">
-              {lifetimePin || '4821'}
-            </Text>
+            {lifetimePin ? (
+              <Text style={styles.lifetimePinDigits} testID="my-bookings-lifetime-pin-digits">
+                {lifetimePin}
+              </Text>
+            ) : (
+              <View style={styles.lifetimePinUnavailableContainer}>
+                <Text style={styles.lifetimePinUnavailableText} testID="my-bookings-lifetime-pin-digits">
+                  PIN unavailable
+                </Text>
+                <TouchableOpacity
+                  style={styles.lifetimePinRetryButton}
+                  onPress={loadLifetimePin}
+                  disabled={isLoadingPin}
+                  testID="my-bookings-lifetime-pin-retry"
+                  accessibilityLabel="Retry loading check-in PIN"
+                >
+                  <Text style={styles.lifetimePinRetryText}>
+                    {isLoadingPin ? 'Retrying...' : 'Retry'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <Text style={styles.lifetimePinDesc}>
               Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits. It never changes or expires upon reschedule.
             </Text>
@@ -633,6 +667,28 @@ const styles = StyleSheet.create({
     color: '#047857',
     letterSpacing: 4,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  lifetimePinUnavailableContainer: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  lifetimePinUnavailableText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#065f46',
+    letterSpacing: 0.5,
+  },
+  lifetimePinRetryButton: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  lifetimePinRetryText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   lifetimePinDesc: {
     flex: 1,
