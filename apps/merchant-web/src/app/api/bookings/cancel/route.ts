@@ -3,9 +3,12 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking } from '@/lib/auth-admin';
 import { validateBookingStatusTransition } from '@/lib/hospital-access';
-import { CancelBookingRequest, CancelBookingResponse } from '@appointments/shared';
+import { CancelBookingRequest, CancelBookingResponse, captureError } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
+  let activeBookingId: string | undefined;
+  let activeProviderId: string | undefined;
+  let activeOrderId: string | undefined;
   try {
     const caller = await verifyAuthenticatedUser(req);
     if (!caller) {
@@ -17,6 +20,7 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as Partial<CancelBookingRequest>;
     const { booking_id, reason, initiated_by = 'CUSTOMER', expected_version, expected_updated_at } = body as any;
+    activeBookingId = booking_id;
 
     if (!booking_id) {
       return NextResponse.json<CancelBookingResponse>(
@@ -29,9 +33,14 @@ export async function POST(req: NextRequest) {
 
     const { data: booking, error: bkgErr } = await supabaseAdmin
       .from('bookings')
-      .select('id, customer_id, provider_id, resource_id, status, gateway_payment_id, version, updated_at')
+      .select('id, customer_id, provider_id, resource_id, status, gateway_payment_id, gateway_order_id, version, updated_at')
       .eq('id', booking_id)
       .maybeSingle();
+
+    if (booking) {
+      activeProviderId = booking.provider_id;
+      activeOrderId = (booking as any).gateway_order_id || booking.gateway_payment_id || undefined;
+    }
 
     if (bkgErr || !booking) {
       return NextResponse.json<CancelBookingResponse>(
@@ -280,6 +289,12 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err: unknown) {
+    captureError(err, {
+      route: '/api/bookings/cancel',
+      booking_id: activeBookingId,
+      provider_id: activeProviderId,
+      order_id: activeOrderId,
+    });
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json<CancelBookingResponse>(
       { success: false, error: message },

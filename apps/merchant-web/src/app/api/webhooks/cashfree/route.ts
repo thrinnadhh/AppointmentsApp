@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { assertSafePayloadStructure, PayloadLimitExceededError } from '@/lib/validation-limits';
+import { captureError } from '@appointments/shared';
 
 export async function POST(req: NextRequest) {
+  let activeOrderId: string | undefined;
+  let activeBookingId: string | undefined;
+  let activeProviderId: string | undefined;
   try {
     const rawBody = await req.text();
 
@@ -52,6 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     const orderId = order?.order_id || payment?.order_id;
+    activeOrderId = orderId;
     const paymentId = payment?.cf_payment_id != null ? String(payment.cf_payment_id) : (orderId ? `cf_pay_${orderId}` : `cf_pay_${Date.now()}`);
     const rawAmountInRupees = Number(payment?.payment_amount ?? order?.order_amount ?? 0);
     const paymentCurrency = payment?.payment_currency ?? order?.order_currency ?? 'INR';
@@ -80,10 +85,14 @@ export async function POST(req: NextRequest) {
       if (orderId) {
         const { data: bByOrder } = await supabaseAdmin
           .from('bookings')
-          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, expected_payment_amount_paise, gateway_payment_id, gateway_order_id, hold_expires_at, resource_id, slot_start')
+          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, expected_payment_amount_paise, gateway_payment_id, gateway_order_id, hold_expires_at, resource_id, slot_start, provider_id')
           .eq('gateway_order_id', orderId)
           .maybeSingle();
         booking = bByOrder;
+        if (booking) {
+          activeBookingId = booking.id;
+          activeProviderId = booking.provider_id;
+        }
       }
 
       if (!booking) {
@@ -282,6 +291,12 @@ export async function POST(req: NextRequest) {
     // Unhandled event types
     return NextResponse.json({ status: 'OK', received: true }, { status: 200 });
   } catch (err: unknown) {
+    captureError(err, {
+      route: '/api/webhooks/cashfree',
+      order_id: activeOrderId,
+      booking_id: activeBookingId,
+      provider_id: activeProviderId,
+    });
     const message = err instanceof Error ? err.message : 'Internal error processing Cashfree webhook';
     console.error('Cashfree webhook endpoint failure:', err);
     return NextResponse.json({ error: message }, { status: 500 });

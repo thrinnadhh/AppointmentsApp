@@ -3,10 +3,13 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { checkRateLimit } from '@/lib/redis';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking, getClientIp } from '@/lib/auth-admin';
-import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee } from '@appointments/shared';
+import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee, captureError } from '@appointments/shared';
 import { parseSafeJson, PayloadLimitExceededError } from '@/lib/validation-limits';
 
 export async function POST(req: NextRequest) {
+  let activeBookingId: string | undefined;
+  let activeProviderId: string | undefined;
+  let activeOrderId: string | undefined;
   try {
     // 1. IP rate limiting (30 requests/minute); falls back to per-booking/user rate limit when IP is absent
     const clientIp = getClientIp(req);
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const { booking_id } = body;
+    activeBookingId = booking_id;
 
     if (!booking_id) {
       return NextResponse.json<CreateRazorpayOrderResponse>(
@@ -62,6 +66,11 @@ export async function POST(req: NextRequest) {
       .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, status, hold_expires_at, gateway_order_id, gateway_provider, payment_session_id')
       .eq('id', booking_id)
       .maybeSingle();
+
+    if (booking) {
+      activeProviderId = booking.provider_id;
+      activeOrderId = booking.gateway_order_id || undefined;
+    }
 
     if (bookingError) {
       console.error('Error fetching booking for payment order:', bookingError);
@@ -276,6 +285,12 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err: unknown) {
+    captureError(err, {
+      route: '/api/payments/create-order',
+      booking_id: activeBookingId,
+      provider_id: activeProviderId,
+      order_id: activeOrderId,
+    });
     const message = err instanceof Error ? err.message : 'Internal error creating payment order';
     console.error('create-order endpoint failure:', err);
     return NextResponse.json<CreateRazorpayOrderResponse>(

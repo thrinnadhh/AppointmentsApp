@@ -53,6 +53,8 @@ export {
   sanitizeLogData,
   computeFingerprint,
   classifySeverity,
+  captureError,
+  sanitizeTelemetryPayload,
 } from '@appointments/shared';
 
 // Register global window error & unhandled promise rejection listeners on web
