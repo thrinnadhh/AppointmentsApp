@@ -21,6 +21,7 @@ describe('Zero-PII / India Data-Residency Telemetry Scrubber', () => {
       status: 'CONFIRMED',
       error_code: 'SLOT_ALREADY_BOOKED',
       order_id: 'order_1234567890',
+      flow: 'payment',
     };
 
     const sanitized = sanitizeTelemetryPayload(payload);
@@ -33,6 +34,7 @@ describe('Zero-PII / India Data-Residency Telemetry Scrubber', () => {
     assert.strictEqual(sanitized.status, 'CONFIRMED');
     assert.strictEqual(sanitized.error_code, 'SLOT_ALREADY_BOOKED');
     assert.strictEqual(sanitized.order_id, 'order_1234567890');
+    assert.strictEqual(sanitized.flow, 'payment');
   });
 
   it('redacts all keys in the strict denylist to [REDACTED]', () => {
@@ -180,6 +182,7 @@ describe('Zero-PII / India Data-Residency Telemetry Scrubber', () => {
 
     try {
       captureError(new Error('Webhook failure for patient@clinic.org with upi clinic@axisbank'), {
+        flow: 'payment',
         booking_id: 'bkg-uuid-456',
         provider_id: 'prov-uuid-789',
         customer_name: 'Patient Name',
@@ -192,6 +195,7 @@ describe('Zero-PII / India Data-Residency Telemetry Scrubber', () => {
         capturedException.message,
         'Webhook failure for [REDACTED] with upi [REDACTED]'
       );
+      assert.strictEqual(capturedContext.tags.flow, 'payment');
       assert.strictEqual(capturedContext.tags.booking_id, 'bkg-uuid-456');
       assert.strictEqual(capturedContext.tags.provider_id, 'prov-uuid-789');
       assert.strictEqual(capturedContext.extra.customer_name, '[REDACTED]');

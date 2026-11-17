@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { canMockPayments } from '@/lib/cashfree';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
-import { ConfirmPaymentResponse } from '@appointments/shared';
+import { ConfirmPaymentResponse, captureError } from '@appointments/shared';
 
 interface ExtendedConfirmRequest {
   booking_id: string;
@@ -159,9 +159,11 @@ async function getAuthenticatedCaller(req: NextRequest): Promise<{ id: string; e
 }
 
 export async function POST(req: NextRequest) {
+  let activeBookingId: string | undefined;
   try {
     const body = (await req.json()) as Partial<ExtendedConfirmRequest>;
     const { booking_id, deposit_amount, razorpay_order_id, razorpay_signature } = body;
+    activeBookingId = booking_id;
     const gateway_payment_id = (body.gateway_payment_id || body.razorpay_payment_id || '').trim();
 
     // 1. VALIDATE PARAMETERS
@@ -521,6 +523,11 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err: unknown) {
+    captureError(err, {
+      flow: 'booking',
+      route: '/api/bookings/confirm',
+      booking_id: activeBookingId,
+    });
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json<ConfirmPaymentResponse>(
       { success: false, error: message },

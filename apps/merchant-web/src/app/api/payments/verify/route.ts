@@ -761,6 +761,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: unknown) {
     captureError(err, {
+      flow: 'payment',
       route: '/api/payments/verify',
       booking_id: activeBookingId,
       provider_id: activeProviderId,

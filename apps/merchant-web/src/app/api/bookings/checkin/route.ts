@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { getAccessContext, canAccessDoctor, authorizeHospitalResourceOrMerchant } from '@/lib/hospital-access';
 import { toClinicDateString } from '@/lib/queue-scheduler';
 import { ON_TIME_GRACE_MS } from '@appointments/shared/queue-engine';
+import { captureError } from '@appointments/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -224,11 +225,15 @@ async function resolveTodayPinBookings(
 }
 
 export async function POST(req: NextRequest) {
+  let activeBookingId: string | undefined;
+  let activeShopId: string | undefined;
   try {
     const body = await req.json();
     const code = (body.code || '').trim();
     const isOfflineWalkIn = Boolean(body.is_offline_walk_in || body.offline_walk_in || body.walk_in);
     const bookingId = body.booking_id || body.bookingId || null;
+    activeBookingId = (bookingId as string) || undefined;
+    activeShopId = (body.shopId as string) || undefined;
 
     if (!code && !isOfflineWalkIn) {
       return NextResponse.json(
@@ -487,6 +492,12 @@ export async function POST(req: NextRequest) {
       checked_in_at: now.toISOString(),
     });
   } catch (err) {
+    captureError(err, {
+      flow: 'booking',
+      route: '/api/bookings/checkin',
+      booking_id: activeBookingId,
+      provider_id: activeShopId,
+    });
     console.error('Exception in checkin route:', err);
     return NextResponse.json(
       { success: false, error: 'SERVER_ERROR', message: err instanceof Error ? err.message : 'Internal error' },

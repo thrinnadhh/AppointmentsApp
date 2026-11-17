@@ -290,6 +290,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: unknown) {
     captureError(err, {
+      flow: 'booking',
       route: '/api/bookings/cancel',
       booking_id: activeBookingId,
       provider_id: activeProviderId,

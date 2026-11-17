@@ -292,6 +292,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: 'OK', received: true }, { status: 200 });
   } catch (err: unknown) {
     captureError(err, {
+      flow: 'payment',
       route: '/api/webhooks/cashfree',
       order_id: activeOrderId,
       booking_id: activeBookingId,

@@ -192,7 +192,25 @@ export const SAFE_TELEMETRY_KEYS = new Set([
   'vertical',
   'status',
   'error_code',
+  'flow',
 ]);
+
+export type TelemetryFlow = 'payment' | 'booking' | 'queue' | 'auth' | 'admin';
+
+export interface TelemetryContext extends Record<string, unknown> {
+  flow?: TelemetryFlow;
+  route?: string;
+  tags?: Record<string, unknown>;
+  extra?: Record<string, unknown>;
+  booking_id?: string;
+  order_id?: string;
+  provider_id?: string;
+  resource_id?: string;
+  city_id?: string;
+  vertical?: string;
+  status?: string;
+  error_code?: string;
+}
 
 export const STRICT_PII_DENYLIST_KEYS = new Set([
   'phone',
@@ -371,7 +389,7 @@ export function getSentryClient(): SentryClientLike | null {
  * Unified telemetry error logger for apps/merchant-web and apps/customer-mobile.
  * Enforces Zero-PII scrubbing and no-ops gracefully when DSN is unconfigured.
  */
-export function captureError(error: unknown, context?: Record<string, unknown>): void {
+export function captureError(error: unknown, context?: TelemetryContext): void {
   const dsn = (
     (typeof process !== 'undefined' && process.env
       ? process.env.NEXT_PUBLIC_SENTRY_DSN ||
