@@ -18,7 +18,57 @@ import { StatusBar } from 'expo-status-bar';
 LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
 LogBox.ignoreAllLogs(true);
 
-import { Resource, Slot, Booking, getPlatformFee } from '@appointments/shared';
+import { Resource, Slot, Booking, getPlatformFee, sanitizeTelemetryPayload, registerSentryClient } from '@appointments/shared';
+import * as Sentry from '@sentry/react-native';
+
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+
+Sentry.init({
+  dsn: SENTRY_DSN,
+  sendDefaultPii: false,
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
+  tracesSampleRate: 0.1,
+  beforeSend(event) {
+    delete event.user;
+    if (event.request) {
+      delete event.request.cookies;
+      delete event.request.data;
+      if (event.request.query_string) {
+        event.request.query_string = '[REDACTED]';
+      }
+      if (event.request.headers) {
+        delete event.request.headers['authorization'];
+        delete event.request.headers['cookie'];
+        delete event.request.headers['x-forwarded-for'];
+      }
+    }
+    if (event.contexts) {
+      event.contexts = sanitizeTelemetryPayload(event.contexts) as any;
+    }
+    if (event.extra) {
+      event.extra = sanitizeTelemetryPayload(event.extra) as any;
+    }
+    if (event.breadcrumbs) {
+      event.breadcrumbs = sanitizeTelemetryPayload(event.breadcrumbs) as any;
+    }
+    return event;
+  },
+  beforeBreadcrumb(breadcrumb) {
+    if (breadcrumb.data) {
+      breadcrumb.data = sanitizeTelemetryPayload(breadcrumb.data) as any;
+    }
+    if (breadcrumb.message) {
+      breadcrumb.message = sanitizeTelemetryPayload(breadcrumb.message) as string;
+    }
+    return breadcrumb;
+  },
+});
+
+registerSentryClient(Sentry);
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).Sentry = Sentry;
+}
 
 
 import HomeScreen from './src/screens/HomeScreen';
@@ -59,7 +109,7 @@ export interface NavigationEntry {
   categoryId?: string | null;
 }
 
-export default function App() {
+function App() {
   // Navigation History Stack ensures returning from booking goes to exactly where the user left off
   const [history, setHistory] = useState<NavigationEntry[]>([
     { screen: 'HOME', categoryId: null },
@@ -1633,3 +1683,5 @@ const styles = StyleSheet.create({
     color: '#be123c',
   },
 });
+
+export default Sentry.wrap(App);
