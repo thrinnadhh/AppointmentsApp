@@ -54,6 +54,11 @@ import ManualCheckinModal, { UpcomingCandidateBooking } from '@/components/front
 import FrontDeskQueueTabs, { FrontDeskQueueBooking } from '@/components/frontdesk/FrontDeskQueueTabs';
 import WaitingLoungeDisplayModal, { DisplayQueueItem } from '@/components/frontdesk/WaitingLoungeDisplayModal';
 
+function isDemoModeAllowed(): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
+  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+}
+
 const DEMO_PROVIDER: Provider & { resources?: Resource[] } = {
   id: 'b66cb1fc-0248-4c13-97d3-73b0519b59f9',
   name: 'Tirupati Multispecialty Hospital',
@@ -317,20 +322,18 @@ export default function MerchantOverviewPage() {
     isAuthenticated,
   } = useMerchantTenant();
 
-  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+  const isDemo = isDemoModeAllowed();
 
   const venueLabel = verticalConfig?.venueLabel || 'Shop';
 
   // Enforce unauthenticated redirect to /login or /register for new users
   useEffect(() => {
     if (!isTenantLoading && !isAuthenticated) {
-      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      if (params?.get('demo') !== '1') {
+      if (!isDemoModeAllowed()) {
         window.location.href = '/login';
       }
     } else if (!isTenantLoading && isAuthenticated && !tenantProvider && !isSuperAdmin) {
-      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      if (params?.get('demo') !== '1') {
+      if (!isDemoModeAllowed()) {
         window.location.href = '/register';
       }
     }
@@ -754,7 +757,7 @@ export default function MerchantOverviewPage() {
   }, [hospitalTodayBookings]);
 
   const handleFrontDeskVerifyCode = async (code: string, bookingId?: string) => {
-    const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+    const isDemo = isDemoModeAllowed();
     if (isDemo) {
       if (code === '1234') {
         return {
@@ -1266,8 +1269,7 @@ export default function MerchantOverviewPage() {
   // If authenticated but no venue (first time user), automatically redirect to venue registration
   useEffect(() => {
     if (!isTenantLoading && !loading && isAuthenticated && !activeProvider && !isSuperAdmin && !errorMessage) {
-      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      if (params?.get('demo') !== '1') {
+      if (!isDemoModeAllowed()) {
         window.location.href = '/register';
       }
     }
@@ -1275,7 +1277,7 @@ export default function MerchantOverviewPage() {
 
   const loadData = useCallback(async () => {
     const version = ++loadVersion.current;
-    const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+    const isDemoMode = isDemoModeAllowed();
     if (isTenantLoading && !isDemoMode) return;
     if (!isAuthenticated && !isDemoMode) {
       setLoading(false);
@@ -1439,7 +1441,7 @@ export default function MerchantOverviewPage() {
     setPendingBookingId(bookingId);
     setErrorMessage(null);
     try {
-      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      const isDemoMode = isDemoModeAllowed();
       if (isDemoMode) {
         setBookings((prev) =>
           prev.map((b) =>
@@ -1481,7 +1483,7 @@ export default function MerchantOverviewPage() {
     setPendingBookingId(bookingId);
     setErrorMessage(null);
     try {
-      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      const isDemoMode = isDemoModeAllowed();
       if (isDemoMode) {
         setBookings((prev) =>
           prev.map((b) =>
@@ -1535,7 +1537,7 @@ export default function MerchantOverviewPage() {
     if (pendingBookingId) return;
     setPendingBookingId(bookingId);
     try {
-      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      const isDemoMode = isDemoModeAllowed();
       if (isDemoMode) {
         setBookings((prev) =>
           prev.map((b) =>
@@ -1589,7 +1591,7 @@ export default function MerchantOverviewPage() {
     setCheckinSuccessData(null);
 
     try {
-      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      const isDemoMode = isDemoModeAllowed();
       if (isDemoMode) {
         const waitingBooking = bookings.find((b) => !b.is_present && b.status !== 'NO_SHOW' && b.status !== 'CANCELLED');
         if (waitingBooking) {
@@ -1657,7 +1659,7 @@ export default function MerchantOverviewPage() {
     const nextStatus = !currentLeft;
     // Optimistic local state update
     setDoctorLeftMap((prev) => ({ ...prev, [resourceId]: nextStatus }));
-    const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+    const isDemoMode = isDemoModeAllowed();
     try {
       const { data: authData } = await supabase.auth.getSession();
       const token = authData?.session?.access_token;

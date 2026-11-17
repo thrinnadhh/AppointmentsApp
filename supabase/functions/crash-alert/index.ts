@@ -66,6 +66,25 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Authorization Guard: Require CRASH_ALERT_SECRET or service_role Bearer authorization
+  const authHeader = req.headers.get('Authorization') || req.headers.get('authorization') || '';
+  const crashAlertSecret = Deno.env.get('CRASH_ALERT_SECRET');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const secretHeader = req.headers.get('x-crash-alert-secret');
+
+  const isAuthorized =
+    (Boolean(crashAlertSecret) && (secretHeader === crashAlertSecret || token === crashAlertSecret)) ||
+    (Boolean(serviceRoleKey) && Boolean(token) && token === serviceRoleKey);
+
+  if (!isAuthorized) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized: Missing or invalid authorization' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const rawBody = await req.json().catch(() => ({}));
     

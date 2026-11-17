@@ -1080,7 +1080,9 @@ export default function CheckoutModal({
                     testID="btn-prompt-sign-in"
                   >
                     <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
-                      👤 Sign In with Phone OTP (Test OTP: 123456) →
+                      {typeof __DEV__ !== 'undefined' && __DEV__
+                        ? '👤 Sign In with Phone OTP (Test OTP: 123456) →'
+                        : '👤 Sign In with Phone OTP →'}
                     </Text>
                   </TouchableOpacity>
                 )}

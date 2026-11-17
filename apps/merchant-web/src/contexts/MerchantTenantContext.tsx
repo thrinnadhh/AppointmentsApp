@@ -56,7 +56,10 @@ export function MerchantTenantProvider({ children }: { children: React.ReactNode
       setMemberships(data.memberships);
       setIsAuthenticated(Boolean(data.user));
 
-      const isDemoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+      const isDemoMode =
+        process.env.NODE_ENV !== 'production' &&
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('demo') === '1';
 
       // Calculate Hospital Admin vs Desk Manager status
       const isOwner = Boolean(data.user && data.activeProvider && data.activeProvider.owner_id === data.user.id);

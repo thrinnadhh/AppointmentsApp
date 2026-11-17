@@ -41,7 +41,7 @@ const SENSITIVE_KEY_REGEX =
  * Medical data keys that must be redacted under DPDP & health privacy standards
  */
 const MEDICAL_KEY_REGEX =
-  /(symptom|diagnosis|medical[-_]?note|prescription|clinical[-_]?note|health[-_]?condition|treatment|vital[-_]?sign|doctor[-_]?note|patient[-_]?history|lab[-_]?result)/i;
+  /(symptom|complaint|diagnosis|medical[-_]?note|prescription|clinical[-_]?note|booking[-_]?note|health[-_]?condition|treatment|vital[-_]?sign|doctor[-_]?note|patient[-_]?history|lab[-_]?result|^note$|^notes$)/i;
 
 /**
  * JWT token pattern
@@ -219,6 +219,7 @@ export const STRICT_PII_DENYLIST_KEYS = new Set([
   'name',
   'full_name',
   'patient',
+  'patient_name',
   'customer_name',
   'owner_name',
   'address',
@@ -226,6 +227,7 @@ export const STRICT_PII_DENYLIST_KEYS = new Set([
   'ip_address',
   'pin',
   'checkin_pin',
+  'permanent_checkin_pin',
   'otp',
   'code',
   'token',
@@ -239,10 +241,22 @@ export const STRICT_PII_DENYLIST_KEYS = new Set([
   'account',
   'ifsc',
   'gstin',
+  'note',
   'notes',
+  'booking_note',
   'clinical',
+  'clinical_note',
+  'medical_note',
+  'doctor_note',
+  'symptom',
+  'symptoms',
+  'complaint',
+  'complaints',
+  'chief_complaint',
   'prescription',
   'diagnosis',
+  'treatment',
+  'condition',
   'reason',
   'override_reason',
 ]);
@@ -287,6 +301,10 @@ export function sanitizeTelemetryString(input: string): string {
   str = str.replace(/(?<![a-zA-Z0-9._%+-])[\w.\-]+@[a-zA-Z0-9_]+(?!\.[a-zA-Z]{2,})\b/g, '[REDACTED]');
   // Redact Indian mobile numbers (+91 9876543210, +91-9876543210, +919876543210, 9876543210, 09876543210)
   str = str.replace(/(?<!\d)(?:(?:\+91[\-\s]?|0)?[6-9]\d{9})(?!\d)/g, '[REDACTED]');
+  // Redact sensitive URL query parameters (e.g. ?phone=..., &token=..., &booking_note=..., &symptom=..., &secret=...)
+  str = str.replace(/([?&](?:phone|mobile|email|token|access_token|refresh_token|secret|otp|pin|checkin_pin|booking_note|note|symptom|complaint|name|patient)=)[^& \r\n]*/gi, '$1[REDACTED]');
+  // Redact clinical symptoms and medical complaints in free text
+  str = str.replace(/\b(symptoms?|chief\s+complaints?|complaints?|clinical\s+notes?|booking\s+notes?|diagnosis)\s*[:=]\s*[^,\n\r.;]+/gi, '$1: [REDACTED_MEDICAL]');
   // Redact IPv4 addresses
   str = str.replace(/(?<!\d)(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?!\d)/g, '[REDACTED]');
   // Redact PAN & Card numbers
@@ -500,6 +518,28 @@ export function sentryBeforeSend(event: any): any {
   }
   if (event.message) {
     event.message = sanitizeTelemetryString(event.message);
+  }
+  // 5. Scrub runtime crash exceptions (event.exception)
+  if (event.exception?.values && Array.isArray(event.exception.values)) {
+    event.exception.values = event.exception.values.map((val: any) => {
+      const cleanVal = { ...val };
+      if (cleanVal.value) {
+        cleanVal.value = sanitizeTelemetryString(cleanVal.value);
+      }
+      if (cleanVal.type) {
+        cleanVal.type = sanitizeTelemetryString(cleanVal.type);
+      }
+      if (cleanVal.stacktrace?.frames && Array.isArray(cleanVal.stacktrace.frames)) {
+        cleanVal.stacktrace.frames = cleanVal.stacktrace.frames.map((frame: any) => {
+          const cleanFrame = { ...frame };
+          if (cleanFrame.vars) {
+            cleanFrame.vars = sanitizeTelemetryPayload(cleanFrame.vars);
+          }
+          return cleanFrame;
+        });
+      }
+      return cleanVal;
+    });
   }
   if (event.tags && typeof event.tags === 'object') {
     const cleanTags: Record<string, string> = {};

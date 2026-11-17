@@ -23,6 +23,13 @@ declare const __DEV__: boolean | undefined;
 
 let cachedPushToken: string | null = null;
 
+/**
+ * Resets the in-memory cached push token on mobile sign-out.
+ */
+export function clearCachedPushToken(): void {
+  cachedPushToken = null;
+}
+
 const isProduction =
   typeof __DEV__ !== 'undefined'
     ? !__DEV__

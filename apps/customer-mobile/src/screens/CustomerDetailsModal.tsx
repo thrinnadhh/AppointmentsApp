@@ -66,24 +66,30 @@ export default function CustomerDetailsModal({
         return;
       }
 
-      // 2. Dev / Local fallback if OAuth provider is not configured in Supabase dashboard
-      const devRes = await signInWithGoogleDev(
-        email || 'patient@gmail.com',
-        fullName || 'Google Patient'
-      );
+      // 2. Dev / Local fallback if OAuth provider is not configured in Supabase dashboard (guarded by __DEV__)
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        const devRes = await signInWithGoogleDev(
+          email || 'patient@gmail.com',
+          fullName || 'Google Patient'
+        );
 
-      if (devRes.success) {
-        if (devRes.user?.user_metadata?.full_name) {
-          setFullName(devRes.user.user_metadata.full_name);
-        }
-        if (devRes.user?.email) {
-          setEmail(devRes.user.email);
-        }
-        if (onAuthSuccess) {
-          onAuthSuccess(devRes.user);
+        if (devRes.success) {
+          if (devRes.user?.user_metadata?.full_name) {
+            setFullName(devRes.user.user_metadata.full_name);
+          }
+          if (devRes.user?.email) {
+            setEmail(devRes.user.email);
+          }
+          if (onAuthSuccess) {
+            onAuthSuccess(devRes.user);
+          }
+        } else {
+          setErrorMessage(devRes.error || 'Google Sign-In was unable to complete. Please check network.');
         }
       } else {
-        setErrorMessage(devRes.error || 'Google Sign-In was unable to complete. Please check network.');
+        setErrorMessage(
+          oAuthRes.error || 'Google Sign-In is currently unavailable. Please sign in using your phone number.'
+        );
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google sign-in error';

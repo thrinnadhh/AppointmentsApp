@@ -1465,6 +1465,9 @@ export async function signInWithGoogleDev(
   email: string = 'patient@gmail.com',
   name: string = 'Google Patient'
 ): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+    return { success: false, error: 'Google dev sign-in is disabled in production' };
+  }
   try {
     const testPhone = '+919999999991';
     const otpRes = await verifyPhoneOtp(testPhone, '123456');

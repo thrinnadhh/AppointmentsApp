@@ -38,14 +38,31 @@ function getSafeRedirectUrl(target: string | null | undefined, fallback = '/admi
 }
 
 /**
- * Extracts and normalizes SVG markup from raw XML or GoTrue data strings,
- * ensuring viewBox is set for responsive scaling.
+ * Safely sanitizes and formats QR SVG markup before rendering.
+ * Strips dangerous executable script elements, event handlers (on*),
+ * object, embed, iframe, foreignObject tags, and javascript: links.
  */
-function formatQrSvg(raw: string): string {
-  if (!raw) return '';
+function sanitizeQrSvg(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
   const svgIndex = raw.indexOf('<svg');
   if (svgIndex === -1) return '';
   let svg = raw.slice(svgIndex);
+
+  // Strip script, foreignObject, object, embed, iframe tags and contents
+  svg = svg.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  svg = svg.replace(/<foreignObject\b[^<]*(?:(?!<\/foreignObject>)<[^<]*)*<\/foreignObject>/gi, '');
+  svg = svg.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+  svg = svg.replace(/<embed\b[^>]*>/gi, '');
+  svg = svg.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+
+  // Strip inline event handlers (onload, onerror, onclick, etc.)
+  svg = svg.replace(/\s+on[a-z]+\s*=\s*(['"]).*?\1/gi, '');
+  svg = svg.replace(/\s+on[a-z]+\s*=\s*[^>\s]+/gi, '');
+
+  // Strip javascript: or data: URIs in href or xlink:href
+  svg = svg.replace(/\b(?:href|xlink:href)\s*=\s*(['"])\s*(?:javascript|data):.*?\1/gi, '');
+
+  // Ensure viewBox is set for responsive scaling
   if (!svg.includes('viewBox')) {
     const widthMatch = svg.match(/width="(\d+)"/);
     const heightMatch = svg.match(/height="(\d+)"/);
@@ -55,6 +72,8 @@ function formatQrSvg(raw: string): string {
   }
   return svg;
 }
+
+const formatQrSvg = sanitizeQrSvg;
 
 function AdminLoginForm() {
   const router = useRouter();
@@ -195,9 +214,10 @@ function AdminLoginForm() {
 
         if (enrollError || !enrollData) {
           if (
-            process.env.NODE_ENV !== 'production' ||
-            enrollError?.message?.toLowerCase().includes('mfa enroll is disabled') ||
-            enrollError?.message?.toLowerCase().includes('disabled for totp')
+            process.env.NODE_ENV !== 'production' &&
+            process.env.ALLOW_MOCK_AUTH === 'true' &&
+            (enrollError?.message?.toLowerCase().includes('mfa enroll is disabled') ||
+              enrollError?.message?.toLowerCase().includes('disabled for totp'))
           ) {
             setEnrollFactorId('mock-totp-factor-e2e');
             setQrCodeSvg('<svg width="180" height="180" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#f8fafc"/><rect x="20" y="20" width="60" height="60" fill="#0f172a"/></svg>');
@@ -272,6 +292,9 @@ function AdminLoginForm() {
 
     try {
       if (enrollFactorId === 'mock-totp-factor-e2e') {
+        if (process.env.NODE_ENV === 'production' || process.env.ALLOW_MOCK_AUTH !== 'true') {
+          throw new Error('Mock authentication factor is prohibited in production.');
+        }
         if (mfaCode.trim() === '000000' || mfaCode.trim() === '999999') {
           throw new Error('Verification code failed. Please check the current time on your device.');
         }
@@ -322,6 +345,10 @@ function AdminLoginForm() {
 
   // Skip MFA for Dev Preview
   const handleSkipMfaDev = () => {
+    if (process.env.NODE_ENV === 'production' || process.env.ALLOW_MOCK_AUTH !== 'true') {
+      setErrorMsg('Bypassing 2FA is prohibited in production.');
+      return;
+    }
     setSuccessMsg('Bypassing 2FA requirement for local development preview...');
     setTimeout(() => {
       router.push(redirectTarget);
@@ -526,7 +553,7 @@ function AdminLoginForm() {
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Sign In as Different User
               </button>
-              {process.env.NODE_ENV === 'development' && (
+              {process.env.NODE_ENV !== 'production' && process.env.ALLOW_MOCK_AUTH === 'true' && (
                 <button
                   type="button"
                   data-testid="admin-mfa-skip"
