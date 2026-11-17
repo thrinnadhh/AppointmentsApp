@@ -435,6 +435,113 @@ export function captureError(error: unknown, context?: Record<string, unknown>):
   }
 }
 
+/**
+ * Global Zero-PII Sentry beforeSend hook.
+ * Deletes event.user (including ip_address), strips request cookies, headers, and bodies,
+ * and recursively scrubs PII from contexts, extra, breadcrumbs, and messages.
+ */
+export function sentryBeforeSend(event: any): any {
+  if (!event || typeof event !== 'object') return event;
+
+  // 1. Delete user identification and IP address
+  if (event.user) {
+    delete event.user.ip_address;
+    delete event.user;
+  }
+
+  // 2. Strip request cookies, headers, data/bodies, and query string
+  if (event.request) {
+    delete event.request.cookies;
+    delete event.request.data;
+    if (event.request.query_string) {
+      event.request.query_string = '[REDACTED]';
+    }
+    if (event.request.headers) {
+      delete event.request.headers['authorization'];
+      delete event.request.headers['cookie'];
+      delete event.request.headers['x-forwarded-for'];
+      delete event.request.headers['client-ip'];
+      delete event.request.headers['x-real-ip'];
+    }
+  }
+
+  // 3. Strip server_name / client IP from extra or tags if present
+  if (event.server_name) {
+    event.server_name = '[REDACTED]';
+  }
+
+  // 4. Zero-PII recursive sanitization across contexts, extra, breadcrumbs, message, exceptions
+  if (event.contexts) {
+    event.contexts = sanitizeTelemetryPayload(event.contexts) as any;
+  }
+  if (event.extra) {
+    event.extra = sanitizeTelemetryPayload(event.extra) as any;
+  }
+  if (event.breadcrumbs) {
+    event.breadcrumbs = sanitizeTelemetryPayload(event.breadcrumbs) as any;
+  }
+  if (event.message) {
+    event.message = sanitizeTelemetryString(event.message);
+  }
+  if (event.tags && typeof event.tags === 'object') {
+    const cleanTags: Record<string, string> = {};
+    for (const [key, val] of Object.entries(event.tags)) {
+      const normKey = key.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+      if (SAFE_TELEMETRY_KEYS.has(normKey)) {
+        cleanTags[key] = String(val);
+      } else if (isDenylistedTelemetryKey(normKey)) {
+        cleanTags[key] = '[REDACTED]';
+      } else {
+        cleanTags[key] = sanitizeTelemetryString(String(val));
+      }
+    }
+    event.tags = cleanTags;
+  }
+
+  return event;
+}
+
+/**
+ * Global Zero-PII Sentry beforeBreadcrumb hook.
+ * Scrubs breadcrumb messages and structured data dictionaries.
+ */
+export function sentryBeforeBreadcrumb(breadcrumb: any): any {
+  if (!breadcrumb || typeof breadcrumb !== 'object') return breadcrumb;
+  if (breadcrumb.data) {
+    breadcrumb.data = sanitizeTelemetryPayload(breadcrumb.data) as any;
+  }
+  if (breadcrumb.message) {
+    breadcrumb.message = sanitizeTelemetryString(breadcrumb.message);
+  }
+  return breadcrumb;
+}
+
+/**
+ * Global Zero-PII Sentry beforeSendTransaction hook.
+ */
+export function sentryBeforeSendTransaction(event: any): any {
+  if (!event || typeof event !== 'object') return event;
+  if (event.user) {
+    delete event.user.ip_address;
+    delete event.user;
+  }
+  if (event.request) {
+    delete event.request.cookies;
+    delete event.request.data;
+    if (event.request.query_string) {
+      event.request.query_string = '[REDACTED]';
+    }
+    if (event.request.headers) {
+      delete event.request.headers['authorization'];
+      delete event.request.headers['cookie'];
+      delete event.request.headers['x-forwarded-for'];
+      delete event.request.headers['client-ip'];
+      delete event.request.headers['x-real-ip'];
+    }
+  }
+  return event;
+}
+
 export interface LoggerInitOptions {
   platform: AppPlatform;
   source?: AppLogSource;

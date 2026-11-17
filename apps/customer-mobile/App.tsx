@@ -18,7 +18,15 @@ import { StatusBar } from 'expo-status-bar';
 LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
 LogBox.ignoreAllLogs(true);
 
-import { Resource, Slot, Booking, getPlatformFee, sanitizeTelemetryPayload, registerSentryClient } from '@appointments/shared';
+import {
+  Resource,
+  Slot,
+  Booking,
+  getPlatformFee,
+  sentryBeforeSend,
+  sentryBeforeBreadcrumb,
+  registerSentryClient,
+} from '@appointments/shared';
 import * as Sentry from '@sentry/react-native';
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
@@ -30,38 +38,10 @@ Sentry.init({
   replaysOnErrorSampleRate: 0,
   tracesSampleRate: 0.1,
   beforeSend(event) {
-    delete event.user;
-    if (event.request) {
-      delete event.request.cookies;
-      delete event.request.data;
-      if (event.request.query_string) {
-        event.request.query_string = '[REDACTED]';
-      }
-      if (event.request.headers) {
-        delete event.request.headers['authorization'];
-        delete event.request.headers['cookie'];
-        delete event.request.headers['x-forwarded-for'];
-      }
-    }
-    if (event.contexts) {
-      event.contexts = sanitizeTelemetryPayload(event.contexts) as any;
-    }
-    if (event.extra) {
-      event.extra = sanitizeTelemetryPayload(event.extra) as any;
-    }
-    if (event.breadcrumbs) {
-      event.breadcrumbs = sanitizeTelemetryPayload(event.breadcrumbs) as any;
-    }
-    return event;
+    return sentryBeforeSend(event);
   },
   beforeBreadcrumb(breadcrumb) {
-    if (breadcrumb.data) {
-      breadcrumb.data = sanitizeTelemetryPayload(breadcrumb.data) as any;
-    }
-    if (breadcrumb.message) {
-      breadcrumb.message = sanitizeTelemetryPayload(breadcrumb.message) as string;
-    }
-    return breadcrumb;
+    return sentryBeforeBreadcrumb(breadcrumb);
   },
 });
 

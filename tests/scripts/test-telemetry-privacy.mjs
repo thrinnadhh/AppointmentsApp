@@ -4,6 +4,8 @@ import {
   sanitizeTelemetryPayload,
   captureError,
   registerSentryClient,
+  sentryBeforeSend,
+  sentryBeforeBreadcrumb,
   SAFE_TELEMETRY_KEYS,
   STRICT_PII_DENYLIST_KEYS,
 } from '../../packages/shared/src/logger.ts';
@@ -199,5 +201,97 @@ describe('Zero-PII / India Data-Residency Telemetry Scrubber', () => {
       delete process.env.SENTRY_DSN;
       registerSentryClient(null);
     }
+  });
+
+  it('sentryBeforeSend deletes user, IP address, request cookies/headers/body and redacts PII', () => {
+    const rawEvent = {
+      event_id: 'evt-123456',
+      user: {
+        id: 'usr_abc123',
+        email: 'doctor@hospital.in',
+        ip_address: '49.206.12.34',
+        name: 'Dr. Ramesh',
+      },
+      request: {
+        url: 'https://api.appointments.in/api/bookings/create',
+        query_string: 'patient=Sita&phone=9876543210',
+        cookies: 'sb-auth=secret_cookie_data',
+        data: {
+          symptoms: 'Chest pain',
+          phone: '+91 9440123456',
+        },
+        headers: {
+          authorization: 'Bearer eyJhbGciOi...',
+          cookie: 'token=xyz',
+          'x-forwarded-for': '49.206.12.34',
+          'user-agent': 'Mozilla/5.0',
+        },
+      },
+      tags: {
+        booking_id: 'bkg-999',
+        provider_id: 'prov-888',
+        city_id: 'tirupati',
+        patient_name: 'Anil Kumar',
+      },
+      extra: {
+        upi_vpa: 'anil@okhdfcbank',
+        reason: 'Emergency consultation',
+      },
+      breadcrumbs: [
+        {
+          category: 'xhr',
+          message: 'POST /verify-otp with phone +91 9876543210',
+          data: { otp: '123456' },
+        },
+      ],
+    };
+
+    const sanitizedEvent = sentryBeforeSend(rawEvent);
+
+    assert.strictEqual(sanitizedEvent.user, undefined, 'event.user must be deleted');
+    assert.strictEqual(sanitizedEvent.request.cookies, undefined, 'request.cookies must be deleted');
+    assert.strictEqual(sanitizedEvent.request.data, undefined, 'request.data must be deleted');
+    assert.strictEqual(sanitizedEvent.request.query_string, '[REDACTED]');
+    assert.strictEqual(sanitizedEvent.request.headers.authorization, undefined);
+    assert.strictEqual(sanitizedEvent.request.headers.cookie, undefined);
+    assert.strictEqual(sanitizedEvent.request.headers['x-forwarded-for'], undefined);
+    assert.strictEqual(sanitizedEvent.request.headers['user-agent'], 'Mozilla/5.0');
+
+    // Safe tags preserved, sensitive tags redacted
+    assert.strictEqual(sanitizedEvent.tags.booking_id, 'bkg-999');
+    assert.strictEqual(sanitizedEvent.tags.provider_id, 'prov-888');
+    assert.strictEqual(sanitizedEvent.tags.city_id, 'tirupati');
+    assert.strictEqual(sanitizedEvent.tags.patient_name, '[REDACTED]');
+
+    // Extras redacted
+    assert.strictEqual(sanitizedEvent.extra.upi_vpa, '[REDACTED]');
+    assert.strictEqual(sanitizedEvent.extra.reason, '[REDACTED]');
+
+    // Breadcrumbs redacted
+    assert.strictEqual(sanitizedEvent.breadcrumbs[0].data.otp, '[REDACTED]');
+    assert.strictEqual(
+      sanitizedEvent.breadcrumbs[0].message,
+      'POST /verify-otp with phone [REDACTED]'
+    );
+  });
+
+  it('sentryBeforeBreadcrumb scrubs breadcrumb message and structured data', () => {
+    const rawBreadcrumb = {
+      category: 'ui.click',
+      message: 'User entered email patient.test@gmail.com and phone +91 9988776655',
+      data: {
+        prescription: 'Cetirizine 10mg',
+        checkin_pin: '5544',
+      },
+    };
+
+    const clean = sentryBeforeBreadcrumb(rawBreadcrumb);
+
+    assert.strictEqual(
+      clean.message,
+      'User entered email [REDACTED] and phone [REDACTED]'
+    );
+    assert.strictEqual(clean.data.prescription, '[REDACTED]');
+    assert.strictEqual(clean.data.checkin_pin, '[REDACTED]');
   });
 });
