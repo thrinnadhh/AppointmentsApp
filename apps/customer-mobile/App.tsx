@@ -156,13 +156,13 @@ export default function App() {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
+      if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setActiveCustomerId('');
         setIsPhoneVerified(false);
         setIsEmailVerified(false);
         setCustomerProfile({
-          name: '',
+          name: 'Ravi Teja',
           phone: '',
           email: '',
           city: '',
@@ -181,7 +181,7 @@ export default function App() {
           ...prev,
           phone: p,
           email: u.email || prev.email,
-          name: (u.user_metadata?.full_name as string) || prev.name,
+          name: (u.user_metadata?.full_name as string) || prev.name || 'Ravi Teja',
         }));
       }
     });
