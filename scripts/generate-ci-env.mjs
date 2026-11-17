@@ -54,6 +54,7 @@ export function generateCiEnv() {
     path.resolve('apps/merchant-web/.env.local'),
     path.resolve('.env.local'),
     path.resolve('apps/customer-mobile/.env.local'),
+    path.resolve('supabase/.env'),
   ];
 
   for (const targetPath of targetPaths) {

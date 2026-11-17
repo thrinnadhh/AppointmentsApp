@@ -61,6 +61,10 @@ env:
   EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE || '+91-877-2244888' }}
   EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS || 'Balaji Colony, Tirupati, AP 517502' }}
   EXPO_PUBLIC_EAS_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_EAS_PROJECT_ID }}
+  SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: ${{ secrets.SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID || '108394829104-apps-tirupati-web.apps.googleusercontent.com' }}
+  SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET: ${{ secrets.SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET || '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upati_2026' }}
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '108394829104-apps-tirupati-web.apps.googleusercontent.com' }}
+  NEXT_PUBLIC_ENABLE_GOOGLE_AUTH: 'true'
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 1 — Dependency Audit & Security Scan
@@ -206,7 +210,7 @@ jobs:
           sudo systemctl stop postgresql 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset
+          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
 
       - name: Provision local and production env templates
         run: |
@@ -384,7 +388,7 @@ jobs:
           sudo systemctl stop postgresql 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset
+          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
@@ -518,7 +522,7 @@ jobs:
           sudo systemctl stop postgresql 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset
+          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
@@ -652,7 +656,7 @@ jobs:
           sudo systemctl stop postgresql 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset
+          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
@@ -781,7 +785,7 @@ jobs:
           sudo systemctl stop postgresql 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset
+          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
@@ -917,7 +921,7 @@ jobs:
           sudo systemctl stop postgresql 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset
+          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV

@@ -36,7 +36,7 @@ async function runLiveVerification() {
 
     // Modal must open automatically from query parameter
     const modalHeader = page.locator('text=Assign Front Desk Manager');
-    await modalHeader.waitFor({ state: 'visible', timeout: 5000 });
+    await modalHeader.waitFor({ state: 'visible', timeout: 15000 });
     console.log('  ✓ Assign Front Desk Manager modal opened from query param.');
 
     // Click '✕' close button

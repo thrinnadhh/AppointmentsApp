@@ -12,9 +12,9 @@ import { Client } from 'pg';
 
 describe('Security: BOLA & Authorization Definer Hardening', () => {
   let client;
-  const merchantAUid = 'dbd900ca-f0e3-4176-9503-ecfac5f56c23'; // admin.apex@test-tirupati.local
-  const merchantBProviderId = '2ffa2a93-7b8d-4d84-b907-eb936969779a'; // Balaji Clinic
-  const customerUid = 'b0fa924e-6ac0-4f94-88d6-058caf1835a5'; // test.patient.01@test-tirupati.local
+  let merchantAUid;
+  let merchantBProviderId;
+  let customerUid;
   let merchantBResourceId;
   let merchantBLeaveId;
   let merchantBBookingId;
@@ -24,6 +24,16 @@ describe('Security: BOLA & Authorization Definer Hardening', () => {
       connectionString: process.env.TEST_DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
     });
     await client.connect();
+
+    // Dynamically resolve seeded test accounts & providers
+    const uRes = await client.query(
+      `SELECT id, email FROM auth.users WHERE email IN ('admin.apex@test-tirupati.local', 'test.patient.01@test-tirupati.local')`
+    );
+    merchantAUid = uRes.rows.find(r => r.email === 'admin.apex@test-tirupati.local')?.id || 'fa6d41f6-da63-4eec-b5b3-66647a9c4535';
+    customerUid = uRes.rows.find(r => r.email === 'test.patient.01@test-tirupati.local')?.id || 'fba0bb21-b0d7-4b2c-9c6d-6f57868a7d86';
+
+    const pRes = await client.query(`SELECT id FROM public.providers WHERE name ILIKE '%Balaji%' LIMIT 1`);
+    merchantBProviderId = pRes.rows[0]?.id || 'ee5ed33a-77ad-4cee-8440-fa4f8cf91375';
 
     // Query or seed a test resource for Merchant B
     const resRes = await client.query(
