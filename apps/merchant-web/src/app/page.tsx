@@ -753,7 +753,7 @@ export default function MerchantOverviewPage() {
       });
   }, [hospitalTodayBookings]);
 
-  const handleFrontDeskVerifyCode = async (code: string) => {
+  const handleFrontDeskVerifyCode = async (code: string, bookingId?: string) => {
     const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
     if (isDemo) {
       if (code === '1234') {
@@ -778,7 +778,7 @@ export default function MerchantOverviewPage() {
       };
     }
 
-    const res = await verifyCheckinCodeRpc(selectedProviderId, code);
+    const res = await verifyCheckinCodeRpc(selectedProviderId, code, bookingId);
     if (res.success) {
       let arrival_tag: 'On Time' | 'Early' | 'Late' = 'On Time';
       if (res.is_late) arrival_tag = 'Late';
@@ -794,6 +794,14 @@ export default function MerchantOverviewPage() {
           arrival_tag,
           checked_in_at: res.checked_in_at,
         },
+      };
+    }
+    if ((res as any).multiple_matches && Array.isArray((res as any).matches)) {
+      return {
+        success: false,
+        multiple_matches: true,
+        matches: (res as any).matches,
+        message: res.message,
       };
     }
     return {

@@ -1410,20 +1410,21 @@ export async function purgeAdminAppLogs(
  */
 export async function verifyCheckinCodeRpc(
   shopId: string,
-  code: string
-): Promise<VerifyCheckinCodeResult> {
+  code: string,
+  bookingId?: string
+): Promise<VerifyCheckinCodeResult & { multiple_matches?: boolean; matches?: any[] }> {
   const cleanCode = code.trim();
   try {
     // 1. Try resilient API endpoint first
     const apiRes = await fetch('/api/bookings/checkin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shopId, code: cleanCode }),
+      body: JSON.stringify({ shopId, code: cleanCode, booking_id: bookingId }),
     });
 
     const apiData = await apiRes.json();
-    if (apiData && typeof apiData === 'object' && ('success' in apiData || 'message' in apiData)) {
-      return apiData as VerifyCheckinCodeResult;
+    if (apiData && typeof apiData === 'object' && ('success' in apiData || 'message' in apiData || 'multiple_matches' in apiData)) {
+      return apiData as any;
     }
   } catch (apiErr) {
     console.warn('API checkin fallback to client RPC:', apiErr);
