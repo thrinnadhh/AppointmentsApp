@@ -167,3 +167,47 @@ On 2026-11-18, following the independent adversarial review, the single identifi
   * `pnpm test:security`: **225/225 PASS** (0 failed).
   * **Total Passing Tests:** **395/395 (100% pass rate)**.
   * **Production Files Modified:** **0**. All audited production source code and migrations remain completely intact.
+
+---
+
+## 9. REMEDIATION OF OPEN WINDOWS & WRAPPER HARDENING
+
+On 2026-11-18, following the red-team adversarial hunt, both confirmed HIGH findings were permanently closed via immutable migrations and verified with comprehensive `ALLOW` + `DENY` runtime tests.
+
+### 9.1 Finding 1: DPDP auth.identities Scrub on User Erasure
+* **Vulnerability:** Invoking user data erasure (`anonymize_user_data`) cleared `auth.users` and `public.profiles`, but left orphaned records in `auth.identities` containing cleartext phone and email strings in `identity_data`.
+* **Remediation Migration:** `supabase/migrations/20261118000011_dpdp_erase_auth_identities.sql`
+  * Added `DELETE FROM auth.identities WHERE user_id = p_user_id;` inside `public.anonymize_user_data(uuid)`.
+  * Preserved `SECURITY DEFINER`, search path locked to `'public', 'storage', 'auth', 'pg_temp'`, and `REVOKE ALL FROM PUBLIC, anon; GRANT EXECUTE TO service_role;`.
+* **Runtime Verification (ALLOW + DENY):**
+  * `1A. ALLOW`: Anonymizing a test user thoroughly scrubs `auth.identities` to 0 rows, and eliminates all occurrences of phone/email across `auth.users`, `public.profiles`, and `public.notification_logs`.
+  * `1B. DENY`: Unauthorized customer callers attempting to invoke `public.anonymize_user_data` are rejected with SQL error `42501`.
+
+### 9.2 Finding 2: Public-to-Private RPC Wrapper Hardening & Front Desk Access
+* **Vulnerability:** With schema `private` restricted from public roles, functions in `public` acting as simple `SECURITY INVOKER` wrappers caused authenticated customers and staff to fail with `42501 (permission denied)` or HTTP 500 when attempting legitimate workflows (cancellations, queue reordering, and front-desk check-in).
+* **Remediation Migration:** `supabase/migrations/20261118000012_harden_public_private_rpc_wrappers.sql`
+  * Audited and hardened all 29 `public.*` functions wrapping `private.*`.
+  * Defined each wrapper as `SECURITY DEFINER` with `SET search_path TO ''`, strict caller checks via `(SELECT auth.uid())`, `REVOKE ALL FROM PUBLIC, anon`, and `GRANT EXECUTE TO authenticated, service_role`.
+  * Hardened error contracts (e.g., `reschedule_booking_slot` returns `{ success: false, error: 'Access Denied: ...' }` instead of an unhandled exception).
+* **Runtime Verification (ALLOW + DENY):**
+  * `2A. ALLOW`: Legitimate `customer_a` cancels own confirmed booking via `POST /api/bookings/cancel` (`200 OK`, `CANCELLED`).
+  * `2B. ALLOW`: Assigned Front Desk staff reorders hospital queue position via `POST /api/bookings/reorder` (`200 OK`).
+  * `2C. DENY`: `customer_b` attempting to cancel `customer_a`'s booking via `POST /api/bookings/cancel` is rejected with `403 Forbidden` (`Unauthorized: Caller is not authorized to cancel this booking`), and direct RPC invocation is rejected with `42501`.
+  * `2D. DENY`: Unauthenticated (`anon`) callers attempting to execute sensitive internal wrappers are rejected with `42501`.
+
+### 9.3 Concurrency & Race Condition Verification
+* **20x Parallel Race Test:** Fired 20 concurrent requests (10 cancel calls by customer vs 10 check-in calls by assigned Front Desk staff) on a single confirmed booking.
+* **Result:** **0 HTTP 500 errors** across all 20 requests. Competing requests cleanly returned `200 OK` (winning transition) or `409 Conflict` (already checked-in / cancelled), and the final database record reached a deterministic valid terminal state with zero data corruption.
+
+### 9.4 Final Serially Executed Verification Gate
+1. `npx supabase db lint --local --schema public,private`: **0 errors** (Clean).
+2. `npx supabase migration list --local`: **183/183 matched** (All applied).
+3. `node --test tests/unit/security-loop-open-windows.test.mjs`: **7/7 PASS** (0 failed).
+4. `node --test tests/unit/checkin-pin-collisions.test.mjs`: **8/8 PASS** (0 failed).
+5. `node --test tests/unit/security-loop-*.test.mjs`: **57/57 PASS** (0 failed).
+6. `node tests/scripts/test-telemetry-privacy.mjs` & `node tests/scripts/verify-logging.mjs`: **27/27 PASS** (0 failed).
+7. `pnpm test:validation`: **85/85 PASS** (0 failed).
+8. `pnpm test:security`: **225/225 PASS** (0 failed).
+9. `pnpm -r typecheck`: **0 errors** across all monorepo packages.
+10. `pnpm build`: **44/44 static pages compiled, 0 errors**.
+
