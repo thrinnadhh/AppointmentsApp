@@ -14,6 +14,7 @@ import {
 import { Booking } from '@appointments/shared';
 import BookingPassModal from './BookingPassModal';
 import { fetchCustomerStrikes, fetchCustomerLifetimePin } from '../services/api';
+import { getEarliestUnlockedBookingState } from '../services/pinVisibility';
 
 interface MyBookingsScreenProps {
   onBack: () => void;
@@ -205,33 +206,60 @@ export default function MyBookingsScreen({
               <Text style={styles.lifetimePinBadgeText}>PERMANENT</Text>
             </View>
           </View>
-          <View style={styles.lifetimePinBody}>
-            {lifetimePin ? (
-              <Text style={styles.lifetimePinDigits} testID="my-bookings-lifetime-pin-digits">
-                {lifetimePin}
-              </Text>
-            ) : (
-              <View style={styles.lifetimePinUnavailableContainer}>
-                <Text style={styles.lifetimePinUnavailableText} testID="my-bookings-lifetime-pin-digits">
-                  PIN unavailable
-                </Text>
-                <TouchableOpacity
-                  style={styles.lifetimePinRetryButton}
-                  onPress={loadLifetimePin}
-                  disabled={isLoadingPin}
-                  testID="my-bookings-lifetime-pin-retry"
-                  accessibilityLabel="Retry loading check-in PIN"
-                >
-                  <Text style={styles.lifetimePinRetryText}>
-                    {isLoadingPin ? 'Retrying...' : 'Retry'}
+          {(() => {
+            const pinDisplay = getEarliestUnlockedBookingState(upcomingBookings, lifetimePin);
+            if (pinDisplay.isUnlocked && lifetimePin) {
+              return (
+                <View style={styles.lifetimePinBody}>
+                  <Text style={styles.lifetimePinDigits} testID="my-bookings-lifetime-pin-digits">
+                    {pinDisplay.displayPin}
                   </Text>
-                </TouchableOpacity>
+                  <Text style={styles.lifetimePinDesc}>
+                    Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits. It never changes or expires upon reschedule.
+                  </Text>
+                </View>
+              );
+            }
+
+            if (!pinDisplay.isUnlocked && lifetimePin) {
+              return (
+                <View style={styles.lifetimePinBody}>
+                  <View style={styles.lifetimePinUnavailableContainer}>
+                    <Text style={styles.lifetimePinUnavailableText} testID="my-bookings-lifetime-pin-digits">
+                      🔒 PIN unlocks 60 mins before slot
+                    </Text>
+                  </View>
+                  <Text style={styles.lifetimePinDesc}>
+                    For your privacy and security, your permanent reception PIN is concealed until 60 minutes before your scheduled appointment slot.
+                  </Text>
+                </View>
+              );
+            }
+
+            return (
+              <View style={styles.lifetimePinBody}>
+                <View style={styles.lifetimePinUnavailableContainer}>
+                  <Text style={styles.lifetimePinUnavailableText} testID="my-bookings-lifetime-pin-digits">
+                    PIN unavailable
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.lifetimePinRetryButton}
+                    onPress={loadLifetimePin}
+                    disabled={isLoadingPin}
+                    testID="my-bookings-lifetime-pin-retry"
+                    accessibilityLabel="Retry loading check-in PIN"
+                  >
+                    <Text style={styles.lifetimePinRetryText}>
+                      {isLoadingPin ? 'Retrying...' : 'Retry'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.lifetimePinDesc}>
+                  Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits.
+                </Text>
               </View>
-            )}
-            <Text style={styles.lifetimePinDesc}>
-              Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits. It never changes or expires upon reschedule.
-            </Text>
-          </View>
+            );
+          })()}
         </View>
 
         {/* Sub-tabs: Upcoming vs History */}

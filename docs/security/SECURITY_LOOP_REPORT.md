@@ -182,29 +182,26 @@ Every suite was executed serially and compared against the Phase 0 baseline:
 
 ---
 
-## 4. Decisions Needed (Spec Conflicts & Architectural Alignment)
+## 4. Decisions Needed & Implementation Resolution (RESOLVED)
 
-During the audit, two structural conflicts between implementation and specification were identified. Per safety rules, these have NOT been modified and are submitted for human decision:
+The two architectural decisions identified during the audit have been formally decided and implemented:
 
-### 1. Check-in PIN Customer Visibility Window
-- **Current Code Behavior**:
-  - In `apps/customer-mobile/src/screens/HomeScreen.tsx:236-248` and `MyBookingsScreen.tsx:197-233`, the customer mobile app calls `fetchCustomerLifetimePin()` and displays the customer's permanent 4-digit check-in PIN unconditionally at all times (24 hours a day, 365 days a year), even weeks before any appointment.
-  - In `apps/merchant-web/src/components/BookingPassModal.tsx` and `apps/merchant-web/src/app/api/ticket/[id]/route.ts`, the web app enforces a strict 60-minute window: the check-in PIN is concealed until 60 minutes before the scheduled appointment slot.
-- **Specification Source of Truth (`docs/hospital/SPEC.md` line 28)**:
-  - *"PIN is shown to the customer on their ticket/booking pass from 60 minutes before the slot until check-in."*
-- **Question for Decision**:
-  - Should the customer mobile app be updated to hide the lifetime check-in PIN on `HomeScreen` and `MyBookingsScreen` until 60 minutes before the patient's slot (aligning with `SPEC.md` line 28 and `BookingPassModal.tsx`), OR should `docs/hospital/SPEC.md` be updated to officially allow customers to view their lifetime permanent check-in PIN at all times in the mobile app?
+### 1. Check-in PIN Customer Visibility Window: **RESOLVED (ALIGNED TO 60-MINUTE GATE)**
+- **Decision**: Aligned mobile customer app with `BookingPassModal.tsx` and `docs/hospital/SPEC.md` line 28.
+- **Implementation**:
+  - Authored `apps/customer-mobile/src/services/pinVisibility.ts` exporting `getCheckinPinDisplayState` and `getEarliestUnlockedBookingState`.
+  - Updated `apps/customer-mobile/src/screens/HomeScreen.tsx` (`UpcomingLiveCard`) and `apps/customer-mobile/src/screens/MyBookingsScreen.tsx` (lifetime PIN card).
+  - The customer's 4-digit check-in PIN is masked as `••••` until **60 minutes before `slot_start`**, displaying `"PIN unlocks 60 mins before slot"` prior to that window. Once within the 60-minute window, the actual PIN is revealed.
+  - Verified with automated unit tests in `tests/unit/hospital-noshow-and-pin-gate.test.mjs` (proves PIN hidden at T-90m and revealed at T-45m).
 
-### 2. No-Show Policy: Strikes & 7-Day Account Block vs. Financial Deduction Only
-- **Current Code Behavior**:
-  - Stored procedure `private.record_no_show` tracks `profiles.no_show_count`. Strikes 1–2 receive courtesy 100% refunds; Strikes 3–5 deduct ₹60 (₹50 to hospital, ₹10 to platform) and refund remainder. On Strike 6 (exceeding 5 strikes), it sets `profiles.blocked_until = NOW() + INTERVAL '7 days'` and resets `no_show_count = 0`.
-  - Procedure `private.create_booking_hold` checks `blocked_until > NOW()` and rejects new booking holds with *"Your account is blocked for 7 days due to excessive no-shows"*.
-  - `CheckoutModal.tsx` and `AccountScreen.tsx` in `apps/customer-mobile` display account blocked banners.
-- **Specification & Prompt Guidance**:
-  - `docs/hospital/SPEC.md` line 23 currently specifies the 7-day account block rule (*"Exceeding 5 strikes (6th no-show): account is blocked for 7 days"*).
-  - However, user guidelines state: *"hospital policy in docs/hospital/SPEC.md is deduction only, no account blocking"*.
-- **Question for Decision**:
-  - Should hospital vertical no-shows be updated to "financial deduction only" (eliminating strike counters and removing the 7-day account block from `record_no_show`, `create_booking_hold`, and the mobile UI), OR should the current 6-strike 7-day account blocking policy be retained as the defense against persistent booking abuse?
+### 2. Hospital Vertical No-Show Policy: **RESOLVED (DEDUCTION ONLY, NO ACCOUNT BLOCK)**
+- **Decision**: Hospital vertical (`clinics`) enforces financial deduction without locking patients out of healthcare access; non-medical verticals (salons, dining, turf) retain the 6-strike 7-day account lockout.
+- **Implementation**:
+  - Authored monotonic migration `supabase/migrations/20261118000010_hospital_noshow_deduction_only.sql` updating `private.record_no_show`.
+  - When provider vertical is `clinics`: Strikes 1–2 grant courtesy 100% refund; Strikes 3+ apply the ₹60 fee deduction (₹50 to doctor, ₹10 to platform) without setting `blocked_until` or locking out the customer account, even after 6 or more no-shows.
+  - When provider vertical is non-medical (e.g. `salons`): Retains the 6-strike 7-day account block (`blocked_until = NOW() + INTERVAL '7 days'`).
+  - Updated `docs/hospital/SPEC.md` lines 22–28.
+  - Verified with automated unit tests in `tests/unit/hospital-noshow-and-pin-gate.test.mjs` (proves 6 no-shows at a `clinics` provider do not set `blocked_until`, while 6 no-shows at a `salons` provider set `blocked_until`).
 
 ---
 
