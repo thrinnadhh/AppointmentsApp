@@ -24,12 +24,21 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
   let hospA;
   let hospB;
   let tokens = {};
-  let neuroDocId = '3a46a2e0-1654-40f9-964e-dba40469f3eb'; // Dr. A. Sharma (Assigned to neuroDesk)
-  let dermaDocId = '8f18c1a0-ef8d-4999-ac48-83cef88c5dca'; // Dr. C. Rao (Unassigned to neuroDesk)
-  let genmedDocId = '50e77e60-7044-4d52-a376-485dcd688c35'; // Hospital B Doctor
+  let neuroDocId; // Dr. A. Sharma (Assigned to neuroDesk)
+  let dermaDocId; // Dr. C. Rao (Unassigned to neuroDesk)
+  let genmedDocId; // Hospital B Doctor
   let createdBookingIds = [];
 
   const appBaseUrl = 'http://localhost:3000';
+
+  // Returns an ISO slot for today (IST) that is guaranteed not to overlap with doctor seed bookings (seed bookings are 03:30-10:45 UTC)
+  function getSafeTodaySlot(hourUtc, minuteUtc = 0, durationMinutes = 15) {
+    const d = new Date();
+    d.setUTCHours(hourUtc, minuteUtc, 0, 0);
+    const start = d.toISOString();
+    const end = new Date(d.getTime() + durationMinutes * 60 * 1000).toISOString();
+    return { slotStart: start, slotEnd: end };
+  }
 
   async function cleanupBookings() {
     const validIds = createdBookingIds.filter(Boolean);
@@ -59,8 +68,14 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
     };
 
     manifest = JSON.parse(fs.readFileSync('scripts/test-seed-manifest.json', 'utf8'));
-    hospA = manifest.hospitalA;
-    hospB = manifest.hospitalB;
+
+    // Dynamically query providers to survive re-seeding and UUID regenerations
+    const provRes = await fetch(`${supabaseUrl}/rest/v1/providers?select=id,name`, { headers: serviceHeaders });
+    const providers = await provRes.json();
+    const hospARecord = Array.isArray(providers) ? providers.find(p => p.name.includes('[TEST-HOSP-A]')) : null;
+    const hospBRecord = Array.isArray(providers) ? providers.find(p => p.name.includes('[TEST-HOSP-B]')) : null;
+    hospA = { id: hospARecord ? hospARecord.id : manifest.hospitalA.id };
+    hospB = { id: hospBRecord ? hospBRecord.id : manifest.hospitalB.id };
 
     async function login(email, password = 'HospitalTest2026!') {
       const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
@@ -80,11 +95,53 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
     tokens.patient3 = await login('test.patient.03@test-tirupati.local');
     tokens.patient4 = await login('test.patient.04@test-tirupati.local');
 
-    // Ensure test.patient.01 has its own dedicated PIN (1001) so its seed booking never collides with test PINs
-    await fetch(`${supabaseUrl}/rest/v1/profiles?email=eq.test.patient.01@test-tirupati.local`, {
-      method: 'PATCH',
+    // Dynamically query active clinic doctors and assignments from the seeded local database
+    const fdRes = await fetch(`${supabaseUrl}/rest/v1/doctor_front_desk_assignments?select=doctor_id,user_id,provider_id`, { headers: serviceHeaders });
+    const fdAssignments = await fdRes.json();
+    const neuroAssign = Array.isArray(fdAssignments) ? fdAssignments.find(a => a.user_id === tokens.neuroDesk.user.id) : null;
+    const genmedAssign = Array.isArray(fdAssignments) ? fdAssignments.find(a => a.user_id === tokens.genmedDesk.user.id) : null;
+
+    if (neuroAssign?.doctor_id) {
+      neuroDocId = neuroAssign.doctor_id;
+    } else {
+      const docRes = await fetch(`${supabaseUrl}/rest/v1/resources?provider_id=eq.${hospA.id}&name=like.*Neurologist*&select=id`, { headers: serviceHeaders });
+      const docs = await docRes.json();
+      neuroDocId = docs?.[0]?.id;
+    }
+
+    if (genmedAssign?.doctor_id) {
+      genmedDocId = genmedAssign.doctor_id;
+    } else {
+      const docRes = await fetch(`${supabaseUrl}/rest/v1/resources?provider_id=eq.${hospB.id}&name=like.*Physician*&select=id`, { headers: serviceHeaders });
+      const docs = await docRes.json();
+      genmedDocId = docs?.[0]?.id;
+    }
+
+    // Query dermatology doctor (unassigned to neuroDesk)
+    const dermaRes = await fetch(`${supabaseUrl}/rest/v1/resources?provider_id=eq.${hospA.id}&name=like.*Dermatologist*&select=id`, { headers: serviceHeaders });
+    const dermaDocs = await dermaRes.json();
+    dermaDocId = dermaDocs?.[0]?.id;
+
+    // Clear any pre-existing seed bookings for patient 2, 3, 4 to guarantee a clean test slate
+    await fetch(`${supabaseUrl}/rest/v1/bookings?customer_id=in.(${tokens.patient2.user.id},${tokens.patient3.user.id},${tokens.patient4.user.id})`, {
+      method: 'DELETE',
       headers: serviceHeaders,
-      body: JSON.stringify({ permanent_checkin_pin: '1001' }),
+    });
+
+    // Ensure all test patients (01-15) have dedicated distinct PINs (1001-1015) so seed bookings never collide with test PINs
+    for (let i = 1; i <= 15; i++) {
+      const num = i < 10 ? `0${i}` : `${i}`;
+      await fetch(`${supabaseUrl}/rest/v1/profiles?email=eq.test.patient.${num}@test-tirupati.local`, {
+        method: 'PATCH',
+        headers: serviceHeaders,
+        body: JSON.stringify({ permanent_checkin_pin: `10${num}` }),
+      });
+    }
+
+    // Purge any temporary appointment codes that might match our test PIN suite
+    await fetch(`${supabaseUrl}/rest/v1/appointment_checkin_codes?code=in.(8811,9922,9933,7733,6644,7711)`, {
+      method: 'DELETE',
+      headers: serviceHeaders,
     });
 
     // Clear any active rate limits for the test staff accounts
@@ -111,8 +168,7 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
     });
 
     const ts = Date.now();
-    const slotStart = new Date(ts + 10 * 60 * 1000).toISOString();
-    const slotEnd = new Date(ts + 25 * 60 * 1000).toISOString();
+    const { slotStart, slotEnd } = getSafeTodaySlot(11, 30);
 
     const bRes = await fetch(`${supabaseUrl}/rest/v1/bookings`, {
       method: 'POST',
@@ -178,10 +234,8 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
     });
 
     const ts = Date.now();
-    const slotStart1 = new Date(ts + 20 * 60 * 1000).toISOString();
-    const slotEnd1 = new Date(ts + 35 * 60 * 1000).toISOString();
-    const slotStart2 = new Date(ts + 45 * 60 * 1000).toISOString();
-    const slotEnd2 = new Date(ts + 60 * 60 * 1000).toISOString();
+    const { slotStart: slotStart1, slotEnd: slotEnd1 } = getSafeTodaySlot(12, 0);
+    const { slotStart: slotStart2, slotEnd: slotEnd2 } = getSafeTodaySlot(12, 30);
 
     // Booking 1 for Patient 2
     const b1Res = await fetch(`${supabaseUrl}/rest/v1/bookings`, {
@@ -280,10 +334,8 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
     });
 
     const ts = Date.now();
-    const slotStart1 = new Date(ts + 20 * 60 * 1000).toISOString();
-    const slotEnd1 = new Date(ts + 35 * 60 * 1000).toISOString();
-    const slotStart2 = new Date(ts + 45 * 60 * 1000).toISOString();
-    const slotEnd2 = new Date(ts + 60 * 60 * 1000).toISOString();
+    const { slotStart: slotStart1, slotEnd: slotEnd1 } = getSafeTodaySlot(13, 0);
+    const { slotStart: slotStart2, slotEnd: slotEnd2 } = getSafeTodaySlot(13, 30);
 
     const [b1] = await (await fetch(`${supabaseUrl}/rest/v1/bookings`, {
       method: 'POST',
@@ -367,8 +419,7 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
     });
 
     const ts = Date.now();
-    const slotStart = new Date(ts + 30 * 60 * 1000).toISOString();
-    const slotEnd = new Date(ts + 45 * 60 * 1000).toISOString();
+    const { slotStart, slotEnd } = getSafeTodaySlot(14, 0);
 
     // Patient 2 booked at Hospital A
     const [bA] = await (await fetch(`${supabaseUrl}/rest/v1/bookings`, {
@@ -494,8 +545,7 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
   it('6. Staff from Hospital A cannot check in Hospital B booking (derived server-side)', async () => {
     // Booking exists at Hospital B for today
     const ts = Date.now();
-    const slotStart = new Date(ts + 20 * 60 * 1000).toISOString();
-    const slotEnd = new Date(ts + 35 * 60 * 1000).toISOString();
+    const { slotStart, slotEnd } = getSafeTodaySlot(14, 30);
 
     const [bHospB] = await (await fetch(`${supabaseUrl}/rest/v1/bookings`, {
       method: 'POST',
@@ -551,8 +601,7 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
     });
 
     const ts = Date.now();
-    const slotStart = new Date(ts + 20 * 60 * 1000).toISOString();
-    const slotEnd = new Date(ts + 35 * 60 * 1000).toISOString();
+    const { slotStart, slotEnd } = getSafeTodaySlot(15, 0);
 
     // Patient 2 has booking with Consultant Y (dermaDocId, unassigned for neuroDesk)
     const [bUnassigned] = await (await fetch(`${supabaseUrl}/rest/v1/bookings`, {
