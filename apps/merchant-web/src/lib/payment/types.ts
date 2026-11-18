@@ -13,6 +13,7 @@ export interface CreateGatewayOrderParams {
   customerEmail?: string;
   orderExpiryTime?: string; // ISO 8601 string, e.g. now + 5 minutes
   notes?: Record<string, string>;
+  orderSplits?: Array<{ vendorId: string; amountInPaise: number }>;
 }
 
 export interface GatewayOrderResult {
@@ -48,6 +49,7 @@ export interface GatewayRefundParams {
   refundId?: string;
   reason?: string;
   speed?: 'normal' | 'optimum' | 'instant';
+  refundSplits?: Array<{ vendorId: string; amountInPaise: number }>;
 }
 
 export interface GatewayRefundResult {

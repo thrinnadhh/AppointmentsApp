@@ -2502,4 +2502,65 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     }
   });
 
+  // 41. Cashfree EasySplit Merchant Vendor Onboarding
+  it('41. /api/merchants/cashfree-vendor: Hospital 1 Admin vs Hospital 2 Admin & Customer A', async () => {
+    // 41.1 Unauthenticated GET must return 401
+    const unauthGet = await fetch(`${appBaseUrl}/api/merchants/cashfree-vendor?provider_id=${hospA.id}`);
+    assert.equal(unauthGet.status, 401, 'Unauthenticated GET /api/merchants/cashfree-vendor must return 401');
+
+    // 41.2 Cross-Tenant GET: Hospital 2 Admin accessing Hospital 1 provider
+    const crossGetAdmin = await fetch(`${appBaseUrl}/api/merchants/cashfree-vendor?provider_id=${hospA.id}`, {
+      headers: { Authorization: `Bearer ${adminB.token}` },
+    });
+    assert.equal(crossGetAdmin.status, 403, 'Hospital 2 Admin GET on Hospital 1 must return 403');
+
+    // 41.3 Cross-Role GET: Customer A accessing Hospital 1 provider
+    const crossGetCust = await fetch(`${appBaseUrl}/api/merchants/cashfree-vendor?provider_id=${hospA.id}`, {
+      headers: { Authorization: `Bearer ${custA.token}` },
+    });
+    assert.equal(crossGetCust.status, 403, 'Customer A GET on Hospital 1 must return 403');
+
+    // 41.4 Authorized GET: Hospital 1 Admin accessing Hospital 1 provider
+    const authGet = await fetch(`${appBaseUrl}/api/merchants/cashfree-vendor?provider_id=${hospA.id}`, {
+      headers: { Authorization: `Bearer ${adminA.token}` },
+    });
+    assert.equal(authGet.status, 200, 'Hospital 1 Admin GET on Hospital 1 must return 200');
+    const authGetData = await authGet.json();
+    assert.equal(authGetData.success, true);
+    assert.equal(authGetData.provider_id, hospA.id);
+
+    // 41.5 Unauthenticated POST must return 401
+    const unauthPost = await fetch(`${appBaseUrl}/api/merchants/cashfree-vendor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider_id: hospA.id }),
+    });
+    assert.equal(unauthPost.status, 401, 'Unauthenticated POST must return 401');
+
+    // 41.6 Cross-Tenant POST: Hospital 2 Admin attempting to configure Hospital 1 vendor
+    const crossPost = await fetch(`${appBaseUrl}/api/merchants/cashfree-vendor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminB.token}` },
+      body: JSON.stringify({
+        provider_id: hospA.id,
+        account_holder: 'Apex Hospital Operations',
+        account_number: '123456789012',
+        ifsc: 'HDFC0001234',
+        pan: 'ABCDE1234F',
+        email: 'ops@apexhospital.in',
+        phone: '9876543210',
+      }),
+    });
+    assert.equal(crossPost.status, 403, 'Hospital 2 Admin POST on Hospital 1 must return 403');
+
+    recordResult(
+      '/api/merchants/cashfree-vendor',
+      'GET, POST',
+      'Hospital 1 Admin (proved 200)',
+      'Hospital 2 Admin & Customer A (proved 401/403)',
+      'apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts:26,94',
+      'PASS'
+    );
+  });
+
 });

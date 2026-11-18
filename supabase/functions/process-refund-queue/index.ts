@@ -194,7 +194,7 @@ serve(async (req: Request) => {
         // Lookup booking to verify status, amount, and payment gateway id
         const { data: bkg } = await supabase
           .from('bookings')
-          .select('id, payment_status, total_amount, deposit_amount, refund_amount, gateway_payment_id, gateway_order_id, gateway_provider')
+          .select('id, payment_status, total_amount, deposit_amount, refund_amount, gateway_payment_id, gateway_order_id, gateway_provider, split_status, merchant_share_amount, provider_id')
           .eq('id', appointment_id)
           .maybeSingle();
 
@@ -243,6 +243,22 @@ serve(async (req: Request) => {
               throw new Error(`Cashfree credentials missing. Refusing to burn real refund for order ${targetOrderId}`);
             }
           } else {
+            let refundSplits: Array<{ vendor_id: string; amount: number }> | undefined = undefined;
+            if (bkg?.split_status === 'SPLIT_CAPTURED' && Number(bkg?.merchant_share_amount || 0) > 0 && bkg?.provider_id) {
+              const { data: prov } = await supabase
+                .from('providers')
+                .select('cashfree_vendor_id')
+                .eq('id', bkg.provider_id)
+                .maybeSingle();
+              if (prov?.cashfree_vendor_id) {
+                const vendorShare = Number(bkg.merchant_share_amount);
+                const vendorRefund = Math.min(vendorShare, requestedAmount);
+                if (vendorRefund > 0) {
+                  refundSplits = [{ vendor_id: prov.cashfree_vendor_id, amount: vendorRefund }];
+                }
+              }
+            }
+
             const cfRes = await fetch(`${cfBaseUrl}/orders/${encodeURIComponent(targetOrderId)}/refunds`, {
               method: 'POST',
               headers: {
@@ -255,6 +271,7 @@ serve(async (req: Request) => {
                 refund_amount: requestedAmount,
                 refund_id: refundId,
                 refund_note: reason || 'Queue-processed refund',
+                refund_splits: refundSplits,
               }),
             });
 
@@ -318,6 +335,8 @@ serve(async (req: Request) => {
           .from('bookings')
           .update({
             payment_status: 'REFUNDED',
+            cf_refund_id: refundGatewayId,
+            split_status: bkg?.split_status === 'SPLIT_CAPTURED' ? 'SPLIT_REFUNDED' : (bkg?.split_status || 'NOT_APPLICABLE'),
             updated_at: new Date().toISOString(),
           })
           .eq('id', appointment_id);

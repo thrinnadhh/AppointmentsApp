@@ -33,8 +33,14 @@ describe('Check-In PIN Collision & Cross-Hospital Safety Suite', { concurrency: 
 
   // Returns an ISO slot for today (IST) that is guaranteed not to overlap with doctor seed bookings (seed bookings are 03:30-10:45 UTC)
   function getSafeTodaySlot(hourUtc, minuteUtc = 0, durationMinutes = 15) {
-    const d = new Date();
-    d.setUTCHours(hourUtc, minuteUtc, 0, 0);
+    const istToday = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const [year, month, day] = istToday.split('-').map(Number);
+    const d = new Date(Date.UTC(year, month - 1, day, hourUtc, minuteUtc, 0, 0));
     const start = d.toISOString();
     const end = new Date(d.getTime() + durationMinutes * 60 * 1000).toISOString();
     return { slotStart: start, slotEnd: end };

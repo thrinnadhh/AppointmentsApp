@@ -26,6 +26,50 @@ export interface CashfreeConfig {
   env?: 'SANDBOX' | 'PRODUCTION';
 }
 
+export interface CashfreeOrderSplit {
+  vendor_id: string;
+  amount?: number;
+  percentage?: number;
+  tags?: Record<string, string>;
+}
+
+export interface CashfreeRefundSplit {
+  vendor_id: string;
+  amount: number;
+}
+
+export interface CashfreeVendorPayload {
+  vendor_id: string;
+  status?: 'ACTIVE' | 'PENDING';
+  name: string;
+  email?: string;
+  phone: string;
+  verify_account?: boolean;
+  bank?: {
+    account_number: string;
+    account_holder: string;
+    ifsc: string;
+  };
+  upi?: {
+    vpa: string;
+    account_holder?: string;
+  };
+  kyc_details?: {
+    pan?: string;
+    account_type?: 'INDIVIDUAL' | 'BUSINESS';
+    business_type?: string;
+  };
+}
+
+export interface CashfreeVendorResponse {
+  vendor_id: string;
+  status: 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'NOT_REGISTERED';
+  name?: string;
+  email?: string;
+  phone?: string;
+  message?: string;
+}
+
 export interface CashfreeOrderResponse {
   cf_order_id: string;
   order_id: string;
@@ -145,6 +189,7 @@ export class CashfreeClient {
     };
     order_expiry_time?: string;
     order_note?: string;
+    order_splits?: CashfreeOrderSplit[];
   }): Promise<CashfreeOrderResponse> {
     if (this.shouldMock(payload.order_id)) {
       if (process.env.NODE_ENV === 'production') {
@@ -206,6 +251,7 @@ export class CashfreeClient {
     refund_id: string;
     refund_note?: string;
     refund_speed?: 'STANDARD' | 'INSTANT';
+    refund_splits?: CashfreeRefundSplit[];
   }): Promise<CashfreeRefundResponse> {
     if (this.shouldMock(orderId)) {
       return {
@@ -225,6 +271,61 @@ export class CashfreeClient {
     if (!res.ok) {
       const errBody = await res.text();
       throw new Error(`Cashfree createRefund failed (${res.status}): ${errBody}`);
+    }
+
+    return await res.json();
+  }
+
+  async registerVendor(payload: CashfreeVendorPayload): Promise<CashfreeVendorResponse> {
+    if (this.shouldMock(payload.vendor_id)) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('CRITICAL SECURITY ERROR: Cashfree credentials missing in production.');
+      }
+      return {
+        vendor_id: payload.vendor_id,
+        status: 'ACTIVE',
+        name: payload.name,
+        email: payload.email,
+        phone: payload.phone,
+        message: 'Mock vendor registered successfully',
+      };
+    }
+
+    if (!this.isConfigured() && process.env.NODE_ENV === 'production') {
+      throw new Error('CRITICAL SECURITY ERROR: Cashfree credentials missing in production.');
+    }
+
+    const res = await fetch(`${this.baseUrl}/easy-split/vendors`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`Cashfree registerVendor failed (${res.status}): ${errBody}`);
+    }
+
+    return await res.json();
+  }
+
+  async getVendor(vendorId: string): Promise<CashfreeVendorResponse | null> {
+    if (this.shouldMock(vendorId)) {
+      return {
+        vendor_id: vendorId,
+        status: 'ACTIVE',
+      };
+    }
+
+    const res = await fetch(`${this.baseUrl}/easy-split/vendors/${encodeURIComponent(vendorId)}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`Cashfree getVendor failed (${res.status}): ${errBody}`);
     }
 
     return await res.json();

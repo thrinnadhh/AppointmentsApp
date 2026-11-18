@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { Client } from 'pg';
 
@@ -7,6 +7,52 @@ const connectionString =
 const BASE_URL = process.env.MERCHANT_WEB_URL || 'http://localhost:3000';
 
 describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrapper Hardening', () => {
+  let hospitalAId;
+  let doctorNeuroId;
+  let deptNeuroId;
+  let frontDeskId;
+  let customerAId;
+  let customerBId;
+
+  before(async () => {
+    const client = new Client({ connectionString });
+    await client.connect();
+    try {
+      const fdRes = await client.query(`
+        SELECT a.user_id, a.doctor_id, a.provider_id, r.department_id
+        FROM public.doctor_front_desk_assignments a
+        JOIN public.resources r ON a.doctor_id = r.id
+        LIMIT 1
+      `);
+      if (fdRes.rows[0]) {
+        frontDeskId = fdRes.rows[0].user_id;
+        doctorNeuroId = fdRes.rows[0].doctor_id;
+        hospitalAId = fdRes.rows[0].provider_id;
+        deptNeuroId = fdRes.rows[0].department_id;
+      } else {
+        const provRes = await client.query("SELECT id FROM public.providers LIMIT 1");
+        hospitalAId = provRes.rows[0]?.id;
+        const docRes = await client.query("SELECT id, department_id FROM public.resources WHERE provider_id = $1 LIMIT 1", [hospitalAId]);
+        doctorNeuroId = docRes.rows[0]?.id;
+        deptNeuroId = docRes.rows[0]?.department_id;
+      }
+
+      const custARes = await client.query(
+        "SELECT id FROM auth.users WHERE email LIKE $1 LIMIT 1",
+        ["%patient.01%"]
+      );
+      customerAId = custARes.rows[0]?.id;
+
+      const custBRes = await client.query(
+        "SELECT id FROM auth.users WHERE email LIKE $1 LIMIT 1",
+        ["%patient.02%"]
+      );
+      customerBId = custBRes.rows[0]?.id;
+    } finally {
+      await client.end();
+    }
+  });
+
   // Helper to run query as a specific database role with optional JWT claims
   async function asRole(client, role, sub, fn) {
     await client.query('BEGIN');
@@ -38,9 +84,6 @@ describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrap
       const testBookingId = '00000000-0000-0000-0000-99990000001b';
       const testEmail = 'dpdp-openwindow-victim@test.local';
       const testPhone = '+919999888811';
-      const hospitalAId = '2984b111-3488-4484-80f9-cf379caa433b';
-      const doctorNeuroId = 'c12abdd6-4aa4-406b-961e-50b9325fdef2';
-      const deptNeuroId = 'ccaee38f-0689-4069-89a9-b9f7ce5800b3';
 
       try {
         // Cleanup prior runs if any
@@ -187,13 +230,6 @@ describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrap
   // FINDING 2: Public-to-Private RPC Wrapper Hardening (ALLOW + DENY)
   // =========================================================================
   describe('Finding 2: Public Wrapper Hardening & Front Desk / Customer Access (ALLOW + DENY)', () => {
-    const customerAId = '2410b495-a238-49ff-a37c-56cfc52654f1'; // seeded customer e2e
-    const customerBId = '99999999-9999-9999-9999-999999999991'; // seeded customer 1
-    const hospitalAId = '2984b111-3488-4484-80f9-cf379caa433b'; // seeded hospital A
-    const doctorNeuroId = 'c12abdd6-4aa4-406b-961e-50b9325fdef2'; // seeded doctor neuro
-    const deptNeuroId = 'ccaee38f-0689-4069-89a9-b9f7ce5800b3'; // seeded dept neuro
-    const frontDeskId = '89a7c201-242e-476c-b32f-37732aab85ec'; // assigned front desk staff
-
     it('2A. ALLOW: Legitimate customer_a cancels own confirmed booking via POST /api/bookings/cancel (200 OK, CANCELLED)', async () => {
       const client = new Client({ connectionString });
       await client.connect();
@@ -396,11 +432,6 @@ describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrap
       await client.connect();
 
       const raceBookingId = '33333333-aace-4444-8888-000000000001';
-      const customerAId = '2410b495-a238-49ff-a37c-56cfc52654f1';
-      const hospitalAId = '2984b111-3488-4484-80f9-cf379caa433b';
-      const doctorNeuroId = 'c12abdd6-4aa4-406b-961e-50b9325fdef2';
-      const deptNeuroId = 'ccaee38f-0689-4069-89a9-b9f7ce5800b3';
-      const frontDeskId = '89a7c201-242e-476c-b32f-37732aab85ec';
       const checkinCode = '8899';
 
       try {

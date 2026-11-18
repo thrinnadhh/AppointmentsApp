@@ -83,6 +83,11 @@ export interface Provider {
   cancellation_window_hours?: number;
   cashfree_app_id?: string | null;
   cashfree_vendor_id?: string | null;
+  cashfree_vendor_status?: 'NOT_REGISTERED' | 'PENDING_KYC' | 'ACTIVE' | 'SUSPENDED';
+  bank_account_holder?: string | null;
+  bank_account_last4?: string | null;
+  bank_ifsc?: string | null;
+  pan_last4?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -137,6 +142,9 @@ export interface Booking {
   total_amount?: number | null;
   platform_fee_amount?: number | null;
   consultation_fee_amount?: number | null;
+  merchant_share_amount?: number | null;
+  split_status?: 'NOT_APPLICABLE' | 'PENDING_SPLIT' | 'SPLIT_CAPTURED' | 'SPLIT_REFUNDED';
+  cf_refund_id?: string | null;
   expected_payment_amount_paise?: number | null;
   platform_payment_status?: PlatformPaymentStatus;
   consultation_payment_status?: ConsultationPaymentStatus;
@@ -395,7 +403,26 @@ export interface CreateRazorpayOrderResponse {
   total_amount?: number;   // total payable online in INR (platform_fee)
   platform_fee_amount?: number;
   consultation_fee_amount?: number;
+  merchant_share_amount?: number;
+  split_status?: 'NOT_APPLICABLE' | 'PENDING_SPLIT' | 'SPLIT_CAPTURED' | 'SPLIT_REFUNDED';
+  cashfree_env?: 'SANDBOX' | 'PRODUCTION';
   error?: string;
+}
+
+export interface MerchantVendorSplit {
+  id: string;
+  booking_id: string;
+  provider_id: string;
+  cashfree_vendor_id: string;
+  cf_order_id: string;
+  cf_transfer_id?: string | null;
+  gross_amount: number;
+  merchant_share: number;
+  platform_fee: number;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REVERSED';
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface VerifyRazorpayPaymentRequest {

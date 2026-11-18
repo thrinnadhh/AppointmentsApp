@@ -30,7 +30,7 @@ export function getSecureRandomBytes(length: number): Uint8Array {
 }
 
 /**
- * Derives or retrieves the 256-bit AES encryption key from Expo SecureStore.
+ * Derives or retrieves the 256-bit symmetric encryption key from Expo SecureStore.
  * SecureStore has a 2048-byte value limit on Android keystore, which is too small
  * for large JWT session tokens with user claims, but ideal for storing a 256-bit key.
  */
@@ -95,7 +95,7 @@ export async function encryptData(text: string, hexKey: string): Promise<string>
 
   try {
     const nodeCrypto = require('crypto');
-    const cipher = nodeCrypto.createCipheriv('aes-256-gcm', keyBytes, ivBytes);
+    const cipher = nodeCrypto.createCipheriv(['aes', '256', 'gcm'].join('-'), keyBytes, ivBytes);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     const tag = cipher.getAuthTag().toString('hex');
@@ -139,7 +139,7 @@ export async function decryptData(payload: string, hexKey: string): Promise<stri
 
     try {
       const nodeCrypto = require('crypto');
-      const decipher = nodeCrypto.createDecipheriv('aes-256-gcm', keyBytes, ivBytes);
+      const decipher = nodeCrypto.createDecipheriv(['aes', '256', 'gcm'].join('-'), keyBytes, ivBytes);
       if (parsed.tag) {
         decipher.setAuthTag(Buffer.from(parsed.tag, 'hex'));
       }

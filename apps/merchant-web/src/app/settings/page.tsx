@@ -43,8 +43,20 @@ export default function SettingsPage() {
   const [cashfreeAppId, setCashfreeAppId] = useState('');
   const [webhookSecretConfigured, setWebhookSecretConfigured] = useState(true);
   const [payoutUpi, setPayoutUpi] = useState('merchant.ops@upi');
-  const [bankAccount] = useState('•••• •••• 9821 (SBI Tirupati Main Branch)');
   const [minDeposit, setMinDeposit] = useState('50');
+
+  // EasySplit Vendor State
+  const [cashfreeVendorId, setCashfreeVendorId] = useState('');
+  const [cashfreeVendorStatus, setCashfreeVendorStatus] = useState<'NOT_REGISTERED' | 'PENDING_KYC' | 'ACTIVE' | 'SUSPENDED'>('NOT_REGISTERED');
+  const [bankAccountHolder, setBankAccountHolder] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankIfsc, setBankIfsc] = useState('');
+  const [panNumber, setPanNumber] = useState('');
+  const [bankAccountLast4, setBankAccountLast4] = useState('');
+  const [panLast4, setPanLast4] = useState('');
+  const [vendorSubmitting, setVendorSubmitting] = useState(false);
+  const [vendorSuccessMsg, setVendorSuccessMsg] = useState<string | null>(null);
+  const [vendorErrorMsg, setVendorErrorMsg] = useState<string | null>(null);
 
   // Notification State
   const [whatsappConfirmations, setWhatsappConfirmations] = useState(true);
@@ -81,6 +93,24 @@ export default function SettingsPage() {
       }
       if (activeProvider.cashfree_app_id) {
         setCashfreeAppId(activeProvider.cashfree_app_id);
+      }
+      if (activeProvider.cashfree_vendor_id) {
+        setCashfreeVendorId(activeProvider.cashfree_vendor_id);
+      }
+      if ((activeProvider as any).cashfree_vendor_status) {
+        setCashfreeVendorStatus((activeProvider as any).cashfree_vendor_status);
+      }
+      if ((activeProvider as any).bank_account_holder) {
+        setBankAccountHolder((activeProvider as any).bank_account_holder);
+      }
+      if ((activeProvider as any).bank_account_last4) {
+        setBankAccountLast4((activeProvider as any).bank_account_last4);
+      }
+      if ((activeProvider as any).bank_ifsc) {
+        setBankIfsc((activeProvider as any).bank_ifsc);
+      }
+      if ((activeProvider as any).pan_last4) {
+        setPanLast4((activeProvider as any).pan_last4);
       }
       if (activeProvider.min_deposit_amount !== undefined && activeProvider.min_deposit_amount !== null) {
         setMinDeposit(String(activeProvider.min_deposit_amount));
@@ -129,6 +159,7 @@ export default function SettingsPage() {
         p_min_deposit_amount: parseFloat(minDeposit) || 0,
         p_cancellation_window_hours: parseInt(cancellationWindowHours, 10) || 1,
         p_cashfree_app_id: cashfreeAppId.trim() || null,
+        p_cashfree_vendor_id: cashfreeVendorId.trim() || null,
       });
 
       if (error || (data && (data as any).success === false)) {
@@ -147,6 +178,44 @@ export default function SettingsPage() {
       const msg = err instanceof Error ? err.message : 'Error saving settings';
       console.error('[handleSave] caught exception:', msg);
       setSaveError(msg);
+    }
+  };
+
+  const handleVendorOnboard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeProvider?.id) return;
+    setVendorErrorMsg(null);
+    setVendorSuccessMsg(null);
+    setVendorSubmitting(true);
+    try {
+      const res = await fetch('/api/merchants/cashfree-vendor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: activeProvider.id,
+          account_holder: bankAccountHolder,
+          account_number: bankAccountNumber,
+          ifsc: bankIfsc.toUpperCase(),
+          upi_id: payoutUpi || undefined,
+          pan: panNumber.toUpperCase(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to onboard vendor with Cashfree');
+      }
+      setCashfreeVendorId(data.vendor_id);
+      setCashfreeVendorStatus(data.cashfree_vendor_status);
+      setBankAccountLast4(data.bank_account_last4);
+      setPanLast4(data.pan_last4);
+      setBankAccountNumber('');
+      setPanNumber('');
+      setVendorSuccessMsg('Cashfree EasySplit vendor registered and activated successfully!');
+      await refreshTenant();
+    } catch (err: any) {
+      setVendorErrorMsg(err.message || 'Vendor onboarding failed');
+    } finally {
+      setVendorSubmitting(false);
     }
   };
 
@@ -442,21 +511,6 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label htmlFor="bank-account-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Designated Bank Account
-                </label>
-                <input
-                  id="bank-account-input"
-                  name="bankAccount"
-                  aria-label="Designated Bank Account"
-                  type="text"
-                  value={bankAccount}
-                  readOnly
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600 font-mono"
-                />
-              </div>
-
-              <div>
                 <label htmlFor="min-deposit-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Minimum Default Deposit (₹)
                 </label>
@@ -469,6 +523,148 @@ export default function SettingsPage() {
                   onChange={(e) => setMinDeposit(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
+              </div>
+            </div>
+
+            {/* EasySplit Marketplace Vendor Settlements Card */}
+            <div className="mt-8 pt-6 border-t border-slate-200 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Cashfree EasySplit Marketplace Settlement
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Direct automated split settlement into your venue bank account per booking.
+                  </p>
+                </div>
+                <div>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                      cashfreeVendorStatus === 'ACTIVE'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : cashfreeVendorStatus === 'PENDING_KYC'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-slate-100 text-slate-700 border border-slate-300'
+                    }`}
+                  >
+                    ● {cashfreeVendorStatus.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status & Masked Summary */}
+              {cashfreeVendorId && (
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-sans font-bold">Vendor ID</span>
+                    <span className="text-slate-800 font-bold">{cashfreeVendorId}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-sans font-bold">Designated Bank</span>
+                    <span className="text-slate-800">
+                      {bankAccountLast4 ? `•••• •••• ${bankAccountLast4} (${bankIfsc || 'IFSC Verified'})` : 'No Bank Registered'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px] uppercase font-sans font-bold">PAN / KYC</span>
+                    <span className="text-slate-800">
+                      {panLast4 ? `•••• •••• ${panLast4}` : 'Pending Submission'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {vendorSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-medium">
+                  ✓ {vendorSuccessMsg}
+                </div>
+              )}
+              {vendorErrorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-medium">
+                  ✕ {vendorErrorMsg}
+                </div>
+              )}
+
+              {/* Onboarding / Update Form */}
+              <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-200 space-y-4">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  {cashfreeVendorStatus === 'ACTIVE' ? 'Update Bank & KYC Details' : 'Register for EasySplit Payouts'}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="account-holder-input" className="block text-xs font-bold text-slate-700 mb-1">
+                      Account Holder Name
+                    </label>
+                    <input
+                      id="account-holder-input"
+                      name="accountHolder"
+                      type="text"
+                      value={bankAccountHolder}
+                      onChange={(e) => setBankAccountHolder(e.target.value)}
+                      placeholder="Legal Entity or Doctor Name"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="account-number-input" className="block text-xs font-bold text-slate-700 mb-1">
+                      Bank Account Number
+                    </label>
+                    <input
+                      id="account-number-input"
+                      name="accountNumber"
+                      type="password"
+                      autoComplete="off"
+                      value={bankAccountNumber}
+                      onChange={(e) => setBankAccountNumber(e.target.value.replace(/\D/g, ''))}
+                      placeholder={bankAccountLast4 ? `•••• •••• ${bankAccountLast4} (Enter new to update)` : '9 to 18 digits'}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="ifsc-input" className="block text-xs font-bold text-slate-700 mb-1">
+                      Bank IFSC Code
+                    </label>
+                    <input
+                      id="ifsc-input"
+                      name="ifsc"
+                      type="text"
+                      maxLength={11}
+                      value={bankIfsc}
+                      onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
+                      placeholder="e.g. SBIN0001234"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 bg-white uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="pan-input" className="block text-xs font-bold text-slate-700 mb-1">
+                      Merchant PAN Card
+                    </label>
+                    <input
+                      id="pan-input"
+                      name="pan"
+                      type="text"
+                      maxLength={10}
+                      value={panNumber}
+                      onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
+                      placeholder={panLast4 ? `•••• •••• ${panLast4} (Enter new to update)` : 'e.g. ABCDE1234F'}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 bg-white uppercase"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={handleVendorOnboard}
+                    disabled={vendorSubmitting || !bankAccountHolder || !bankIfsc || (!bankAccountNumber && !bankAccountLast4) || (!panNumber && !panLast4)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold transition flex items-center gap-2"
+                  >
+                    {vendorSubmitting ? 'Registering with Gateway...' : 'Submit to Cashfree EasySplit'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

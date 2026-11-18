@@ -50,21 +50,40 @@ export async function POST(req: NextRequest) {
     const data = body?.data;
     const order = data?.order;
     const payment = data?.payment;
+    const refund = data?.refund || body?.refund;
+    const transfer = data?.transfer || body?.transfer;
+    const vendor = data?.vendor || body?.vendor;
 
-    if (!eventType || (!order && !payment)) {
+    if (!eventType) {
+      return NextResponse.json({ status: 'OK', received: true, message: 'Missing event type' }, { status: 200 });
+    }
+
+    const isPaymentEvent = eventType === 'PAYMENT_SUCCESS_WEBHOOK' ||
+      eventType === 'order.paid' ||
+      eventType === 'PAYMENT_FAILED_WEBHOOK' ||
+      eventType === 'PAYMENT_USER_DROPPED_WEBHOOK';
+    const isRefundEvent = eventType === 'REFUND_STATUS_WEBHOOK' || eventType === 'refund.speed_changed';
+    const isVendorEvent = eventType === 'VENDOR_ACTIVATED' || eventType === 'VENDOR_SUSPENDED';
+    const isTransferEvent = eventType === 'TRANSFER_SUCCESS_WEBHOOK' ||
+      eventType === 'TRANSFER_FAILED_WEBHOOK' ||
+      eventType === 'TRANSFER_REVERSED_WEBHOOK';
+
+    if (!isPaymentEvent && !isRefundEvent && !isVendorEvent && !isTransferEvent) {
       return NextResponse.json({ status: 'OK', received: true, message: 'Ignored unhandled event' }, { status: 200 });
     }
 
-    const orderId = order?.order_id || payment?.order_id;
+    const orderId = order?.order_id || payment?.order_id || refund?.order_id || transfer?.order_id;
     activeOrderId = orderId;
-    const paymentId = payment?.cf_payment_id != null ? String(payment.cf_payment_id) : (orderId ? `cf_pay_${orderId}` : `cf_pay_${Date.now()}`);
+    const paymentId = payment?.cf_payment_id != null
+      ? String(payment.cf_payment_id)
+      : (orderId ? `cf_pay_${orderId}` : undefined);
     const rawAmountInRupees = Number(payment?.payment_amount ?? order?.order_amount ?? 0);
     const paymentCurrency = payment?.payment_currency ?? order?.order_currency ?? 'INR';
 
     const supabaseAdmin = getSupabaseAdmin();
 
-    // 3. Check payment ledger for already-processed event ID (idempotency)
-    if (paymentId) {
+    // 3. Check payment ledger for already-processed payment event ID (idempotency)
+    if (isPaymentEvent && paymentId) {
       const { data: existingPayment } = await supabaseAdmin
         .from('payments')
         .select('id, booking_id, status')
@@ -85,7 +104,7 @@ export async function POST(req: NextRequest) {
       if (orderId) {
         const { data: bByOrder } = await supabaseAdmin
           .from('bookings')
-          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, expected_payment_amount_paise, gateway_payment_id, gateway_order_id, hold_expires_at, resource_id, slot_start, provider_id')
+          .select('id, status, payment_status, deposit_amount, platform_fee, total_amount, expected_payment_amount_paise, gateway_payment_id, gateway_order_id, hold_expires_at, resource_id, slot_start, provider_id, split_status, merchant_share_amount, platform_fee_amount')
           .eq('gateway_order_id', orderId)
           .maybeSingle();
         booking = bByOrder;
@@ -210,7 +229,7 @@ export async function POST(req: NextRequest) {
           await supabaseAdmin
             .from('payments')
             .update({ status: 'REFUND_FAILED', updated_at: new Date().toISOString() })
-            .eq('gateway_payment_id', paymentId);
+            .eq('gateway_payment_id', paymentId || '');
 
           console.error('[Cashfree Webhook] Refund failed for expired hold booking:', booking.id, errorMsg);
           return NextResponse.json({
@@ -226,7 +245,7 @@ export async function POST(req: NextRequest) {
       // Valid active hold: settle payment via Supabase RPC confirm_booking_payment
       const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('confirm_booking_payment', {
         p_booking_id: booking.id,
-        p_gateway_payment_id: paymentId,
+        p_gateway_payment_id: paymentId || `cf_pay_${booking.id}`,
         p_deposit_amount: rawAmountInRupees,
       });
 
@@ -238,6 +257,41 @@ export async function POST(req: NextRequest) {
       const result = rpcData as { success: boolean; error?: string };
       if (!result?.success) {
         return NextResponse.json({ error: result?.error || 'Failed to confirm booking' }, { status: 400 });
+      }
+
+      // EasySplit Marketplace Split Capture Handling
+      if (booking.split_status === 'PENDING_SPLIT' && booking.provider_id) {
+        const { data: prov } = await supabaseAdmin
+          .from('providers')
+          .select('cashfree_vendor_id')
+          .eq('id', booking.provider_id)
+          .maybeSingle();
+
+        await supabaseAdmin
+          .from('bookings')
+          .update({
+            split_status: 'SPLIT_CAPTURED',
+            consultation_payment_status: 'COLLECTED_ONLINE',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id);
+
+        if (prov?.cashfree_vendor_id) {
+          await supabaseAdmin.from('merchant_vendor_splits').insert({
+            booking_id: booking.id,
+            provider_id: booking.provider_id,
+            cashfree_vendor_id: prov.cashfree_vendor_id,
+            cf_order_id: orderId || booking.id,
+            gross_amount: rawAmountInRupees,
+            merchant_share: Number(booking.merchant_share_amount || 0),
+            platform_fee: Number(booking.platform_fee_amount || booking.platform_fee || 10),
+            status: 'SUCCESS',
+            metadata: {
+              payment_id: paymentId,
+              processed_at: new Date().toISOString(),
+            },
+          });
+        }
       }
 
       // Release Redis slot lock if applicable
@@ -286,6 +340,96 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json({ status: 'OK', received: true }, { status: 200 });
+    }
+
+    // 6. Handle REFUND_STATUS_WEBHOOK
+    if (eventType === 'REFUND_STATUS_WEBHOOK' || eventType === 'refund.speed_changed') {
+      const refund = data?.refund || body?.refund;
+      const refundId = refund?.cf_refund_id || refund?.refund_id;
+      const refundStatus = (refund?.refund_status || '').toUpperCase();
+      const targetOrderId = orderId || refund?.order_id;
+
+      if (targetOrderId && (refundStatus === 'SUCCESS' || refundStatus === 'PAID')) {
+        const { data: booking } = await supabaseAdmin
+          .from('bookings')
+          .select('id, split_status')
+          .eq('gateway_order_id', targetOrderId)
+          .maybeSingle();
+
+        if (booking) {
+          await supabaseAdmin
+            .from('bookings')
+            .update({
+              payment_status: 'REFUNDED',
+              cf_refund_id: refundId ? String(refundId) : undefined,
+              split_status: booking.split_status === 'SPLIT_CAPTURED' ? 'SPLIT_REFUNDED' : booking.split_status,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', booking.id);
+
+          await supabaseAdmin
+            .from('payments')
+            .update({
+              status: 'REFUNDED',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('booking_id', booking.id);
+
+          if (booking.split_status === 'SPLIT_CAPTURED') {
+            await supabaseAdmin
+              .from('merchant_vendor_splits')
+              .update({
+                status: 'REVERSED',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('booking_id', booking.id);
+          }
+        }
+      }
+
+      return NextResponse.json({ status: 'OK', received: true, event: eventType }, { status: 200 });
+    }
+
+    // 7. Handle EasySplit VENDOR_ACTIVATED / VENDOR_SUSPENDED
+    if (eventType === 'VENDOR_ACTIVATED' || eventType === 'VENDOR_SUSPENDED') {
+      const vendor = data?.vendor || body?.vendor || body?.data;
+      const vendorId = vendor?.vendor_id || data?.vendor_id;
+      const newStatus = eventType === 'VENDOR_ACTIVATED' ? 'ACTIVE' : 'SUSPENDED';
+
+      if (vendorId) {
+        await supabaseAdmin
+          .from('providers')
+          .update({
+            cashfree_vendor_status: newStatus,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('cashfree_vendor_id', vendorId);
+      }
+
+      return NextResponse.json({ status: 'OK', received: true, event: eventType }, { status: 200 });
+    }
+
+    // 8. Handle EasySplit TRANSFER_SUCCESS_WEBHOOK / TRANSFER_FAILED_WEBHOOK / TRANSFER_REVERSED_WEBHOOK
+    if (eventType === 'TRANSFER_SUCCESS_WEBHOOK' || eventType === 'TRANSFER_FAILED_WEBHOOK' || eventType === 'TRANSFER_REVERSED_WEBHOOK') {
+      const transfer = data?.transfer || body?.transfer || body?.data;
+      const cfTransferId = transfer?.cf_transfer_id || transfer?.transfer_id;
+      const transferOrderId = transfer?.order_id || orderId;
+      const transferStatus = eventType === 'TRANSFER_SUCCESS_WEBHOOK'
+        ? 'SUCCESS'
+        : (eventType === 'TRANSFER_REVERSED_WEBHOOK' ? 'REVERSED' : 'FAILED');
+
+      if (transferOrderId) {
+        await supabaseAdmin
+          .from('merchant_vendor_splits')
+          .update({
+            status: transferStatus,
+            cf_transfer_id: cfTransferId ? String(cfTransferId) : undefined,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('cf_order_id', transferOrderId);
+      }
+
+      return NextResponse.json({ status: 'OK', received: true, event: eventType }, { status: 200 });
     }
 
     // Unhandled event types

@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
     if (result.refund_eligible && (result.refund_amount ?? 0) > 0) {
       const { data: bkg } = await supabaseAdmin
         .from('bookings')
-        .select('gateway_payment_id, gateway_order_id, gateway_provider')
+        .select('gateway_payment_id, gateway_order_id, gateway_provider, split_status, merchant_share_amount, provider_id, total_amount')
         .eq('id', booking_id)
         .maybeSingle();
 
@@ -173,12 +173,38 @@ export async function POST(req: NextRequest) {
           let refundId = '';
           let refundAmount: number;
 
+          // EasySplit Refund Split Calculation:
+          // If the booking was split with an EasySplit vendor, deduct from merchant's share
+          let refundSplits: Array<{ vendorId: string; amountInPaise: number }> | undefined = undefined;
+          if (bkg.split_status === 'SPLIT_CAPTURED' && Number(bkg.merchant_share_amount || 0) > 0 && bkg.provider_id) {
+            const { data: prov } = await supabaseAdmin
+              .from('providers')
+              .select('cashfree_vendor_id')
+              .eq('id', bkg.provider_id)
+              .maybeSingle();
+
+            if (prov?.cashfree_vendor_id) {
+              const vendorShareInr = Number(bkg.merchant_share_amount);
+              const eligibleRefundInr = Number(result.refund_amount || 0);
+              const vendorRefundInr = Math.min(vendorShareInr, eligibleRefundInr);
+              if (vendorRefundInr > 0) {
+                refundSplits = [
+                  {
+                    vendorId: prov.cashfree_vendor_id,
+                    amountInPaise: Math.round(vendorRefundInr * 100),
+                  },
+                ];
+              }
+            }
+          }
+
           const cfAdapter = getPaymentGateway('cashfree');
           const refundResult = await cfAdapter.refundOrder({
             orderId: bkg.gateway_order_id || booking_id,
             paymentId: bkg.gateway_payment_id || undefined,
             amountInPaise: refundAmountPaise,
             reason: reason || 'Policy-eligible cancellation refund',
+            refundSplits,
           });
           refundId = refundResult.refundId;
           refundAmount = refundResult.amountInPaise;
@@ -187,8 +213,24 @@ export async function POST(req: NextRequest) {
           finalPaymentStatus = 'REFUNDED';
           await supabaseAdmin
             .from('bookings')
-            .update({ payment_status: 'REFUNDED', updated_at: new Date().toISOString() })
+            .update({
+              payment_status: 'REFUNDED',
+              split_status: bkg.split_status === 'SPLIT_CAPTURED' ? 'SPLIT_REFUNDED' : bkg.split_status,
+              cf_refund_id: refundId,
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', booking_id);
+
+          // Update vendor split ledger status if present
+          if (bkg.split_status === 'SPLIT_CAPTURED') {
+            await supabaseAdmin
+              .from('merchant_vendor_splits')
+              .update({
+                status: 'REVERSED',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('booking_id', booking_id);
+          }
 
           await supabaseAdmin
             .from('payments')
@@ -199,6 +241,7 @@ export async function POST(req: NextRequest) {
                 refund_id: refundId,
                 refund_amount_paise: refundAmount,
                 refund_amount: Number(result.refund_amount),
+                refund_splits: refundSplits || null,
               },
             })
             .eq('booking_id', booking_id);

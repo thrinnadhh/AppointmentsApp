@@ -589,12 +589,12 @@ export async function createHoldOnSupabase(
       p_slot_end: slotEnd,
       p_customer_id: resolvedCustomerId,
       p_booking_for_someone_else: isFamily,
-      p_patient_name: patientName || null,
-      p_patient_phone: patientPhone || null,
-      p_patient_relationship: patientRelationship || null,
+      p_patient_name: patientName || undefined,
+      p_patient_phone: patientPhone || undefined,
+      p_patient_relationship: patientRelationship || undefined,
       p_booked_for: isFamily ? 'family' : 'self',
-      p_patient_age: patientAge !== undefined ? patientAge : null,
-      p_booking_note: bookingNote || null,
+      p_patient_age: typeof patientAge === 'number' ? patientAge : undefined,
+      p_booking_note: bookingNote || undefined,
     });
 
     if (error) {

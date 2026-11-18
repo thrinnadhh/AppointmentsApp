@@ -23,6 +23,7 @@ import {
   fetchCustomerStrikes,
   checkCoolingPeriodEligibility,
 } from '../services/api';
+import { CashfreeCheckoutWebView } from '../components/CashfreeCheckoutWebView';
 
 const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -110,6 +111,14 @@ export default function CheckoutModal({
   const [secondsLeft, setSecondsLeft] = useState<number>(300); // 5 minutes
   const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
   const [, setCheckingCooling] = useState<boolean>(false);
+  const [cashfreeModalVisible, setCashfreeModalVisible] = useState<boolean>(false);
+  const [cashfreePaymentData, setCashfreePaymentData] = useState<{
+    paymentSessionId: string;
+    orderId: string;
+    bookingId: string;
+    holdReferenceCode?: string;
+    attachedPath?: string;
+  } | null>(null);
 
   const isFreeFollowup = Boolean(coolingEligibility?.eligible);
   const rawPlatformFee = getPlatformFee(categoryId);
@@ -414,24 +423,42 @@ export default function CheckoutModal({
           }
         }
 
-        // Mobile / Sandbox verification for Cashfree
-        const verifyRes = await verifyRazorpayPayment({
-          booking_id: bookingId,
-          gateway_provider: 'cashfree',
-          order_id: orderId,
-          payment_id: `cf_pay_${Date.now().toString(36)}`,
-          attachment_url: attachedPath,
-          customerId,
-        });
-
-        if (verifyRes.success) {
-          const assignedToken = verifyRes.queue_position || 1;
-          onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
-        } else {
-          const fallbackRes = await confirmBookingPaymentOnSupabase(bookingId, `cf_pay_${orderId}`, attachedPath);
-          const assignedToken = (fallbackRes as any)?.queue_position || 1;
-          onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+        // Real Native Android/iOS Mobile Checkout via CashfreeCheckoutWebView
+        if (Platform.OS !== 'web' && !orderRes.is_mock && !isAutomatedTest && orderRes.payment_session_id) {
+          setCashfreePaymentData({
+            paymentSessionId: orderRes.payment_session_id,
+            orderId,
+            bookingId,
+            holdReferenceCode: holdRes.reference_code,
+            attachedPath: attachedPath || undefined,
+          });
+          setCashfreeModalVisible(true);
+          return;
         }
+
+        // Automated test harness or explicit mock mode only
+        if (orderRes.is_mock || isAutomatedTest) {
+          const verifyRes = await verifyRazorpayPayment({
+            booking_id: bookingId,
+            gateway_provider: 'cashfree',
+            order_id: orderId,
+            payment_id: `cf_pay_mock_${Date.now().toString(36)}`,
+            attachment_url: attachedPath,
+            customerId,
+          });
+
+          if (verifyRes.success) {
+            const assignedToken = verifyRes.queue_position || 1;
+            onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+          } else {
+            setPayError(verifyRes.error || 'Payment verification failed.');
+          }
+          setIsProcessing(false);
+          return;
+        }
+
+        setPayError('Unable to open Cashfree payment checkout.');
+        setIsProcessing(false);
         return;
       }
 
@@ -515,7 +542,8 @@ export default function CheckoutModal({
   if (!resource || !slot) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
+    <>
+      <Modal visible={visible} animationType="slide" transparent={false}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           {/* Header */}
@@ -1168,6 +1196,55 @@ export default function CheckoutModal({
         )}
       </SafeAreaView>
     </Modal>
+
+    {cashfreePaymentData && (
+      <CashfreeCheckoutWebView
+        visible={cashfreeModalVisible}
+        paymentSessionId={cashfreePaymentData.paymentSessionId}
+        orderId={cashfreePaymentData.orderId}
+        bookingId={cashfreePaymentData.bookingId}
+        mode={process.env.EXPO_PUBLIC_CASHFREE_ENV === 'PRODUCTION' ? 'production' : 'sandbox'}
+        onSuccess={async (details) => {
+          setCashfreeModalVisible(false);
+          setIsProcessing(true);
+          try {
+            const verifyRes = await verifyRazorpayPayment({
+              booking_id: cashfreePaymentData.bookingId,
+              gateway_provider: 'cashfree',
+              order_id: details?.orderId || cashfreePaymentData.orderId,
+              payment_id: details?.paymentId || `cf_pay_${cashfreePaymentData.orderId}`,
+              attachment_url: cashfreePaymentData.attachedPath,
+              customerId,
+            });
+            if (verifyRes.success) {
+              const assignedToken = verifyRes.queue_position || 1;
+              onPaymentSuccess(
+                cashfreePaymentData.bookingId,
+                cashfreePaymentData.holdReferenceCode,
+                false,
+                assignedToken
+              );
+            } else {
+              setPayError(verifyRes.error || 'Payment verification failed after checkout.');
+            }
+          } catch (err: any) {
+            setPayError(err?.message || 'Payment verification error.');
+          } finally {
+            setIsProcessing(false);
+          }
+        }}
+        onFailure={(errorMsg) => {
+          setCashfreeModalVisible(false);
+          setIsProcessing(false);
+          setPayError(errorMsg);
+        }}
+        onClose={() => {
+          setCashfreeModalVisible(false);
+          setIsProcessing(false);
+        }}
+      />
+    )}
+  </>
   );
 }
 
