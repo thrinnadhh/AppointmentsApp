@@ -33,6 +33,7 @@ export function generateCiEnv() {
     `PAYMENT_GATEWAY_PROVIDER="cashfree"`,
     `CASHFREE_APP_ID="${cashfreeAppId}"`,
     `CASHFREE_SECRET_KEY="${cashfreeSecret}"`,
+    `CASHFREE_WEBHOOK_SECRET="${cashfreeSecret}"`,
     `CASHFREE_ENV="${cashfreeEnv}"`,
     `NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME="Dr. K. S. Rao"`,
     `NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL="grievance-officer@tirupati-appointments.org"`,

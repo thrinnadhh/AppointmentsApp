@@ -119,11 +119,18 @@ export function formatOrderIdForCashfree(bookingId: string): string {
 export class CashfreeClient {
   private appId: string;
   private secretKey: string;
+  private isExplicitSecret = false;
   private baseUrl: string;
 
   constructor(config?: CashfreeConfig) {
     this.appId = config?.appId || process.env.CASHFREE_APP_ID || '';
-    this.secretKey = config?.secretKey || process.env.CASHFREE_SECRET_KEY || '';
+    if (config?.secretKey) {
+      this.secretKey = config.secretKey;
+      this.isExplicitSecret = true;
+    } else {
+      this.secretKey = process.env.CASHFREE_SECRET_KEY || '';
+      this.isExplicitSecret = false;
+    }
     const env = config?.env || (process.env.CASHFREE_ENV as 'SANDBOX' | 'PRODUCTION') || 'SANDBOX';
     this.baseUrl = env === 'PRODUCTION' 
       ? 'https://api.cashfree.com/pg' 
@@ -342,7 +349,9 @@ export class CashfreeClient {
       return { isValid: false, error: 'Missing webhook signature' };
     }
 
-    const webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET || this.secretKey;
+    const webhookSecret = this.isExplicitSecret
+      ? this.secretKey
+      : (process.env.CASHFREE_WEBHOOK_SECRET || this.secretKey);
     if (!webhookSecret) {
       return { isValid: false, error: 'Cashfree secret key unconfigured' };
     }

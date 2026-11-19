@@ -1990,8 +1990,8 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
 
     // 38.7 /api/webhooks/cashfree
     const envFileLocal = fs.existsSync('apps/merchant-web/.env.local') ? fs.readFileSync('apps/merchant-web/.env.local', 'utf8') : '';
-    const envKeyMatch = envFileLocal.match(/CASHFREE_SECRET_KEY="?([^"\n]+)"?/);
-    const cfWebhookSecret = process.env.CASHFREE_SECRET_KEY || envKeyMatch?.[1] || 'mock_cfsk_test_secret_for_matrix_tests_12345';
+    const envKeyMatch = envFileLocal.match(/CASHFREE_WEBHOOK_SECRET="?([^"\n]+)"?/) || envFileLocal.match(/CASHFREE_SECRET_KEY="?([^"\n]+)"?/);
+    const cfWebhookSecret = process.env.CASHFREE_WEBHOOK_SECRET || process.env.CASHFREE_SECRET_KEY || envKeyMatch?.[1] || 'mock_cfsk_test_secret_for_matrix_tests_12345';
     const cfPayload = JSON.stringify({
       type: 'TEST_WEBHOOK',
       data: {},
