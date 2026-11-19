@@ -68,7 +68,15 @@ function sanitizeQrSvg(raw: string): string {
         }
         for (const attr of Array.from(el.attributes)) {
           const attrName = attr.name.toLowerCase();
-          if (attrName.startsWith('on') || attr.value.trim().toLowerCase().startsWith('javascript:')) {
+          const attrVal = attr.value.trim().toLowerCase();
+          if (
+            attrName.startsWith('on') ||
+            attrName === 'href' ||
+            attrName === 'xlink:href' ||
+            attrVal.startsWith('javascript:') ||
+            attrVal.startsWith('data:') ||
+            attrVal.startsWith('vbscript:')
+          ) {
             el.removeAttribute(attr.name);
           }
         }
