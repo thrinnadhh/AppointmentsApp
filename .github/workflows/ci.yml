@@ -209,7 +209,8 @@ jobs:
       - name: Start local Supabase and apply migrations
         run: |
           sudo systemctl stop postgresql 2>/dev/null || true
-          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
 
@@ -387,7 +388,8 @@ jobs:
       - name: Start local Supabase and apply migrations
         run: |
           sudo systemctl stop postgresql 2>/dev/null || true
-          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
@@ -521,7 +523,8 @@ jobs:
       - name: Start local Supabase and apply migrations
         run: |
           sudo systemctl stop postgresql 2>/dev/null || true
-          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
@@ -655,7 +658,8 @@ jobs:
       - name: Start local Supabase and apply migrations
         run: |
           sudo systemctl stop postgresql 2>/dev/null || true
-          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
@@ -784,7 +788,8 @@ jobs:
       - name: Start local Supabase and apply migrations
         run: |
           sudo systemctl stop postgresql 2>/dev/null || true
-          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
@@ -920,7 +925,8 @@ jobs:
       - name: Start local Supabase and apply migrations
         run: |
           sudo systemctl stop postgresql 2>/dev/null || true
-          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 2>/dev/null || true
+          docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
+          sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
           npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"

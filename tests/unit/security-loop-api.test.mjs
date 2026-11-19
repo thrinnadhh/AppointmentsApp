@@ -144,12 +144,11 @@ describe('Wave 2: API Security & Auth Hardening (security-loop-api)', () => {
     const phoneA = customerA.phone && customerA.phone.trim().length >= 4 ? customerA.phone : '+919999904921';
     const phoneB = customerB.phone && customerB.phone.trim().length >= 4 ? customerB.phone : '+919999908888';
 
-    // Ensure customer A has phone, notes, and check-in PIN
+    // Ensure customer A has phone, notes, and check-in PIN (mark is_present to open check-in window without slot collision)
     await pool.query(`
       UPDATE public.bookings
       SET booking_note = 'Confidential Patient Medical History: Chronic Migraine',
-          slot_start = NOW() + INTERVAL '30 minutes',
-          slot_end = NOW() + INTERVAL '45 minutes'
+          is_present = true
       WHERE id = $1;
     `, [customerA.booking_id]);
 
