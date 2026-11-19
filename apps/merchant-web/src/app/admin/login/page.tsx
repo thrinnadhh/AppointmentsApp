@@ -46,31 +46,49 @@ function sanitizeQrSvg(raw: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const svgIndex = raw.indexOf('<svg');
   if (svgIndex === -1) return '';
-  let svg = raw.slice(svgIndex);
+  const rawSvg = raw.slice(svgIndex);
 
-  // Strip script, foreignObject, object, embed, iframe tags and contents
-  svg = svg.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  svg = svg.replace(/<foreignObject\b[^<]*(?:(?!<\/foreignObject>)<[^<]*)*<\/foreignObject>/gi, '');
-  svg = svg.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
-  svg = svg.replace(/<embed\b[^>]*>/gi, '');
-  svg = svg.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+  if (typeof window !== 'undefined' && typeof window.DOMParser !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawSvg, 'image/svg+xml');
+      const svgEl = doc.querySelector('svg');
+      if (!svgEl) return '';
 
-  // Strip inline event handlers (onload, onerror, onclick, etc.)
-  svg = svg.replace(/\s+on[a-z]+\s*=\s*(['"]).*?\1/gi, '');
-  svg = svg.replace(/\s+on[a-z]+\s*=\s*[^>\s]+/gi, '');
+      // Whitelist only safe SVG presentation tags
+      const allowedTags = new Set([
+        'svg', 'path', 'rect', 'circle', 'line', 'polyline', 'polygon',
+        'g', 'defs', 'clippath', 'use', 'title', 'desc'
+      ]);
+      const allElements = Array.from(doc.querySelectorAll('*'));
+      for (const el of allElements) {
+        if (!allowedTags.has(el.tagName.toLowerCase())) {
+          el.remove();
+          continue;
+        }
+        for (const attr of Array.from(el.attributes)) {
+          const attrName = attr.name.toLowerCase();
+          if (attrName.startsWith('on') || attr.value.trim().toLowerCase().startsWith('javascript:')) {
+            el.removeAttribute(attr.name);
+          }
+        }
+      }
 
-  // Strip javascript: or data: URIs in href or xlink:href
-  svg = svg.replace(/\b(?:href|xlink:href)\s*=\s*(['"])\s*(?:javascript|data):.*?\1/gi, '');
+      if (!svgEl.hasAttribute('viewBox')) {
+        const widthMatch = rawSvg.match(/width="(\d+)"/);
+        const heightMatch = rawSvg.match(/height="(\d+)"/);
+        const w = widthMatch ? widthMatch[1] : (svgEl.getAttribute('width') || '231');
+        const h = heightMatch ? heightMatch[1] : (svgEl.getAttribute('height') || '231');
+        svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      }
 
-  // Ensure viewBox is set for responsive scaling
-  if (!svg.includes('viewBox')) {
-    const widthMatch = svg.match(/width="(\d+)"/);
-    const heightMatch = svg.match(/height="(\d+)"/);
-    const w = widthMatch ? widthMatch[1] : '231';
-    const h = heightMatch ? heightMatch[1] : '231';
-    svg = svg.replace('<svg', `<svg viewBox="0 0 ${w} ${h}"`);
+      return new XMLSerializer().serializeToString(svgEl);
+    } catch {
+      return '';
+    }
   }
-  return svg;
+
+  return rawSvg;
 }
 
 const formatQrSvg = sanitizeQrSvg;

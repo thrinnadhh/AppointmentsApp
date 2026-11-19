@@ -52,7 +52,6 @@ export async function POST(req: NextRequest) {
     const payment = data?.payment;
     const refund = data?.refund || body?.refund;
     const transfer = data?.transfer || body?.transfer;
-    const vendor = data?.vendor || body?.vendor;
 
     if (!eventType) {
       return NextResponse.json({ status: 'OK', received: true, message: 'Missing event type' }, { status: 200 });

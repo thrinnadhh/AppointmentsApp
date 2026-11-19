@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { createAppLogger, AppLoggerInstance, AppLogEntry, captureError, sanitizeTelemetryPayload } from '@appointments/shared';
+import { createAppLogger, AppLoggerInstance, AppLogEntry, captureError } from '@appointments/shared';
 import { supabase } from './api';
 
 async function flushMobileLog(entry: AppLogEntry): Promise<void> {

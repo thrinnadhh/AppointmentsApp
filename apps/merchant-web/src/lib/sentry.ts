@@ -3,7 +3,6 @@
  * Next.js 15 App Router Sentry Integration with Zero-PII / India Data-Residency Scrubber
  */
 
-import * as Sentry from '@sentry/nextjs';
 import {
   captureError,
   sanitizeTelemetryPayload,

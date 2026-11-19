@@ -44,8 +44,6 @@ export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = (
   onFailure,
   onClose,
 }) => {
-  const [loading, setLoading] = useState(true);
-
   if (!visible || !paymentSessionId) {
     return null;
   }
@@ -250,8 +248,6 @@ export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = (
             onShouldStartLoadWithRequest={handleShouldStartLoad}
             onNavigationStateChange={handleNavigationStateChange}
             onMessage={handleMessage}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             startInLoadingState={true}

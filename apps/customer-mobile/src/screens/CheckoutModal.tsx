@@ -222,7 +222,7 @@ export default function CheckoutModal({
     }
 
     // Acquire atomic hold upon opening checkout if authenticated
-    if (visible && customerId && isAuthenticated && resource && slot && !isBlocked) {
+    if (customerId && isAuthenticated && resource && slot && !isBlocked) {
       setIsHolding(true);
       createHoldOnSupabase(
         customerId,
