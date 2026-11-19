@@ -20,6 +20,13 @@ export function getSecureRandomBytes(length: number): Uint8Array {
     return bytes;
   }
   try {
+    const ExpoCrypto = require('expo-crypto');
+    if (typeof ExpoCrypto.getRandomValues === 'function') {
+      ExpoCrypto.getRandomValues(bytes);
+      return bytes;
+    }
+  } catch {}
+  try {
     const nodeCrypto = require('crypto');
     if (typeof nodeCrypto.randomFillSync === 'function') {
       nodeCrypto.randomFillSync(bytes);
@@ -250,14 +257,19 @@ async function rawRemoveItem(key: string): Promise<void> {
 export const encryptedSessionStorage = {
   async getItem(key: string): Promise<string | null> {
     try {
-      const encryptedValue = await rawGetItem(key);
-      if (!encryptedValue) return null;
+      const rawValue = await rawGetItem(key);
+      if (!rawValue) return null;
 
-      const encKey = await getOrCreateEncryptionKey();
-      return await decryptData(encryptedValue, encKey);
+      // If payload is authenticated encrypted JSON format, decrypt it
+      if (rawValue.startsWith('{') && rawValue.includes('"c":') && rawValue.includes('"iv":')) {
+        const encKey = await getOrCreateEncryptionKey();
+        const decrypted = await decryptData(rawValue, encKey);
+        if (decrypted) return decrypted;
+      }
+      return rawValue;
     } catch (err) {
       console.warn('[Storage] Failed to read encrypted session:', err);
-      return null;
+      return inMemoryCache.get(key) ?? null;
     }
   },
 
@@ -267,7 +279,12 @@ export const encryptedSessionStorage = {
       const encryptedValue = await encryptData(value, encKey);
       await rawSetItem(key, encryptedValue);
     } catch (err) {
-      console.warn('[Storage] Failed to store encrypted session:', err);
+      console.warn('[Storage] Failed to store encrypted session, persisting unencrypted fallback:', err);
+      try {
+        await rawSetItem(key, value);
+      } catch (fallbackErr) {
+        console.warn('[Storage] Failed to store fallback session:', fallbackErr);
+      }
     }
   },
 

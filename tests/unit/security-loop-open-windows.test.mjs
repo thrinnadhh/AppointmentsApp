@@ -127,7 +127,7 @@ describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrap
              reference_code, queue_position, version
            ) VALUES (
              $1, $2, $3, $4, $5,
-             NOW() + INTERVAL '1 hour', NOW() + INTERVAL '1 hour 15 minutes',
+             NOW() + INTERVAL '10 days', NOW() + INTERVAL '10 days 15 minutes',
              'CONFIRMED', 'CAPTURED', 100, 'TEST-DPDP-BKG', 99, 1
            )`,
           [testBookingId, testUserId, hospitalAId, doctorNeuroId, deptNeuroId]
@@ -248,7 +248,7 @@ describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrap
              reference_code, queue_position, version
            ) VALUES (
              $1, $2, $3, $4, $5,
-             NOW() + INTERVAL '3 hours', NOW() + INTERVAL '3 hours 15 minutes',
+             NOW() + INTERVAL '7 hours', NOW() + INTERVAL '7 hours 15 minutes',
              'CONFIRMED', 'CAPTURED', 100, 'TEST-CANCEL-01', 10, 1
            )`,
           [bookingId, customerAId, hospitalAId, doctorNeuroId, deptNeuroId]
@@ -299,7 +299,7 @@ describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrap
              reference_code, queue_position, version
            ) VALUES (
              $1, $2, $3, $4, $5,
-             NOW() + INTERVAL '4 hours', NOW() + INTERVAL '4 hours 15 minutes',
+             NOW() + INTERVAL '8 hours', NOW() + INTERVAL '8 hours 15 minutes',
              'CONFIRMED', 'CAPTURED', 100, 'TEST-REORDER-01', 8, 1
            )`,
           [bookingId, customerAId, hospitalAId, doctorNeuroId, deptNeuroId]
@@ -350,7 +350,7 @@ describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrap
              reference_code, queue_position, version
            ) VALUES (
              $1, $2, $3, $4, $5,
-             NOW() + INTERVAL '5 hours', NOW() + INTERVAL '5 hours 15 minutes',
+             NOW() + INTERVAL '9 hours', NOW() + INTERVAL '9 hours 15 minutes',
              'CONFIRMED', 'CAPTURED', 100, 'TEST-CANCEL-DENY-01', 12, 1
            )`,
           [bookingId, customerAId, hospitalAId, doctorNeuroId, deptNeuroId]
@@ -447,7 +447,7 @@ describe('Security Loop Open-Windows Verification: DPDP Identities & Public Wrap
              reference_code, queue_position, version
            ) VALUES (
              $1, $2, $3, $4, $5,
-             NOW() + INTERVAL '2 hours', NOW() + INTERVAL '2 hours 15 minutes',
+             NOW() + INTERVAL '10 hours', NOW() + INTERVAL '10 hours 15 minutes',
              'CONFIRMED', 'CAPTURED', 100, 'TEST-RACE-PARALLEL', 50, 1
            )`,
           [raceBookingId, customerAId, hospitalAId, doctorNeuroId, deptNeuroId]
