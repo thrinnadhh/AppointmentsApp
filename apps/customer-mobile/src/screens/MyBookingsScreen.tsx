@@ -26,6 +26,7 @@ interface MyBookingsScreenProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  onRequireAuth?: () => void;
 }
 
 export default function MyBookingsScreen({
@@ -38,6 +39,7 @@ export default function MyBookingsScreen({
   onLoadMore,
   hasMore,
   isLoadingMore,
+  onRequireAuth,
 }: MyBookingsScreenProps) {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
   const [lifetimePin, setLifetimePin] = useState<string | null>(null);
@@ -51,6 +53,9 @@ export default function MyBookingsScreen({
   const loadLifetimePin = async () => {
     if (!customerId) {
       setLifetimePin(null);
+      if (onRequireAuth) {
+        onRequireAuth();
+      }
       return;
     }
     setIsLoadingPin(true);
@@ -244,13 +249,13 @@ export default function MyBookingsScreen({
                   </Text>
                   <TouchableOpacity
                     style={styles.lifetimePinRetryButton}
-                    onPress={loadLifetimePin}
+                    onPress={!customerId && onRequireAuth ? onRequireAuth : loadLifetimePin}
                     disabled={isLoadingPin}
                     testID="my-bookings-lifetime-pin-retry"
-                    accessibilityLabel="Retry loading check-in PIN"
+                    accessibilityLabel={!customerId ? 'Sign in to view check-in PIN' : 'Retry loading check-in PIN'}
                   >
                     <Text style={styles.lifetimePinRetryText}>
-                      {isLoadingPin ? 'Retrying...' : 'Retry'}
+                      {isLoadingPin ? 'Retrying...' : !customerId ? 'Sign In' : 'Retry'}
                     </Text>
                   </TouchableOpacity>
                 </View>

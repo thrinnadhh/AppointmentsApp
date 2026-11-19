@@ -873,6 +873,7 @@ function App() {
             onLoadMore={handleLoadMoreBookings}
             hasMore={hasMoreBookings}
             isLoadingMore={isLoadingMoreBookings}
+            onRequireAuth={() => setProfileVisible(true)}
           />
         )}
       </View>
