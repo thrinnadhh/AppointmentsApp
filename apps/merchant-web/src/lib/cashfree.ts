@@ -342,7 +342,8 @@ export class CashfreeClient {
       return { isValid: false, error: 'Missing webhook signature' };
     }
 
-    if (!this.secretKey) {
+    const webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET || this.secretKey;
+    if (!webhookSecret) {
       return { isValid: false, error: 'Cashfree secret key unconfigured' };
     }
 
@@ -357,7 +358,7 @@ export class CashfreeClient {
 
     const payload = timestamp ? `${timestamp}${rawBody}` : rawBody;
     const computedSignature = crypto
-      .createHmac('sha256', this.secretKey)
+      .createHmac('sha256', webhookSecret)
       .update(payload)
       .digest('base64');
 

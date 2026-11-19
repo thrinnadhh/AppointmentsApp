@@ -6,6 +6,9 @@ const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   transpilePackages: ['@appointments/shared'],
+  env: {
+    ALLOW_MOCK_AUTH: process.env.ALLOW_MOCK_AUTH || (process.env.NODE_ENV !== 'production' ? 'true' : 'false'),
+  },
   images: {
     remotePatterns: [
       {
