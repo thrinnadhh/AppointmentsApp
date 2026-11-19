@@ -285,7 +285,7 @@ export default function InteractiveDemoPage() {
           message: 'Code 4821 verified! Token #4 turned GREEN (Present & Ready in Lobby).',
         });
 
-        addLog(`✓ Reception verified OTP ${code} for ${booking.customer_name} — Token #4 turned GREEN (Present & Ready)!`, 'success');
+        addLog(`✓ Reception verified PIN ${code} for ${booking.customer_name} — Token #4 turned GREEN (Present & Ready)!`, 'success');
       } else {
         setVerifyError('Invalid check-in code. Please verify the code on the customer pass.');
         addLog(`❌ Check-in rejected: Code ${code} does not match active booking`, 'warn');
@@ -654,10 +654,10 @@ export default function InteractiveDemoPage() {
                           </div>
                         </div>
 
-                        {/* 4-Digit OTP Display */}
+                        {/* 4-Digit PIN Display */}
                         <div className="p-3.5 bg-white rounded-xl border border-rose-200 text-center space-y-1">
                           <span className="text-[10px] font-extrabold uppercase tracking-widest text-rose-600">
-                            RECEPTION CHECK-IN OTP
+                            RECEPTION CHECK-IN PIN
                           </span>
                           <div className="text-3xl font-black font-mono tracking-widest text-slate-900">
                             {booking.checkin_code}
@@ -672,7 +672,7 @@ export default function InteractiveDemoPage() {
                           className="w-full py-2 rounded-xl text-xs font-bold bg-white hover:bg-rose-100 text-rose-800 border border-rose-300 transition flex items-center justify-center gap-1.5 shadow-2xs"
                         >
                           {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedCode ? 'Copied to Clipboard!' : 'Copy 4-Digit Code'}</span>
+                          <span>{copiedCode ? 'Copied to Clipboard!' : 'Copy 4-Digit PIN'}</span>
                         </button>
                       </div>
                     )}

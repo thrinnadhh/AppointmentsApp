@@ -24,15 +24,37 @@ export interface CashfreeCheckoutWebViewProps {
   onClose: () => void;
 }
 
-const UPI_SCHEMES = [
+export const UPI_SCHEMES = [
   'upi://',
   'tez://',
   'phonepe://',
   'paytmmp://',
   'bhim://',
   'credpay://',
-  'intent://',
 ];
+
+export const CASHFREE_ALLOWED_ORIGINS = new Set([
+  'https://sdk.cashfree.com',
+  'https://api.cashfree.com',
+  'https://sandbox.cashfree.com',
+  'https://payments.cashfree.com',
+  'https://payments-test.cashfree.com',
+]);
+
+export function isAllowedCashfreeUrl(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  if (urlStr === 'about:blank') return true;
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== 'https:') return false;
+    const origin = parsed.origin.toLowerCase();
+    if (CASHFREE_ALLOWED_ORIGINS.has(origin)) return true;
+    const hostname = parsed.hostname.toLowerCase();
+    return hostname === 'cashfree.com' || hostname.endsWith('.cashfree.com');
+  } catch {
+    return false;
+  }
+}
 
 export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = ({
   visible,
@@ -140,8 +162,12 @@ export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = (
 
   const handleShouldStartLoad = (request: { url: string }): boolean => {
     const { url } = request;
+    if (!url || typeof url !== 'string') return false;
 
-    // Check for UPI and native app schemes
+    // 1. Initial local blank load
+    if (url === 'about:blank') return true;
+
+    // 2. Check for UPI and native app schemes (intent:* strictly excluded per SEC-WIN-002)
     const isUpiScheme = UPI_SCHEMES.some((scheme) => url.toLowerCase().startsWith(scheme));
     if (isUpiScheme) {
       Linking.canOpenURL(url)
@@ -161,38 +187,52 @@ export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = (
       return false; // Prevent WebView from trying to navigate to upi:// and crashing
     }
 
-    // Check for return / completion URL
+    // 3. Check for return / completion URL
     if (
+      url.startsWith('appointments://checkout') ||
       url.includes('/checkout/return') ||
       url.includes('return_url') ||
-      url.includes('appointments://checkout') ||
       url.includes('cashfree.com/pg/orders/success')
     ) {
       onSuccess({ orderId });
       return false;
     }
 
-    return true;
+    // 4. Strict HTTPS Cashfree origin allowlist (SEC-WIN-002)
+    if (isAllowedCashfreeUrl(url)) {
+      return true;
+    }
+
+    // Block all other navigation (foreign domains, intent://, data:, javascript:)
+    console.warn('[CashfreeWebView] Blocked unauthorized navigation to:', url);
+    return false;
   };
 
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
     const { url } = navState;
     if (
+      url.startsWith('appointments://checkout') ||
       url.includes('/checkout/return') ||
       url.includes('return_url') ||
-      url.includes('appointments://checkout') ||
       url.includes('cashfree.com/pg/orders/success')
     ) {
       onSuccess({ orderId });
     }
   };
 
-  const handleMessage = (event: { nativeEvent: { data: string } }) => {
+  const handleMessage = (event: { nativeEvent: { data: string; url?: string } }) => {
     try {
+      // SEC-WIN-003: Inspect nativeEvent.url (origin property is not available on native WebView)
+      const currentUrl = event.nativeEvent.url;
+      if (currentUrl && !isAllowedCashfreeUrl(currentUrl) && currentUrl !== 'about:blank') {
+        console.warn('[CashfreeWebView] Ignored postMessage from untrusted URL:', currentUrl);
+        return;
+      }
+
       const data = JSON.parse(event.nativeEvent.data);
+      // Treat postMessage as an untrusted trigger to initiate backend verification
       if (data.type === 'PAYMENT_SUCCESS') {
-        const paymentId = data.details?.paymentMessage || data.details?.cf_payment_id;
-        onSuccess({ orderId, paymentId });
+        onSuccess({ orderId });
       } else if (data.type === 'PAYMENT_ERROR') {
         onFailure(data.message || 'Payment failed or was cancelled');
       } else if (data.type === 'ERROR') {
