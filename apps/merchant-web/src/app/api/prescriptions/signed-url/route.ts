@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { isCallerAuthorizedForBooking, isCallerAuthorizedForProvider } from '@/lib/auth-admin';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { isE2EBypassEnabled, logBypassAudit } from '@/lib/e2e-bypass';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,9 +33,10 @@ async function getAuthenticatedUser(req: NextRequest) {
     // cookies unavailable
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (isE2EBypassEnabled()) {
     const testUserId = req.headers.get('x-test-bypass-user');
     if (testUserId) {
+      logBypassAudit('PrescriptionsSignedUrl:x-test-bypass-user', { testUserId });
       const { data: profile } = await getSupabaseAdmin()
         .from('profiles')
         .select('id, email, phone, role')
@@ -104,7 +106,7 @@ export async function POST(req: NextRequest) {
         cleanPath.startsWith(`${booking.id}/`) ||
         cleanPath.startsWith(`${booking.customer_id}/`) ||
         Boolean(cleanAttachment && (cleanPath === cleanAttachment || storagePath === booking.attachment_url)) ||
-        (process.env.NODE_ENV !== 'production' && cleanPath === 'test-rx.pdf');
+        (isE2EBypassEnabled() && cleanPath === 'test-rx.pdf');
 
       if (!isBookingPath) {
         return NextResponse.json(

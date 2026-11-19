@@ -1960,15 +1960,15 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     });
     const whSig = crypto.createHmac('sha256', effectiveWebhookSecret).update(whPayload).digest('hex');
 
-    // Unsigned webhook request -> 401
+    // Unsigned webhook request -> 410 (Decommissioned per SEC-WIN-005)
     const unauthWh = await fetch(`${appBaseUrl}/api/webhooks/razorpay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: whPayload,
     });
-    assert.equal(unauthWh.status, 401, 'Unsigned webhook request must receive 401');
+    assert.equal(unauthWh.status, 410, 'Unsigned webhook request to decommissioned route must receive 410');
 
-    // Signed webhook request -> 200
+    // Signed webhook request -> 410 (Decommissioned per SEC-WIN-005)
     const signedWh = await fetch(`${appBaseUrl}/api/webhooks/razorpay`, {
       method: 'POST',
       headers: {
@@ -1977,14 +1977,14 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       },
       body: whPayload,
     });
-    assert.equal(signedWh.status, 200, 'Valid HMAC signed webhook must receive 200');
+    assert.equal(signedWh.status, 410, 'Signed webhook to decommissioned route must receive 410');
 
     recordResult(
       '/api/webhooks/razorpay',
       'POST',
-      'Razorpay Webhook (proved 200 signed)',
-      'Unsigned Request (proved 401)',
-      'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:43',
+      'Decommissioned Route (proved 410)',
+      'Unsigned Request (proved 410)',
+      'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:11',
       'PASS'
     );
 

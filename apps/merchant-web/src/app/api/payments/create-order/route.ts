@@ -11,7 +11,16 @@ export async function POST(req: NextRequest) {
   let activeProviderId: string | undefined;
   let activeOrderId: string | undefined;
   try {
-    // 1. IP rate limiting (30 requests/minute); falls back to per-booking/user rate limit when IP is absent
+    // 1. Authentication check FIRST (fail-closed before body parsing or DB queries - SEC-WIN-014)
+    const caller = await verifyAuthenticatedUser(req);
+    if (!caller) {
+      return NextResponse.json<CreateRazorpayOrderResponse>(
+        { success: false, error: 'Unauthorized: Authentication required to create an order' },
+        { status: 401 }
+      );
+    }
+
+    // 2. IP rate limiting (30 requests/minute); falls back to per-booking/user rate limit when IP is absent
     const clientIp = getClientIp(req);
     if (clientIp) {
       const rateLimit = await checkRateLimit(`order-ip:${clientIp}`, 30, 60);
@@ -87,15 +96,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if caller is authenticated and authorized for this booking
-    const caller = await verifyAuthenticatedUser(req);
-    if (!caller) {
-      return NextResponse.json<CreateRazorpayOrderResponse>(
-        { success: false, error: 'Unauthorized: Authentication required to create an order' },
-        { status: 401 }
-      );
-    }
-
+    // Check if caller is authorized for this booking
     const isAuthorized = await isCallerAuthorizedForBooking(caller.id, booking, true);
     if (!isAuthorized) {
       return NextResponse.json<CreateRazorpayOrderResponse>(

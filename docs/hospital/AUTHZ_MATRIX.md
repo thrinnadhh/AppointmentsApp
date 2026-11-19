@@ -43,7 +43,7 @@
 | `/api/auth/otp/verify` | `POST` | Authorized Verification Flow | Invalid OTP Code (proved 400) | `apps/merchant-web/src/app/api/auth/otp/verify/route.ts:98` | PASS |
 | `/api/cities/waitlist` | `POST` | Public Caller (proved 201) | Invalid Phone Format (proved 400) | `apps/merchant-web/src/app/api/cities/waitlist/route.ts:5` | PASS |
 | `/api/health` | `GET` | Public Caller (proved 200) | Unhealthy Dependency (503) | `apps/merchant-web/src/app/api/health/route.ts:40` | PASS |
-| `/api/webhooks/razorpay` | `POST` | Razorpay Webhook (proved 200 signed) | Unsigned Request (proved 401) | `apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:43` | PASS |
+| `/api/webhooks/razorpay` | `POST` | Decommissioned Route (proved 410) | Unsigned Request (proved 410) | `apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:11` | PASS |
 | `/api/webhooks/cashfree` | `POST` | Cashfree Webhook (proved 200 signed) | Unsigned Request (proved 400) | `apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:16` | PASS |
 | `/api/auth/me` | `GET` | Authenticated User (proved 200) | Unauthenticated Caller (proved 401) | `apps/merchant-web/src/app/api/auth/me/route.ts:7` | PASS |
 | `pgmq / vault / pg_net / pg_cron` | `ALL` | Power features & security lockdown verified | Cross-tenant / unauthorized caller blocked | `supabase/migrations/20261105100001_enable_power_extensions.sql` | PASS |
