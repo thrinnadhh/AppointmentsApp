@@ -85,7 +85,6 @@ describe('Packet 1.1: Database Grants, Privileges, and RLS WITH CHECK Compliance
       'sub_categories::SELECT',
       'resources::SELECT',
       'resource_availability::SELECT',
-      'resource_leaves::SELECT',
       'providers::SELECT'
     ]);
     

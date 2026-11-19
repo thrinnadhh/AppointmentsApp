@@ -38,7 +38,7 @@ A full gate was executed serially from a clean database reset (`supabase db rese
 | `SEC-WIN-012` | Medium | CWE-799 | Anonymous Telemetry Event Ingestion Flooding | **RESOLVED** | `c31ae58` | `tests/security/anon-log-throttle.test.mjs` (2/2 PASS) |
 | `SEC-WIN-013` | Low | CWE-200 | `SUPABASE_SERVICE_ROLE_KEY` Variable Name in Client Bundle | **DEFERRED** | N/A | Variable name literal bundled in auth dictionary; value undefined in browser and never leaked |
 | `SEC-WIN-014` | Medium | CWE-306 | Unauthenticated Body Parsing on `/api/payments/create-order` | **RESOLVED** | `c31ae58` | `tests/unit/create-order-auth-ordering.test.mjs` (3/3 PASS) |
-| `SEC-WIN-015` | Low | CWE-200 | `resource_leaves` SELECT Policy `qual: true` for Anon | **NEEDS_HUMAN** | N/A | Flagged for morning day-shift; destructive policy drops forbidden overnight per Standing Rules |
+| `SEC-WIN-015` | Low | CWE-200 | `resource_leaves` SELECT Policy `qual: true` for Anon | **RESOLVED** | Pending Commit | `tests/security/resource-leaves-rls-hardening.test.mjs` (3/3 PASS) |
 
 ---
 
@@ -152,15 +152,13 @@ Every platform security invariant was empirically audited against live running s
 ## 6. Backlog Items & Questions for User
 
 ### Backlog Items (Recorded per Standing Rule 6)
-1. **`SEC-WIN-015` (`public.resource_leaves` SELECT policy `qual: true` for anon):**  
-   - *Symptom:* Unauthenticated requests via PostgREST can query doctor leave reasons.  
-   - *Status:* `NEEDS_HUMAN` (Day-shift schema migration required).  
-   - *Reason Deferred Tonight:* Standing rules strictly forbid destructive policy drops (`DROP POLICY`) during unattended overnight runs.  
-   - *Recommended Action:* Author a forward migration creating a sanitized public view or restricting SELECT to authenticated hospital staff with a written rollback migration.
-2. **`SEC-WIN-013` (`SUPABASE_SERVICE_ROLE_KEY` literal string in client bundle):**  
+1. **`SEC-WIN-013` (`SUPABASE_SERVICE_ROLE_KEY` literal string in client bundle):**  
    - *Symptom:* Literal string name of the env var is bundled into Next.js client chunks (actual secret value is `undefined` and never leaked).  
    - *Status:* `DEFERRED` (Approved by user in Stage 1d).  
    - *Recommended Action:* Decouple client authentication helper dictionaries from server-only environment configurations in `apps/merchant-web/src/lib/env.ts`.
+
+### Resolved Daytime Approvals
+- **`SEC-WIN-015` (`resource_leaves` SELECT policy lockdown):** Approved by user ("proceed"); applied forward migration `20261120000003_harden_resource_leaves_rls.sql` with written rollback `20261120000003_rollback.sql` and verified by `tests/security/resource-leaves-rls-hardening.test.mjs` (3/3 PASS). Status: **RESOLVED**.
 
 ### Questions for Morning Review
 1. **Physical UPI Deep-Link Verification (`SEC-WIN-002`):**  
