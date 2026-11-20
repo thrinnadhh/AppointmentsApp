@@ -833,12 +833,14 @@ describe('Priority 5 Security Remediation: Strix Deep Scan Findings (vuln-0001 -
     assert.match(confirmCode, /status: isNotFound \? 404 : \(isExpired \? 410 : \(isConflict \? 409 : 400\)\)/);
   });
 
-  // vuln-0008: Razorpay Webhook Settlement & RPC Return Verification
-  it('verifies vuln-0008: razorpay webhook passes deposit_amount and fails cleanly if RPC returns success=false', () => {
+  // vuln-0008: Razorpay Webhook Decommissioning (SEC-WIN-005)
+  it('verifies vuln-0008: razorpay webhook is decommissioned (410, no secret read, no body parsing)', () => {
     const webhookCode = fs.readFileSync(path.join(rootDir, 'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts'), 'utf8');
-    assert.match(webhookCode, /p_deposit_amount: expectedDepositAmount/);
-    assert.match(webhookCode, /if \(rpcError \|\| !rpcData \|\| !\(rpcData as any\)\.success\)/);
-    assert.match(webhookCode, /paymentInsertError/);
+    assert.match(webhookCode, /status:\s*410/, 'Must return HTTP 410 Gone status');
+    assert.match(webhookCode, /RAZORPAY_DECOMMISSIONED/, 'Must return decommissioned error code');
+    assert.doesNotMatch(webhookCode, /RAZORPAY_WEBHOOK_SECRET|webhookSecret/, 'Must not access or read webhook secrets');
+    assert.doesNotMatch(webhookCode, /req\.text\(\)|req\.json\(\)/, 'Must not parse request body');
+    assert.doesNotMatch(webhookCode, /supabaseAdmin|rpc\(/, 'Must not invoke database RPCs');
   });
 
   // Cashfree Webhook Settlement & Timing-Safe Verification

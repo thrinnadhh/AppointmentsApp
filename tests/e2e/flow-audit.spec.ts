@@ -232,13 +232,14 @@ test.describe('Comprehensive Merchant & Customer Flow & API Audit', () => {
       expect(typeof (data as any).released_count).toBe('number');
     });
 
-    test('2.10 POST /api/webhooks/razorpay should reject invalid JSON with 400', async ({ request }) => {
+    test('2.10 POST /api/webhooks/razorpay should reject requests with 410 Gone (decommissioned)', async ({ request }) => {
       const res = await request.post('http://localhost:3000/api/webhooks/razorpay', {
         data: 'INVALID_NON_JSON_PAYLOAD',
         headers: { 'content-type': 'text/plain' },
       });
-      expect(res.status()).toBe(400);
+      expect(res.status()).toBe(410);
       const data = await res.json();
+      expect(data.code).toBe('RAZORPAY_DECOMMISSIONED');
       expect(data.error).toBeDefined();
     });
 

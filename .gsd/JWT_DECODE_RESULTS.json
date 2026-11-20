@@ -1,0 +1,121 @@
+[
+  {
+    "path": ".github/workflows/ci.yml",
+    "line": 31,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": ".github/workflows/ci.yml",
+    "line": 33,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": ".github/workflows/ci.yml",
+    "line": 34,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "docs/evidence/J-J3.txt",
+    "line": 11,
+    "iss": "UNKNOWN",
+    "role": "UNKNOWN",
+    "classification": "CHECK_MANUAL"
+  },
+  {
+    "path": "docs/evidence/J-J3.txt",
+    "line": 15,
+    "iss": "UNKNOWN",
+    "role": "UNKNOWN",
+    "classification": "CHECK_MANUAL"
+  },
+  {
+    "path": "docs/evidence/J-J3.txt",
+    "line": 135,
+    "iss": "None",
+    "role": "None",
+    "classification": "CHECK_MANUAL"
+  },
+  {
+    "path": "docs/security/strix-remediation-plan.md",
+    "line": 131,
+    "iss": "UNKNOWN",
+    "role": "UNKNOWN",
+    "classification": "CHECK_MANUAL"
+  },
+  {
+    "path": "playwright.config.ts",
+    "line": 31,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "playwright.config.ts",
+    "line": 34,
+    "iss": "supabase-demo",
+    "role": "service_role",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "playwright.config.ts",
+    "line": 88,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "playwright.config.ts",
+    "line": 89,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "playwright.config.ts",
+    "line": 104,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "scripts/generate-ci-env.mjs",
+    "line": 6,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "scripts/generate-ci-env.mjs",
+    "line": 7,
+    "iss": "supabase-demo",
+    "role": "anon",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "scripts/generate-full-test-table.mjs",
+    "line": 12,
+    "iss": "supabase-demo",
+    "role": "service_role",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  },
+  {
+    "path": "scripts/scan-secrets.mjs",
+    "line": 64,
+    "iss": "UNKNOWN",
+    "role": "UNKNOWN",
+    "classification": "CHECK_MANUAL"
+  },
+  {
+    "path": "scripts/seed-hospital-test-data.mjs",
+    "line": 27,
+    "iss": "supabase-demo",
+    "role": "service_role",
+    "classification": "LOCAL_DEMO_TOKEN (Safe)"
+  }
+]

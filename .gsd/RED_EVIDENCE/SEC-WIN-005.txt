@@ -1,0 +1,83 @@
+VULNERABILITY ID: SEC-WIN-005
+COMMAND: node tests/unit/razorpay-decommission.test.mjs
+EXIT CODE: 1
+OUTPUT:
+▶ SEC-WIN-005: Razorpay Webhook Decommissioning (HTTP 410 Gone)
+  ✖ 1. POST /api/webhooks/razorpay returns 410 Gone for unsigned empty request (156.527958ms)
+  ✖ 2. POST /api/webhooks/razorpay returns 410 Gone even when signature header is present (0.339459ms)
+  ✖ 3. Fails closed and never crashes when RAZORPAY_WEBHOOK_SECRET is unset or empty (0.230541ms)
+  ✖ 4. Source code check: verifies no DB calls or secret checks are performed in route.ts (0.678709ms)
+✖ SEC-WIN-005: Razorpay Webhook Decommissioning (HTTP 410 Gone) (158.697208ms)
+ℹ tests 4
+ℹ suites 1
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 164.555834
+
+✖ failing tests:
+
+test at tests/unit/razorpay-decommission.test.mjs:92:3
+✖ 1. POST /api/webhooks/razorpay returns 410 Gone for unsigned empty request (156.527958ms)
+  file:///Users/trinadh/projects/Appointments/apps/merchant-web/src/lib/supabase.ts:2
+  import { createBrowserClient } from '@supabase/ssr';
+           ^^^^^^^^^^^^^^^^^^^
+  SyntaxError: The requested module '@supabase/ssr' does not provide an export named 'createBrowserClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:463:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:561:5)
+      at async node:internal/modules/esm/loader:650:26
+      at async TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/razorpay-decommission.test.mjs:93:22)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at tests/unit/razorpay-decommission.test.mjs:106:3
+✖ 2. POST /api/webhooks/razorpay returns 410 Gone even when signature header is present (0.339459ms)
+  file:///Users/trinadh/projects/Appointments/apps/merchant-web/src/lib/supabase.ts:2
+  import { createBrowserClient } from '@supabase/ssr';
+           ^^^^^^^^^^^^^^^^^^^
+  SyntaxError: The requested module '@supabase/ssr' does not provide an export named 'createBrowserClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:463:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:561:5)
+      at async node:internal/modules/esm/loader:650:26
+      at async TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/razorpay-decommission.test.mjs:93:22)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at tests/unit/razorpay-decommission.test.mjs:121:3
+✖ 3. Fails closed and never crashes when RAZORPAY_WEBHOOK_SECRET is unset or empty (0.230541ms)
+  file:///Users/trinadh/projects/Appointments/apps/merchant-web/src/lib/supabase.ts:2
+  import { createBrowserClient } from '@supabase/ssr';
+           ^^^^^^^^^^^^^^^^^^^
+  SyntaxError: The requested module '@supabase/ssr' does not provide an export named 'createBrowserClient'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:463:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:561:5)
+      at async node:internal/modules/esm/loader:650:26
+      at async TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/razorpay-decommission.test.mjs:93:22)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at tests/unit/razorpay-decommission.test.mjs:142:3
+✖ 4. Source code check: verifies no DB calls or secret checks are performed in route.ts (0.678709ms)
+  AssertionError [ERR_ASSERTION]: Must return status 410
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/razorpay-decommission.test.mjs:144:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "import crypto from 'crypto';\nimport { NextRequest, NextResponse } from 'next/server';\nimport { getSupabaseAdmin } from '@/lib/supabase';\nimport { getPaymentGateway } from '@/lib/payment/index.ts';\nimport { RazorpayWebhookPayload } from '@appointments/shared';\nimport { assertSafePayloadStructure, PayloadLimitExceededError } from '@/lib/validation-limits';\n\nexport async function POST(req: NextRequest) {\n  try {\n    const rawBody = await req.text();\n...",
+    expected: /status:\s*410/,
+    operator: 'match',
+    diff: 'simple'
+  }

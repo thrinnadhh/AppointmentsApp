@@ -1,0 +1,127 @@
+{
+  "timestamp": "2026-11-19T21:28:57.744990+00:00",
+  "stage": "Stage 5 Pass 1 Verification",
+  "branch": "security/window-closure",
+  "base_commit": "f7c388df0c1de710b4048a1af18ed908ee45be61",
+  "head_commit": "090b220",
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "Supabase DB Reset",
+      "command": "pnpm supabase db reset",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "All forward migrations applied cleanly from scratch"
+    },
+    {
+      "name": "Hospital Test Data Seed",
+      "command": "node scripts/seed-hospital-test-data.mjs",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Created providers, departments, staff, and 15 appointments with zero conflicts"
+    },
+    {
+      "name": "Cross-Tenant Authorization Matrix",
+      "command": "node tests/unit/cross-tenant-authorization-matrix.test.mjs",
+      "exit_code": 0,
+      "result": "PASS",
+      "passed": 41,
+      "failed": 0,
+      "total": 41,
+      "details": "100% of discovered API routes (39/39) + RPCs covered"
+    },
+    {
+      "name": "Stage 3 Wave Security Test Suites",
+      "command": "node --test tests/security/database-grants-allowlist.test.mjs tests/security/security-definer-schema-guard.test.mjs tests/security/anon-log-throttle.test.mjs tests/unit/prescriptions-signed-url-bypass.test.mjs tests/unit/razorpay-decommission.test.mjs tests/unit/create-order-auth-ordering.test.mjs tests/unit/cashfree-webview-origin-guard.test.mjs tests/unit/checkin-pin-terminology.test.mjs tests/security/github-actions-hardening.test.mjs tests/unit/security-loop-api.test.mjs",
+      "exit_code": 0,
+      "result": "PASS",
+      "passed": 39,
+      "failed": 0,
+      "total": 39,
+      "details": "All 10 security suites covering SEC-WIN-001..014 verified green"
+    },
+    {
+      "name": "Security & Route Regression Suite",
+      "command": "pnpm run test:security",
+      "exit_code": 0,
+      "result": "PASS",
+      "passed": 225,
+      "failed": 0,
+      "total": 225,
+      "details": "73 suites passing across cron guards, payment verification, and BOLA"
+    },
+    {
+      "name": "Concurrency & Race Invariants",
+      "command": "node --test tests/unit/hospital-concurrency-safety.test.mjs",
+      "exit_code": 0,
+      "result": "PASS",
+      "passed": 4,
+      "failed": 0,
+      "total": 4,
+      "details": "200 concurrent runs (50/50 per race condition) verified zero double-processing"
+    },
+    {
+      "name": "Dependency Security Audit",
+      "command": "node scripts/audit-dependencies.mjs --audit-level=high",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Zero unmitigated high/critical vulnerabilities across prod dependencies"
+    },
+    {
+      "name": "Legal Placeholders Check",
+      "command": "pnpm run check:legal",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Zero unpopulated placeholder tokens"
+    },
+    {
+      "name": "Environment Configuration Check",
+      "command": "pnpm run check:env",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Supabase, OAuth, Cashfree environment variables valid"
+    },
+    {
+      "name": "TypeScript Typecheck",
+      "command": "pnpm -r exec tsc --noEmit",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Zero type errors across all packages and apps"
+    },
+    {
+      "name": "Linter",
+      "command": "pnpm lint",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Zero lint errors across customer-mobile, merchant-web, shared"
+    },
+    {
+      "name": "Production Build",
+      "command": "pnpm build",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Next.js 15.5.28 production build and Expo web export succeeded"
+    },
+    {
+      "name": "Gitleaks Secret Scan (Branch)",
+      "command": "gitleaks detect --log-opts=f7c388d..HEAD",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Zero secrets in any commit introduced on security/window-closure"
+    },
+    {
+      "name": "Client Bundle Grep",
+      "command": "python3 bundle_grep_check",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "Service-role JWT string not leaked in client bundles"
+    },
+    {
+      "name": "Semgrep SAST Scan",
+      "command": "semgrep --config=p/security-audit,p/secrets,p/owasp-top-ten,p/javascript,p/typescript",
+      "exit_code": 0,
+      "result": "PASS",
+      "details": "14 findings all matched to documented false-positive catalog or dev scripts"
+    }
+  ]
+}

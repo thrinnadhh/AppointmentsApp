@@ -26,46 +26,23 @@ permissions:
 env:
   NODE_VERSION: '22'
   PNPM_VERSION: '8.15.0'
-  # Supabase — local containerized defaults for CI test isolation (Standing Rule 5: Local database only)
+  # Public configuration variables (Standing Rule 5: Local database only, zero secrets in top-level env)
   NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
   EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
-  SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
-  RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID || 'rzp_test_51MockAppPlatform' }}
-  RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET || 'mock_secret_key_1234567890' }}
-  RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET || 'mock_webhook_secret' }}
-  CASHFREE_APP_ID: ${{ secrets.CASHFREE_APP_ID || 'TEST_CF_APP_ID_MOCK' }}
-  CASHFREE_SECRET_KEY: ${{ secrets.CASHFREE_SECRET_KEY || 'TEST_CF_SECRET_KEY_MOCK' }}
-  CASHFREE_WEBHOOK_SECRET: ${{ secrets.CASHFREE_WEBHOOK_SECRET || secrets.CASHFREE_SECRET_KEY || 'TEST_CF_SECRET_KEY_MOCK' }}
   CASHFREE_ENV: 'SANDBOX'
-  EXPO_PUBLIC_CASHFREE_APP_ID: ${{ secrets.CASHFREE_APP_ID || 'TEST_CF_APP_ID_MOCK' }}
   EXPO_PUBLIC_CASHFREE_ENV: 'SANDBOX'
   PAYMENT_GATEWAY_PROVIDER: 'cashfree'
-  TEST_MERCHANT_EMAIL: ${{ secrets.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com' }}
-  TEST_MERCHANT_PASSWORD: ${{ secrets.TEST_MERCHANT_PASSWORD || 'SvimsClinic2026!' }}
-  TEST_SALON_EMAIL: ${{ secrets.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com' }}
-  TEST_SALON_PASSWORD: ${{ secrets.TEST_SALON_PASSWORD || 'NaturalsSalon2026!' }}
-  TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com' }}
-  TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'AdminSecure2026!' }}
-  ADMIN_SECRET: ${{ secrets.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2' }}
-  SUPERADMIN_E2E_TOKEN: ${{ secrets.SUPERADMIN_E2E_TOKEN || 'tirupati_e2e_secure_bypass_key_2026_x9k2' }}
   ALLOW_MOCK_PAYMENTS: 'false'
   ALLOW_MOCK_AUTH: 'true'
-  CRON_SECRET: ${{ secrets.CRON_SECRET || 'test_cron_secret_2026' }}
-  NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME || 'Dr. K. S. Rao' }}
-  NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL || 'grievance-officer@tirupati-appointments.org' }}
-  NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE || '+91-877-2244888' }}
-  NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS: ${{ secrets.NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS || 'Balaji Colony, Tirupati, AP 517502' }}
-  EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME || 'Dr. K. S. Rao' }}
-  EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL || 'grievance-officer@tirupati-appointments.org' }}
-  EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE || '+91-877-2244888' }}
-  EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS: ${{ secrets.EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS || 'Balaji Colony, Tirupati, AP 517502' }}
-  EXPO_PUBLIC_EAS_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_EAS_PROJECT_ID }}
-  SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: ${{ secrets.SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID || '108394829104-apps-tirupati-web.apps.googleusercontent.com' }}
-  SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET: ${{ secrets.SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET || '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upati_2026' }}
-  NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '108394829104-apps-tirupati-web.apps.googleusercontent.com' }}
-  NEXT_PUBLIC_ENABLE_GOOGLE_AUTH: 'true'
+  NEXT_PUBLIC_ENABLE_GOOGLE_AUTH: 'false'
+  NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME: 'Dr. K. S. Rao'
+  NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL: 'grievance-officer@tirupati-appointments.org'
+  NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE: '+91-877-2244888'
+  NEXT_PUBLIC_GRIEVANCE_OFFICER_ADDRESS: 'Balaji Colony, Tirupati, AP 517502'
+  EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME: 'Dr. K. S. Rao'
+  EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL: 'grievance-officer@tirupati-appointments.org'
+  EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE: '+91-877-2244888'
+  EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS: 'Balaji Colony, Tirupati, AP 517502'
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 1 — Dependency Audit & Security Scan
@@ -141,6 +118,20 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
         continue-on-error: false
 
+      - name: Run Semgrep SAST scan (SEC-WIN-011)
+        uses: semgrep/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d # v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/javascript
+            p/typescript
+            p/github-actions
+          auditOn: push
+        env:
+          SEMGREP_ARGS: --metrics=off
+
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 2 — Lint, Typecheck
 # ─────────────────────────────────────────────────────────────────────────────
@@ -166,12 +157,18 @@ jobs:
       - name: Lint (all workspaces)
         run: pnpm lint
 
+      - name: Lint GitHub Actions workflows (actionlint)
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+        with:
+          shellcheck: false
+
       - name: Verify environment configuration (check:env)
         run: pnpm run check:env
         env:
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key-ci
           SUPABASE_SERVICE_ROLE_KEY: stub-service-role-key-ci
+          NEXT_PUBLIC_ENABLE_GOOGLE_AUTH: 'false'
 
       - name: Typecheck (all workspaces)
         run: pnpm -r exec tsc --noEmit
@@ -254,6 +251,7 @@ jobs:
           export CRON_SECRET="${CRON_SECRET:-test_cron_secret_2026}"
           export DELETION_TOKEN_SECRET="${DELETION_TOKEN_SECRET:-d24831bb6c322697ea855e7464e8e9767191d1f4d340548e400bab603f927cfe}"
           export ALLOW_MOCK_PAYMENTS="false"
+          export ENABLE_E2E_BYPASS="true"
 
           pnpm --filter @appointments/merchant-web dev --port 3000 > /tmp/merchant-web-ci.log 2>&1 &
           SERVER_PID=$!
@@ -359,7 +357,7 @@ jobs:
 
       - name: Cache Playwright browser binaries
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
@@ -494,7 +492,7 @@ jobs:
 
       - name: Cache Playwright browser binaries
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
@@ -629,7 +627,7 @@ jobs:
 
       - name: Cache Playwright browser binaries
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
@@ -759,7 +757,7 @@ jobs:
 
       - name: Cache Playwright browser binaries
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
@@ -894,7 +892,7 @@ jobs:
 
       - name: Cache Playwright browser binaries
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}

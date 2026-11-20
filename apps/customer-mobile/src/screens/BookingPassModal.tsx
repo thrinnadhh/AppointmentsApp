@@ -583,16 +583,16 @@ export default function BookingPassModal({
                       <View style={styles.checkinCodeBox} testID="pass-checkin-code-box">
                         <View style={styles.checkinCodeHeader}>
                           <Text style={styles.checkinCodeIcon}>🎟️</Text>
-                          <Text style={styles.checkinCodeBadge}>RECEPTION CHECK-IN CODE</Text>
+                          <Text style={styles.checkinCodeBadge}>RECEPTION CHECK-IN PIN</Text>
                         </View>
                         <Text style={styles.checkinCodeNumber} testID="pass-checkin-code-number">
                           {checkinCode || '••••'}
                         </Text>
                         <Text style={styles.checkinCodeInstruction}>
-                          Show or tell this code at reception counter
+                          Show or tell this 4-digit check-in PIN at reception counter
                         </Text>
                         <Text style={styles.checkinCodeSubtext}>
-                          Reception will enter this 4-digit code to immediately flip your presence status to GREEN.
+                          Reception will enter this 4-digit check-in PIN to immediately flip your presence status to GREEN.
                         </Text>
                       </View>
                     ) : (liveStatus === 'CONFIRMED' && !isWindowOpen) ? (

@@ -1,0 +1,250 @@
+[
+  {
+    "table": "account_deletion_requests",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "Data Returned (1 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "admin_audit_logs",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "app_logs",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "appointment_checkin_codes",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "audit_logs",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "Data Returned (776 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "bookings",
+    "anon": "Blocked by RLS (0 rows)",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "Data Returned (13 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "categories",
+    "anon": "Data Returned (5 rows)",
+    "foreign_auth": "Public / Shared (5 rows)",
+    "owner_ctrl": "Data Returned (5 rows - Positive Control PASS)",
+    "anon_grants": "SELECT",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "cities",
+    "anon": "Data Returned (6 rows)",
+    "foreign_auth": "Public / Shared (6 rows)",
+    "owner_ctrl": "Data Returned (6 rows - Positive Control PASS)",
+    "anon_grants": "SELECT",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "city_settlements",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "city_waitlist",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "contact_reveal_audit",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "crash_alert_dedup",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by Grant",
+    "owner_ctrl": "Blocked by Grant",
+    "anon_grants": "NONE",
+    "auth_grants": "NONE"
+  },
+  {
+    "table": "department_members",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "Data Returned (10 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "departments",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "Data Returned (6 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "doctor_front_desk_assignments",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "Data Returned (6 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "merchant_memberships",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "merchant_vendor_splits",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "notification_logs",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "payments",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "platform_config",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by Grant",
+    "owner_ctrl": "Blocked by Grant",
+    "anon_grants": "NONE",
+    "auth_grants": "NONE"
+  },
+  {
+    "table": "profiles",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "Data Returned (1 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "NONE"
+  },
+  {
+    "table": "providers",
+    "anon": "Data Returned (9 rows)",
+    "foreign_auth": "Public Active (1 rows)",
+    "owner_ctrl": "Data Returned (1 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "SELECT, UPDATE"
+  },
+  {
+    "table": "push_tokens",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "NONE",
+    "auth_grants": "INSERT, SELECT, UPDATE, DELETE"
+  },
+  {
+    "table": "resource_availability",
+    "anon": "Data Returned (126 rows)",
+    "foreign_auth": "Public / Shared (126 rows)",
+    "owner_ctrl": "Data Returned (126 rows - Positive Control PASS)",
+    "anon_grants": "SELECT",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "resource_leaves",
+    "anon": "Blocked by RLS (0 rows)",
+    "foreign_auth": "Public / Shared (0 rows)",
+    "owner_ctrl": "0 rows in seed",
+    "anon_grants": "SELECT",
+    "auth_grants": "INSERT, SELECT, UPDATE, DELETE"
+  },
+  {
+    "table": "resources",
+    "anon": "Data Returned (22 rows)",
+    "foreign_auth": "Public Active (8 rows)",
+    "owner_ctrl": "Data Returned (8 rows - Positive Control PASS)",
+    "anon_grants": "SELECT",
+    "auth_grants": "SELECT, UPDATE"
+  },
+  {
+    "table": "staff_checkin_rate_limits",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by Grant",
+    "owner_ctrl": "Blocked by Grant",
+    "anon_grants": "NONE",
+    "auth_grants": "NONE"
+  },
+  {
+    "table": "sub_categories",
+    "anon": "Data Returned (12 rows)",
+    "foreign_auth": "Public / Shared (12 rows)",
+    "owner_ctrl": "Data Returned (12 rows - Positive Control PASS)",
+    "anon_grants": "SELECT",
+    "auth_grants": "SELECT"
+  },
+  {
+    "table": "test_provider_clock_links",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by Grant",
+    "owner_ctrl": "Blocked by Grant",
+    "anon_grants": "NONE",
+    "auth_grants": "NONE"
+  },
+  {
+    "table": "test_tenant_clocks",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by Grant",
+    "owner_ctrl": "Blocked by Grant",
+    "anon_grants": "NONE",
+    "auth_grants": "NONE"
+  },
+  {
+    "table": "user_consents",
+    "anon": "Blocked by Grant",
+    "foreign_auth": "Blocked by RLS (0 rows)",
+    "owner_ctrl": "Data Returned (1 rows - Positive Control PASS)",
+    "anon_grants": "NONE",
+    "auth_grants": "INSERT, SELECT, UPDATE"
+  }
+]

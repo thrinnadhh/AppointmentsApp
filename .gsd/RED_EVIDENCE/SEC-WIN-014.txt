@@ -1,0 +1,75 @@
+VULNERABILITY ID: SEC-WIN-014
+COMMAND: node tests/unit/create-order-auth-ordering.test.mjs
+EXIT CODE: 1
+OUTPUT:
+▶ SEC-WIN-014: Authentication Ordering on /api/payments/create-order
+  ✖ 1. Returns 401 Unauthorized on unauthenticated request before any 400 validation error (432.242625ms)
+  ✖ 2. Returns 401 Unauthorized on unauthenticated request with invalid/malformed JSON (1.414041ms)
+  ✖ 3. Source check: verifies verifyAuthenticatedUser occurs before parseSafeJson / getSupabaseAdmin (0.306792ms)
+✖ SEC-WIN-014: Authentication Ordering on /api/payments/create-order (435.082792ms)
+ℹ tests 3
+ℹ suites 1
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 451.78825
+
+✖ failing tests:
+
+test at tests/unit/create-order-auth-ordering.test.mjs:119:3
+✖ 1. Returns 401 Unauthorized on unauthenticated request before any 400 validation error (432.242625ms)
+  AssertionError [ERR_ASSERTION]: Unauthenticated request must return 401 Unauthorized before checking body payload
+  
+  400 !== 401
+  
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/create-order-auth-ordering.test.mjs:130:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 401,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/unit/create-order-auth-ordering.test.mjs:135:3
+✖ 2. Returns 401 Unauthorized on unauthenticated request with invalid/malformed JSON (1.414041ms)
+  AssertionError [ERR_ASSERTION]: Unauthenticated request must return 401 before body parsing fails
+  
+  400 !== 401
+  
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/create-order-auth-ordering.test.mjs:145:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 401,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/unit/create-order-auth-ordering.test.mjs:148:3
+✖ 3. Source check: verifies verifyAuthenticatedUser occurs before parseSafeJson / getSupabaseAdmin (0.306792ms)
+  AssertionError [ERR_ASSERTION]: verifyAuthenticatedUser must be called before parseSafeJson in POST handler
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/create-order-auth-ordering.test.mjs:156:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+[RateLimit] missing_trusted_client_ip { route: '/api/payments/create-order' }
+[RateLimit] missing_trusted_client_ip { route: '/api/payments/create-order' }
