@@ -158,8 +158,6 @@ export default function SettingsPage() {
         p_payout_upi_id: payoutUpi.trim() || null,
         p_min_deposit_amount: parseFloat(minDeposit) || 0,
         p_cancellation_window_hours: parseInt(cancellationWindowHours, 10) || 1,
-        p_cashfree_app_id: cashfreeAppId.trim() || null,
-        p_cashfree_vendor_id: cashfreeVendorId.trim() || null,
       });
 
       if (error || (data && (data as any).success === false)) {

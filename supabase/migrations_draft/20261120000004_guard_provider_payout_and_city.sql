@@ -10,8 +10,9 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  -- Allow service_role, admin, or trusted internal execution context
-  IF auth.role() = 'service_role'
+  -- Allow service_role, admin, trusted internal execution context, or postgres superuser with no JWT
+  IF (session_user IN ('postgres', 'supabase_admin') AND auth.jwt() IS NULL)
+     OR auth.role() = 'service_role'
      OR current_setting('app.trusted_write', true) = 'true'
      OR public.is_admin(auth.uid()) THEN
     RETURN NEW;

@@ -12,7 +12,7 @@ const COMMITTED_DEFAULT_E2E_SECRETS = new Set([
 
 function verifyCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || COMMITTED_DEFAULT_E2E_SECRETS.has(cronSecret)) {
+  if (!cronSecret || (process.env.NODE_ENV === 'production' && COMMITTED_DEFAULT_E2E_SECRETS.has(cronSecret))) {
     if (process.env.NODE_ENV === 'production') {
       console.error('[Security Monitor Cron] CRON_SECRET is not configured or uses a blacklisted committed default');
     }

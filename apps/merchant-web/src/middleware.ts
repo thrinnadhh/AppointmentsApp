@@ -220,7 +220,7 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith('/api/cron/') &&
     cronSecret &&
-    !COMMITTED_DEFAULT_E2E_SECRETS.includes(cronSecret) &&
+    (!isProduction || !COMMITTED_DEFAULT_E2E_SECRETS.includes(cronSecret)) &&
     bearerToken &&
     bearerToken.length === cronSecret.length
   ) {

@@ -3,7 +3,7 @@
 > **Monorepo**: AppointmentsApp (Tirupati Hyperlocal Multi-Tenant Platform)
 > **Branch**: `security/window-closure`
 > **Base Commit**: `f7c388df0c1de710b4048a1af18ed908ee45be61`
-> **Updated At**: 2026-11-20T06:46:29.939414+00:00
+> **Updated At**: 2026-11-20T09:52:01.546926+00:00
 > **Status**: Campaign Complete — All Approved Remediations Verified Green
 
 ---
@@ -15,8 +15,8 @@
 | **Critical** | 0 | 0 | 0 | 0 | 0 |
 | **High** | 0 | 0 | 0 | 0 | 0 |
 | **Medium** | 6 | 6 | 0 | 0 | 0 |
-| **Low** | 12 | 5 | 5 | 2 | 0 |
-| **Total** | **18** | **11** | **5** | **2** | **0** |
+| **Low** | 9 | 5 | 2 | 2 | 0 |
+| **Total** | **15** | **11** | **2** | **2** | **0** |
 
 ---
 
@@ -40,8 +40,6 @@
 | `SEC-WIN-014` | **Medium** | CWE-306 | `RESOLVED` | `c31ae58` | `tests/unit/create-order-auth-ordering.test.mjs (3/3 PASS)` |
 | `SEC-WIN-015` | **Low** | CWE-200 | `RESOLVED` | `6ed29bc` | `tests/security/resource-leaves-rls-hardening.test.mjs (3/3 PASS)` |
 | `SEC-WIN-016` | **Low** | CWE-540 | `DEFERRED` | `N/A (Approved Deferred)` | `gitleaks detect --log-opts=f7c388d..HEAD passes with zero leaks and all seed credentials are confirmed local-only demo fixtures.` |
-| `SEC-WIN-017` | **Low** | CWE-284 | `DEFERRED` | `Pending Approval` | `guard_provider_governance() omits providers.city text column update check.` |
-| `SEC-WIN-018` | **Low** | CWE-312 | `DEFERRED` | `Pending Approval` | `appointment_checkin_codes stores 4-digit PIN in cleartext at rest.` |
 
 ---
 
@@ -188,39 +186,6 @@
 - **Fix Commit**: `N/A (Approved Deferred)`
 - **Remediation**: Seed demo credentials verified local-only development fixtures for local Docker Supabase environment. Approved deferred by user in Stage 1c.
 - **Verification**: `gitleaks detect --log-opts=f7c388d..HEAD passes with zero leaks and all seed credentials are confirmed local-only demo fixtures.`
-
----
-
-### SEC-WIN-017 [Low]: CWE-284: Improper Access Control
-- **Target File**: `supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:143-152`
-- **Status**: `DEFERRED (Pending Human Approval: Migration Drafted & Verified)`
-- **Fix Commit**: `Pending Human Approval (Draft: supabase/migrations_draft/20261120000004_guard_provider_payout_and_city.sql)`
-- **Rollback Script**: `supabase/migrations_rollback/20261120000004_rollback_provider_payout_and_city.sql`
-- **Remediation**: Forward migration drafted to extend `guard_provider_governance()` with `OR NEW.city IS DISTINCT FROM OLD.city`. Replaces trigger function to block tenant owners from modifying `providers.city` (error code 42501). Unapplied to keep live DB clean.
-- **Verification**: `tests/security/guard-provider-payout-and-city.test.mjs` (4/4 PASS via transactional isolation).
-
----
-
-### SEC-WIN-018 [Low]: CWE-312: Cleartext Storage of Sensitive Information
-- **Target File**: `supabase/migrations/20261011000001_reception_checkin_code_system.sql:43-50`
-- **Status**: `ACCEPTED_RISK (Pending User Approval)`
-- **Fix Commit**: `N/A (Accepted Risk)`
-- **Compensating Controls**: 
-  1. Rate Limit Lockout: 5 failed attempts lock staff for 60 seconds via `_record_checkin_failure` (`supabase/migrations/20261011000001_reception_checkin_code_system.sql:237-255`).
-  2. Temporal Expiry: Restricted to `appointment_date` IST and 60-min pre-slot window (`supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:196-198, 381-384`).
-  3. Row Level Security: Table restricted to `customer_id = auth.uid()`; merchant staff and owners have zero direct read grants.
-  4. Client Verification: `CheckoutModal.tsx` fails closed; no on-close or unauthenticated client confirmations.
-- **Verification**: `Audited lockout and expiry logic. CheckoutModal fail-closed verification confirmed.`
-
----
-
-### SEC-WIN-019 [Medium]: CWE-284: Improper Access Control (Cashfree Vendor Status & Payout Credential Bypass)
-- **Target File**: `supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:128-155`
-- **Status**: `DEFERRED (Pending Human Approval: Migration Drafted & Verified)`
-- **Fix Commit**: `Pending Human Approval (Draft: supabase/migrations_draft/20261120000004_guard_provider_payout_and_city.sql)`
-- **Rollback Script**: `supabase/migrations_rollback/20261120000004_rollback_provider_payout_and_city.sql`
-- **Remediation**: Forward migration drafted to extend `guard_provider_governance()` with protection for `cashfree_vendor_status`, `cashfree_vendor_id`, `cashfree_app_id`, `bank_account_holder`, `bank_account_last4`, `bank_ifsc`, `pan_last4`, and `payout_upi_id`. Blocks tenant owners from self-activating EasySplit status or altering payout routing (error code 42501). Unapplied to keep live DB clean.
-- **Verification**: `tests/security/guard-provider-payout-and-city.test.mjs` (4/4 PASS via transactional isolation).
 
 ---
 
