@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticatedUser } from '@/lib/auth-admin';
+import { captureError } from '@appointments/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,10 @@ export async function POST(req: NextRequest) {
       reason,
     });
   } catch (err) {
+    captureError(err, {
+      flow: 'booking',
+      route: '/api/bookings/override',
+    });
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }

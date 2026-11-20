@@ -1,7 +1,7 @@
 # Hospital & Platform API Authorization Matrix
 
 > **Verification Protocol**: Generated and programmatically validated by `tests/unit/cross-tenant-authorization-matrix.test.mjs`.
-> 100% Coverage of all API endpoints on disk (40 tested entries across all 38 routes + database extensions).
+> 100% Coverage of all API endpoints on disk (41 tested entries across all 39 routes + database extensions).
 
 ## End-to-End Route Authorization Ledger
 
@@ -47,6 +47,7 @@
 | `/api/webhooks/cashfree` | `POST` | Cashfree Webhook (proved 200 signed) | Unsigned Request (proved 400) | `apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:16` | PASS |
 | `/api/auth/me` | `GET` | Authenticated User (proved 200) | Unauthenticated Caller (proved 401) | `apps/merchant-web/src/app/api/auth/me/route.ts:7` | PASS |
 | `pgmq / vault / pg_net / pg_cron` | `ALL` | Power features & security lockdown verified | Cross-tenant / unauthorized caller blocked | `supabase/migrations/20261105100001_enable_power_extensions.sql` | PASS |
+| `/api/merchants/cashfree-vendor` | `GET, POST` | Hospital 1 Admin (proved 200) | Hospital 2 Admin & Customer A (proved 401/403) | `apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts:26,94` | PASS |
 
 ---
 

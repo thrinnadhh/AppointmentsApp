@@ -26,6 +26,7 @@ import {
   joinCityWaitlist,
   fetchBookingCheckinCode,
 } from '../services/api';
+import { getCheckinPinDisplayState } from '../services/pinVisibility';
 
 interface VerticalVisual {
   emoji: string;
@@ -239,20 +240,23 @@ function UpcomingLiveCard({ booking, onOpenPass, onMarkReached, onOpenMyBookings
           <Text style={styles.livePinTitle}>🔑 Permanent Check-in PIN</Text>
           <Text style={styles.livePinBadge}>LIFETIME</Text>
         </View>
-        {isWithin60m ? (
-          <View style={styles.livePinRow}>
-            <Text style={styles.livePinDigits} testID="live-pin-digits">
-              {checkinPin || '••••'}
-            </Text>
-            <Text style={styles.livePinHint}>Show/tell code at reception counter</Text>
-          </View>
-        ) : (
-          <View style={styles.livePinLockedRow}>
-            <Text style={styles.livePinLockedText}>
-              🔒 Reveals 60 minutes before slot ({new Date(slotMs - 60 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
-            </Text>
-          </View>
-        )}
+        {(() => {
+          const pinDisplay = getCheckinPinDisplayState(booking.slot_start, checkinPin, nowMs);
+          return pinDisplay.isUnlocked ? (
+            <View style={styles.livePinRow}>
+              <Text style={styles.livePinDigits} testID="live-pin-digits">
+                {pinDisplay.displayPin}
+              </Text>
+              <Text style={styles.livePinHint}>Show/tell code at reception counter</Text>
+            </View>
+          ) : (
+            <View style={styles.livePinLockedRow}>
+              <Text style={styles.livePinLockedText} testID="live-pin-locked-text">
+                🔒 PIN unlocks 60 mins before slot
+              </Text>
+            </View>
+          );
+        })()}
       </View>
 
       {/* Action Buttons */}

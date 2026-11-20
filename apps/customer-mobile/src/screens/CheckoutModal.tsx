@@ -23,6 +23,7 @@ import {
   fetchCustomerStrikes,
   checkCoolingPeriodEligibility,
 } from '../services/api';
+import { CashfreeCheckoutWebView } from '../components/CashfreeCheckoutWebView';
 
 const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -108,8 +109,20 @@ export default function CheckoutModal({
   const [showThirdStrikePopup, setShowThirdStrikePopup] = useState<boolean>(false);
   const [acknowledgedThirdStrike, setAcknowledgedThirdStrike] = useState<boolean>(false);
   const [secondsLeft, setSecondsLeft] = useState<number>(300); // 5 minutes
+  const [isHoldActive, setIsHoldActive] = useState<boolean>(false);
+  const [isHolding, setIsHolding] = useState<boolean>(false);
+  const [heldBookingId, setHeldBookingId] = useState<string | null>(null);
+  const [heldReferenceCode, setHeldReferenceCode] = useState<string | null>(null);
   const [coolingEligibility, setCoolingEligibility] = useState<CoolingPeriodEligibilityResult | null>(null);
   const [, setCheckingCooling] = useState<boolean>(false);
+  const [cashfreeModalVisible, setCashfreeModalVisible] = useState<boolean>(false);
+  const [cashfreePaymentData, setCashfreePaymentData] = useState<{
+    paymentSessionId: string;
+    orderId: string;
+    bookingId: string;
+    holdReferenceCode?: string;
+    attachedPath?: string;
+  } | null>(null);
 
   const isFreeFollowup = Boolean(coolingEligibility?.eligible);
   const rawPlatformFee = getPlatformFee(categoryId);
@@ -190,8 +203,13 @@ export default function CheckoutModal({
   const isMinor = bookedFor === 'family' && parsedAge !== null && !isNaN(parsedAge) && parsedAge < 18;
 
   useEffect(() => {
+    let active = true;
     if (!visible) {
       setSecondsLeft(300);
+      setIsHoldActive(false);
+      setIsHolding(false);
+      setHeldBookingId(null);
+      setHeldReferenceCode(null);
       setAttachedFileName(null);
       setAttachedPath(null);
       setPayError(null);
@@ -203,10 +221,79 @@ export default function CheckoutModal({
       return;
     }
 
+    // Acquire atomic hold upon opening checkout if authenticated
+    if (customerId && isAuthenticated && resource && slot && !isBlocked) {
+      setIsHolding(true);
+      createHoldOnSupabase(
+        customerId,
+        resource.id,
+        slot.start_time,
+        slot.end_time,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        'self',
+        undefined,
+        undefined
+      )
+        .then((holdRes) => {
+          if (!active) return;
+          setIsHolding(false);
+          if (holdRes.success && holdRes.booking_id) {
+            setIsHoldActive(true);
+            setHeldBookingId(holdRes.booking_id);
+            setHeldReferenceCode(holdRes.reference_code || null);
+            setSecondsLeft(300);
+          } else {
+            setIsHoldActive(false);
+            if (holdRes.error) {
+              let errMsg = holdRes.error;
+              if (
+                errMsg.includes('PATIENT_APPOINTMENT_GAP_VIOLATION') ||
+                errMsg.toLowerCase().includes('1 hour') ||
+                errMsg.toLowerCase().includes('one hour')
+              ) {
+                errMsg =
+                  "Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for family member / child'.";
+              }
+              setPayError(errMsg);
+            }
+          }
+        })
+        .catch((err) => {
+          if (!active) return;
+          setIsHolding(false);
+          setIsHoldActive(false);
+          setPayError(err instanceof Error ? err.message : 'Failed to hold slot.');
+        });
+    } else {
+      setIsHoldActive(false);
+      setIsHolding(false);
+      setHeldBookingId(null);
+      setHeldReferenceCode(null);
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [visible, customerId, isAuthenticated, resource?.id, slot?.start_time, isBlocked]);
+
+  // Countdown timer runs only when atomic hold is confirmed in database
+  useEffect(() => {
+    if (!visible || !isHoldActive) {
+      setSecondsLeft(300);
+      return;
+    }
+
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          setIsHoldActive(false);
+          setHeldBookingId(null);
+          setHeldReferenceCode(null);
+          setPayError('Hold time expired. Please re-select a slot or try again.');
           return 0;
         }
         return prev - 1;
@@ -214,7 +301,7 @@ export default function CheckoutModal({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [visible]);
+  }, [visible, isHoldActive]);
 
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
@@ -316,38 +403,48 @@ export default function CheckoutModal({
         }
       }
 
-      // 1. Acquire atomic hold via backend API (with all validation)
-      const holdRes = await createHoldOnSupabase(
-        customerId,
-        resource.id,
-        slot.start_time,
-        slot.end_time,
-        bookedFor === 'family',
-        bookedFor === 'family' ? otherPatientName.trim() : undefined,
-        undefined,
-        bookedFor === 'family' ? patientRelationship : undefined,
-        bookedFor,
-        bookedFor === 'family' && parsedAge !== null && !isNaN(parsedAge) ? parsedAge : undefined,
-        bookedFor === 'family' && bookingNote.trim() ? bookingNote.trim() : undefined
-      );
+      // 1. Acquire atomic hold via backend API (or reuse existing active hold)
+      let bookingId = heldBookingId;
+      let referenceCode = heldReferenceCode || '';
 
-      if (!holdRes.success || !holdRes.booking_id) {
-        let errMsg = holdRes.error || 'Could not reserve this slot. It may already be taken.';
-        if (
-          errMsg.includes('PATIENT_APPOINTMENT_GAP_VIOLATION') ||
-          errMsg.toLowerCase().includes('1 hour') ||
-          errMsg.toLowerCase().includes('one hour')
-        ) {
-          errMsg =
-            "Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for family member / child'.";
+      if (!bookingId || bookedFor === 'family') {
+        const holdRes = await createHoldOnSupabase(
+          customerId,
+          resource.id,
+          slot.start_time,
+          slot.end_time,
+          bookedFor === 'family',
+          bookedFor === 'family' ? otherPatientName.trim() : undefined,
+          undefined,
+          bookedFor === 'family' ? patientRelationship : undefined,
+          bookedFor,
+          bookedFor === 'family' && parsedAge !== null && !isNaN(parsedAge) ? parsedAge : undefined,
+          bookedFor === 'family' && bookingNote.trim() ? bookingNote.trim() : undefined
+        );
+
+        if (!holdRes.success || !holdRes.booking_id) {
+          let errMsg = holdRes.error || 'Could not reserve this slot. It may already be taken.';
+          if (
+            errMsg.includes('PATIENT_APPOINTMENT_GAP_VIOLATION') ||
+            errMsg.toLowerCase().includes('1 hour') ||
+            errMsg.toLowerCase().includes('one hour')
+          ) {
+            errMsg =
+              "Appointments for the same patient must be at least 1 hour apart. To book for a family member or friend, select 'Booking for family member / child'.";
+          }
+          setPayError(errMsg);
+          setIsProcessing(false);
+          return;
         }
-        setPayError(errMsg);
-        setIsProcessing(false);
-        return;
+
+        bookingId = holdRes.booking_id;
+        referenceCode = holdRes.reference_code || '';
+        setHeldBookingId(bookingId);
+        setHeldReferenceCode(referenceCode);
+        setIsHoldActive(true);
       }
 
-      const bookingId = holdRes.booking_id;
-      const effectiveFollowup = Boolean(holdRes.is_followup || isFreeFollowup);
+      const effectiveFollowup = Boolean(isFreeFollowup);
 
       // 2. Free Cooling Period Follow-up Consultation: Zero fee bypasses payment gateway
       if (effectiveFollowup) {
@@ -359,7 +456,7 @@ export default function CheckoutModal({
           return;
         }
         const assignedToken = (confirmRes as any)?.queue_position || 1;
-        onPaymentSuccess(bookingId, holdRes.reference_code, true, assignedToken);
+        onPaymentSuccess(bookingId, referenceCode, true, assignedToken);
         return;
       }
 
@@ -401,7 +498,7 @@ export default function CheckoutModal({
               });
               if (verifyRes.success) {
                 const assignedToken = verifyRes.queue_position || 1;
-                onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+                onPaymentSuccess(bookingId, referenceCode, false, assignedToken);
               } else {
                 setPayError(verifyRes.error || 'Payment verification failed.');
               }
@@ -414,24 +511,42 @@ export default function CheckoutModal({
           }
         }
 
-        // Mobile / Sandbox verification for Cashfree
-        const verifyRes = await verifyRazorpayPayment({
-          booking_id: bookingId,
-          gateway_provider: 'cashfree',
-          order_id: orderId,
-          payment_id: `cf_pay_${Date.now().toString(36)}`,
-          attachment_url: attachedPath,
-          customerId,
-        });
-
-        if (verifyRes.success) {
-          const assignedToken = verifyRes.queue_position || 1;
-          onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
-        } else {
-          const fallbackRes = await confirmBookingPaymentOnSupabase(bookingId, `cf_pay_${orderId}`, attachedPath);
-          const assignedToken = (fallbackRes as any)?.queue_position || 1;
-          onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+        // Real Native Android/iOS Mobile Checkout via CashfreeCheckoutWebView
+        if (Platform.OS !== 'web' && !orderRes.is_mock && !isAutomatedTest && orderRes.payment_session_id) {
+          setCashfreePaymentData({
+            paymentSessionId: orderRes.payment_session_id,
+            orderId,
+            bookingId,
+            holdReferenceCode: referenceCode,
+            attachedPath: attachedPath || undefined,
+          });
+          setCashfreeModalVisible(true);
+          return;
         }
+
+        // Automated test harness or explicit mock mode only
+        if (orderRes.is_mock || isAutomatedTest) {
+          const verifyRes = await verifyRazorpayPayment({
+            booking_id: bookingId,
+            gateway_provider: 'cashfree',
+            order_id: orderId,
+            payment_id: `cf_pay_mock_${Date.now().toString(36)}`,
+            attachment_url: attachedPath,
+            customerId,
+          });
+
+          if (verifyRes.success) {
+            const assignedToken = verifyRes.queue_position || 1;
+            onPaymentSuccess(bookingId, referenceCode, false, assignedToken);
+          } else {
+            setPayError(verifyRes.error || 'Payment verification failed.');
+          }
+          setIsProcessing(false);
+          return;
+        }
+
+        setPayError('Unable to open Cashfree payment checkout.');
+        setIsProcessing(false);
         return;
       }
 
@@ -459,7 +574,7 @@ export default function CheckoutModal({
                 });
                 if (verifyRes.success) {
                   const assignedToken = verifyRes.queue_position || 1;
-                  onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+                  onPaymentSuccess(bookingId, referenceCode, false, assignedToken);
                 } else {
                   setPayError(verifyRes.error || 'Payment verification failed.');
                 }
@@ -496,12 +611,9 @@ export default function CheckoutModal({
 
       if (verifyRes.success) {
         const assignedToken = verifyRes.queue_position || 1;
-        onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+        onPaymentSuccess(bookingId, referenceCode, false, assignedToken);
       } else {
-        // Fallback to direct Supabase confirmation if verification endpoint is unavailable
-        const fallbackRes = await confirmBookingPaymentOnSupabase(bookingId, paymentId, attachedPath);
-        const assignedToken = (fallbackRes as any)?.queue_position || 1;
-        onPaymentSuccess(bookingId, holdRes.reference_code, false, assignedToken);
+        setPayError(verifyRes.error || 'Payment verification failed.');
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Payment failed. Please try again.';
@@ -515,7 +627,8 @@ export default function CheckoutModal({
   if (!resource || !slot) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
+    <>
+      <Modal visible={visible} animationType="slide" transparent={false}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           {/* Header */}
@@ -528,16 +641,30 @@ export default function CheckoutModal({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
-            {/* 5-Min Timer Alert */}
+            {/* Hold Timer Alert / Details Banner */}
             <View style={styles.timerCard}>
-              <Text style={styles.timerIcon}>⏳</Text>
+              <Text style={styles.timerIcon}>{isHoldActive ? '⏳' : isHolding ? '⏳' : '📋'}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.timerTitle}>Slot Held for You</Text>
+                <Text style={styles.timerTitle}>
+                  {isHoldActive
+                    ? 'Slot Held for You'
+                    : isHolding
+                    ? 'Reserving Slot...'
+                    : 'Confirm your booking details'}
+                </Text>
                 <Text style={styles.timerSub}>
-                  {isFreeFollowup ? 'Confirm reservation within ' : 'Complete deposit payment within '}
-                  <Text style={styles.timerCountdown}>
-                    0{minutes}:{seconds < 10 ? `0${seconds}` : seconds}
-                  </Text>
+                  {isHoldActive ? (
+                    <>
+                      {isFreeFollowup ? 'Confirm reservation within ' : 'Complete deposit payment within '}
+                      <Text style={styles.timerCountdown}>
+                        0{minutes}:{seconds < 10 ? `0${seconds}` : seconds}
+                      </Text>
+                    </>
+                  ) : isHolding ? (
+                    'Placing a 5-minute hold on your selected time...'
+                  ) : (
+                    'Reservation hold will be placed when you proceed to pay'
+                  )}
                 </Text>
               </View>
             </View>
@@ -639,7 +766,12 @@ export default function CheckoutModal({
 
                 <TouchableOpacity
                   style={[styles.segmentBtn, bookedFor === 'family' && styles.segmentBtnActive]}
-                  onPress={() => setBookedFor('family')}
+                  onPress={() => {
+                    setBookedFor('family');
+                    setHeldBookingId(null);
+                    setHeldReferenceCode(null);
+                    setIsHoldActive(false);
+                  }}
                   testID="segment-booked-for-family"
                   activeOpacity={0.8}
                 >
@@ -1080,7 +1212,9 @@ export default function CheckoutModal({
                     testID="btn-prompt-sign-in"
                   >
                     <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
-                      👤 Sign In with Phone OTP (Test OTP: 123456) →
+                      {typeof __DEV__ !== 'undefined' && __DEV__
+                        ? '👤 Sign In with Phone OTP (Test OTP: 123456) →'
+                        : '👤 Sign In with Phone OTP →'}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -1166,6 +1300,55 @@ export default function CheckoutModal({
         )}
       </SafeAreaView>
     </Modal>
+
+    {cashfreePaymentData && (
+      <CashfreeCheckoutWebView
+        visible={cashfreeModalVisible}
+        paymentSessionId={cashfreePaymentData.paymentSessionId}
+        orderId={cashfreePaymentData.orderId}
+        bookingId={cashfreePaymentData.bookingId}
+        mode={process.env.EXPO_PUBLIC_CASHFREE_ENV === 'PRODUCTION' ? 'production' : 'sandbox'}
+        onSuccess={async (details) => {
+          setCashfreeModalVisible(false);
+          setIsProcessing(true);
+          try {
+            const verifyRes = await verifyRazorpayPayment({
+              booking_id: cashfreePaymentData.bookingId,
+              gateway_provider: 'cashfree',
+              order_id: details?.orderId || cashfreePaymentData.orderId,
+              payment_id: details?.paymentId || `cf_pay_${cashfreePaymentData.orderId}`,
+              attachment_url: cashfreePaymentData.attachedPath,
+              customerId,
+            });
+            if (verifyRes.success) {
+              const assignedToken = verifyRes.queue_position || 1;
+              onPaymentSuccess(
+                cashfreePaymentData.bookingId,
+                cashfreePaymentData.holdReferenceCode,
+                false,
+                assignedToken
+              );
+            } else {
+              setPayError(verifyRes.error || 'Payment verification failed after checkout.');
+            }
+          } catch (err: any) {
+            setPayError(err?.message || 'Payment verification error.');
+          } finally {
+            setIsProcessing(false);
+          }
+        }}
+        onFailure={(errorMsg) => {
+          setCashfreeModalVisible(false);
+          setIsProcessing(false);
+          setPayError(errorMsg);
+        }}
+        onClose={() => {
+          setCashfreeModalVisible(false);
+          setIsProcessing(false);
+        }}
+      />
+    )}
+  </>
   );
 }
 

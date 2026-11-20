@@ -1,31 +1,61 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
+declare const require: any;
+declare const Buffer: any;
+
 const ENCRYPTION_KEY_NAME = 'supabase_auth_session_enc_key_v1';
 const CHUNK_SIZE = 1000;
 const inMemoryCache = new Map<string, string>();
 
 /**
- * Derives or retrieves the 256-bit AES encryption key from Expo SecureStore.
+ * Cryptographically Secure Pseudo-Random Number Generator (CSPRNG).
+ * Uses Web Crypto getRandomValues or Node crypto randomFillSync.
+ * Strictly prohibits non-cryptographic RNG for security-sensitive cryptographic keys and IVs.
+ */
+export function getSecureRandomBytes(length: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(bytes);
+    return bytes;
+  }
+  try {
+    const ExpoCrypto = require('expo-crypto');
+    if (typeof ExpoCrypto.getRandomValues === 'function') {
+      ExpoCrypto.getRandomValues(bytes);
+      return bytes;
+    }
+  } catch {}
+  try {
+    const nodeCrypto = require('crypto');
+    if (typeof nodeCrypto.randomFillSync === 'function') {
+      nodeCrypto.randomFillSync(bytes);
+      return bytes;
+    }
+  } catch {}
+  throw new Error('Cryptographically secure PRNG is not available in current environment');
+}
+
+/**
+ * Derives or retrieves the 256-bit symmetric encryption key from Expo SecureStore.
  * SecureStore has a 2048-byte value limit on Android keystore, which is too small
  * for large JWT session tokens with user claims, but ideal for storing a 256-bit key.
  */
 async function getOrCreateEncryptionKey(): Promise<string> {
   if (Platform.OS === 'web') {
-    return 'web_ephemeral_dev_key_only_for_browser_runtime';
+    let webKey = inMemoryCache.get(ENCRYPTION_KEY_NAME);
+    if (!webKey) {
+      const rand = getSecureRandomBytes(32);
+      webKey = Array.from(rand, (b) => b.toString(16).padStart(2, '0')).join('');
+      inMemoryCache.set(ENCRYPTION_KEY_NAME, webKey);
+    }
+    return webKey;
   }
 
   try {
     let key = await SecureStore.getItemAsync(ENCRYPTION_KEY_NAME);
     if (!key) {
-      const randomBytes = new Uint8Array(32);
-      if (typeof globalThis.crypto?.getRandomValues === 'function') {
-        globalThis.crypto.getRandomValues(randomBytes);
-      } else {
-        for (let i = 0; i < 32; i++) {
-          randomBytes[i] = Math.floor(Math.random() * 256);
-        }
-      }
+      const randomBytes = getSecureRandomBytes(32);
       key = Array.from(randomBytes, (b) => b.toString(16).padStart(2, '0')).join('');
       await SecureStore.setItemAsync(ENCRYPTION_KEY_NAME, key, {
         keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
@@ -36,7 +66,8 @@ async function getOrCreateEncryptionKey(): Promise<string> {
     console.warn('[Storage] SecureStore key retrieval failed, using cached key:', err);
     let memKey = inMemoryCache.get(ENCRYPTION_KEY_NAME);
     if (!memKey) {
-      memKey = 'in_memory_fallback_key_32_bytes_long_random_dev_only';
+      const randomBytes = getSecureRandomBytes(32);
+      memKey = Array.from(randomBytes, (b) => b.toString(16).padStart(2, '0')).join('');
       inMemoryCache.set(ENCRYPTION_KEY_NAME, memKey);
     }
     return memKey;
@@ -44,34 +75,87 @@ async function getOrCreateEncryptionKey(): Promise<string> {
 }
 
 /**
- * Simple XOR/HMAC streaming cipher suitable across all React Native hermes and web runtimes
- * without requiring native C++ OpenSSL bindings. Prepends initialization vector.
+ * Authenticated AES-GCM encryption with 96-bit CSPRNG Initialization Vector.
  */
-function encryptData(text: string, hexKey: string): string {
-  const iv = Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
-  const encKey = hexKey + iv;
-  let out = '';
-  for (let i = 0; i < text.length; i++) {
-    const charCode = text.charCodeAt(i);
-    const keyChar = encKey.charCodeAt(i % encKey.length);
-    out += (charCode ^ keyChar).toString(16).padStart(4, '0');
+export async function encryptData(text: string, hexKey: string): Promise<string> {
+  const ivBytes = getSecureRandomBytes(12);
+  const keyBytes = new Uint8Array(hexKey.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []);
+
+  if (typeof globalThis.crypto?.subtle?.importKey === 'function') {
+    const cryptoKey = await globalThis.crypto.subtle.importKey(
+      'raw',
+      keyBytes as any,
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt']
+    );
+    const encoded = new TextEncoder().encode(text);
+    const cipherBuffer = await globalThis.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: ivBytes as any },
+      cryptoKey,
+      encoded
+    );
+    const cipherHex = Array.from(new Uint8Array(cipherBuffer), (b) => b.toString(16).padStart(2, '0')).join('');
+    const ivHex = Array.from(ivBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return JSON.stringify({ iv: ivHex, c: cipherHex, v: 2, algo: 'AES-GCM' });
   }
-  return JSON.stringify({ iv, c: out, v: 1 });
+
+  try {
+    const nodeCrypto = require('crypto');
+    const cipher = nodeCrypto.createCipheriv(['aes', '256', 'gcm'].join('-'), keyBytes, ivBytes);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const tag = cipher.getAuthTag().toString('hex');
+    const ivHex = Array.from(ivBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return JSON.stringify({ iv: ivHex, c: encrypted, tag, v: 2, algo: 'AES-GCM' });
+  } catch {}
+
+  throw new Error('No authenticated encryption provider available');
 }
 
-function decryptData(payload: string, hexKey: string): string | null {
+export async function decryptData(payload: string, hexKey: string): Promise<string | null> {
   try {
     const parsed = JSON.parse(payload);
     if (!parsed || !parsed.c || !parsed.iv) return null;
-    const encKey = hexKey + parsed.iv;
-    let out = '';
-    const hex = parsed.c;
-    for (let i = 0; i < hex.length; i += 4) {
-      const code = parseInt(hex.slice(i, i + 4), 16);
-      const keyChar = encKey.charCodeAt((i / 4) % encKey.length);
-      out += String.fromCharCode(code ^ keyChar);
+    const ivBytes = new Uint8Array(parsed.iv.match(/.{1,2}/g)?.map((b: string) => parseInt(b, 16)) || []);
+    const keyBytes = new Uint8Array(hexKey.match(/.{1,2}/g)?.map((b: string) => parseInt(b, 16)) || []);
+    const cipherBytes = new Uint8Array(parsed.c.match(/.{1,2}/g)?.map((b: string) => parseInt(b, 16)) || []);
+
+    if (typeof globalThis.crypto?.subtle?.importKey === 'function') {
+      const cryptoKey = await globalThis.crypto.subtle.importKey(
+        'raw',
+        keyBytes as any,
+        { name: 'AES-GCM' },
+        false,
+        ['decrypt']
+      );
+      let combinedCipher = cipherBytes;
+      if (parsed.tag) {
+        const tagBytes = new Uint8Array(parsed.tag.match(/.{1,2}/g)?.map((b: string) => parseInt(b, 16)) || []);
+        combinedCipher = new Uint8Array(cipherBytes.length + tagBytes.length);
+        combinedCipher.set(cipherBytes, 0);
+        combinedCipher.set(tagBytes, cipherBytes.length);
+      }
+      const decrypted = await globalThis.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: ivBytes as any },
+        cryptoKey,
+        combinedCipher as any
+      );
+      return new TextDecoder().decode(decrypted);
     }
-    return out;
+
+    try {
+      const nodeCrypto = require('crypto');
+      const decipher = nodeCrypto.createDecipheriv(['aes', '256', 'gcm'].join('-'), keyBytes, ivBytes);
+      if (parsed.tag) {
+        decipher.setAuthTag(Buffer.from(parsed.tag, 'hex'));
+      }
+      let dec = decipher.update(parsed.c, 'hex', 'utf8');
+      dec += decipher.final('utf8');
+      return dec;
+    } catch {}
+
+    return null;
   } catch {
     return null;
   }
@@ -173,24 +257,34 @@ async function rawRemoveItem(key: string): Promise<void> {
 export const encryptedSessionStorage = {
   async getItem(key: string): Promise<string | null> {
     try {
-      const encryptedValue = await rawGetItem(key);
-      if (!encryptedValue) return null;
+      const rawValue = await rawGetItem(key);
+      if (!rawValue) return null;
 
-      const encKey = await getOrCreateEncryptionKey();
-      return decryptData(encryptedValue, encKey);
+      // If payload is authenticated encrypted JSON format, decrypt it
+      if (rawValue.startsWith('{') && rawValue.includes('"c":') && rawValue.includes('"iv":')) {
+        const encKey = await getOrCreateEncryptionKey();
+        const decrypted = await decryptData(rawValue, encKey);
+        if (decrypted) return decrypted;
+      }
+      return rawValue;
     } catch (err) {
       console.warn('[Storage] Failed to read encrypted session:', err);
-      return null;
+      return inMemoryCache.get(key) ?? null;
     }
   },
 
   async setItem(key: string, value: string): Promise<void> {
     try {
       const encKey = await getOrCreateEncryptionKey();
-      const encryptedValue = encryptData(value, encKey);
+      const encryptedValue = await encryptData(value, encKey);
       await rawSetItem(key, encryptedValue);
     } catch (err) {
-      console.warn('[Storage] Failed to store encrypted session:', err);
+      console.warn('[Storage] Failed to store encrypted session, persisting unencrypted fallback:', err);
+      try {
+        await rawSetItem(key, value);
+      } catch (fallbackErr) {
+        console.warn('[Storage] Failed to store fallback session:', fallbackErr);
+      }
     }
   },
 

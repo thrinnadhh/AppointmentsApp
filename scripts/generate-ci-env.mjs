@@ -25,6 +25,7 @@ export function generateCiEnv() {
     `CRON_SECRET="${cronSecret}"`,
     `DELETION_TOKEN_SECRET="${deletionSecret}"`,
     `ALLOW_MOCK_PAYMENTS="${allowMock}"`,
+    `ALLOW_MOCK_AUTH="true"`,
     `ENABLE_E2E_BYPASS="true"`,
     `RAZORPAY_KEY_ID="${process.env.RAZORPAY_KEY_ID || ''}"`,
     `RAZORPAY_KEY_SECRET="mock_secret_key_1234567890"`,
@@ -32,6 +33,7 @@ export function generateCiEnv() {
     `PAYMENT_GATEWAY_PROVIDER="cashfree"`,
     `CASHFREE_APP_ID="${cashfreeAppId}"`,
     `CASHFREE_SECRET_KEY="${cashfreeSecret}"`,
+    `CASHFREE_WEBHOOK_SECRET="${cashfreeSecret}"`,
     `CASHFREE_ENV="${cashfreeEnv}"`,
     `NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME="Dr. K. S. Rao"`,
     `NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL="grievance-officer@tirupati-appointments.org"`,
@@ -50,10 +52,24 @@ export function generateCiEnv() {
     `EXPO_PUBLIC_SUPABASE_ANON_KEY="${anonKey}"`,
   ].join('\n') + '\n';
 
+  const mobileEnvLines = [
+    `EXPO_PUBLIC_SUPABASE_URL="${supabaseUrl}"`,
+    `EXPO_PUBLIC_SUPABASE_ANON_KEY="${anonKey}"`,
+    `EXPO_PUBLIC_CASHFREE_APP_ID="${cashfreeAppId}"`,
+    `EXPO_PUBLIC_CASHFREE_ENV="${cashfreeEnv}"`,
+    `EXPO_PUBLIC_PAYMENT_GATEWAY_PROVIDER="cashfree"`,
+    `EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:3000"`,
+    `EXPO_PUBLIC_EAS_PROJECT_ID="${process.env.EXPO_PUBLIC_EAS_PROJECT_ID || '27a9b4e1-8c3d-4f6a-9b2e-1d5c7a8f9e0b'}"`,
+    `EXPO_PUBLIC_GRIEVANCE_OFFICER_NAME="Dr. K. S. Rao"`,
+    `EXPO_PUBLIC_GRIEVANCE_OFFICER_EMAIL="grievance-officer@tirupati-appointments.org"`,
+    `EXPO_PUBLIC_GRIEVANCE_OFFICER_PHONE="+91-877-2244888"`,
+    `EXPO_PUBLIC_GRIEVANCE_OFFICER_ADDRESS="Balaji Colony, Tirupati, AP 517502"`,
+    `ALLOW_MOCK_PAYMENTS="false"`,
+  ].join('\n') + '\n';
+
   const targetPaths = [
     path.resolve('apps/merchant-web/.env.local'),
     path.resolve('.env.local'),
-    path.resolve('apps/customer-mobile/.env.local'),
     path.resolve('supabase/.env'),
   ];
 
@@ -62,6 +78,11 @@ export function generateCiEnv() {
     fs.writeFileSync(targetPath, envLines, 'utf8');
     console.log(`[CI-ENV] Provisioned: ${path.relative(process.cwd(), targetPath)}`);
   }
+
+  const mobilePath = path.resolve('apps/customer-mobile/.env.local');
+  fs.mkdirSync(path.dirname(mobilePath), { recursive: true });
+  fs.writeFileSync(mobilePath, mobileEnvLines, 'utf8');
+  console.log(`[CI-ENV] Provisioned (Sanitized Mobile): ${path.relative(process.cwd(), mobilePath)}`);
 }
 
 if (process.argv[1] && process.argv[1].endsWith('generate-ci-env.mjs')) {

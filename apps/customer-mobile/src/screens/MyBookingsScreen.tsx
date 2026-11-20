@@ -14,6 +14,7 @@ import {
 import { Booking } from '@appointments/shared';
 import BookingPassModal from './BookingPassModal';
 import { fetchCustomerStrikes, fetchCustomerLifetimePin } from '../services/api';
+import { getEarliestUnlockedBookingState } from '../services/pinVisibility';
 
 interface MyBookingsScreenProps {
   onBack: () => void;
@@ -25,6 +26,7 @@ interface MyBookingsScreenProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  onRequireAuth?: () => void;
 }
 
 export default function MyBookingsScreen({
@@ -37,14 +39,35 @@ export default function MyBookingsScreen({
   onLoadMore,
   hasMore,
   isLoadingMore,
+  onRequireAuth,
 }: MyBookingsScreenProps) {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
   const [lifetimePin, setLifetimePin] = useState<string | null>(null);
+  const [isLoadingPin, setIsLoadingPin] = useState<boolean>(false);
   const [selectedPassBooking, setSelectedPassBooking] = useState<
     (Booking & { provider_name?: string; resource_name?: string }) | null
   >(null);
   const [customerStrikes, setCustomerStrikes] = useState<number>(0);
   const [markingReachedId, setMarkingReachedId] = useState<string | null>(null);
+
+  const loadLifetimePin = async () => {
+    if (!customerId) {
+      setLifetimePin(null);
+      if (onRequireAuth) {
+        onRequireAuth();
+      }
+      return;
+    }
+    setIsLoadingPin(true);
+    try {
+      const pin = await fetchCustomerLifetimePin(customerId);
+      setLifetimePin(pin);
+    } catch {
+      setLifetimePin(null);
+    } finally {
+      setIsLoadingPin(false);
+    }
+  };
 
   const handleReachedClick = (bookingId: string) => {
     Alert.alert(
@@ -82,9 +105,7 @@ export default function MyBookingsScreen({
     fetchCustomerStrikes(customerId).then((res) => {
       setCustomerStrikes(res.strikes);
     });
-    fetchCustomerLifetimePin(customerId).then((pin) => {
-      if (pin) setLifetimePin(pin);
-    });
+    loadLifetimePin();
   }, [customerId]);
 
   const upcomingBookings = bookings.filter((b) =>
@@ -190,14 +211,60 @@ export default function MyBookingsScreen({
               <Text style={styles.lifetimePinBadgeText}>PERMANENT</Text>
             </View>
           </View>
-          <View style={styles.lifetimePinBody}>
-            <Text style={styles.lifetimePinDigits} testID="my-bookings-lifetime-pin-digits">
-              {lifetimePin || '4821'}
-            </Text>
-            <Text style={styles.lifetimePinDesc}>
-              Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits. It never changes or expires upon reschedule.
-            </Text>
-          </View>
+          {(() => {
+            const pinDisplay = getEarliestUnlockedBookingState(upcomingBookings, lifetimePin);
+            if (pinDisplay.isUnlocked && lifetimePin) {
+              return (
+                <View style={styles.lifetimePinBody}>
+                  <Text style={styles.lifetimePinDigits} testID="my-bookings-lifetime-pin-digits">
+                    {pinDisplay.displayPin}
+                  </Text>
+                  <Text style={styles.lifetimePinDesc}>
+                    Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits. It never changes or expires upon reschedule.
+                  </Text>
+                </View>
+              );
+            }
+
+            if (!pinDisplay.isUnlocked && lifetimePin) {
+              return (
+                <View style={styles.lifetimePinBody}>
+                  <View style={styles.lifetimePinUnavailableContainer}>
+                    <Text style={styles.lifetimePinUnavailableText} testID="my-bookings-lifetime-pin-digits">
+                      🔒 PIN unlocks 60 mins before slot
+                    </Text>
+                  </View>
+                  <Text style={styles.lifetimePinDesc}>
+                    For your privacy and security, your permanent reception PIN is concealed until 60 minutes before your scheduled appointment slot.
+                  </Text>
+                </View>
+              );
+            }
+
+            return (
+              <View style={styles.lifetimePinBody}>
+                <View style={styles.lifetimePinUnavailableContainer}>
+                  <Text style={styles.lifetimePinUnavailableText} testID="my-bookings-lifetime-pin-digits">
+                    PIN unavailable
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.lifetimePinRetryButton}
+                    onPress={!customerId && onRequireAuth ? onRequireAuth : loadLifetimePin}
+                    disabled={isLoadingPin}
+                    testID="my-bookings-lifetime-pin-retry"
+                    accessibilityLabel={!customerId ? 'Sign in to view check-in PIN' : 'Retry loading check-in PIN'}
+                  >
+                    <Text style={styles.lifetimePinRetryText}>
+                      {isLoadingPin ? 'Retrying...' : !customerId ? 'Sign In' : 'Retry'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.lifetimePinDesc}>
+                  Use this permanent 4-digit PIN for instant reception check-in across all your hospital & clinic visits.
+                </Text>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Sub-tabs: Upcoming vs History */}
@@ -633,6 +700,28 @@ const styles = StyleSheet.create({
     color: '#047857',
     letterSpacing: 4,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  lifetimePinUnavailableContainer: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  lifetimePinUnavailableText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#065f46',
+    letterSpacing: 0.5,
+  },
+  lifetimePinRetryButton: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  lifetimePinRetryText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   lifetimePinDesc: {
     flex: 1,

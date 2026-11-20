@@ -68,6 +68,13 @@
     },
     "plugins": [
       [
+        "@sentry/react-native/expo",
+        {
+          "organization": "tirupati-appointments",
+          "project": "customer-mobile"
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",

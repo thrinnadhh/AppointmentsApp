@@ -10,7 +10,8 @@ import {
   Clock, 
   Lock, 
   UserPlus, 
-  ShieldAlert
+  ShieldAlert,
+  Users
 } from 'lucide-react';
 
 export interface CheckinSuccessData {
@@ -24,12 +25,22 @@ export interface CheckinSuccessData {
   queue_name?: string;
 }
 
+export interface CheckinMatchOption {
+  booking_id: string;
+  consultant_name: string;
+  slot_time: string;
+  customer_first_name: string;
+  phone_last_2: string;
+}
+
 interface FastPassCheckinPanelProps {
-  onVerifyCode: (code: string) => Promise<{
+  onVerifyCode: (code: string, bookingId?: string) => Promise<{
     success: boolean;
     data?: CheckinSuccessData;
     error?: string;
     message?: string;
+    multiple_matches?: boolean;
+    matches?: CheckinMatchOption[];
   }>;
   onOpenManualCheckin: () => void;
   selectedDoctorName?: string;
@@ -44,6 +55,8 @@ export default function FastPassCheckinPanel({
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successData, setSuccessData] = useState<CheckinSuccessData | null>(null);
+  const [multipleMatches, setMultipleMatches] = useState<CheckinMatchOption[] | null>(null);
+  const [pendingCode, setPendingCode] = useState<string>('');
 
   // 5 wrong attempts lock staff for 60 seconds (SPEC line 16)
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -83,7 +96,16 @@ export default function FastPassCheckinPanel({
         setSuccessData(res.data);
         setCodeInput('');
         setFailedAttempts(0);
+        setMultipleMatches(null);
+        setPendingCode('');
+      } else if (res.multiple_matches && Array.isArray(res.matches) && res.matches.length > 1) {
+        setMultipleMatches(res.matches);
+        setPendingCode(trimmed);
+        setErrorMessage(null);
+        setSuccessData(null);
       } else {
+        setMultipleMatches(null);
+        setPendingCode('');
         const nextFailed = failedAttempts + 1;
         setFailedAttempts(nextFailed);
         
@@ -100,7 +122,31 @@ export default function FastPassCheckinPanel({
         inputRef.current?.focus();
       }
     } catch (err) {
+      setMultipleMatches(null);
+      setPendingCode('');
       setErrorMessage(err instanceof Error ? err.message : 'Invalid check-in code');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleSelectMatch = async (bookingId: string) => {
+    if (!pendingCode || isVerifying || lockoutSeconds > 0) return;
+    setIsVerifying(true);
+    setErrorMessage(null);
+    try {
+      const res = await onVerifyCode(pendingCode, bookingId);
+      if (res.success && res.data) {
+        setSuccessData(res.data);
+        setCodeInput('');
+        setMultipleMatches(null);
+        setPendingCode('');
+        setFailedAttempts(0);
+      } else {
+        setErrorMessage(res.message || 'Failed to check in selected appointment');
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Check-in failed');
     } finally {
       setIsVerifying(false);
     }
@@ -223,6 +269,63 @@ export default function FastPassCheckinPanel({
           )}
         </button>
       </form>
+
+      {/* Multiple Matches Collision Picker */}
+      {multipleMatches && multipleMatches.length > 0 && (
+        <div
+          data-testid="multiple-matches-picker"
+          className="p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-amber-700 shrink-0" />
+              <div>
+                <h3 className="text-sm font-bold text-amber-950">
+                  Multiple Patients Match PIN {pendingCode}
+                </h3>
+                <p className="text-xs text-amber-800">
+                  Select the patient at the reception desk to complete check-in:
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMultipleMatches(null);
+                setPendingCode('');
+              }}
+              className="text-xs font-semibold text-amber-800 hover:text-amber-950 px-2 py-1 rounded-lg hover:bg-amber-100 transition cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            {multipleMatches.map((match) => (
+              <button
+                key={match.booking_id}
+                type="button"
+                data-testid={`match-select-btn-${match.booking_id}`}
+                disabled={isVerifying}
+                onClick={() => handleSelectMatch(match.booking_id)}
+                className="p-3 bg-white border border-amber-200 hover:border-emerald-500 hover:ring-2 hover:ring-emerald-500/20 rounded-xl text-left transition flex items-center justify-between group cursor-pointer"
+              >
+                <div>
+                  <p className="text-sm font-bold text-slate-900 group-hover:text-emerald-700">
+                    {match.customer_first_name} (••{match.phone_last_2})
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {match.consultant_name} • <span className="font-semibold text-slate-700">{match.slot_time}</span>
+                  </p>
+                </div>
+                <div className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 group-hover:bg-emerald-600 group-hover:text-white transition">
+                  Check In
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Success Notification Banner */}
       {successData && (

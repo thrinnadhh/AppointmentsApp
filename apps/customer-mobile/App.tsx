@@ -18,7 +18,37 @@ import { StatusBar } from 'expo-status-bar';
 LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
 LogBox.ignoreAllLogs(true);
 
-import { Resource, Slot, Booking, getPlatformFee } from '@appointments/shared';
+import {
+  Resource,
+  Slot,
+  Booking,
+  getPlatformFee,
+  sentryBeforeSend,
+  sentryBeforeBreadcrumb,
+  registerSentryClient,
+} from '@appointments/shared';
+import * as Sentry from '@sentry/react-native';
+
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+
+Sentry.init({
+  dsn: SENTRY_DSN,
+  sendDefaultPii: false,
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
+  tracesSampleRate: 0.1,
+  beforeSend(event) {
+    return sentryBeforeSend(event);
+  },
+  beforeBreadcrumb(breadcrumb) {
+    return sentryBeforeBreadcrumb(breadcrumb);
+  },
+});
+
+registerSentryClient(Sentry);
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).Sentry = Sentry;
+}
 
 
 import HomeScreen from './src/screens/HomeScreen';
@@ -49,6 +79,7 @@ import {
 import {
   registerForPushNotificationsAsync,
   setupNotificationListeners,
+  clearCachedPushToken,
 } from './src/services/notifications';
 
 type ScreenType = 'HOME' | 'PROVIDER_DETAIL' | 'MY_BOOKINGS';
@@ -59,7 +90,7 @@ export interface NavigationEntry {
   categoryId?: string | null;
 }
 
-export default function App() {
+function App() {
   // Navigation History Stack ensures returning from booking goes to exactly where the user left off
   const [history, setHistory] = useState<NavigationEntry[]>([
     { screen: 'HOME', categoryId: null },
@@ -161,8 +192,17 @@ export default function App() {
         setActiveCustomerId('');
         setIsPhoneVerified(false);
         setIsEmailVerified(false);
+        setCustomerBookings([]);
+        setPatientBookingDetails({
+          fullName: '',
+          phone: '',
+          email: '',
+        });
+        setSelectedBookingForPass(null);
+        setAssignedTokenNumber(undefined);
+        clearCachedPushToken();
         setCustomerProfile({
-          name: 'Ravi Teja',
+          name: '',
           phone: '',
           email: '',
           city: '',
@@ -351,7 +391,11 @@ export default function App() {
       const res = await sendPhoneOtp(authPhone);
       if (res.success) {
         setOtpSent(true);
-        setConfirmationToast('Code sent on WhatsApp! Test OTP is 123456');
+        setConfirmationToast(
+          typeof __DEV__ !== 'undefined' && __DEV__
+            ? 'Code sent on WhatsApp! Test OTP is 123456'
+            : 'Code sent on WhatsApp!'
+        );
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {
         setAuthError(
@@ -395,7 +439,12 @@ export default function App() {
         setConfirmationToast('Phone verified! Signed in with Supabase.');
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {
-        setAuthError(res.error || 'Invalid OTP. Please try 123456.');
+        setAuthError(
+          res.error ||
+            (typeof __DEV__ !== 'undefined' && __DEV__
+              ? 'Invalid OTP. Please try 123456.'
+              : 'Invalid OTP. Please try again.')
+        );
       }
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Failed to verify OTP');
@@ -415,7 +464,11 @@ export default function App() {
       const res = await sendEmailOtp(authEmail);
       if (res.success) {
         setEmailOtpSent(true);
-        setConfirmationToast('Email verification code sent! Test OTP is 123456');
+        setConfirmationToast(
+          typeof __DEV__ !== 'undefined' && __DEV__
+            ? 'Email verification code sent! Test OTP is 123456'
+            : 'Email verification code sent!'
+        );
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {
         setAuthError(res.error || 'Failed to send email verification');
@@ -445,7 +498,12 @@ export default function App() {
         setConfirmationToast('Email verified! Linked to your patient profile.');
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {
-        setAuthError(res.error || 'Invalid email verification code. Try 123456.');
+        setAuthError(
+          res.error ||
+            (typeof __DEV__ !== 'undefined' && __DEV__
+              ? 'Invalid email verification code. Try 123456.'
+              : 'Invalid email verification code. Please try again.')
+        );
       }
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Failed to verify email');
@@ -458,9 +516,19 @@ export default function App() {
     setAuthLoading(true);
     try {
       await signOutCustomer();
+      clearCachedPushToken();
       setActiveCustomerId('');
       setIsAuthenticated(false);
+      setIsPhoneVerified(false);
+      setIsEmailVerified(false);
       setCustomerBookings([]);
+      setPatientBookingDetails({
+        fullName: '',
+        phone: '',
+        email: '',
+      });
+      setSelectedBookingForPass(null);
+      setAssignedTokenNumber(undefined);
       setOtpSent(false);
       setAuthOtp('');
       setCustomerProfile({
@@ -805,6 +873,7 @@ export default function App() {
             onLoadMore={handleLoadMoreBookings}
             hasMore={hasMoreBookings}
             isLoadingMore={isLoadingMoreBookings}
+            onRequireAuth={() => setProfileVisible(true)}
           />
         )}
       </View>
@@ -1029,7 +1098,7 @@ export default function App() {
                           style={styles.authTextInput}
                           value={authPhone}
                           onChangeText={setAuthPhone}
-                          placeholder="+919999999991"
+                          placeholder={typeof __DEV__ !== 'undefined' && __DEV__ ? '+919999999991' : '+91 98765 43210'}
                           placeholderTextColor="#94a3b8"
                           keyboardType="phone-pad"
                           autoCapitalize="none"
@@ -1050,9 +1119,11 @@ export default function App() {
                           <Text style={styles.authPrimaryBtnText}>Send 6-Digit OTP</Text>
                         )}
                       </TouchableOpacity>
-                      <Text style={styles.authHelperText}>
-                        ℹ️ Test Phone: +919999999991 (Fixed OTP: 123456)
-                      </Text>
+                      {(typeof __DEV__ !== 'undefined' && __DEV__) && (
+                        <Text style={styles.authHelperText}>
+                          ℹ️ Test Phone: +919999999991 (Fixed OTP: 123456)
+                        </Text>
+                      )}
                     </View>
                   ) : (
                     <View>
@@ -1062,7 +1133,7 @@ export default function App() {
                           style={[styles.authTextInput, { letterSpacing: 4, textAlign: 'center', fontSize: 20 }]}
                           value={authOtp}
                           onChangeText={setAuthOtp}
-                          placeholder="123456"
+                          placeholder={typeof __DEV__ !== 'undefined' && __DEV__ ? '123456' : '••••••'}
                           placeholderTextColor="#94a3b8"
                           keyboardType="number-pad"
                           maxLength={6}
@@ -1151,9 +1222,11 @@ export default function App() {
                           <Text style={styles.authPrimaryBtnText}>Send Email Verification OTP</Text>
                         )}
                       </TouchableOpacity>
-                      <Text style={styles.authHelperText}>
-                        ℹ️ Test Email OTP: 123456
-                      </Text>
+                      {(typeof __DEV__ !== 'undefined' && __DEV__) && (
+                        <Text style={styles.authHelperText}>
+                          ℹ️ Test Email OTP: 123456
+                        </Text>
+                      )}
                     </View>
                   ) : (
                     <View>
@@ -1163,7 +1236,7 @@ export default function App() {
                           style={[styles.authTextInput, { letterSpacing: 4, textAlign: 'center', fontSize: 20 }]}
                           value={authEmailOtp}
                           onChangeText={setAuthEmailOtp}
-                          placeholder="123456"
+                          placeholder={typeof __DEV__ !== 'undefined' && __DEV__ ? '123456' : '••••••'}
                           placeholderTextColor="#94a3b8"
                           keyboardType="number-pad"
                           maxLength={6}
@@ -1262,7 +1335,10 @@ export default function App() {
         onRequestClose={() => setAccountVisible(false)}
       >
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-          <AccountScreen onClose={() => setAccountVisible(false)} />
+          <AccountScreen
+            onClose={() => setAccountVisible(false)}
+            onSignOut={handleSignOut}
+          />
         </SafeAreaView>
       </Modal>
 
@@ -1633,3 +1709,5 @@ const styles = StyleSheet.create({
     color: '#be123c',
   },
 });
+
+export default Sentry.wrap(App);

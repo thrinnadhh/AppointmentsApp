@@ -20,6 +20,7 @@ import {
   AppLogEntry,
   AppLogsFilter,
   VerifyCheckinCodeResult,
+  BookingStatus,
 } from '@appointments/shared';
 
 import { authEnv } from './env';
@@ -211,7 +212,7 @@ export async function manageLateQueueBooking(
   }
 }
 
-export const PROVIDER_SELECT_COLUMNS = 'id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, category_id, sub_category_id, weekly_hours, auto_accept_bookings, daily_booking_limit, is_booking_frozen, cooling_period_days, auto_confirm_holds, whatsapp_confirmations, reminder_offset_hours, gstin, support_phone, support_email, jurisdiction, payout_upi_id, min_deposit_amount, cancellation_window_hours, cashfree_app_id, cashfree_vendor_id, owner_id, created_at, updated_at';
+export const PROVIDER_SELECT_COLUMNS = 'id, name, description, address, city, latitude, longitude, phone, email, opening_time, closing_time, photos, status, is_active, category_id, sub_category_id, weekly_hours, auto_accept_bookings, daily_booking_limit, is_booking_frozen, cooling_period_days, auto_confirm_holds, whatsapp_confirmations, reminder_offset_hours, gstin, support_phone, support_email, jurisdiction, payout_upi_id, min_deposit_amount, cancellation_window_hours, cashfree_app_id, cashfree_vendor_id, cashfree_vendor_status, bank_account_holder, bank_account_last4, bank_ifsc, pan_last4, owner_id, created_at, updated_at';
 
 export async function fetchAllProviders(): Promise<(Provider & { resources: Resource[] })[]> {
   const { data, error } = await supabase
@@ -383,7 +384,7 @@ export async function fetchProviderResources(providerId: string) {
 
 export async function updateBookingStatus(
   bookingId: string,
-  status: Database['public']['Enums']['booking_status'] | 'IN_PROGRESS',
+  status: BookingStatus | 'IN_PROGRESS',
   paymentStatus?: Database['public']['Enums']['payment_status']
 ) {
   const { data: authData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
@@ -1410,20 +1411,21 @@ export async function purgeAdminAppLogs(
  */
 export async function verifyCheckinCodeRpc(
   shopId: string,
-  code: string
-): Promise<VerifyCheckinCodeResult> {
+  code: string,
+  bookingId?: string
+): Promise<VerifyCheckinCodeResult & { multiple_matches?: boolean; matches?: any[] }> {
   const cleanCode = code.trim();
   try {
     // 1. Try resilient API endpoint first
     const apiRes = await fetch('/api/bookings/checkin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shopId, code: cleanCode }),
+      body: JSON.stringify({ shopId, code: cleanCode, booking_id: bookingId }),
     });
 
     const apiData = await apiRes.json();
-    if (apiData && typeof apiData === 'object' && ('success' in apiData || 'message' in apiData)) {
-      return apiData as VerifyCheckinCodeResult;
+    if (apiData && typeof apiData === 'object' && ('success' in apiData || 'message' in apiData || 'multiple_matches' in apiData)) {
+      return apiData as any;
     }
   } catch (apiErr) {
     console.warn('API checkin fallback to client RPC:', apiErr);

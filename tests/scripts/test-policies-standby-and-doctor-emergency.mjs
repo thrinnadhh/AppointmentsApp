@@ -122,17 +122,17 @@ async function runPolicyVerificationSuite() {
     await client.query("DELETE FROM public.bookings WHERE provider_id = $1 AND status IN ('WAITING', 'UP_NEXT')", [prov.id]);
 
     // Create 4 bookings to verify both rules:
-    // b1 (Unarrived remote standby): is_present = false, customer_arrived_at = 09:05 IST for 08:50 slot (+15m late; 55m wait at 10:00 -> EXPIRED!)
+    // b1 (Unarrived remote standby): is_present = false, customer_arrived_at = 08:55 IST for 08:40 slot (+15m late; 65m wait at 10:00 -> EXPIRED!)
     // b2 (Active remote standby): is_present = false, customer_arrived_at = 09:35 IST for 09:20 slot (+15m late; 25m wait at 10:00 -> NOT EXPIRED)
-    // b3 (Checked-in late patient): is_present = true, checked_in_at = 09:05 IST for 08:40 slot (+25m late; 55m wait at 10:00 -> MUST NEVER EXPIRE because physically checked-in!)
-    // b4 (Checked-in on-time patient): is_present = true, checked_in_at = 08:45 IST for 08:50 slot (early arrival; 75m wait at 10:00 -> MUST NEVER EXPIRE!)
+    // b3 (Checked-in late patient): is_present = true, checked_in_at = 08:25 IST for 08:00 slot (+25m late; 95m wait at 10:00 -> MUST NEVER EXPIRE because physically checked-in!)
+    // b4 (Checked-in on-time patient): is_present = true, checked_in_at = 08:15 IST for 08:20 slot (early arrival; 105m wait at 10:00 -> MUST NEVER EXPIRE!)
     const b1Res = await client.query(
       `INSERT INTO public.bookings (
         customer_id, provider_id, resource_id, slot_start, slot_end,
         status, payment_status, deposit_amount, is_present, customer_arrived_at, queue_position
       ) VALUES (
-        $1, $2, $3, '2026-10-22T08:50:00+05:30', '2026-10-22T09:05:00+05:30',
-        'WAITING', 'CAPTURED', 100, false, '2026-10-22T09:05:00+05:30', 10
+        $1, $2, $3, '2026-10-22T08:40:00+05:30', '2026-10-22T08:55:00+05:30',
+        'WAITING', 'CAPTURED', 100, false, '2026-10-22T08:55:00+05:30', 10
       ) RETURNING id`,
       [c1.id, prov.id, doc.id]
     );
@@ -155,8 +155,8 @@ async function runPolicyVerificationSuite() {
         customer_id, provider_id, resource_id, slot_start, slot_end,
         status, payment_status, deposit_amount, is_present, checked_in_at
       ) VALUES (
-        $1, $2, $3, '2026-10-22T08:40:00+05:30', '2026-10-22T08:55:00+05:30',
-        'WAITING', 'CAPTURED', 100, true, '2026-10-22T09:05:00+05:30'
+        $1, $2, $3, '2026-10-22T08:00:00+05:30', '2026-10-22T08:15:00+05:30',
+        'WAITING', 'CAPTURED', 100, true, '2026-10-22T08:25:00+05:30'
       ) RETURNING id`,
       [(c3 || c1).id, prov.id, doc.id]
     );
@@ -167,8 +167,8 @@ async function runPolicyVerificationSuite() {
         customer_id, provider_id, resource_id, slot_start, slot_end,
         status, payment_status, deposit_amount, is_present, checked_in_at
       ) VALUES (
-        $1, $2, $3, '2026-10-22T08:50:00+05:30', '2026-10-22T09:05:00+05:30',
-        'WAITING', 'CAPTURED', 100, true, '2026-10-22T08:45:00+05:30'
+        $1, $2, $3, '2026-10-22T08:20:00+05:30', '2026-10-22T08:35:00+05:30',
+        'WAITING', 'CAPTURED', 100, true, '2026-10-22T08:15:00+05:30'
       ) RETURNING id`,
       [(c3 || c1).id, prov.id, doc.id]
     );

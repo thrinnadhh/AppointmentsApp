@@ -55,8 +55,8 @@ async function createAndConfirmBooking(request: any, opts: {
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const randomOffset = 86400000 * (30 + attempt * 5) + Math.floor(Math.random() * 86400000);
-    slotStart = opts.slotStart || new Date(Date.now() + randomOffset).toISOString();
-    slotEnd = opts.slotEnd || new Date(new Date(slotStart).getTime() + 1800000).toISOString();
+    slotStart = opts.slotStart && attempt === 0 ? opts.slotStart : new Date(Date.now() + randomOffset).toISOString();
+    slotEnd = opts.slotEnd && attempt === 0 ? opts.slotEnd : new Date(new Date(slotStart).getTime() + 1800000).toISOString();
 
     const { data: holdData, error: holdError } = await supabase.rpc('create_booking_hold', {
       p_customer_id: customerId,
@@ -292,31 +292,28 @@ test.describe('Cross-System Integration — Edge Cases', () => {
     const initialStrikes: number = initial?.no_show_count ?? 0;
 
     try {
-      // 2. Create and confirm booking (within 30m window so no-show is allowed)
-      const slotStart = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-      const slotEnd   = new Date(Date.now() + 10 * 60 * 1000 + 1800000).toISOString();
-
-      // Clear any leftover HELD/CONFIRMED booking in this window from prior runs
-      await supabase
-        .from('bookings')
-        .delete()
-        .eq('resource_id', CLINIC_RESOURCE_ID)
-        .gte('slot_start', new Date(Date.now() - 30 * 60 * 1000).toISOString())
-        .lte('slot_start', new Date(Date.now() + 60 * 60 * 1000).toISOString());
-
+      // 2. Create and confirm booking
       const { booking_id, confirmRes } = await createAndConfirmBooking(request, {
         customerId: SEED_CUSTOMER_ID,
         resourceId: CLINIC_RESOURCE_ID,
-        slotStart,
-        slotEnd,
       });
       expect(confirmRes.status()).toBe(200);
+
+      // Backdate slot_start and slot_end to past so premature no-show check passes (NOW >= slot_start + 10m)
+      await supabase
+        .from('bookings')
+        .update({
+          slot_start: new Date(Date.now() - 3600000).toISOString(),
+          slot_end: new Date(Date.now() - 1800000).toISOString(),
+        })
+        .eq('id', booking_id);
 
       // 3. Merchant marks no-show via direct RPC
       const { data: noShowData, error: noShowError } = await (supabase.rpc as any)('record_no_show', {
         p_booking_id: booking_id,
       });
       expect(noShowError).toBeFalsy();
+      expect((noShowData as any)?.success !== false).toBe(true);
 
       // 4. Verify booking is NO_SHOW + payment reflects 3-strike courtesy policy
       const { data: booking } = await supabase

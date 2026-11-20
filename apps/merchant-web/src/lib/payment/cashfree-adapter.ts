@@ -63,6 +63,12 @@ export class CashfreeAdapter implements PaymentGatewayAdapter {
     if (validExpiryTime) {
       payload.order_expiry_time = validExpiryTime;
     }
+    if (params.orderSplits && params.orderSplits.length > 0) {
+      payload.order_splits = params.orderSplits.map((s) => ({
+        vendor_id: s.vendorId,
+        amount: this.paiseToRupees(s.amountInPaise),
+      }));
+    }
 
     const response = await this.client.createOrder(payload);
 
@@ -110,11 +116,20 @@ export class CashfreeAdapter implements PaymentGatewayAdapter {
     const refundAmountRupees = this.paiseToRupees(params.amountInPaise);
     const refundId = params.refundId || `ref_${Date.now()}`;
 
+    let refundSplitsPayload: Array<{ vendor_id: string; amount: number }> | undefined = undefined;
+    if (params.refundSplits && params.refundSplits.length > 0) {
+      refundSplitsPayload = params.refundSplits.map((s) => ({
+        vendor_id: s.vendorId,
+        amount: this.paiseToRupees(s.amountInPaise),
+      }));
+    }
+
     const res = await this.client.createRefund(params.orderId, {
       refund_amount: refundAmountRupees,
       refund_id: refundId,
       refund_note: params.reason || 'Hospital appointment refund',
       refund_speed: params.speed === 'instant' ? 'INSTANT' : 'STANDARD',
+      refund_splits: refundSplitsPayload,
     });
 
     return {

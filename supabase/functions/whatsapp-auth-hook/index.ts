@@ -138,17 +138,21 @@ Deno.serve(async (req: Request) => {
 
   // ── 1. Standard Webhooks Signature Verification ───────────────────────────
   const hookSecret = Deno.env.get('SEND_SMS_HOOK_SECRET');
-  if (hookSecret) {
-    const isValid = await verifyStandardWebhook(rawBody, req.headers, hookSecret);
-    if (!isValid) {
-      console.warn('[whatsapp-auth-hook] ⚠️ Invalid Standard Webhooks signature. Rejecting payload.');
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid webhook signature' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-  } else {
-    console.warn('[whatsapp-auth-hook] Notice: SEND_SMS_HOOK_SECRET not set in environment.');
+  if (!hookSecret) {
+    console.error('[whatsapp-auth-hook] ❌ SEND_SMS_HOOK_SECRET not set in environment. Rejecting unauthenticated access.');
+    return new Response(JSON.stringify({ error: 'Unauthorized: Webhook secret not configured' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const isValid = await verifyStandardWebhook(rawBody, req.headers, hookSecret);
+  if (!isValid) {
+    console.warn('[whatsapp-auth-hook] ⚠️ Invalid Standard Webhooks signature. Rejecting payload.');
+    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid webhook signature' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   let payload: any;

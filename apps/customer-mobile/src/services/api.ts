@@ -589,12 +589,12 @@ export async function createHoldOnSupabase(
       p_slot_end: slotEnd,
       p_customer_id: resolvedCustomerId,
       p_booking_for_someone_else: isFamily,
-      p_patient_name: patientName || null,
-      p_patient_phone: patientPhone || null,
-      p_patient_relationship: patientRelationship || null,
+      p_patient_name: patientName || undefined,
+      p_patient_phone: patientPhone || undefined,
+      p_patient_relationship: patientRelationship || undefined,
       p_booked_for: isFamily ? 'family' : 'self',
-      p_patient_age: patientAge !== undefined ? patientAge : null,
-      p_booking_note: bookingNote || null,
+      p_patient_age: typeof patientAge === 'number' ? patientAge : undefined,
+      p_booking_note: bookingNote || undefined,
     });
 
     if (error) {
@@ -1465,6 +1465,9 @@ export async function signInWithGoogleDev(
   email: string = 'patient@gmail.com',
   name: string = 'Google Patient'
 ): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+    return { success: false, error: 'Google dev sign-in is disabled in production' };
+  }
   try {
     const testPhone = '+919999999991';
     const otpRes = await verifyPhoneOtp(testPhone, '123456');
@@ -1660,15 +1663,26 @@ export async function fetchBookingCheckinCode(bookingId: string): Promise<string
  * Fetch permanent lifetime 4-digit check-in PIN for customer
  */
 export async function fetchCustomerLifetimePin(customerId: string): Promise<string | null> {
+  if (!customerId) return null;
   try {
     const { data, error } = await (supabase as any)
-      .from('customer_checkin_pins')
-      .select('pin')
-      .eq('customer_id', customerId)
+      .from('profiles')
+      .select('permanent_checkin_pin')
+      .eq('id', customerId)
       .maybeSingle();
 
-    if (!error && data?.pin) {
-      return data.pin;
+    if (!error && data?.permanent_checkin_pin) {
+      return data.permanent_checkin_pin;
+    }
+
+    if (!error && !data?.permanent_checkin_pin) {
+      const { data: rpcPin, error: rpcError } = await (supabase as any).rpc(
+        'get_or_create_customer_checkin_pin',
+        { p_customer_id: customerId }
+      );
+      if (!rpcError && rpcPin) {
+        return rpcPin;
+      }
     }
   } catch (err) {
     console.warn('Network error fetching customer lifetime pin:', err);

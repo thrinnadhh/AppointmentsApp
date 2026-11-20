@@ -38,23 +38,68 @@ function getSafeRedirectUrl(target: string | null | undefined, fallback = '/admi
 }
 
 /**
- * Extracts and normalizes SVG markup from raw XML or GoTrue data strings,
- * ensuring viewBox is set for responsive scaling.
+ * Safely sanitizes and formats QR SVG markup before rendering.
+ * Strips dangerous executable script elements, event handlers (on*),
+ * object, embed, iframe, foreignObject tags, and javascript: links.
  */
-function formatQrSvg(raw: string): string {
-  if (!raw) return '';
+function sanitizeQrSvg(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
   const svgIndex = raw.indexOf('<svg');
   if (svgIndex === -1) return '';
-  let svg = raw.slice(svgIndex);
-  if (!svg.includes('viewBox')) {
-    const widthMatch = svg.match(/width="(\d+)"/);
-    const heightMatch = svg.match(/height="(\d+)"/);
-    const w = widthMatch ? widthMatch[1] : '231';
-    const h = heightMatch ? heightMatch[1] : '231';
-    svg = svg.replace('<svg', `<svg viewBox="0 0 ${w} ${h}"`);
+  const rawSvg = raw.slice(svgIndex);
+
+  if (typeof window !== 'undefined' && typeof window.DOMParser !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawSvg, 'image/svg+xml');
+      const svgEl = doc.querySelector('svg');
+      if (!svgEl) return '';
+
+      // Whitelist only safe SVG presentation tags
+      const allowedTags = new Set([
+        'svg', 'path', 'rect', 'circle', 'line', 'polyline', 'polygon',
+        'g', 'defs', 'clippath', 'use', 'title', 'desc'
+      ]);
+      const allElements = Array.from(doc.querySelectorAll('*'));
+      for (const el of allElements) {
+        if (!allowedTags.has(el.tagName.toLowerCase())) {
+          el.remove();
+          continue;
+        }
+        for (const attr of Array.from(el.attributes)) {
+          const attrName = attr.name.toLowerCase();
+          const attrVal = attr.value.trim().toLowerCase();
+          if (
+            attrName.startsWith('on') ||
+            attrName === 'href' ||
+            attrName === 'xlink:href' ||
+            attrVal.startsWith('javascript:') ||
+            attrVal.startsWith('data:') ||
+            attrVal.startsWith('vbscript:')
+          ) {
+            el.removeAttribute(attr.name);
+          }
+        }
+      }
+
+      if (!svgEl.hasAttribute('viewBox')) {
+        const widthMatch = rawSvg.match(/width="(\d+)"/);
+        const heightMatch = rawSvg.match(/height="(\d+)"/);
+        const w = widthMatch ? widthMatch[1] : (svgEl.getAttribute('width') || '231');
+        const h = heightMatch ? heightMatch[1] : (svgEl.getAttribute('height') || '231');
+        svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      }
+
+      return new XMLSerializer().serializeToString(svgEl);
+    } catch {
+      return '';
+    }
   }
-  return svg;
+
+  return rawSvg;
 }
+
+const formatQrSvg = sanitizeQrSvg;
 
 function AdminLoginForm() {
   const router = useRouter();
@@ -195,9 +240,10 @@ function AdminLoginForm() {
 
         if (enrollError || !enrollData) {
           if (
-            process.env.NODE_ENV !== 'production' ||
-            enrollError?.message?.toLowerCase().includes('mfa enroll is disabled') ||
-            enrollError?.message?.toLowerCase().includes('disabled for totp')
+            process.env.NODE_ENV !== 'production' &&
+            process.env.ALLOW_MOCK_AUTH === 'true' &&
+            (enrollError?.message?.toLowerCase().includes('mfa enroll is disabled') ||
+              enrollError?.message?.toLowerCase().includes('disabled for totp'))
           ) {
             setEnrollFactorId('mock-totp-factor-e2e');
             setQrCodeSvg('<svg width="180" height="180" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#f8fafc"/><rect x="20" y="20" width="60" height="60" fill="#0f172a"/></svg>');
@@ -272,6 +318,9 @@ function AdminLoginForm() {
 
     try {
       if (enrollFactorId === 'mock-totp-factor-e2e') {
+        if (process.env.NODE_ENV === 'production' || process.env.ALLOW_MOCK_AUTH !== 'true') {
+          throw new Error('Mock authentication factor is prohibited in production.');
+        }
         if (mfaCode.trim() === '000000' || mfaCode.trim() === '999999') {
           throw new Error('Verification code failed. Please check the current time on your device.');
         }
@@ -322,6 +371,10 @@ function AdminLoginForm() {
 
   // Skip MFA for Dev Preview
   const handleSkipMfaDev = () => {
+    if (process.env.NODE_ENV === 'production' || process.env.ALLOW_MOCK_AUTH !== 'true') {
+      setErrorMsg('Bypassing 2FA is prohibited in production.');
+      return;
+    }
     setSuccessMsg('Bypassing 2FA requirement for local development preview...');
     setTimeout(() => {
       router.push(redirectTarget);
@@ -526,7 +579,7 @@ function AdminLoginForm() {
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Sign In as Different User
               </button>
-              {process.env.NODE_ENV === 'development' && (
+              {process.env.NODE_ENV !== 'production' && process.env.ALLOW_MOCK_AUTH === 'true' && (
                 <button
                   type="button"
                   data-testid="admin-mfa-skip"

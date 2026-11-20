@@ -11,6 +11,8 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
   let tokens = {};
   let neuroDocId;
   let neuroDeptId;
+  let salonProvId;
+  let salonResourceId;
   let testCustomerId;
 
   before(async () => {
@@ -28,6 +30,16 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
     manifest = JSON.parse(fs.readFileSync('scripts/test-seed-manifest.json', 'utf8'));
     hospA = manifest.hospitalA;
     neuroDeptId = hospA.departments.find((d) => d.name === 'Neurology').id;
+
+    // Fetch salon provider & resource for non-medical lockout tests
+    const salonProvRes = await fetch(`${supabaseUrl}/rest/v1/providers?category_id=eq.salons&select=id`, { headers: serviceHeaders });
+    const salonProvs = await salonProvRes.json();
+    salonProvId = salonProvs[0]?.id;
+    if (salonProvId) {
+      const salonRes = await fetch(`${supabaseUrl}/rest/v1/resources?provider_id=eq.${salonProvId}&select=id`, { headers: serviceHeaders });
+      const sDocs = await salonRes.json();
+      salonResourceId = sDocs[0]?.id;
+    }
 
     async function login(email, password = 'HospitalTest2026!') {
       const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
@@ -64,7 +76,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
   });
 
   // Helper to create a test booking in CONFIRMED state with ₹100 deposit (past slot to allow legitimate no-show reporting)
-  async function createTestBooking(offsetHours) {
+  async function createTestBooking(offsetHours, providerId = hospA.id, resourceId = neuroDocId, deptId = neuroDeptId) {
     const start = new Date(Date.now() - (48 + offsetHours) * 3600000);
     const end = new Date(start.getTime() + 15 * 60000);
     const refCode = `NS-TEST-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
@@ -73,9 +85,9 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
       method: 'POST',
       headers: serviceHeaders,
       body: JSON.stringify({
-        provider_id: hospA.id,
-        resource_id: neuroDocId,
-        department_id: neuroDeptId,
+        provider_id: providerId,
+        resource_id: resourceId,
+        department_id: deptId,
         customer_id: testCustomerId,
         slot_start: start.toISOString(),
         slot_end: end.toISOString(),
@@ -195,7 +207,7 @@ describe('Hospital Tiered No-Show Policy & 7-Day Account Block', () => {
   });
 
   it('5. Strike 6 (> 5 strikes): Blocks account for 7 days, sets blocked_until, and resets strike counter to 0', async () => {
-    const booking = await createTestBooking(6);
+    const booking = await createTestBooking(6, salonProvId || hospA.id, salonResourceId || neuroDocId, null);
     const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/record_no_show`, {
       method: 'POST',
       headers: serviceHeaders,

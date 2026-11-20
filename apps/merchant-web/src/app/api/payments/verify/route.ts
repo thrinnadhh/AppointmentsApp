@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { canMockPayments } from '@/lib/cashfree';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { checkRateLimit } from '@/lib/redis';
-import { VerifyRazorpayPaymentRequest, VerifyRazorpayPaymentResponse, getPlatformFee } from '@appointments/shared';
+import { VerifyRazorpayPaymentRequest, VerifyRazorpayPaymentResponse, getPlatformFee, captureError } from '@appointments/shared';
 import { getClientIp, verifyAuthenticatedUser } from '@/lib/auth-admin';
 import { parseSafeJson, PayloadLimitExceededError } from '@/lib/validation-limits';
 
@@ -14,6 +14,9 @@ async function fetchRazorpayOrder(orderId?: string): Promise<{ id: string; amoun
 }
 
 export async function POST(req: NextRequest) {
+  let activeBookingId: string | undefined;
+  let activeProviderId: string | undefined;
+  let activeOrderId: string | undefined;
   try {
     // 0. IP rate limiting (30 attempts/minute); falls back to per-user rate limit when IP is absent
     const clientIp = getClientIp(req);
@@ -67,6 +70,8 @@ export async function POST(req: NextRequest) {
       razorpay_signature,
       attachment_url,
     } = body;
+    activeBookingId = booking_id;
+    activeOrderId = razorpay_order_id;
 
     if (!booking_id) {
       return NextResponse.json<VerifyRazorpayPaymentResponse>(
@@ -83,6 +88,13 @@ export async function POST(req: NextRequest) {
       .select('id, customer_id, provider_id, resource_id, slot_start, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, expected_payment_amount_paise, platform_payment_status, consultation_payment_status, status, payment_status, gateway_order_id, gateway_payment_id, gateway_provider, hold_expires_at')
       .eq('id', booking_id)
       .maybeSingle();
+
+    if (booking) {
+      activeProviderId = booking.provider_id;
+      if (!activeOrderId && booking.gateway_order_id) {
+        activeOrderId = booking.gateway_order_id;
+      }
+    }
 
     if (bkgErr || !booking) {
       return NextResponse.json<VerifyRazorpayPaymentResponse>(
@@ -748,6 +760,13 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err: unknown) {
+    captureError(err, {
+      flow: 'payment',
+      route: '/api/payments/verify',
+      booking_id: activeBookingId,
+      provider_id: activeProviderId,
+      order_id: activeOrderId,
+    });
     const message = err instanceof Error ? err.message : 'Internal error verifying payment';
     console.error('Payment verification failed:', err);
     return NextResponse.json<VerifyRazorpayPaymentResponse>(

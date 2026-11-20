@@ -35,10 +35,13 @@ export async function GET(
     const searchParams = req.nextUrl?.searchParams;
     const phoneLast4 = searchParams?.get("phone_last4") || null;
 
-    let isBookingOwner = Boolean(caller && caller.id === booking.customer_id);
-    let isAuthorized = caller ? await isCallerAuthorizedForBooking(caller.id, booking, true) : false;
+    const isBookingOwner = Boolean(caller && caller.id === booking.customer_id);
+    const isStaffAuthorized = caller ? await isCallerAuthorizedForBooking(caller.id, booking, false) : false;
+    const isFullyAuthorized = isBookingOwner || isStaffAuthorized;
 
-    if (!isAuthorized && phoneLast4 && typeof phoneLast4 === "string") {
+    let isPhoneVerified = false;
+
+    if (!isFullyAuthorized && phoneLast4 && typeof phoneLast4 === "string") {
       const { data: custProfile } = await supabaseAdmin
         .from("profiles")
         .select("phone")
@@ -50,12 +53,16 @@ export async function GET(
       const expectedLast4 = digitsOnly.slice(-4);
 
       if (expectedLast4 && phoneLast4.trim() === expectedLast4) {
-        isAuthorized = true;
-        isBookingOwner = true;
+        isPhoneVerified = true;
+      } else {
+        return NextResponse.json(
+          { error: "Invalid phone verification digits", requires_verification: true },
+          { status: 403 }
+        );
       }
     }
 
-    if (!isAuthorized) {
+    if (!isFullyAuthorized && !isPhoneVerified) {
       const { data: publicResource } = await supabaseAdmin
         .from("resources")
         .select("id, duration_minutes")
@@ -111,6 +118,8 @@ export async function GET(
 
     // 6. Check-in code visibility gating (SPEC line 16)
     // Shown to customer from 60 minutes before slot start until check-in.
+    // ONLY authenticated booking owner or authorized hospital staff can receive check-in PIN.
+    // Unauthenticated phone_last4 caller must NEVER receive check-in PIN.
     const slotStartMs = new Date(booking.slot_start).getTime();
     const nowMs = Date.now();
     const isWindowOpen = nowMs >= slotStartMs - 60 * 60 * 1000;
@@ -118,15 +127,42 @@ export async function GET(
     const isCheckedIn = booking.status === "CHECKED_IN" || booking.is_present;
 
     let displayCode: string | null = null;
-    if (isBookingOwner) {
+    if (isFullyAuthorized && (isWindowOpen || isCheckedIn)) {
       const { data: checkinCodeRecord } = await supabaseAdmin
         .from("appointment_checkin_codes")
         .select("code, appointment_date")
         .eq("booking_id", booking.id)
         .maybeSingle();
 
-      if (isWindowOpen || isCheckedIn) {
-        displayCode = checkinCodeRecord?.code || profile?.permanent_checkin_pin || null;
+      displayCode = checkinCodeRecord?.code || profile?.permanent_checkin_pin || null;
+    }
+
+    // Redact sensitive PII when accessed unauthenticated with phone_last4:
+    let customerPhone = profile?.phone || null;
+    let customerEmail = profile?.email || null;
+    let bookingNote = booking.booking_note || null;
+
+    if (!isFullyAuthorized) {
+      // Strip clinical notes / complaints
+      bookingNote = null;
+
+      // Mask phone (e.g. '******' + last4)
+      if (customerPhone) {
+        const digits = customerPhone.replace(/\D/g, "");
+        const last4 = digits.slice(-4);
+        customerPhone = `******${last4}`;
+      }
+
+      // Mask email
+      if (customerEmail) {
+        const parts = customerEmail.split('@');
+        if (parts.length === 2) {
+          const namePart = parts[0];
+          const maskedName = namePart.length > 1 ? `${namePart[0]}***` : '***';
+          customerEmail = `${maskedName}@${parts[1]}`;
+        } else {
+          customerEmail = null;
+        }
       }
     }
 
@@ -154,14 +190,14 @@ export async function GET(
         patient_age: booking.patient_age ?? null,
         patient_relationship: booking.patient_relationship || null,
         is_minor: Boolean(booking.is_minor),
-        booking_note: booking.booking_note || null,
+        booking_note: bookingNote,
       },
       customer: {
         id: booking.customer_id,
         name: profile?.full_name || "Patient",
         full_name: profile?.full_name || "Patient",
-        email: profile?.email || null,
-        phone: profile?.phone || null,
+        email: customerEmail,
+        phone: customerPhone,
       },
       hospital: {
         id: booking.provider_id,

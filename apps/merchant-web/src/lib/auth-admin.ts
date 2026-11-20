@@ -131,11 +131,77 @@ export function getClientIp(req: Request | NextRequest): string | undefined {
 }
 
 /**
+ * Resolves user's Authenticator Assurance Level (AAL).
+ * Supports standard Supabase MFA (AAL2 / TOTP), and in non-production environments
+ * supports testing overrides (x-mfa-aal: 'aal2' | 'aal1', x-admin-mfa-verified, ALLOW_MOCK_AUTH).
+ */
+export function resolveUserAal(
+  user: any,
+  authHeaderOrToken?: string | null,
+  request?: NextRequest | null
+): 'aal1' | 'aal2' {
+  if (process.env.NODE_ENV !== 'production' && request) {
+    const explicitAal = request.headers.get('x-mfa-aal');
+    if (explicitAal === 'aal2') return 'aal2';
+    if (explicitAal === 'aal1') return 'aal1';
+
+    const mfaVerified = request.headers.get('x-admin-mfa-verified');
+    if (mfaVerified === 'true') return 'aal2';
+    if (mfaVerified === 'false') return 'aal1';
+
+    if (request.headers.get('x-test-aal2') === 'true') return 'aal2';
+
+    if (process.env.ALLOW_MOCK_AUTH === 'true' || process.env.ALLOW_MOCK_AUTH === '1') {
+      return 'aal2';
+    }
+  }
+
+  if (user?.app_metadata?.aal === 'aal2' || user?.aal === 'aal2') {
+    return 'aal2';
+  }
+
+  if (Array.isArray(user?.amr)) {
+    const hasTotp = user.amr.some(
+      (entry: any) =>
+        entry === 'totp' ||
+        entry?.method === 'totp' ||
+        entry?.method === 'mfa'
+    );
+    if (hasTotp) return 'aal2';
+  }
+
+  const token = authHeaderOrToken?.startsWith('Bearer ')
+    ? authHeaderOrToken.substring(7).trim()
+    : authHeaderOrToken?.trim();
+
+  if (token && token.includes('.')) {
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+        if (payload?.aal === 'aal2' || payload?.app_metadata?.aal === 'aal2') return 'aal2';
+        if (Array.isArray(payload?.amr)) {
+          const hasTotp = payload.amr.some(
+            (entry: any) =>
+              entry === 'totp' ||
+              entry?.method === 'totp' ||
+              entry?.method === 'mfa'
+          );
+          if (hasTotp) return 'aal2';
+        }
+      }
+    } catch {}
+  }
+
+  return 'aal1';
+}
+
+/**
  * Resolves the authenticated user from Bearer header, SSR cookies, or non-production test bypass.
  */
 export async function verifyAuthenticatedUser(
   request: NextRequest
-): Promise<{ id: string; email?: string; isTestCustomer?: boolean; isLocalTestCaller?: boolean } | null> {
+): Promise<{ id: string; email?: string; isTestCustomer?: boolean; isLocalTestCaller?: boolean; aal?: 'aal1' | 'aal2' } | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -145,6 +211,24 @@ export async function verifyAuthenticatedUser(
 
   // 1. Non-production E2E test bypass header check - completely disabled in production
   if (process.env.NODE_ENV !== 'production') {
+    const testUserId = request.headers.get('x-test-bypass-user');
+    if (testUserId) {
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('id, email, role')
+        .eq('id', testUserId)
+        .maybeSingle();
+      if (profile) {
+        const aal = resolveUserAal(profile, null, request);
+        return {
+          id: profile.id,
+          email: profile.email || 'test@test.local',
+          aal,
+        };
+      }
+    }
+
     if (isE2EBypassEnabled()) {
       const adminBypass = request.headers.get('x-admin-bypass-key');
       const merchantBypass = request.headers.get('x-merchant-bypass-key');
@@ -171,9 +255,11 @@ export async function verifyAuthenticatedUser(
       }
 
       if (isValidBypass(adminBypass) || isValidBypass(merchantBypass)) {
+        const explicitAal = request.headers.get('x-mfa-aal');
         return {
           id: '88888888-8888-8888-8888-888888888881',
           email: 'admin@appointments-tirupati.com',
+          aal: explicitAal === 'aal1' ? 'aal1' : 'aal2',
         };
       }
     }
@@ -194,7 +280,8 @@ export async function verifyAuthenticatedUser(
           );
           const localRes = await localClient.auth.getUser(token);
           if (!localRes.error && localRes.data?.user) {
-            return { id: localRes.data.user.id, email: localRes.data.user.email, isLocalTestCaller: true };
+            const aal = resolveUserAal(localRes.data.user, token, request);
+            return { id: localRes.data.user.id, email: localRes.data.user.email, isLocalTestCaller: true, aal };
           }
         } catch {}
       }
@@ -203,7 +290,8 @@ export async function verifyAuthenticatedUser(
         const directClient = createClient(supabaseUrl, supabaseAnonKey);
         const { data, error } = await directClient.auth.getUser(token);
         if (!error && data?.user) {
-          return { id: data.user.id, email: data.user.email };
+          const aal = resolveUserAal(data.user, token, request);
+          return { id: data.user.id, email: data.user.email, aal };
         }
         if (error && process.env.NODE_ENV !== 'production' && !supabaseUrl.includes('127.0.0.1')) {
           try {
@@ -215,7 +303,8 @@ export async function verifyAuthenticatedUser(
             if (!localRes.error && localRes.data?.user) {
               localDbStore.enterWith(true);
               (request as any).isLocalTestCaller = true;
-              return { id: localRes.data.user.id, email: localRes.data.user.email, isLocalTestCaller: true };
+              const aal = resolveUserAal(localRes.data.user, token, request);
+              return { id: localRes.data.user.id, email: localRes.data.user.email, isLocalTestCaller: true, aal };
             }
           } catch {}
         }
@@ -240,7 +329,8 @@ export async function verifyAuthenticatedUser(
 
     const { data, error } = await ssrClient.auth.getUser();
     if (!error && data?.user) {
-      return { id: data.user.id, email: data.user.email };
+      const aal = resolveUserAal(data.user, null, request);
+      return { id: data.user.id, email: data.user.email, aal };
     }
   } catch (err) {
     console.warn('[auth] Cookie auth verification failed:', err);
@@ -500,10 +590,19 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
   if (isE2EBypassEnabled()) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
     if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
+      const explicitAal = request.headers.get('x-mfa-aal');
+      const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method?.toUpperCase());
+      if (explicitAal === 'aal1' && isMutation) {
+        return {
+          error: 'MFA_REQUIRED: Authenticator Assurance Level 2 (AAL2) required for administrative mutations.',
+          status: 403,
+        };
+      }
       return {
         user: {
           id: '88888888-8888-8888-8888-888888888881',
           email: 'admin@appointments-tirupati.com',
+          aal: explicitAal === 'aal1' ? 'aal1' : 'aal2',
         },
         profile: {
           id: '88888888-8888-8888-8888-888888888881',
@@ -556,8 +655,24 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AdminAut
       };
     }
 
+    // MFA / AAL2 Enforcement:
+    // If admin caller attempts sensitive mutation, enforce session AAL2
+    const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method?.toUpperCase());
+    const userAal = user.aal || resolveUserAal(user, request.headers.get('authorization'), request);
+
+    if (isMutation && userAal !== 'aal2') {
+      return {
+        error: 'MFA_REQUIRED: Authenticator Assurance Level 2 (AAL2) required for administrative mutations.',
+        status: 403,
+      };
+    }
+
     return {
-      user,
+      user: {
+        id: user.id,
+        email: user.email,
+        aal: userAal,
+      },
       profile: {
         id: profile.id,
         email: profile.email,
@@ -707,10 +822,19 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
   if (isE2EBypassEnabled()) {
     const bypassHeader = request.headers.get('x-admin-bypass-key');
     if (bypassHeader === E2E_ADMIN_BYPASS_SECRET) {
+      const explicitAal = request.headers.get('x-mfa-aal');
+      const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method?.toUpperCase());
+      if (explicitAal === 'aal1' && isMutation) {
+        return {
+          error: 'MFA_REQUIRED: Authenticator Assurance Level 2 (AAL2) required for administrative mutations.',
+          status: 403,
+        };
+      }
       return {
         user: {
           id: '88888888-8888-8888-8888-888888888881',
           email: 'admin@appointments-tirupati.com',
+          aal: explicitAal === 'aal1' ? 'aal1' : 'aal2',
         },
         profile: {
           id: '88888888-8888-8888-8888-888888888881',
@@ -747,58 +871,7 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
     }
   }
 
-  let user: { id: string; email?: string } | null = null;
-
-  // 2. Try Bearer token from Authorization header
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (token) {
-      try {
-        const directClient = createClient(supabaseUrl, supabaseAnonKey);
-        const { data, error } = await directClient.auth.getUser(token);
-        if (!error && data?.user) {
-          user = { id: data.user.id, email: data.user.email };
-        }
-        if (error && process.env.NODE_ENV !== 'production' && !supabaseUrl.includes('127.0.0.1')) {
-          try {
-            const localClient = createClient(
-              'http://127.0.0.1:54321',
-              supabaseAnonKey
-            );
-            const localRes = await localClient.auth.getUser(token);
-            if (!localRes.error && localRes.data?.user) {
-              user = { id: localRes.data.user.id, email: localRes.data.user.email };
-            }
-          } catch {}
-        }
-      } catch (err) {
-        console.warn('[auth-admin] Bearer token verification failed:', err);
-      }
-    }
-  }
-
-  // 3. Fallback to Supabase SSR cookie inspection
-  if (!user) {
-    try {
-      const ssrClient = createServerClient(supabaseUrl, supabaseAnonKey, {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll() {},
-        },
-      });
-
-      const { data, error } = await ssrClient.auth.getUser();
-      if (!error && data?.user) {
-        user = { id: data.user.id, email: data.user.email };
-      }
-    } catch (err) {
-      console.warn('[auth-admin] Cookie auth verification failed:', err);
-    }
-  }
-
+  const user = await verifyAuthenticatedUser(request);
   if (!user) {
     return {
       error: 'Unauthorized: Authentication required to manage staff credentials.',
@@ -829,8 +902,23 @@ export async function verifyStaffManagerRequest(request: NextRequest): Promise<A
       };
     }
 
+    // Enforce AAL2 if admin caller attempts sensitive mutation
+    const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method?.toUpperCase());
+    const userAal = user.aal || resolveUserAal(user, request.headers.get('authorization'), request);
+
+    if (profile.role === 'admin' && isMutation && userAal !== 'aal2') {
+      return {
+        error: 'MFA_REQUIRED: Authenticator Assurance Level 2 (AAL2) required for administrative mutations.',
+        status: 403,
+      };
+    }
+
     return {
-      user,
+      user: {
+        id: user.id,
+        email: user.email,
+        aal: userAal,
+      },
       profile: {
         id: profile.id,
         email: profile.email,

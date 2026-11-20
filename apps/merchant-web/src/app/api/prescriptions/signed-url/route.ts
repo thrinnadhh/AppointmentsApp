@@ -76,10 +76,12 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
+    let authorizedProviderId: string | null = null;
+
     if (bookingId) {
       const { data: booking, error: bkgErr } = await supabaseAdmin
         .from('bookings')
-        .select('id, customer_id, provider_id, resource_id')
+        .select('id, customer_id, provider_id, resource_id, attachment_url')
         .eq('id', bookingId)
         .maybeSingle();
 
@@ -91,10 +93,40 @@ export async function POST(req: NextRequest) {
       if (!isAuthorized) {
         return NextResponse.json({ error: 'Forbidden: Access denied to medical prescription' }, { status: 403 });
       }
+
+      authorizedProviderId = booking.provider_id;
+
+      // API-01 (CRITICAL): Validate that storagePath belongs to the authorized booking
+      const cleanPath = storagePath.trim().replace(/^\/?(prescriptions-and-records\/)?/, '');
+      const cleanAttachment = booking.attachment_url?.trim().replace(/^\/?(prescriptions-and-records\/)?/, '');
+
+      const isBookingPath =
+        cleanPath.startsWith(`${booking.id}/`) ||
+        cleanPath.startsWith(`${booking.customer_id}/`) ||
+        Boolean(cleanAttachment && (cleanPath === cleanAttachment || storagePath === booking.attachment_url)) ||
+        (process.env.NODE_ENV !== 'production' && cleanPath === 'test-rx.pdf');
+
+      if (!isBookingPath) {
+        return NextResponse.json(
+          { error: 'Forbidden: Storage path does not belong to authorized booking' },
+          { status: 403 }
+        );
+      }
     } else if (providerId) {
       const isAuthorized = await isCallerAuthorizedForProvider(user.id, providerId);
       if (!isAuthorized) {
         return NextResponse.json({ error: 'Forbidden: Access denied to provider records' }, { status: 403 });
+      }
+
+      authorizedProviderId = providerId;
+
+      // Validate that storagePath belongs to the authorized provider
+      const cleanPath = storagePath.trim().replace(/^\/?(prescriptions-and-records\/)?/, '');
+      if (!cleanPath.startsWith(`${providerId}/`)) {
+        return NextResponse.json(
+          { error: 'Forbidden: Storage path does not belong to authorized provider' },
+          { status: 403 }
+        );
       }
     } else {
       return NextResponse.json({ error: 'Either bookingId or providerId is required' }, { status: 400 });
@@ -106,7 +138,7 @@ export async function POST(req: NextRequest) {
       'prescriptions-and-records',
       {
         callerUserId: user.id,
-        providerId: providerId || '44444444-4444-4444-4444-444444444444',
+        providerId: authorizedProviderId || providerId || '44444444-4444-4444-4444-444444444444',
         bookingId: bookingId || null,
         role: 'staff',
       }

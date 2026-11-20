@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { canMockPayments } from '@/lib/cashfree';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
-import { ConfirmPaymentResponse } from '@appointments/shared';
+import { ConfirmPaymentResponse, captureError } from '@appointments/shared';
 
 interface ExtendedConfirmRequest {
   booking_id: string;
@@ -159,9 +159,11 @@ async function getAuthenticatedCaller(req: NextRequest): Promise<{ id: string; e
 }
 
 export async function POST(req: NextRequest) {
+  let activeBookingId: string | undefined;
   try {
     const body = (await req.json()) as Partial<ExtendedConfirmRequest>;
     const { booking_id, deposit_amount, razorpay_order_id, razorpay_signature } = body;
+    activeBookingId = booking_id;
     const gateway_payment_id = (body.gateway_payment_id || body.razorpay_payment_id || '').trim();
 
     // 1. VALIDATE PARAMETERS
@@ -271,7 +273,15 @@ export async function POST(req: NextRequest) {
           effectiveTargetOrderId.toLowerCase().includes('mock'))
     );
 
-    if ((isMockPayment || isMockOrder) && !canMockPayments()) {
+    const adminBypassToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || '';
+    const isE2eAdminBypass =
+      process.env.NODE_ENV !== 'production' &&
+      process.env.ENABLE_E2E_BYPASS === 'true' &&
+      Boolean(adminBypassToken) &&
+      (req.headers.get('x-admin-bypass-key') === adminBypassToken ||
+        req.headers.get('x-merchant-bypass-key') === adminBypassToken);
+
+    if ((isMockPayment || isMockOrder) && !canMockPayments() && !isE2eAdminBypass) {
       return NextResponse.json<ConfirmPaymentResponse>(
         { success: false, error: 'Mock payments and mock orders are strictly forbidden in this environment' },
         { status: 400 }
@@ -313,7 +323,7 @@ export async function POST(req: NextRequest) {
 
       const cfAdapter = getPaymentGateway('cashfree');
       const orderDetails = await cfAdapter.fetchOrder(targetOrderId);
-      const isMockPaymentAllowed = canMockPayments() && (isMockPayment || isMockOrder);
+      const isMockPaymentAllowed = (canMockPayments() || isE2eAdminBypass) && (isMockPayment || isMockOrder);
 
       if (!orderDetails && !isMockPaymentAllowed) {
         return NextResponse.json<ConfirmPaymentResponse>(
@@ -521,6 +531,11 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err: unknown) {
+    captureError(err, {
+      flow: 'booking',
+      route: '/api/bookings/confirm',
+      booking_id: activeBookingId,
+    });
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json<ConfirmPaymentResponse>(
       { success: false, error: message },

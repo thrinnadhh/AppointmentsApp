@@ -28,9 +28,10 @@ interface ConsentState {
 
 export interface AccountScreenProps {
   onClose?: () => void;
+  onSignOut?: () => void | Promise<void>;
 }
 
-export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
+export default function AccountScreen({ onClose, onSignOut }: AccountScreenProps = {}) {
   const [user, setUser]                 = useState<{ id: string; phone?: string; email?: string } | null>(null);
   const [deletion, setDeletion]         = useState<DeletionStatus | null>(null);
   const [strikeInfo, setStrikeInfo]     = useState<{ strikes: number; isBlocked: boolean; blockedUntil: string | null } | null>(null);
@@ -91,8 +92,14 @@ export default function AccountScreen({ onClose }: AccountScreenProps = {}) {
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    if (onClose) onClose();
+    try {
+      await supabase.auth.signOut();
+      if (onSignOut) {
+        await onSignOut();
+      }
+    } finally {
+      if (onClose) onClose();
+    }
   };
 
   const toggleConsent = async (purpose: 'location_detection' | 'marketing_notifications' | 'whatsapp_notifications', value: boolean) => {

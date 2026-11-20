@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { createAppLogger, AppLoggerInstance, AppLogEntry } from '@appointments/shared';
+import { createAppLogger, AppLoggerInstance, AppLogEntry, captureError } from '@appointments/shared';
 import { supabase } from './api';
 
 async function flushMobileLog(entry: AppLogEntry): Promise<void> {
@@ -7,6 +7,26 @@ async function flushMobileLog(entry: AppLogEntry): Promise<void> {
   // Preserves Postgres strictly for audit logs and eliminates mobile egress / IOPS overhead.
   if (entry.level !== 'error' && entry.severity !== 'CRITICAL') {
     return;
+  }
+
+  try {
+    const errObj = new Error(entry.message);
+    if (entry.stack_trace) {
+      errObj.stack = entry.stack_trace;
+    }
+    captureError(errObj, {
+      platform: entry.platform,
+      component: entry.component || 'customer-mobile',
+      severity: entry.severity,
+      category: entry.category,
+      error_code: entry.error_code || undefined,
+      city_id: entry.city_id || undefined,
+      vertical: entry.vertical || undefined,
+      booking_id: entry.appointment_id || undefined,
+      ...entry.metadata,
+    });
+  } catch {
+    // Non-blocking telemetry
   }
 
   try {
@@ -62,6 +82,8 @@ export {
   sanitizeLogData,
   computeFingerprint,
   classifySeverity,
+  captureError,
+  sanitizeTelemetryPayload,
 } from '@appointments/shared';
 
 // Register global React Native ErrorUtils handler to catch unhandled JS crashes

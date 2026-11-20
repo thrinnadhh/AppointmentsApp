@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { webLogger } from '@/lib/logger';
+import { captureError } from '@appointments/shared';
 
 export default function RootGlobalError({
   error,
@@ -12,6 +14,12 @@ export default function RootGlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    captureError(error, {
+      digest: error.digest,
+      component: 'RootGlobalError',
+      category: 'UI_CRASH',
+    });
+    Sentry.captureException(error);
     webLogger.forComponent('RootGlobalError', 'UI_CRASH').critical(
       error.message || 'Fatal root layout crash',
       error,

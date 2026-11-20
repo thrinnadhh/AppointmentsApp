@@ -3,10 +3,13 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getPaymentGateway } from '@/lib/payment/index.ts';
 import { checkRateLimit } from '@/lib/redis';
 import { verifyAuthenticatedUser, isCallerAuthorizedForBooking, getClientIp } from '@/lib/auth-admin';
-import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee } from '@appointments/shared';
+import { CreateRazorpayOrderRequest, CreateRazorpayOrderResponse, getPlatformFee, captureError } from '@appointments/shared';
 import { parseSafeJson, PayloadLimitExceededError } from '@/lib/validation-limits';
 
 export async function POST(req: NextRequest) {
+  let activeBookingId: string | undefined;
+  let activeProviderId: string | undefined;
+  let activeOrderId: string | undefined;
   try {
     // 1. IP rate limiting (30 requests/minute); falls back to per-booking/user rate limit when IP is absent
     const clientIp = getClientIp(req);
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const { booking_id } = body;
+    activeBookingId = booking_id;
 
     if (!booking_id) {
       return NextResponse.json<CreateRazorpayOrderResponse>(
@@ -62,6 +66,11 @@ export async function POST(req: NextRequest) {
       .select('id, reference_code, customer_id, provider_id, resource_id, deposit_amount, platform_fee, total_amount, platform_fee_amount, consultation_fee_amount, status, hold_expires_at, gateway_order_id, gateway_provider, payment_session_id')
       .eq('id', booking_id)
       .maybeSingle();
+
+    if (booking) {
+      activeProviderId = booking.provider_id;
+      activeOrderId = booking.gateway_order_id || undefined;
+    }
 
     if (bookingError) {
       console.error('Error fetching booking for payment order:', bookingError);
@@ -111,15 +120,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch provider category to determine vertical platform fee
+    // Fetch provider category and EasySplit vendor status
     let categoryId: string | null = null;
+    let cashfreeVendorId: string | null = null;
+    let cashfreeVendorStatus: string | null = null;
     if (booking.provider_id) {
       const { data: prov } = await supabaseAdmin
         .from('providers')
-        .select('category_id')
+        .select('category_id, cashfree_vendor_id, cashfree_vendor_status')
         .eq('id', booking.provider_id)
         .maybeSingle();
       categoryId = prov?.category_id || null;
+      cashfreeVendorId = prov?.cashfree_vendor_id || null;
+      cashfreeVendorStatus = prov?.cashfree_vendor_status || null;
     }
 
     const isFreeFollowup = Number(booking.deposit_amount) === 0 && Number(booking.total_amount || 0) === 0 && Number(booking.platform_fee || 0) === 0;
@@ -134,6 +147,8 @@ export async function POST(req: NextRequest) {
           total_amount: 0,
           platform_fee_amount: 0,
           consultation_fee_amount: 0,
+          merchant_share_amount: 0,
+          split_status: 'NOT_APPLICABLE',
           platform_payment_status: 'WAIVED',
           consultation_payment_status: 'WAIVED',
         })
@@ -152,21 +167,47 @@ export async function POST(req: NextRequest) {
           total_amount: 0,
           platform_fee_amount: 0,
           consultation_fee_amount: 0,
+          merchant_share_amount: 0,
+          split_status: 'NOT_APPLICABLE',
         },
         { status: 200 }
       );
     }
 
-    // SPLIT PAYMENT WORKFLOW:
-    // Patient pays ONLY platform fee online (e.g. ₹10, or ₹50 for gaming/turf).
-    // Doctor consultation fee is paid offline directly at the hospital reception desk.
-    const platformFeeInInr = Number(booking.platform_fee_amount) || Number(booking.platform_fee) || getPlatformFee(categoryId);
-    const consultationFeeInInr = Number(booking.consultation_fee_amount) || 500;
-    const onlineAmountInInr = platformFeeInInr;
-    const amountInPaise = Math.round(onlineAmountInInr * 100);
-
     const activeGateway = getPaymentGateway();
     const isCashfreeActive = activeGateway.provider === 'cashfree';
+
+    // SPLIT PAYMENT WORKFLOW EVALUATION:
+    // When provider is registered and ACTIVE with Cashfree EasySplit, collect full amount online
+    // and split merchant_share to vendor, retaining platform_fee in platform account.
+    // Otherwise fallback to platform-fee-only online collection (consultation paid offline at desk).
+    const platformFeeInInr = Number(booking.platform_fee_amount) || Number(booking.platform_fee) || getPlatformFee(categoryId);
+    const consultationFeeInInr = Number(booking.consultation_fee_amount) || 500;
+
+    const isEasySplitActive = Boolean(
+      isCashfreeActive &&
+      cashfreeVendorId &&
+      cashfreeVendorStatus === 'ACTIVE'
+    );
+
+    let merchantShareInInr = 0;
+    let onlineAmountInInr = platformFeeInInr;
+    let splitStatus: 'NOT_APPLICABLE' | 'PENDING_SPLIT' = 'NOT_APPLICABLE';
+    let orderSplits: Array<{ vendorId: string; amountInPaise: number }> | undefined = undefined;
+
+    if (isEasySplitActive && cashfreeVendorId) {
+      merchantShareInInr = consultationFeeInInr;
+      onlineAmountInInr = Number((platformFeeInInr + merchantShareInInr).toFixed(2));
+      splitStatus = 'PENDING_SPLIT';
+      orderSplits = [
+        {
+          vendorId: cashfreeVendorId,
+          amountInPaise: Math.round(merchantShareInInr * 100),
+        },
+      ];
+    }
+
+    const amountInPaise = Math.round(onlineAmountInInr * 100);
 
     // Idempotency: Reuse existing active gateway_order_id if amount matches
     if (
@@ -190,12 +231,15 @@ export async function POST(req: NextRequest) {
           total_amount: onlineAmountInInr,
           platform_fee_amount: platformFeeInInr,
           consultation_fee_amount: consultationFeeInInr,
+          merchant_share_amount: merchantShareInInr,
+          split_status: splitStatus,
+          cashfree_env: (process.env.CASHFREE_ENV as any) || 'SANDBOX',
         },
         { status: 200 }
       );
     }
 
-    // Defensively sync platform fee & total online amount onto booking record
+    // Defensively sync platform fee, merchant share & total online amount onto booking record
     await supabaseAdmin
       .from('bookings')
       .update({
@@ -203,10 +247,12 @@ export async function POST(req: NextRequest) {
         platform_fee_amount: platformFeeInInr,
         deposit_amount: onlineAmountInInr,
         total_amount: onlineAmountInInr,
+        merchant_share_amount: merchantShareInInr,
+        split_status: splitStatus,
         expected_payment_amount_paise: amountInPaise,
         consultation_fee_amount: consultationFeeInInr,
         platform_payment_status: 'PENDING',
-        consultation_payment_status: 'PENDING_OFFLINE',
+        consultation_payment_status: isEasySplitActive ? 'PENDING' : 'PENDING_OFFLINE',
       })
       .eq('id', booking.id);
 
@@ -235,13 +281,15 @@ export async function POST(req: NextRequest) {
       customerName,
       customerEmail,
       orderExpiryTime: booking.hold_expires_at || new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      orderSplits,
       notes: {
         booking_id: booking.id,
         customer_id: booking.customer_id,
         provider_id: booking.provider_id,
         platform_fee: String(platformFeeInInr),
         consultation_fee: String(consultationFeeInInr),
-        payment_split: 'platform_fee_only_online',
+        merchant_share: String(merchantShareInInr),
+        payment_split: isEasySplitActive ? 'easysplit_marketplace' : 'platform_fee_only_online',
         category: categoryId || 'general',
       },
     });
@@ -272,10 +320,20 @@ export async function POST(req: NextRequest) {
         total_amount: onlineAmountInInr,
         platform_fee_amount: platformFeeInInr,
         consultation_fee_amount: consultationFeeInInr,
+        merchant_share_amount: merchantShareInInr,
+        split_status: splitStatus,
+        cashfree_env: (process.env.CASHFREE_ENV as any) || 'SANDBOX',
       },
       { status: 200 }
     );
   } catch (err: unknown) {
+    captureError(err, {
+      flow: 'payment',
+      route: '/api/payments/create-order',
+      booking_id: activeBookingId,
+      provider_id: activeProviderId,
+      order_id: activeOrderId,
+    });
     const message = err instanceof Error ? err.message : 'Internal error creating payment order';
     console.error('create-order endpoint failure:', err);
     return NextResponse.json<CreateRazorpayOrderResponse>(

@@ -41,7 +41,7 @@ const SENSITIVE_KEY_REGEX =
  * Medical data keys that must be redacted under DPDP & health privacy standards
  */
 const MEDICAL_KEY_REGEX =
-  /(symptom|diagnosis|medical[-_]?note|prescription|clinical[-_]?note|health[-_]?condition|treatment|vital[-_]?sign|doctor[-_]?note|patient[-_]?history|lab[-_]?result)/i;
+  /(symptom|complaint|diagnosis|medical[-_]?note|prescription|clinical[-_]?note|booking[-_]?note|health[-_]?condition|treatment|vital[-_]?sign|doctor[-_]?note|patient[-_]?history|lab[-_]?result|^note$|^notes$)/i;
 
 /**
  * JWT token pattern
@@ -181,6 +181,423 @@ export function sanitizeLogData<T = unknown>(input: T, depth = 0): T {
   }
 
   return input;
+}
+
+export const SAFE_TELEMETRY_KEYS = new Set([
+  'booking_id',
+  'order_id',
+  'provider_id',
+  'resource_id',
+  'city_id',
+  'vertical',
+  'status',
+  'error_code',
+  'flow',
+]);
+
+export type TelemetryFlow = 'payment' | 'booking' | 'queue' | 'auth' | 'admin';
+
+export interface TelemetryContext extends Record<string, unknown> {
+  flow?: TelemetryFlow;
+  route?: string;
+  tags?: Record<string, unknown>;
+  extra?: Record<string, unknown>;
+  booking_id?: string;
+  order_id?: string;
+  provider_id?: string;
+  resource_id?: string;
+  city_id?: string;
+  vertical?: string;
+  status?: string;
+  error_code?: string;
+}
+
+export const STRICT_PII_DENYLIST_KEYS = new Set([
+  'phone',
+  'mobile',
+  'email',
+  'name',
+  'full_name',
+  'patient',
+  'patient_name',
+  'customer_name',
+  'owner_name',
+  'address',
+  'ip',
+  'ip_address',
+  'pin',
+  'checkin_pin',
+  'permanent_checkin_pin',
+  'otp',
+  'code',
+  'token',
+  'secret',
+  'password',
+  'authorization',
+  'cookie',
+  'upi',
+  'vpa',
+  'card',
+  'account',
+  'ifsc',
+  'gstin',
+  'note',
+  'notes',
+  'booking_note',
+  'clinical',
+  'clinical_note',
+  'medical_note',
+  'doctor_note',
+  'symptom',
+  'symptoms',
+  'complaint',
+  'complaints',
+  'chief_complaint',
+  'prescription',
+  'diagnosis',
+  'treatment',
+  'condition',
+  'reason',
+  'override_reason',
+]);
+
+/**
+ * Checks whether a key matches the strict denylist (case-insensitive and format-agnostic)
+ */
+export function isDenylistedTelemetryKey(key: string): boolean {
+  const normKey = key.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+  if (SAFE_TELEMETRY_KEYS.has(normKey)) {
+    return false;
+  }
+  if (STRICT_PII_DENYLIST_KEYS.has(normKey)) {
+    return true;
+  }
+  const segments = normKey.split('_');
+  for (const seg of segments) {
+    if (STRICT_PII_DENYLIST_KEYS.has(seg)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Scrubs PII from free-text strings:
+ * - Indian mobile numbers: (\+91[\-\s]?)?[6-9]\d{9}
+ * - Email addresses
+ * - UPI IDs: [\w.\-]+@[\w]+
+ * - Bearer tokens and JWTs
+ * - IPv4 addresses
+ */
+export function sanitizeTelemetryString(input: string): string {
+  if (!input || typeof input !== 'string') return input;
+  let str = input;
+  // Redact Bearer tokens & JWTs
+  str = str.replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, 'Bearer [REDACTED]');
+  str = str.replace(/ey[a-zA-Z0-9_-]{10,}\.ey[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]+/g, '[REDACTED]');
+  // Redact email addresses (must precede UPI scrub so emails aren't partially matched)
+  str = str.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/g, '[REDACTED]');
+  // Redact UPI IDs (e.g. user@okhdfcbank, dr@paytm, merchant@upi)
+  str = str.replace(/(?<![a-zA-Z0-9._%+-])[\w.\-]+@[a-zA-Z0-9_]+(?!\.[a-zA-Z]{2,})\b/g, '[REDACTED]');
+  // Redact Indian mobile numbers (+91 9876543210, +91-9876543210, +919876543210, 9876543210, 09876543210)
+  str = str.replace(/(?<!\d)(?:(?:\+91[\-\s]?|0)?[6-9]\d{9})(?!\d)/g, '[REDACTED]');
+  // Redact sensitive URL query parameters (e.g. ?phone=..., &token=..., &booking_note=..., &symptom=..., &secret=...)
+  str = str.replace(/([?&](?:phone|mobile|email|token|access_token|refresh_token|secret|otp|pin|checkin_pin|booking_note|note|symptom|complaint|name|patient)=)[^& \r\n]*/gi, '$1[REDACTED]');
+  // Redact clinical symptoms and medical complaints in free text
+  str = str.replace(/\b(symptoms?|chief\s+complaints?|complaints?|clinical\s+notes?|booking\s+notes?|diagnosis)\s*[:=]\s*[^,\n\r.;]+/gi, '$1: [REDACTED_MEDICAL]');
+  // Redact IPv4 addresses
+  str = str.replace(/(?<!\d)(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?!\d)/g, '[REDACTED]');
+  // Redact PAN & Card numbers
+  str = str.replace(PAN_REGEX, '[REDACTED]');
+  if (str.length >= 13 && /\d{4}/.test(str)) {
+    str = str.replace(CARD_REGEX, '[REDACTED]');
+  }
+  return str;
+}
+
+/**
+ * Deterministic Zero-PII scrubber for telemetry payloads (Sentry events, contexts, extras, breadcrumbs)
+ */
+export function sanitizeTelemetryPayload<T = unknown>(data: T, seen = new WeakSet(), depth = 0): T {
+  if (depth > 8 || data === null || data === undefined) {
+    return data;
+  }
+
+  if (typeof data === 'string') {
+    return sanitizeTelemetryString(data) as unknown as T;
+  }
+
+  if (typeof data === 'number' || typeof data === 'boolean') {
+    return data;
+  }
+
+  if (data instanceof Error) {
+    const cleanErr = new Error(sanitizeTelemetryString(data.message));
+    cleanErr.name = sanitizeTelemetryString(data.name);
+    if (data.stack) {
+      cleanErr.stack = sanitizeTelemetryString(data.stack);
+    }
+    for (const key of Object.keys(data)) {
+      if (key !== 'name' && key !== 'message' && key !== 'stack') {
+        const normKey = key.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+        if (SAFE_TELEMETRY_KEYS.has(normKey)) {
+          (cleanErr as any)[key] = sanitizeTelemetryPayload((data as any)[key], seen, depth + 1);
+        } else if (isDenylistedTelemetryKey(normKey)) {
+          (cleanErr as any)[key] = '[REDACTED]';
+        } else {
+          (cleanErr as any)[key] = sanitizeTelemetryPayload((data as any)[key], seen, depth + 1);
+        }
+      }
+    }
+    return cleanErr as unknown as T;
+  }
+
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeTelemetryPayload(item, seen, depth + 1)) as unknown as T;
+  }
+
+  if (typeof data === 'object') {
+    if (seen.has(data as object)) {
+      return '[CIRCULAR]' as unknown as T;
+    }
+    seen.add(data as object);
+
+    const output: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        continue;
+      }
+      const normKey = key.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+      if (SAFE_TELEMETRY_KEYS.has(normKey)) {
+        output[key] = sanitizeTelemetryPayload(value, seen, depth + 1);
+      } else if (isDenylistedTelemetryKey(normKey)) {
+        output[key] = '[REDACTED]';
+      } else {
+        output[key] = sanitizeTelemetryPayload(value, seen, depth + 1);
+      }
+    }
+    return output as unknown as T;
+  }
+
+  return data;
+}
+
+export interface SentryClientLike {
+  captureException: (error: any, captureContext?: any) => any;
+}
+
+let registeredSentryClient: SentryClientLike | null = null;
+
+export function registerSentryClient(client: SentryClientLike): void {
+  registeredSentryClient = client;
+}
+
+export function getSentryClient(): SentryClientLike | null {
+  if (registeredSentryClient) return registeredSentryClient;
+  if (typeof globalThis !== 'undefined' && (globalThis as any).Sentry) {
+    return (globalThis as any).Sentry;
+  }
+  if (typeof window !== 'undefined' && (window as any).Sentry) {
+    return (window as any).Sentry;
+  }
+  return null;
+}
+
+/**
+ * Unified telemetry error logger for apps/merchant-web and apps/customer-mobile.
+ * Enforces Zero-PII scrubbing and no-ops gracefully when DSN is unconfigured.
+ */
+export function captureError(error: unknown, context?: TelemetryContext): void {
+  const dsn = (
+    (typeof process !== 'undefined' && process.env
+      ? process.env.NEXT_PUBLIC_SENTRY_DSN ||
+        process.env.SENTRY_DSN ||
+        process.env.EXPO_PUBLIC_SENTRY_DSN
+      : undefined) || ''
+  ).trim();
+
+  const isConfigured = Boolean(dsn && dsn.length > 0 && dsn.startsWith('http'));
+
+  const safeTags: Record<string, string> = {};
+  const extra: Record<string, unknown> = {};
+
+  if (context && typeof context === 'object') {
+    for (const [key, val] of Object.entries(context)) {
+      const normKey = key.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+      if (SAFE_TELEMETRY_KEYS.has(normKey) && (typeof val === 'string' || typeof val === 'number')) {
+        safeTags[key] = String(val);
+      } else if (key === 'tags' && typeof val === 'object' && val !== null) {
+        for (const [tKey, tVal] of Object.entries(val as Record<string, unknown>)) {
+          const normTKey = tKey.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+          if (SAFE_TELEMETRY_KEYS.has(normTKey) && (typeof tVal === 'string' || typeof tVal === 'number')) {
+            safeTags[tKey] = String(tVal);
+          }
+        }
+      } else {
+        extra[key] = val;
+      }
+    }
+  }
+
+  const sanitizedExtra = sanitizeTelemetryPayload(extra) as Record<string, unknown>;
+  const sanitizedError = sanitizeTelemetryPayload(error);
+
+  if (!isConfigured) {
+    // No-Op When Unconfigured: log locally, do not attempt any network request
+    if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'test') {
+      console.error('[Telemetry-Standby] captureError:', sanitizedError, {
+        tags: safeTags,
+        extra: sanitizedExtra,
+      });
+    }
+    return;
+  }
+
+  const client = getSentryClient();
+  if (client && typeof client.captureException === 'function') {
+    try {
+      client.captureException(sanitizedError, {
+        tags: safeTags,
+        extra: sanitizedExtra,
+      });
+    } catch {
+      // Non-blocking telemetry
+    }
+  } else {
+    console.error('[Telemetry] Sentry client unavailable:', sanitizedError, {
+      tags: safeTags,
+      extra: sanitizedExtra,
+    });
+  }
+}
+
+/**
+ * Global Zero-PII Sentry beforeSend hook.
+ * Deletes event.user (including ip_address), strips request cookies, headers, and bodies,
+ * and recursively scrubs PII from contexts, extra, breadcrumbs, and messages.
+ */
+export function sentryBeforeSend(event: any): any {
+  if (!event || typeof event !== 'object') return event;
+
+  // 1. Delete user identification and IP address
+  if (event.user) {
+    delete event.user.ip_address;
+    delete event.user;
+  }
+
+  // 2. Strip request cookies, headers, data/bodies, and query string
+  if (event.request) {
+    delete event.request.cookies;
+    delete event.request.data;
+    if (event.request.query_string) {
+      event.request.query_string = '[REDACTED]';
+    }
+    if (event.request.headers) {
+      delete event.request.headers['authorization'];
+      delete event.request.headers['cookie'];
+      delete event.request.headers['x-forwarded-for'];
+      delete event.request.headers['client-ip'];
+      delete event.request.headers['x-real-ip'];
+    }
+  }
+
+  // 3. Strip server_name / client IP from extra or tags if present
+  if (event.server_name) {
+    event.server_name = '[REDACTED]';
+  }
+
+  // 4. Zero-PII recursive sanitization across contexts, extra, breadcrumbs, message, exceptions
+  if (event.contexts) {
+    event.contexts = sanitizeTelemetryPayload(event.contexts) as any;
+  }
+  if (event.extra) {
+    event.extra = sanitizeTelemetryPayload(event.extra) as any;
+  }
+  if (event.breadcrumbs) {
+    event.breadcrumbs = sanitizeTelemetryPayload(event.breadcrumbs) as any;
+  }
+  if (event.message) {
+    event.message = sanitizeTelemetryString(event.message);
+  }
+  // 5. Scrub runtime crash exceptions (event.exception)
+  if (event.exception?.values && Array.isArray(event.exception.values)) {
+    event.exception.values = event.exception.values.map((val: any) => {
+      const cleanVal = { ...val };
+      if (cleanVal.value) {
+        cleanVal.value = sanitizeTelemetryString(cleanVal.value);
+      }
+      if (cleanVal.type) {
+        cleanVal.type = sanitizeTelemetryString(cleanVal.type);
+      }
+      if (cleanVal.stacktrace?.frames && Array.isArray(cleanVal.stacktrace.frames)) {
+        cleanVal.stacktrace.frames = cleanVal.stacktrace.frames.map((frame: any) => {
+          const cleanFrame = { ...frame };
+          if (cleanFrame.vars) {
+            cleanFrame.vars = sanitizeTelemetryPayload(cleanFrame.vars);
+          }
+          return cleanFrame;
+        });
+      }
+      return cleanVal;
+    });
+  }
+  if (event.tags && typeof event.tags === 'object') {
+    const cleanTags: Record<string, string> = {};
+    for (const [key, val] of Object.entries(event.tags)) {
+      const normKey = key.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+      if (SAFE_TELEMETRY_KEYS.has(normKey)) {
+        cleanTags[key] = String(val);
+      } else if (isDenylistedTelemetryKey(normKey)) {
+        cleanTags[key] = '[REDACTED]';
+      } else {
+        cleanTags[key] = sanitizeTelemetryString(String(val));
+      }
+    }
+    event.tags = cleanTags;
+  }
+
+  return event;
+}
+
+/**
+ * Global Zero-PII Sentry beforeBreadcrumb hook.
+ * Scrubs breadcrumb messages and structured data dictionaries.
+ */
+export function sentryBeforeBreadcrumb(breadcrumb: any): any {
+  if (!breadcrumb || typeof breadcrumb !== 'object') return breadcrumb;
+  if (breadcrumb.data) {
+    breadcrumb.data = sanitizeTelemetryPayload(breadcrumb.data) as any;
+  }
+  if (breadcrumb.message) {
+    breadcrumb.message = sanitizeTelemetryString(breadcrumb.message);
+  }
+  return breadcrumb;
+}
+
+/**
+ * Global Zero-PII Sentry beforeSendTransaction hook.
+ */
+export function sentryBeforeSendTransaction(event: any): any {
+  if (!event || typeof event !== 'object') return event;
+  if (event.user) {
+    delete event.user.ip_address;
+    delete event.user;
+  }
+  if (event.request) {
+    delete event.request.cookies;
+    delete event.request.data;
+    if (event.request.query_string) {
+      event.request.query_string = '[REDACTED]';
+    }
+    if (event.request.headers) {
+      delete event.request.headers['authorization'];
+      delete event.request.headers['cookie'];
+      delete event.request.headers['x-forwarded-for'];
+      delete event.request.headers['client-ip'];
+      delete event.request.headers['x-real-ip'];
+    }
+  }
+  return event;
 }
 
 export interface LoggerInitOptions {
@@ -367,8 +784,7 @@ export function createAppLogger(options: LoggerInitOptions): AppLoggerInstance {
         }
       }
 
-      // Remote flush only for errors and critical exceptions to eliminate database IOPS and serverless overhead
-      if (flushHandler && (entry.level === 'error' || entry.severity === 'CRITICAL')) {
+      if (flushHandler) {
         await flushHandler(entry);
       }
     } catch {

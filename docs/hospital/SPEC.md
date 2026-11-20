@@ -20,12 +20,12 @@ Roles: Hospital Admin, Front Desk, Consultant. Arrival tags: On Time, Early, Lat
   - Strikes 1 & 2: Two times there will be no issue (100% courtesy deposit refund, no monetary penalty).
   - Third time booking (with 2 prior misses): Warning popup modal and note stating: "Two times there will be no issue, but for the third time: if you don't show up this time, there will be a penalty of ₹60. In ₹60, ₹50 will be given to the hospital and ₹10 to the Appointments app. The rest of your deposit will be refunded."
   - Strikes 3 to 5: ₹50 goes to the hospital, ₹10 to the Appointments app, and the rest (deposit minus 60) is refunded to customer.
-  - Exceeding 5 strikes (6th no-show): account is blocked for 7 days (`blocked_until = NOW() + INTERVAL '7 days'`), display 'Your account is blocked for 7 days', and reset the strike counter to 0.
+  - Exceeding 5 strikes (6th no-show): In the hospital vertical (`clinics`), no-shows remain **deduction only** (₹60 deduction continues without setting a 7-day account lockout, ensuring healthcare access is never blocked). For non-medical verticals (salons, dining, turf), exceeding 5 strikes sets a 7-day account block (`blocked_until = NOW() + INTERVAL '7 days'`).
 - A patient who checked in but was not reached is NOT a no-show: free reschedule or full refund.
 ## Check-in
 - 4-digit check-in PIN is permanent and lifetime tied directly to the customer profile across all their bookings as long as they use the app. It does not change on reschedule or per-appointment, ensuring streamlined hospital check-ins.
 - Offline walk-in bypass: Hospital staff processing offline or walk-in patients can check in patients directly via manual mark-present bypass (`is_offline_walk_in: true`) without requiring the customer's permanent PIN, while online bookings continue to verify the customer's permanent PIN.
-- PIN is shown to the customer on their ticket/booking pass from 60 minutes before the slot until check-in. Staff verify it through a function only and can never read codes. 5 wrong attempts lock that staff user for 60 seconds. Unauthorized, other-shop and invalid codes return the identical error. Manual mark-present exists as a logged fallback.
+- PIN is shown to the customer on their ticket/booking pass from 60 minutes before the slot until check-in. In the customer mobile app (`HomeScreen` live card and `MyBookingsScreen` PIN card), the PIN is masked as `••••` until **60 minutes before `slot_start`**, displaying `"PIN unlocks 60 mins before slot"` prior to that window. Staff verify it through a function only and can never read codes. 5 wrong attempts lock that staff user for 60 seconds. Unauthorized, other-shop and invalid codes return the identical error. Manual mark-present exists as a logged fallback.
 ## Customer Mobile UX & Notifications
 - SMS & WhatsApp are primary communication channels.
 - Customer Mobile App features a dedicated 'My Appointments' tab showing:

@@ -9,6 +9,8 @@ export const ACTIVE_SLOT_BOOKING_STATUSES = [
   'CONFIRMED',
   'CHECKED_IN',
   'IN_CONSULTATION',
+  'UP_NEXT',
+  'WAITING',
 ] as const;
 
 export type ActiveSlotBookingStatus = (typeof ACTIVE_SLOT_BOOKING_STATUSES)[number];
