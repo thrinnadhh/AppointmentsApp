@@ -29,9 +29,11 @@ const envLocal = fs.existsSync('apps/merchant-web/.env.local')
   : '';
 const envUrl = envLocal.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\n]+)"?/)?.[1];
 const envAnonKey = envLocal.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="?([^"\n]+)"?/)?.[1];
+const envBypassKey = envLocal.match(/SUPERADMIN_E2E_TOKEN="?([^"\n]+)"?/)?.[1] || envLocal.match(/ADMIN_SECRET="?([^"\n]+)"?/)?.[1];
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || envUrl || 'http://127.0.0.1:54321';
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || envAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const ADMIN_BYPASS_KEY = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || envBypassKey || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 
 describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
   let providerId;
@@ -180,7 +182,11 @@ describe('Step 3: Expired Holds & Daily Limit Isolation Suite', () => {
     const res = await fetch(
       `${BASE_URL}/api/slots/availability?resource_id=${resourceId}&date=${todayStr}`,
       {
-        headers: { 'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2' },
+        headers: {
+          'x-admin-bypass-key': ADMIN_BYPASS_KEY,
+          'x-test-bypass-user': customerId,
+          ...(adminToken ? { 'authorization': `Bearer ${adminToken}` } : {}),
+        },
       }
     );
     assert.equal(res.status, 200);

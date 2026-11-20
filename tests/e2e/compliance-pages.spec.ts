@@ -397,10 +397,11 @@ test.describe('Customer Data Masking — DPIIT & DPDPA Compliance', () => {
       });
       if (holdRes.ok()) {
         const { booking_id } = await holdRes.json();
+        const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
         await request.post('http://localhost:3000/api/bookings/confirm', {
           headers: {
             'x-customer-id': '99999999-9999-9999-9999-999999999991',
-            'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
+            'x-admin-bypass-key': adminBypass,
           },
           data: {
             booking_id,
