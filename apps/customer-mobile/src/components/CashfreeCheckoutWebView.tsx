@@ -66,6 +66,7 @@ export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = (
   onSuccess,
   onFailure,
   onClose,
+  onFallbackVerify,
 }) => {
   if (!visible || !paymentSessionId) {
     return null;
