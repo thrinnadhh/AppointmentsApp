@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execSync } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 
 describe('Layer 2: API & Build Secret Safety (DEF-RC-01)', () => {
   const merchantWebDir = path.resolve(process.cwd(), 'apps/merchant-web');
@@ -73,6 +74,15 @@ describe('Layer 2: API & Build Secret Safety (DEF-RC-01)', () => {
     assert.ok(
       stdout.includes('EXPECTED_RUNTIME_SECURITY_THROW_CASHFREE'),
       `Calling CashfreeClient.createOrder without secrets in production must throw at runtime. Got: ${stdout}`
+    );
+  });
+
+  it('3. client auth env schema in env.ts must NEVER contain SUPABASE_SERVICE_ROLE_KEY (SEC-WIN-013)', () => {
+    const envSource = fs.readFileSync(path.join(merchantWebDir, 'src/lib/env.ts'), 'utf8');
+    assert.doesNotMatch(
+      envSource,
+      /SUPABASE_SERVICE_ROLE_KEY/,
+      'apps/merchant-web/src/lib/env.ts must not reference SUPABASE_SERVICE_ROLE_KEY in client bundle schema'
     );
   });
 });
