@@ -458,7 +458,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label htmlFor="cashfree-app-id-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Cashfree PG App ID
+                  Cashfree PG App ID <span className="text-slate-400 font-normal text-[10px] lowercase">(server-managed)</span>
                 </label>
                 <div className="relative">
                   <Key className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
@@ -467,10 +467,10 @@ export default function SettingsPage() {
                     name="cashfreeAppId"
                     aria-label="Cashfree PG App ID"
                     type="text"
-                    value={cashfreeAppId}
-                    onChange={(e) => setCashfreeAppId(e.target.value)}
-                    placeholder="cf_app_live_..."
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    value={cashfreeAppId || 'Platform Default (Enforced)'}
+                    readOnly
+                    disabled
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-sm font-mono cursor-not-allowed"
                   />
                 </div>
               </div>
