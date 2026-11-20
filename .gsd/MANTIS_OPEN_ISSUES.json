@@ -563,8 +563,8 @@
     "verdict": "confirmed",
     "fingerprint": "SEC-WIN-022",
     "title": "[CWE-798] Hardcoded JWT Secret Literal in EasySplit Unit Test File",
-    "description": "ISSUE_ID: SEC-WIN-022\nSEVERITY: low\nCWE: CWE-798: Use of Hard-coded Credentials\nATTACK_SURFACE: tests/unit/cashfree-easysplit.test.mjs\nFILE_PATH: tests/unit/cashfree-easysplit.test.mjs\nLINE_RANGE: 488\nROOT_CAUSE: tests/unit/cashfree-easysplit.test.mjs contains literal string const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';. This triggers git working tree credential leakage assertions in tests/security/strix-regression.test.mjs.\nSECURITY_INVARIANT_VIOLATED: Secrets hygiene: test files should not embed canonical production/demo secret literals directly in code.\nEXPLOITABILITY: Automated secret scanners flag repository as vulnerable; risk of developer copying secret into production configuration.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/security/strix-regression.test.mjs",
-    "root_cause": "tests/unit/cashfree-easysplit.test.mjs contains literal string const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';. This triggers git working tree credential leakage assertions in tests/security/strix-regression.test.mjs.",
+    "description": "ISSUE_ID: SEC-WIN-022\nSEVERITY: low\nCWE: CWE-798: Use of Hard-coded Credentials\nATTACK_SURFACE: tests/unit/cashfree-easysplit.test.mjs\nFILE_PATH: tests/unit/cashfree-easysplit.test.mjs\nLINE_RANGE: 488\nROOT_CAUSE: tests/unit/cashfree-easysplit.test.mjs contains literal string const JWT_SECRET = 'super-secret-jwt-token-[REDACTED]';. This triggers git working tree credential leakage assertions in tests/security/strix-regression.test.mjs.\nSECURITY_INVARIANT_VIOLATED: Secrets hygiene: test files should not embed canonical production/demo secret literals directly in code.\nEXPLOITABILITY: Automated secret scanners flag repository as vulnerable; risk of developer copying secret into production configuration.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/security/strix-regression.test.mjs",
+    "root_cause": "tests/unit/cashfree-easysplit.test.mjs contains literal string const JWT_SECRET = 'super-secret-jwt-token-[REDACTED]';. This triggers git working tree credential leakage assertions in tests/security/strix-regression.test.mjs.",
     "intended_behavior": "Service-role keys and secret tokens never exist as hardcoded literals in the repository.",
     "trace": [
       {
@@ -593,7 +593,7 @@
       {
         "file": "tests/unit/cashfree-easysplit.test.mjs",
         "line": 488,
-        "description": "const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';"
+        "description": "const JWT_SECRET = 'super-secret-jwt-token-[REDACTED]';"
       }
     ],
     "conditions": [
