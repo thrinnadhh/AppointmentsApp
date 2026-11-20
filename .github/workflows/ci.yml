@@ -34,7 +34,7 @@ env:
   PAYMENT_GATEWAY_PROVIDER: 'cashfree'
   ALLOW_MOCK_PAYMENTS: 'false'
   ALLOW_MOCK_AUTH: 'true'
-  NEXT_PUBLIC_ENABLE_GOOGLE_AUTH: 'true'
+  NEXT_PUBLIC_ENABLE_GOOGLE_AUTH: 'false'
   NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME: 'Dr. K. S. Rao'
   NEXT_PUBLIC_GRIEVANCE_OFFICER_EMAIL: 'grievance-officer@tirupati-appointments.org'
   NEXT_PUBLIC_GRIEVANCE_OFFICER_PHONE: '+91-877-2244888'
@@ -168,6 +168,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key-ci
           SUPABASE_SERVICE_ROLE_KEY: stub-service-role-key-ci
+          NEXT_PUBLIC_ENABLE_GOOGLE_AUTH: 'false'
 
       - name: Typecheck (all workspaces)
         run: pnpm -r exec tsc --noEmit
