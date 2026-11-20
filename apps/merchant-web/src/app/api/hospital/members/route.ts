@@ -385,3 +385,89 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const ctx = await getAccessContext(req);
+    if (!isHospitalAdmin(ctx)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital admin can remove or revoke members' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    let memberId = searchParams.get('id') || searchParams.get('member_id');
+    if (!memberId) {
+      try {
+        const body = await req.json();
+        memberId = body?.id || body?.member_id;
+      } catch {
+        // ignore json parse error if query param or empty body
+      }
+    }
+
+    if (!memberId) {
+      return NextResponse.json({ success: false, error: 'Missing member id' }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    const { data: member, error: memberErr } = await supabaseAdmin
+      .from('department_members')
+      .select('id, department_id, merchant_id, email, status')
+      .eq('id', memberId)
+      .maybeSingle();
+
+    if (memberErr || !member) {
+      return NextResponse.json({ success: false, error: 'Member not found' }, { status: 404 });
+    }
+
+    if (member.merchant_id !== ctx.merchantId) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Member belongs to another hospital' }, { status: 403 });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    if (member.status === 'invited') {
+      await supabaseAdmin
+        .from('department_members')
+        .delete()
+        .eq('id', memberId);
+
+      await logHospitalAuditEvent({
+        merchantId: ctx.merchantId!,
+        actorId: ctx.userId,
+        action: 'member.cancel_invite',
+        target: memberId,
+        metadata: { email: member.email, department_id: member.department_id, method: 'DELETE' },
+      });
+
+      return NextResponse.json({ success: true, cancelled_id: memberId });
+    } else {
+      const { data: revoked, error: revokeErr } = await supabaseAdmin
+        .from('department_members')
+        .update({
+          status: 'revoked',
+          updated_at: nowIso,
+        })
+        .eq('id', memberId)
+        .select()
+        .single();
+
+      if (revokeErr) {
+        return NextResponse.json({ success: false, error: revokeErr.message }, { status: 500 });
+      }
+
+      await logHospitalAuditEvent({
+        merchantId: ctx.merchantId!,
+        actorId: ctx.userId,
+        action: 'member.revoke',
+        target: memberId,
+        metadata: { email: member.email, department_id: member.department_id, previous_status: member.status, method: 'DELETE' },
+      });
+
+      return NextResponse.json({ success: true, member: revoked });
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Internal error';
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
+}

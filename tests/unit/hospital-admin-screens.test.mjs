@@ -176,4 +176,70 @@ describe('Phase 5a: Hospital Admin Screens & API Logic Suite', () => {
       }
     });
   });
+
+  describe('4. Hospital Members DELETE API Handler (SEC-WIN-021)', () => {
+    it('blocks regular customers from calling DELETE on hospital members', async () => {
+      const res = await fetch(`${appBaseUrl}/api/hospital/members?id=00000000-0000-0000-0000-000000000001`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${tokens.patient1.token}`,
+        },
+      });
+      assert.strictEqual(res.status, 403);
+    });
+
+    it('allows Hospital Admin to DELETE a pending invite / member via DELETE method', async () => {
+      // Create a fresh test department for this test so quota isn't full
+      const deptRes = await fetch(`${appBaseUrl}/api/hospital/departments`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokens.adminApex.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `Delete Dept ${Date.now()}`,
+          allowed_modules: ['appointments'],
+          is_active: true,
+        }),
+      });
+      const deptJson = await deptRes.json();
+      assert.strictEqual(deptRes.status, 200);
+      const targetDeptId = deptJson.department.id;
+
+      const testEmail = `doctor.delete.${Date.now()}@test-tirupati.local`;
+      const createRes = await fetch(`${appBaseUrl}/api/hospital/members`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokens.adminApex.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          department_id: targetDeptId,
+          email: testEmail,
+          role: 'consultant',
+        }),
+      });
+
+      const createJson = await createRes.json();
+      assert.strictEqual(createRes.status, 200, `Expected 200 on create, got ${createRes.status}: ${JSON.stringify(createJson)}`);
+      assert.ok(createJson.member?.id);
+
+      const deleteRes = await fetch(`${appBaseUrl}/api/hospital/members?id=${createJson.member.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${tokens.adminApex.token}`,
+        },
+      });
+
+      assert.strictEqual(deleteRes.status, 200, 'DELETE method must be implemented and return 200 for hospital admin');
+      const deleteJson = await deleteRes.json();
+      assert.strictEqual(deleteJson.success, true);
+
+      // Clean up department
+      await fetch(`${supabaseUrl}/rest/v1/departments?id=eq.${targetDeptId}`, {
+        method: 'DELETE',
+        headers: serviceHeaders,
+      });
+    });
+  });
 });
