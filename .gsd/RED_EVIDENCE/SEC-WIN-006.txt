@@ -1,0 +1,44 @@
+VULNERABILITY ID: SEC-WIN-006
+COMMAND: node tests/security/security-definer-schema-guard.test.mjs
+EXIT CODE: 1
+OUTPUT:
+▶ Packet 1.2: SECURITY DEFINER search_path & Schema Isolation Guard
+  ✔ 1. All SECURITY DEFINER functions must set an explicit search_path in proconfig (121.858541ms)
+  ✔ 2. Zero non-superuser CREATE privileges on schemas referenced in search_path (vault, net, extensions, pgmq, storage) (257.765542ms)
+  ✖ 3. Public schema CREATE privilege lockdown: anon and authenticated cannot CREATE in public schema (118.540208ms)
+✖ Packet 1.2: SECURITY DEFINER search_path & Schema Isolation Guard (499.719125ms)
+ℹ tests 3
+ℹ suites 1
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 505.108708
+
+✖ failing tests:
+
+test at tests/security/security-definer-schema-guard.test.mjs:64:3
+✖ 3. Public schema CREATE privilege lockdown: anon and authenticated cannot CREATE in public schema (118.540208ms)
+  AssertionError [ERR_ASSERTION]: Non-superusers have CREATE privilege in public schema: anon
+  + actual - expected
+  
+  + [
+  +   'anon'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/security/security-definer-schema-guard.test.mjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

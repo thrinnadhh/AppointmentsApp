@@ -1,0 +1,390 @@
+{
+  "routes": [
+    {
+      "route": "/api/account/delete-public-request/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Regex / Pattern",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/account/delete/route.ts",
+      "authn": "auth.getUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/account/export/route.ts",
+      "authn": "getAuthenticatedUser, auth.getUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Query Param validation",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/admin/doctor-assignments/route.ts",
+      "authn": "verifyStaffManager",
+      "authz": "doctor_front_desk_assignments",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/admin/refunds/route.ts",
+      "authn": "verifyAdminRequest",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/auth/me/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Query Param validation",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/auth/otp/send/route.ts",
+      "authn": "Public / Custom",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/auth/otp/verify/route.ts",
+      "authn": "Public / Custom",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Regex / Pattern",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/admit/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/cancel/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking, admin role check, customer_id ownership",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/checkin/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForProvider, doctor_front_desk_assignments, hospital_role, admin role check, provider owner check",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/collect-fee/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking, hospital_role",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/confirm/route.ts",
+      "authn": "auth.getUser",
+      "authz": "isCallerAuthorizedForBooking",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/emergency-choice/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking, customer_id ownership",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/end/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/offline/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Regex / Pattern",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/override/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/reorder/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/bookings/start/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/cities/waitlist/route.ts",
+      "authn": "Public Unauthenticated",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/cron/security-monitor/route.ts",
+      "authn": "CRON_SECRET Bearer",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Query Param validation",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/customer/queue-and-history/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking, isCallerAuthorizedForProvider, admin role check",
+      "validation": "Regex / Pattern",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/doctor/emergency-cancel/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/health/route.ts",
+      "authn": "Public Unauthenticated",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Query Param validation",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/hospital/audit-logs/route.ts",
+      "authn": "Public / Custom",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/hospital/context/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Query Param validation",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/hospital/departments/route.ts",
+      "authn": "Public / Custom",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/hospital/members/route.ts",
+      "authn": "Public / Custom",
+      "authz": "provider owner check",
+      "validation": "Regex / Pattern",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/merchant/doctor-status/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/merchants/cashfree-vendor/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForProvider",
+      "validation": "parseSafeJson, PayloadLimit, Regex / Pattern",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/notifications/push/route.ts",
+      "authn": "auth.getUser",
+      "authz": "admin role check",
+      "validation": "Regex / Pattern",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/payments/create-order/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking",
+      "validation": "parseSafeJson, PayloadLimit",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/payments/verify/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "customer_id ownership",
+      "validation": "parseSafeJson, PayloadLimit, Regex / Pattern",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/prescriptions/signed-url/route.ts",
+      "authn": "getAuthenticatedUser, auth.getUser",
+      "authz": "isCallerAuthorizedForBooking, isCallerAuthorizedForProvider",
+      "validation": "JSON Schema / Type assertion",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/queue/broadcast/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "admin role check",
+      "validation": "Regex / Pattern",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/slots/availability/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "Regex / Pattern",
+      "rate_limit": "checkRateLimit (Redis/Memory)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/ticket/[id]/route.ts",
+      "authn": "verifyAuthenticatedUser",
+      "authz": "isCallerAuthorizedForBooking, customer_id ownership",
+      "validation": "Regex / Pattern",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "N/A"
+    },
+    {
+      "route": "/api/webhooks/cashfree/route.ts",
+      "authn": "Webhook Header Signature",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "assertSafePayloadStructure, PayloadLimit",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "Cashfree HMAC-SHA256 (300s window)"
+    },
+    {
+      "route": "/api/webhooks/razorpay/route.ts",
+      "authn": "Webhook Header Signature",
+      "authz": "None / Inherited from RPC or Public",
+      "validation": "assertSafePayloadStructure, PayloadLimit, Regex / Pattern",
+      "rate_limit": "None (Standard infrastructure/CDN)",
+      "webhook": "Razorpay HMAC-SHA256"
+    }
+  ],
+  "edge_functions": [
+    {
+      "function": "crash-alert/index.ts",
+      "authn": "Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "Header / Payload verification",
+      "rate_limit": "Infrastructure / Ingress",
+      "webhook": "N/A"
+    },
+    {
+      "function": "generate-invoice/index.ts",
+      "authn": "Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "Header / Payload verification",
+      "rate_limit": "Infrastructure / Ingress",
+      "webhook": "N/A"
+    },
+    {
+      "function": "process-cancellation/index.ts",
+      "authn": "Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "Header / Payload verification",
+      "rate_limit": "Infrastructure / Ingress",
+      "webhook": "N/A"
+    },
+    {
+      "function": "process-notification-queue/index.ts",
+      "authn": "Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "Header / Payload verification",
+      "rate_limit": "Infrastructure / Ingress",
+      "webhook": "N/A"
+    },
+    {
+      "function": "process-refund-queue/index.ts",
+      "authn": "Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "Header / Payload verification",
+      "rate_limit": "Infrastructure / Ingress",
+      "webhook": "N/A"
+    },
+    {
+      "function": "send-booking-notification/index.ts",
+      "authn": "Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "Header / Payload verification",
+      "rate_limit": "Infrastructure / Ingress",
+      "webhook": "N/A"
+    },
+    {
+      "function": "whatsapp-auth-hook/index.ts",
+      "authn": "Standard Webhook Signature, Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "JSON Schema Parse",
+      "rate_limit": "Edge In-memory Rate Limit",
+      "webhook": "Standard Webhook HMAC-SHA256 (300s)"
+    },
+    {
+      "function": "whatsapp-sender/index.ts",
+      "authn": "Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "Header / Payload verification",
+      "rate_limit": "Infrastructure / Ingress",
+      "webhook": "N/A"
+    },
+    {
+      "function": "whatsapp-webhook/index.ts",
+      "authn": "Meta HMAC-SHA256, Service Role / Internal Cron, Bearer / Anon / Service Token",
+      "authz": "service_role restricted",
+      "validation": "JSON Schema Parse",
+      "rate_limit": "Infrastructure / Ingress",
+      "webhook": "Meta X-Hub-Signature-256"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+VULNERABILITY ID: SEC-WIN-004
+COMMAND: node tests/unit/prescriptions-signed-url-bypass.test.mjs
+EXIT CODE: 1
+OUTPUT:
+▶ SEC-WIN-004: /api/prescriptions/signed-url E2E Bypass Security Guard
+  ✖ 1. REJECT: When ENABLE_E2E_BYPASS is unset/false, x-test-bypass-user is rejected with 401 Unauthorized (413.893208ms)
+  ✔ 2. REJECT: When NODE_ENV === "production", x-test-bypass-user is rejected with 401 even if ENABLE_E2E_BYPASS is true (1.112583ms)
+  ✔ 3. ALLOW: When ENABLE_E2E_BYPASS === "true" AND NODE_ENV !== "production", bypass header is accepted (24.242667ms)
+  ✖ 4. Source code check: verifies isE2EBypassEnabled() is imported and used, no naked NODE_ENV bypass (0.81925ms)
+✖ SEC-WIN-004: /api/prescriptions/signed-url E2E Bypass Security Guard (488.312ms)
+ℹ tests 4
+ℹ suites 1
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 496.572125
+
+✖ failing tests:
+
+test at tests/unit/prescriptions-signed-url-bypass.test.mjs:135:3
+✖ 1. REJECT: When ENABLE_E2E_BYPASS is unset/false, x-test-bypass-user is rejected with 401 Unauthorized (413.893208ms)
+  AssertionError [ERR_ASSERTION]: Request with x-test-bypass-user must return 401 when ENABLE_E2E_BYPASS is not true
+  
+  500 !== 401
+  
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/prescriptions-signed-url-bypass.test.mjs:154:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 500,
+    expected: 401,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/unit/prescriptions-signed-url-bypass.test.mjs:201:3
+✖ 4. Source code check: verifies isE2EBypassEnabled() is imported and used, no naked NODE_ENV bypass (0.81925ms)
+  AssertionError [ERR_ASSERTION]: route.ts must invoke isE2EBypassEnabled()
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/prescriptions-signed-url-bypass.test.mjs:203:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "import { NextRequest, NextResponse } from 'next/server';\nimport { getPrivateDocumentSignedUrl } from '@/lib/storage';\nimport { getSupabaseAdmin } from '@/lib/supabase';\nimport { isCallerAuthorizedForBooking, isCallerAuthorizedForProvider } from '@/lib/auth-admin';\nimport { cookies } from 'next/headers';\nimport { createServerClient } from '@supabase/ssr';\n\nexport const dynamic = 'force-dynamic';\n\nasync function getAuthenticatedUser(req: NextRequest) {\n...",
+    expected: /isE2EBypassEnabled\(\)/,
+    operator: 'match',
+    diff: 'simple'
+  }

@@ -1,0 +1,50 @@
+VULNERABILITY ID: SEC-WIN-012
+COMMAND: node tests/security/anon-log-throttle.test.mjs
+EXIT CODE: 1
+OUTPUT:
+▶ SEC-WIN-012: Throttling anon log_client_event RPC
+  ✖ 1. Rejects or throttles anon client log flooding after threshold (57.360458ms)
+  ✖ 2. Enforces tighter length caps on anon message and metadata (3.108625ms)
+✖ SEC-WIN-012: Throttling anon log_client_event RPC (63.33ms)
+ℹ tests 2
+ℹ suites 1
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68.871833
+
+✖ failing tests:
+
+test at tests/security/anon-log-throttle.test.mjs:23:3
+✖ 1. Rejects or throttles anon client log flooding after threshold (57.360458ms)
+  AssertionError [ERR_ASSERTION]: Expected anon log calls beyond threshold to be throttled, but all 35 calls succeeded without throttling
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/security/anon-log-throttle.test.mjs:57:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/security/anon-log-throttle.test.mjs:67:3
+✖ 2. Enforces tighter length caps on anon message and metadata (3.108625ms)
+  AssertionError [ERR_ASSERTION]: Message length must be capped <= 500, got 2000
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/security/anon-log-throttle.test.mjs:93:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

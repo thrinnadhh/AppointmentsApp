@@ -1,0 +1,432 @@
+[
+  {
+    "canonical_refs": {
+      "surface": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#handleMessage",
+      "boundary": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#MessageHandling",
+      "subsystem": "apps/customer-mobile",
+      "attack_class": "ATTACK-CLASSES.md#Origin validation"
+    },
+    "surface": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx",
+    "boundary": "MessageHandling",
+    "subsystem": "apps/customer-mobile",
+    "attack_class": "Origin validation",
+    "starting_paths": [
+      "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Origin validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+        ],
+        "invariant": "handleMessage must validate origin and payload structure",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-003; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23handleMessage::apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23MessageHandling::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Origin%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#originWhitelist",
+      "boundary": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#WebViewBridge",
+      "subsystem": "apps/customer-mobile",
+      "attack_class": "ATTACK-CLASSES.md#Origin validation"
+    },
+    "surface": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx",
+    "boundary": "WebViewBridge",
+    "subsystem": "apps/customer-mobile",
+    "attack_class": "Origin validation",
+    "starting_paths": [
+      "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Origin validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+        ],
+        "invariant": "originWhitelist must restrict to Cashfree and verified UPI schemes",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-002; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23originWhitelist::apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23WebViewBridge::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Origin%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/customer-mobile/src/screens/BookingPassModal.tsx#ModalCopy",
+      "boundary": "apps/customer-mobile/src/screens/BookingPassModal.tsx#UI",
+      "subsystem": "apps/customer-mobile",
+      "attack_class": "ATTACK-CLASSES.md#Information exposure"
+    },
+    "surface": "apps/customer-mobile/src/screens/BookingPassModal.tsx",
+    "boundary": "UI",
+    "subsystem": "apps/customer-mobile",
+    "attack_class": "Information exposure",
+    "starting_paths": [
+      "apps/customer-mobile/src/screens/BookingPassModal.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Information exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "apps/customer-mobile/src/screens/BookingPassModal.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "apps/customer-mobile/src/screens/BookingPassModal.tsx"
+        ],
+        "invariant": "Check-in PIN must not be labeled as auth OTP",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-008; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fscreens%2FBookingPassModal.tsx%23ModalCopy::apps%2Fcustomer-mobile%2Fsrc%2Fscreens%2FBookingPassModal.tsx%23UI::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Information%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/hospital/departments/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/hospital/departments/route.ts#InputValidation",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Input validation"
+    },
+    "surface": "apps/merchant-web/src/app/api/hospital/departments/route.ts",
+    "boundary": "InputValidation",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Input validation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/hospital/departments/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Input validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/hospital/departments/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/hospital/departments/route.ts"
+        ],
+        "invariant": "Department input fields must be validated server-side",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-007; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fdepartments%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fdepartments%2Froute.ts%23InputValidation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Input%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts#AuthBypass",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Authentication bypass"
+    },
+    "surface": "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts",
+    "boundary": "AuthBypass",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Authentication bypass",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Authentication bypass",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts"
+        ],
+        "invariant": "E2E bypass must require explicit isE2EBypassEnabled() and token",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-004; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fprescriptions%2Fsigned-url%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fprescriptions%2Fsigned-url%2Froute.ts%23AuthBypass::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts#WebhookAuth",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Replay attacks"
+    },
+    "surface": "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts",
+    "boundary": "WebhookAuth",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Replay attacks",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Replay attacks",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts"
+        ],
+        "invariant": "Decommissioned webhook must return 410 Gone",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-005; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Frazorpay%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Frazorpay%2Froute.ts%23WebhookAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Replay%20attacks"
+  },
+  {
+    "canonical_refs": {
+      "surface": "packages/shared/package.json#dependencies",
+      "boundary": "packages/shared/package.json#Lockfile",
+      "subsystem": "packages/shared",
+      "attack_class": "ATTACK-CLASSES.md#Dependency security"
+    },
+    "surface": "packages/shared/package.json",
+    "boundary": "Lockfile",
+    "subsystem": "packages/shared",
+    "attack_class": "Dependency security",
+    "starting_paths": [
+      "packages/shared/package.json"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Dependency security",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "packages/shared/package.json"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "packages/shared/package.json"
+        ],
+        "invariant": "Root pnpm-lock.yaml governs all package resolutions",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-009; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "packages%2Fshared%2Fpackage.json%23dependencies::packages%2Fshared%2Fpackage.json%23Lockfile::packages%2Fshared::ATTACK-CLASSES.md%23Dependency%20security"
+  },
+  {
+    "canonical_refs": {
+      "surface": "scripts/run-strix-scan.sh#StrixLogs",
+      "boundary": "scripts/run-strix-scan.sh#ArtifactStorage",
+      "subsystem": "scripts",
+      "attack_class": "ATTACK-CLASSES.md#Credential exposure"
+    },
+    "surface": "scripts/run-strix-scan.sh",
+    "boundary": "ArtifactStorage",
+    "subsystem": "scripts",
+    "attack_class": "Credential exposure",
+    "starting_paths": [
+      "scripts/run-strix-scan.sh"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Credential exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "scripts/run-strix-scan.sh"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "scripts/run-strix-scan.sh"
+        ],
+        "invariant": "Local scanner run outputs must remain gitignored",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-010; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "scripts%2Frun-strix-scan.sh%23StrixLogs::scripts%2Frun-strix-scan.sh%23ArtifactStorage::scripts::ATTACK-CLASSES.md%23Credential%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20261105100001_enable_power_extensions.sql#SECURITY_DEFINER",
+      "boundary": "supabase/migrations/20261105100001_enable_power_extensions.sql#search_path",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Privilege escalation"
+    },
+    "surface": "supabase/migrations/20261105100001_enable_power_extensions.sql",
+    "boundary": "search_path",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Privilege escalation",
+    "starting_paths": [
+      "supabase/migrations/20261105100001_enable_power_extensions.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Privilege escalation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "supabase/migrations/20261105100001_enable_power_extensions.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "supabase/migrations/20261105100001_enable_power_extensions.sql"
+        ],
+        "invariant": "SECURITY DEFINER functions must have fixed search_path or non-writable schemas",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-006; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20261105100001_enable_power_extensions.sql%23SECURITY_DEFINER::supabase%2Fmigrations%2F20261105100001_enable_power_extensions.sql%23search_path::supabase%2Fmigrations::ATTACK-CLASSES.md%23Privilege%20escalation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20261107000010_perf_consolidate_multiple_permissive_policies.sql#resource_availability",
+      "boundary": "public.resource_availability#RLS",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20261107000010_perf_consolidate_multiple_permissive_policies.sql",
+    "boundary": "RLS",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20261107000010_perf_consolidate_multiple_permissive_policies.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "auditor",
+    "reviewed_paths": [
+      "supabase/migrations/20261107000010_perf_consolidate_multiple_permissive_policies.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "auditor",
+        "reviewed_paths": [
+          "supabase/migrations/20261107000010_perf_consolidate_multiple_permissive_policies.sql"
+        ],
+        "invariant": "resource_availability UPDATE policy requires WITH CHECK",
+        "method": "source",
+        "result": "Security review completed for SEC-WIN-001; invariant mapped and remediation specified.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20261107000010_perf_consolidate_multiple_permissive_policies.sql%23resource_availability::public.resource_availability%23RLS::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  }
+]

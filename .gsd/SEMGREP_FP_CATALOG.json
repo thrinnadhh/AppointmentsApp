@@ -1,0 +1,76 @@
+{
+  "CLI & Tooling Execution Helpers": [
+    ".agents/scripts/auto_preview.py:82",
+    ".agents/skills/stack-diagram/scripts/fetch_icons.py:151",
+    ".agents/skills/stack-diagram/scripts/share.py:41",
+    "scripts/audit-security-gate.mjs:40",
+    "scripts/generate-full-test-table.mjs:14"
+  ],
+  "Non-Literal Regexp (Internal Filter Matching)": [
+    ".agents/skills/security-audit/validate-findings.cjs:321",
+    ".agents/skills/security-audit/validate-findings.cjs:451",
+    "apps/merchant-web/src/app/api/payments/verify/route.ts:116",
+    "apps/merchant-web/src/app/api/payments/verify/route.ts:409",
+    "apps/merchant-web/src/app/api/payments/verify/route.ts:703"
+  ],
+  "JWT Test / Demo Fixtures": [
+    ".github/workflows/ci.yml:31",
+    ".github/workflows/ci.yml:33",
+    ".github/workflows/ci.yml:34",
+    "docs/evidence/J-J3.txt:11",
+    "docs/evidence/J-J3.txt:15",
+    "docs/evidence/J-J3.txt:135",
+    "docs/security/strix-remediation-plan.md:131",
+    "playwright.config.ts:31",
+    "playwright.config.ts:34",
+    "playwright.config.ts:88",
+    "playwright.config.ts:89",
+    "playwright.config.ts:104",
+    "scripts/generate-ci-env.mjs:6",
+    "scripts/generate-ci-env.mjs:7",
+    "scripts/generate-full-test-table.mjs:12",
+    "scripts/scan-secrets.mjs:64",
+    "scripts/seed-hospital-test-data.mjs:27"
+  ],
+  "Unsafe Format String (Internal Concatenation / Query Builder)": [
+    "apps/customer-mobile/src/services/notifications.ts:271",
+    "apps/merchant-web/src/lib/otp-circuit-breaker.ts:85",
+    "apps/merchant-web/src/lib/otp-circuit-breaker.ts:87",
+    "packages/shared/src/logger.ts:779",
+    "packages/shared/src/logger.ts:781",
+    "packages/shared/src/logger.ts:783",
+    "scripts/reset-hospital-test-data.mjs:45",
+    "scripts/seed-e2e-data.mjs:128",
+    "scripts/seed-e2e-data.mjs:260",
+    "scripts/seed-e2e-data.mjs:387",
+    "supabase/functions/process-notification-queue/index.ts:258",
+    "supabase/functions/whatsapp-sender/index.ts:272",
+    "supabase/functions/whatsapp-sender/index.ts:306",
+    "supabase/functions/whatsapp-webhook/index.ts:213"
+  ],
+  "Open Redirect (Sanitized by Regex)": [
+    "apps/merchant-web/src/app/login/page.tsx:82",
+    "apps/merchant-web/src/app/login/page.tsx:114",
+    "apps/merchant-web/src/app/login/page.tsx:152",
+    "apps/merchant-web/src/app/login/page.tsx:180",
+    "apps/merchant-web/src/app/login/page.tsx:306"
+  ],
+  "Local Docker Compose Configuration": [
+    "docker-compose.yml:5",
+    "docker-compose.yml:5"
+  ],
+  "Package Manager Advisory Checks": [
+    "pnpm-workspace.yaml:1",
+    "pnpm-workspace.yaml:1",
+    "pnpm-workspace.yaml:1",
+    "supabase/functions/whatsapp-webhook/.npmrc:1"
+  ],
+  "Path Traversal (Static Build / Script Paths)": [
+    "scripts/check-legal-placeholders.js:64",
+    "scripts/generate-ui-inventory.mjs:270",
+    "scripts/generate-ui-inventory.mjs:282",
+    "scripts/generate-ui-inventory.mjs:296",
+    "scripts/scan-untracked-allowlist-paths.mjs:20",
+    "scripts/scan-untracked-allowlist-paths.mjs:20"
+  ]
+}

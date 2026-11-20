@@ -1,0 +1,49 @@
+VULNERABILITY ID: SEC-WIN-001
+COMMAND: node tests/security/database-grants-allowlist.test.mjs
+EXIT CODE: 1
+OUTPUT:
+▶ Packet 1.1: Database Grants, Privileges, and RLS WITH CHECK Compliance
+  ✖ 1. RLS WITH CHECK clause completeness: all UPDATE and ALL policies must specify WITH CHECK (141.009125ms)
+  ✔ 2. Anon EXECUTE privilege allowlist: exactly the 4 approved functions callable by anon (131.58725ms)
+  ✔ 3. Anon Table Grant Allowlist: anon must only have SELECT on approved catalog tables (101.135541ms)
+  ✔ 4. Authenticated Table Grant Lockdown: authenticated must have ZERO write privileges on server-managed financial tables (97.459834ms)
+  ✔ 5. Default Privileges Hygiene: assert postgres default privileges do not grant unmanaged write access to anon in public schema (85.3595ms)
+✖ Packet 1.1: Database Grants, Privileges, and RLS WITH CHECK Compliance (557.826166ms)
+ℹ tests 5
+ℹ suites 1
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 563.516083
+
+✖ failing tests:
+
+test at tests/security/database-grants-allowlist.test.mjs:34:3
+✖ 1. RLS WITH CHECK clause completeness: all UPDATE and ALL policies must specify WITH CHECK (141.009125ms)
+  AssertionError [ERR_ASSERTION]: Found policies with NULL with_check clause: resource_availability::resource_availability_update_policy::UPDATE
+  + actual - expected
+  
+  + [
+  +   'resource_availability::resource_availability_update_policy::UPDATE'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/security/database-grants-allowlist.test.mjs:44:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at node:internal/test_runner/test:1887:71
+      at node:internal/per_context/primordials:504:82
+      at new Promise (<anonymous>)
+      at new SafePromise (node:internal/per_context/primordials:478:3)
+      at node:internal/per_context/primordials:504:9
+      at Array.map (<anonymous>) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,98 @@
+[
+  {
+    "table": "providers",
+    "column": "status",
+    "writable": false,
+    "status": "BLOCKED: Unauthorized provider modification: status, strikes, penalty balance, booking freeze, city, and ownership are protected"
+  },
+  {
+    "table": "providers",
+    "column": "owner_id",
+    "writable": false,
+    "status": "BLOCKED: Unauthorized provider modification: status, strikes, penalty balance, booking freeze, city, and ownership are protected"
+  },
+  {
+    "table": "providers",
+    "column": "is_verified",
+    "writable": false,
+    "status": "BLOCKED: column \"is_verified\" of relation \"providers\" does not exist"
+  },
+  {
+    "table": "providers",
+    "column": "is_promoted",
+    "writable": false,
+    "status": "BLOCKED: column \"is_promoted\" of relation \"providers\" does not exist"
+  },
+  {
+    "table": "providers",
+    "column": "rank_multiplier",
+    "writable": false,
+    "status": "BLOCKED: column \"rank_multiplier\" of relation \"providers\" does not exist"
+  },
+  {
+    "table": "providers",
+    "column": "city",
+    "writable": true,
+    "status": "WRITABLE (1 rows updated)"
+  },
+  {
+    "table": "providers",
+    "column": "upi_vpa",
+    "writable": false,
+    "status": "BLOCKED: column \"upi_vpa\" of relation \"providers\" does not exist"
+  },
+  {
+    "table": "providers",
+    "column": "bank_account_number",
+    "writable": false,
+    "status": "BLOCKED: column \"bank_account_number\" of relation \"providers\" does not exist"
+  },
+  {
+    "table": "providers",
+    "column": "consultation_fee",
+    "writable": false,
+    "status": "BLOCKED: column \"consultation_fee\" of relation \"providers\" does not exist"
+  },
+  {
+    "table": "resources",
+    "column": "provider_id",
+    "writable": false,
+    "status": "BLOCKED: new row violates row-level security policy for table \"resources\""
+  },
+  {
+    "table": "resources",
+    "column": "is_active",
+    "writable": true,
+    "status": "WRITABLE (8 rows updated)"
+  },
+  {
+    "table": "resources",
+    "column": "price",
+    "writable": true,
+    "status": "WRITABLE (8 rows updated)"
+  },
+  {
+    "table": "user_consents",
+    "column": "user_id",
+    "writable": false,
+    "status": "BLOCKED: new row violates row-level security policy for table \"user_consents\""
+  },
+  {
+    "table": "user_consents",
+    "column": "granted",
+    "writable": true,
+    "status": "WRITABLE (1 rows updated)"
+  },
+  {
+    "table": "push_tokens",
+    "column": "user_id",
+    "writable": false,
+    "status": "BLOCKED by RLS / zero rows affected"
+  },
+  {
+    "table": "push_tokens",
+    "column": "token",
+    "writable": false,
+    "status": "BLOCKED by RLS / zero rows affected"
+  }
+]

@@ -1,0 +1,98 @@
+VULNERABILITY ID: SEC-WIN-003
+COMMAND: node tests/unit/cashfree-webview-origin-guard.test.mjs
+EXIT CODE: 1
+OUTPUT:
+▶ SEC-WIN-002 & SEC-WIN-003: Cashfree WebView Origin & Scheme Lockdown
+  ✖ 1. Scheme allowlist: intent:// is strictly excluded from UPI_SCHEMES (1.212125ms)
+  ✖ 2. Origin allowlist: CashfreeCheckoutWebView contains explicit HTTPS domain allowlist (0.236833ms)
+  ✖ 3. Navigation safety: handleShouldStartLoad must block unauthorized foreign domains by default (0.109875ms)
+  ✖ 4. Message handler safety: reads nativeEvent.url and treats payment payload as untrusted trigger (0.21975ms)
+  ✔ 5. Manual verification marker for physical UPI deep link (0.130917ms)
+✖ SEC-WIN-002 & SEC-WIN-003: Cashfree WebView Origin & Scheme Lockdown (3.403666ms)
+ℹ tests 5
+ℹ suites 1
+ℹ pass 1
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9.392083
+
+✖ failing tests:
+
+test at tests/unit/cashfree-webview-origin-guard.test.mjs:10:3
+✖ 1. Scheme allowlist: intent:// is strictly excluded from UPI_SCHEMES (1.212125ms)
+  AssertionError [ERR_ASSERTION]: intent:// must NOT be in UPI_SCHEMES array
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/cashfree-webview-origin-guard.test.mjs:11:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at node:internal/test_runner/test:1887:71
+      at node:internal/per_context/primordials:504:82
+      at new Promise (<anonymous>)
+      at new SafePromise (node:internal/per_context/primordials:478:3)
+      at node:internal/per_context/primordials:504:9
+      at Array.map (<anonymous>) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/unit/cashfree-webview-origin-guard.test.mjs:17:3
+✖ 2. Origin allowlist: CashfreeCheckoutWebView contains explicit HTTPS domain allowlist (0.236833ms)
+  AssertionError [ERR_ASSERTION]: Must contain api.cashfree.com in origin allowlist
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/cashfree-webview-origin-guard.test.mjs:23:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "import React from 'react';\nimport {\n  Modal,\n  SafeAreaView,\n  View,\n  Text,\n  TouchableOpacity,\n  StyleSheet,\n  ActivityIndicator,\n  Linking,\n...",
+    expected: /api\.cashfree\.com/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/unit/cashfree-webview-origin-guard.test.mjs:35:3
+✖ 3. Navigation safety: handleShouldStartLoad must block unauthorized foreign domains by default (0.109875ms)
+  AssertionError [ERR_ASSERTION]: handleShouldStartLoad must not fall through to unconditioned return true
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/cashfree-webview-origin-guard.test.mjs:36:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/unit/cashfree-webview-origin-guard.test.mjs:42:3
+✖ 4. Message handler safety: reads nativeEvent.url and treats payment payload as untrusted trigger (0.21975ms)
+  AssertionError [ERR_ASSERTION]: handleMessage event signature must inspect nativeEvent.url
+      at TestContext.<anonymous> (file:///Users/trinadh/projects/Appointments/tests/unit/cashfree-webview-origin-guard.test.mjs:43:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "import React from 'react';\nimport {\n  Modal,\n  SafeAreaView,\n  View,\n  Text,\n  TouchableOpacity,\n  StyleSheet,\n  ActivityIndicator,\n  Linking,\n...",
+    expected: /nativeEvent\s*:\s*\{[^}]*data[^}]*url/,
+    operator: 'match',
+    diff: 'simple'
+  }
