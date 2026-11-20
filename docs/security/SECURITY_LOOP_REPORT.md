@@ -264,6 +264,14 @@ The following security configurations cannot be proven by local Docker execution
 - **Invariants:** 16 governance and payout columns in `public.providers` are blocked by `guard_provider_governance()` with SQLSTATE 42501; 3 identity columns are protected by foreign key constraints; 29 operational and profile columns are safely writable by authorized tenant owners.
 
 ### C. CI Pipeline & Cron Auth Alignment
-- **Problem:** `apps/merchant-web/src/app/api/cron/security-monitor/route.ts` and `middleware.ts` checked `COMMITTED_DEFAULT_E2E_SECRETS` unconditionally, causing local test runs and CI runners using default test secrets (`test_cron_secret_2026`) to receive HTTP 401 instead of 200.
-- **Fix:** Gated the blacklisted committed secret check behind `process.env.NODE_ENV === 'production'`, allowing development and CI test suites to authenticate while strictly prohibiting committed defaults in production.
-- **Verification:** `tests/unit/cron-deduplication.test.mjs` (10/10 PASS) and `tests/unit/cross-tenant-authorization-matrix.test.mjs` (41/41 PASS, 100% route coverage across all 40 routes on disk).
+- **Problem:** `apps/merchant-web/src/app/api/cron/security-monitor/route.ts` and `middleware.ts` checked `COMMITTED_DEFAULT_E2E_SECRETS` unconditionally, causing local test runs and CI runners using default test secrets (`test_cron_secret_2026`) to receive HTTP 401 instead of 200. Furthermore, `tests/scripts/test-expired-holds-limit.mjs` hardcoded the blacklisted bypass string `tirupati_e2e_secure_bypass_key_2026_x9k2`, causing 401 failures during CI availability checks.
+- **Fix:**
+  - Gated the blacklisted committed secret check behind `process.env.NODE_ENV === 'production'`, allowing development and CI test suites to authenticate while strictly prohibiting committed defaults in production.
+  - In `test-expired-holds-limit.mjs`, dynamically resolved `SUPERADMIN_E2E_TOKEN` / `ADMIN_SECRET` from environment and passed `x-test-bypass-user: customerId` to ensure non-bypass test compatibility.
+  - In `.github/workflows/ci.yml`, robustified `supabase db reset` retry with `sudo fuser -k` and extended sleep to prevent inbucket port 54324 contention.
+- **Verification:**
+  - `tests/unit/cron-deduplication.test.mjs` (10/10 PASS).
+  - `tests/scripts/test-expired-holds-limit.mjs` (4/4 PASS).
+  - `tests/unit/cross-tenant-authorization-matrix.test.mjs` (41/41 PASS, 100% route coverage across all 40 routes on disk).
+  - **Full CI Matrix Run `44716767746` on Commit `0131c06`:** 100% Green across all 10 jobs (Security Audit, Lint/Typecheck, Unit/Scripts, Build, Admin E2E, Stress Tests, Customer E2E, Merchant E2E, Integration E2E, All CI Gates Passed).
+  - **Gitleaks Audit:** 23 commits scanned (`f7c388d..0131c06`), 0 leaks detected.
