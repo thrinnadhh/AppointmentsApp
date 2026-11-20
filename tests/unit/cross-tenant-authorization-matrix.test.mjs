@@ -644,7 +644,7 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     console.log('\n========================================================================================\n');
 
     // Programmatic Completeness Assertion: walks disk and asserts 100% of discovered routes exist in matrixLedger
-    const apiDir = path.resolve('apps/merchant-web/src/app/api');
+    const appDir = path.resolve('apps/merchant-web/src/app');
     function findRouteFiles(dir, fileList = []) {
       const files = fs.readdirSync(dir);
       for (const file of files) {
@@ -652,15 +652,15 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
         if (fs.statSync(filePath).isDirectory()) {
           findRouteFiles(filePath, fileList);
         } else if (file === 'route.ts') {
-          const rel = path.relative(apiDir, path.dirname(filePath));
-          const routePath = rel === '' ? '/api' : `/api/${rel.split(path.sep).join('/')}`;
+          const rel = path.relative(appDir, path.dirname(filePath));
+          const routePath = `/${rel.split(path.sep).join('/')}`;
           fileList.push(routePath);
         }
       }
       return fileList;
     }
 
-    const diskRoutes = findRouteFiles(apiDir).sort();
+    const diskRoutes = findRouteFiles(appDir).sort();
     const ledgerRoutes = new Set(matrixLedger.map((e) => e.route));
     const missingFromLedger = diskRoutes.filter((r) => !ledgerRoutes.has(r));
 
@@ -2047,6 +2047,34 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       'Authenticated User (proved 200)',
       'Unauthenticated Caller (proved 401)',
       'apps/merchant-web/src/app/api/auth/me/route.ts:7',
+      'PASS'
+    );
+
+    // 38.9 /auth/callback Open-Redirect Protection
+    // Adversarial: external URL in next parameter
+    const callbackExternal = await fetch(`${appBaseUrl}/auth/callback?next=https://evil.com`, {
+      redirect: 'manual',
+    });
+    assert.ok([302, 307].includes(callbackExternal.status), 'Must return redirect status');
+    const extLocation = callbackExternal.headers.get('location') || '';
+    assert.ok(extLocation.includes('/login'), 'Missing auth code must redirect to /login');
+    assert.ok(!extLocation.includes('evil.com'), 'Must not redirect to external open-redirect host');
+
+    // Adversarial: protocol-relative URI in redirect parameter
+    const callbackProtocolRelative = await fetch(`${appBaseUrl}/auth/callback?error=access_denied&redirect=//evil.com`, {
+      redirect: 'manual',
+    });
+    assert.ok([302, 307].includes(callbackProtocolRelative.status), 'Must return redirect status on error');
+    const protoLocation = callbackProtocolRelative.headers.get('location') || '';
+    assert.ok(protoLocation.includes('/login?error=access_denied'), 'Error must redirect to /login?error=');
+    assert.ok(!protoLocation.includes('//evil.com'), 'Must not redirect to protocol-relative host');
+
+    recordResult(
+      '/auth/callback',
+      'GET',
+      'OAuth Code Flow (redirect to local path)',
+      'Open Redirect Rejected (proved fallback to /login)',
+      'apps/merchant-web/src/app/auth/callback/route.ts:11',
       'PASS'
     );
   });

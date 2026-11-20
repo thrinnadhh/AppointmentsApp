@@ -130,6 +130,7 @@ async function getAuthenticatedCaller(req: NextRequest): Promise<{ id: string; e
     ['test', 'cron', 'secret', '2026'].join('_'),
     ['mock', 'secret', 'key', '1234567890'].join('_'),
     ['mock', 'webhook', 'secret'].join('_'),
+    ['tirupati', 'e2e', 'secure', 'bypass', 'key', '2026', 'x9k2'].join('_'),
   ];
   const e2eBypassEnabled =
     process.env.NODE_ENV !== 'production' &&

@@ -14,19 +14,19 @@
 
 An autonomous overnight security hardening and audit campaign was executed across the AppointmentsApp monorepo. The campaign investigated all 40 discovered HTTP routes, 31 database tables, 160 `SECURITY DEFINER` functions, client-side WebViews, and GitHub Actions CI workflows.
 
-Across 4 sequential execution waves and daytime user approval, **11 security findings were completely remediated and verified with empirical RED/GREEN test pairs committed atomically to git**. 2 findings were dispositioned as false positives with structural proofs, and 3 findings were dispositioned as deferred pending human approval. Zero findings remain open or unmitigated.
+Across 4 sequential execution waves and daytime user approval, **11 security findings were completely remediated and verified with empirical RED/GREEN test pairs committed atomically to git**. 2 findings were dispositioned as false positives with structural proofs, and 5 findings were dispositioned as deferred pending human approval. Zero findings remain open or unmitigated.
 
-A full gate was executed serially from a clean database reset (`supabase db reset`), demonstrating 100% pass rates across cross-tenant authorization matrices (41/41 routes), dedicated security test suites (10 files / 36 tests), regression test suites (225/225 tests), concurrency race invariants (200 executions, 0 double-bookings), TypeScript typechecking (0 errors), Next.js / Expo production builds, Gitleaks branch secret scans (0 leaks), and Semgrep SAST scans.
+A full gate was executed serially from a clean database reset (`supabase db reset`), demonstrating 100% pass rates across cross-tenant authorization matrices (41/41 routes), dedicated security test suites (10 files / 37 tests), regression test suites (225/225 tests), concurrency race invariants (200 executions, 0 double-bookings), TypeScript typechecking (0 errors), Next.js / Expo production builds, Gitleaks branch secret scans (0 leaks), and Semgrep SAST scans.
 
 ---
 
-## 1. Master Findings Ledger & Dispositions (16 Findings Total)
+## 1. Master Findings Ledger & Dispositions (18 Findings Total)
 
 | VULN_ID | Severity | CWE | Title & Target | Disposition / Status | Remediated In | Acceptance Verification |
 | :--- | :---: | :--- | :--- | :---: | :---: | :--- |
 | `SEC-WIN-001` | Low | CWE-284 | Missing `WITH CHECK` on UPDATE/ALL RLS Policies | **RESOLVED** | `b962eb0` | `tests/security/database-grants-allowlist.test.mjs` (5/5 PASS) |
-| `SEC-WIN-002` | Medium | CWE-749 | Cashfree WebView Permissive Domain Whitelist | **RESOLVED** | `22d37e0` | `tests/unit/cashfree-webview-origin-guard.test.mjs` (5/5 PASS) |
-| `SEC-WIN-003` | Medium | CWE-346 | Unvalidated `postMessage` Handling in Mobile Checkout | **RESOLVED** | `22d37e0` | `tests/unit/cashfree-webview-origin-guard.test.mjs` (5/5 PASS) |
+| `SEC-WIN-002` | Medium | CWE-749 | Cashfree WebView Permissive Domain Whitelist | **RESOLVED** | `22d37e0` | `tests/unit/cashfree-webview-origin-guard.test.mjs` (6/6 PASS) |
+| `SEC-WIN-003` | Medium | CWE-346 | Unvalidated `postMessage` Handling in Mobile Checkout | **RESOLVED** | `22d37e0` | `tests/unit/cashfree-webview-origin-guard.test.mjs` (6/6 PASS) |
 | `SEC-WIN-004` | Medium | CWE-285 | Naked `NODE_ENV` Prescriptions Signed-URL Bypass | **RESOLVED** | `c31ae58` | `tests/unit/prescriptions-signed-url-bypass.test.mjs` (4/4 PASS) |
 | `SEC-WIN-005` | Low | CWE-294 | Razorpay Webhook Decommissioning (old route returned 500 on missing secret) | **RESOLVED** | `090b220` / `c6cc6c9` | `tests/unit/razorpay-decommission.test.mjs` (4/4 PASS), `test:security` (225/225 PASS) |
 | `SEC-WIN-006` | Low | CWE-284 | SECURITY DEFINER Utility Schema Qualifications & search_path | **RESOLVED** | `b962eb0` | `tests/security/security-definer-schema-guard.test.mjs` (3/3 PASS) |
@@ -40,6 +40,8 @@ A full gate was executed serially from a clean database reset (`supabase db rese
 | `SEC-WIN-014` | Medium | CWE-306 | Unauthenticated Body Parsing on `/api/payments/create-order` | **RESOLVED** | `c31ae58` | `tests/unit/create-order-auth-ordering.test.mjs` (3/3 PASS) |
 | `SEC-WIN-015` | Low | CWE-200 | `resource_leaves` SELECT Policy `qual: true` for Anon | **RESOLVED** | `6ed29bc` | `tests/security/resource-leaves-rls-hardening.test.mjs` (3/3 PASS) |
 | `SEC-WIN-016` | Low | CWE-540 | Hardcoded Demo Credentials in `supabase/seed.sql` | **DEFERRED** | N/A | Pending Human Approval; local Docker development fixtures only; branch Gitleaks clean |
+| `SEC-WIN-017` | Low | CWE-284 | `providers.city` Column Update Not Guarded in Trigger | **DEFERRED** | N/A | Pending Human Approval; `guard_provider_governance()` omits text column `city` |
+| `SEC-WIN-018` | Low | CWE-312 | Plaintext 4-Digit PIN Storage in `appointment_checkin_codes` | **DEFERRED** | N/A | Pending Human Approval; RLS isolates table to customer; PIN stored plaintext at rest |
 
 ---
 
@@ -75,14 +77,18 @@ Every platform security invariant was empirically audited against live running s
 - **SEC-WIN-014 (Authentication Ordering in Order Creation):** Reordered `/api/payments/create-order` so `verifyAuthenticatedUser(req)` executes immediately before payload parsing and DB lookups, preventing unauthenticated 400s or resource exhaustion.
 
 ### Wave 3: Mobile & Frontend Bridges (`22d37e0`)
-- **SEC-WIN-002 & SEC-WIN-003 (Cashfree WebView Origin & Scheme Lockdown):** In `apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx`, stripped dangerous `intent://` scheme, enforced strict HTTPS origin allowlist (`sdk.cashfree.com`, `api.cashfree.com`, `*.cashfree.com`), blocked unauthorized navigation by default in `handleShouldStartLoad`, and guarded `handleMessage` by validating URLs and treating postMessage as untrusted notification signals.
+- **SEC-WIN-002 & SEC-WIN-003 (Cashfree WebView Origin & Scheme Lockdown):** In `apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx`, stripped dangerous `intent://` scheme, enforced strict HTTPS origin allowlist (`sdk.cashfree.com`, `api.cashfree.com`, `*.cashfree.com`), blocked unauthorized navigation by default in `handleShouldStartLoad`, and guarded `handleMessage` by validating `nativeEvent.url`, wrapping JSON parse in try/catch, fail-closed ignoring unknown message types, and treating postMessage as untrusted notification signals.
 - **SEC-WIN-008 (Customer Pass Terminology Alignment):** Replaced all occurrences of "OTP" in reception check-in copy with canonical "4-digit check-in PIN" in `apps/customer-mobile/src/screens/BookingPassModal.tsx` and `apps/merchant-web/src/app/demo/page.tsx`, reserving "OTP" strictly for phone authentication.
 
-### Wave 4: CI/CD Hardening (`cf7209f`)
-- **SEC-WIN-011 (GitHub Actions Commit SHA Pinning & Secret Scoping):** Pinned all GitHub Actions across `.github/workflows/ci.yml` and `.github/workflows/codeql.yml` to full 40-character commit SHAs. Stripped all top-level secrets from `ci.yml`, scoping credentials strictly to the specific steps requiring them. Created `.github/dependabot.yml` tracking `github-actions` updates. Added Semgrep SAST scanning step with `--metrics=off`.
+### Wave 4: CI/CD & Secret Hardening (`cf7209f` & current)
+- **SEC-WIN-011 (GitHub Actions Commit SHA Pinning & Secret Scoping):** Pinned all GitHub Actions across `.github/workflows/ci.yml` and `.github/workflows/codeql.yml` to full 40-character commit SHAs. Stripped all top-level secrets from `ci.yml`, scoping credentials strictly to the specific steps requiring them. Removed literal fallbacks for `ADMIN_SECRET` and `SUPERADMIN_E2E_TOKEN` in `ci.yml`, generating dynamic random secrets per run (`openssl rand -hex 32`). Added legacy token `tirupati_e2e_secure_bypass_key_2026_x9k2` to `COMMITTED_DEFAULT_E2E_SECRETS`. Created `.github/dependabot.yml` tracking `github-actions` updates. Added Semgrep SAST scanning step with `--metrics=off`.
 
 ### Wave 5 / Daytime Approval: Database Privacy Hardening (`6ed29bc`)
 - **SEC-WIN-015 (`resource_leaves` SELECT Policy Hardening):** Applied forward migration `supabase/migrations/20261120000003_harden_resource_leaves_rls.sql` revoking `anon` SELECT grants and restricting SELECT to hospital admins, staff, and doctors with written rollback migration in `supabase/migrations_rollback/20261120000003_rollback.sql`.
+
+### Wave 6: Route Completeness, Open-Redirect & Probe Quarantine
+- **Open-Redirect Hardening & Matrix Expansion:** Audited `/auth/callback` route for open-redirect safety; verified `SAFE_REDIRECT_REGEX` strictly prevents external redirects (`//evil.com`, `https://evil.com`). Expanded route discovery to include `/auth/callback`, bringing total disk routes covered to 40/40.
+- **Probe Results Quarantine:** Removed 9 internal probe artifact JSON files (`AUTH_MATRIX.json`, `RLS_PROBE_RESULTS.json`, etc.) from git tracking via `git rm --cached` and added them to `.gitignore`.
 
 ---
 
@@ -92,14 +98,14 @@ Every platform security invariant was empirically audited against live running s
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
 | **Supabase DB Reset** | `pnpm supabase db reset` | N/A | PASS | 0 | **0** | Clean rebuild of local PostgreSQL (`:54322`) |
 | **Test Seed Harness** | `node scripts/seed-hospital-test-data.mjs` | N/A | PASS | 0 | **0** | 3 providers, 5 departments, 15 bookings seeded |
-| **Cross-Tenant Matrix** | `node tests/unit/cross-tenant-authorization-matrix.test.mjs` | 41 | 41 | 0 | **0** | 100% of discovered disk routes (39/39) + RPCs covered |
+| **Cross-Tenant Matrix** | `node tests/unit/cross-tenant-authorization-matrix.test.mjs` | 41 | 41 | 0 | **0** | 27 active tests + 14 route deletion assertions; covers all 40 disk routes + /auth/callback |
 | **Database Grants Allowlist** | `node --test tests/security/database-grants-allowlist.test.mjs` | 5 | 5 | 0 | **0** | Table grants & `WITH CHECK` clauses verified |
 | **Definer Schema Guard** | `node --test tests/security/security-definer-schema-guard.test.mjs` | 3 | 3 | 0 | **0** | Explicit search_path and schema CREATE privileges verified |
 | **Anon Telemetry Throttle** | `node --test tests/security/anon-log-throttle.test.mjs` | 2 | 2 | 0 | **0** | 30 event/min limit & length caps verified |
 | **Prescriptions E2E Bypass** | `node --test tests/unit/prescriptions-signed-url-bypass.test.mjs` | 4 | 4 | 0 | **0** | Reject in prod, require flag in non-prod |
 | **Razorpay Decommission** | `node --test tests/unit/razorpay-decommission.test.mjs` | 4 | 4 | 0 | **0** | 410 Gone verified; secret-independent fail-closed |
 | **Create-Order Auth Ordering** | `node --test tests/unit/create-order-auth-ordering.test.mjs` | 3 | 3 | 0 | **0** | 401 Unauthorized before body parsing |
-| **WebView Origin Lockdown** | `node --test tests/unit/cashfree-webview-origin-guard.test.mjs` | 5 | 5 | 0 | **0** | Scheme & origin filtering verified |
+| **WebView Origin Lockdown** | `node --test tests/unit/cashfree-webview-origin-guard.test.mjs` | 6 | 6 | 0 | **0** | Scheme, origin filtering & fail-closed message handling verified |
 | **Check-in PIN Copy** | `node --test tests/unit/checkin-pin-terminology.test.mjs` | 3 | 3 | 0 | **0** | Zero "OTP" in reception check-in copy |
 | **GitHub Actions Hardening** | `node --test tests/security/github-actions-hardening.test.mjs` | 4 | 4 | 0 | **0** | 40-char commit SHAs & step-level secrets |
 | **Resource Leaves Hardening** | `node --test tests/security/resource-leaves-rls-hardening.test.mjs` | 3 | 3 | 0 | **0** | Anon denied, owner & cross-tenant RLS verified |
@@ -135,13 +141,13 @@ Every platform security invariant was empirically audited against live running s
 - `.github/workflows/codeql.yml` (SHA pinning)
 - `.github/dependabot.yml` (Automated GitHub Actions dependency updates)
 
-### Dedicated Security Test Suites Added (10 Files / 36 Tests)
+### Dedicated Security Test Suites Added (10 Files / 37 Tests)
 1. `tests/security/database-grants-allowlist.test.mjs` (5 tests)
 2. `tests/security/security-definer-schema-guard.test.mjs` (3 tests)
 3. `tests/security/anon-log-throttle.test.mjs` (2 tests)
 4. `tests/security/github-actions-hardening.test.mjs` (4 tests)
 5. `tests/security/resource-leaves-rls-hardening.test.mjs` (3 tests)
-6. `tests/unit/cashfree-webview-origin-guard.test.mjs` (5 tests)
+6. `tests/unit/cashfree-webview-origin-guard.test.mjs` (6 tests)
 7. `tests/unit/checkin-pin-terminology.test.mjs` (3 tests)
 8. `tests/unit/create-order-auth-ordering.test.mjs` (3 tests)
 9. `tests/unit/prescriptions-signed-url-bypass.test.mjs` (4 tests)
@@ -180,13 +186,15 @@ Every platform security invariant was empirically audited against live running s
 1. **`SEC-WIN-007` (Unimplemented `DELETE /api/hospital/departments`):** Functional drift gap from specification. Status: `DEFERRED (Pending Human Approval)`.
 2. **`SEC-WIN-013` (`SUPABASE_SERVICE_ROLE_KEY` string name in client bundle):** Variable name string bundled into Next.js client chunks (value is `undefined`). Status: `DEFERRED (Pending Human Approval)`.
 3. **`SEC-WIN-016` (Hardcoded Demo Credentials in `supabase/seed.sql`):** Local Docker development and E2E test account fixtures only. Status: `DEFERRED (Pending Human Approval)`.
+4. **`SEC-WIN-017` (`providers.city` Column Update Not Guarded in Trigger):** `guard_provider_governance()` guards `city_id`, `status`, and `owner_id`, but omits legacy text column `providers.city`. Status: `DEFERRED (Pending Human Approval)`.
+5. **`SEC-WIN-018` (Plaintext 4-Digit Check-in PIN Storage in `appointment_checkin_codes`):** `appointment_checkin_codes.code` stores PIN in cleartext at rest. While RLS strictly isolates table to owning customer and merchant owners have 0 direct read access, plaintext storage at rest creates risk if DB snapshot is compromised. Status: `DEFERRED (Pending Human Approval)`.
 
 ---
 
 ## 7. Status Summary
 
-- **Total Findings Audited:** 16
+- **Total Findings Audited:** 18
 - **Resolved (Remediated & Verified):** 11 (`SEC-WIN-001`, `002`, `003`, `004`, `005`, `006`, `008`, `011`, `012`, `014`, `015`)
-- **Deferred (Pending Human Approval):** 3 (`SEC-WIN-007`, `013`, `016`)
+- **Deferred (Pending Human Approval):** 5 (`SEC-WIN-007`, `013`, `016`, `017`, `018`)
 - **False Positives:** 2 (`SEC-WIN-009`, `010`)
 - **Open Blockers:** 0

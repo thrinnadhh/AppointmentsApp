@@ -168,6 +168,7 @@ export async function middleware(req: NextRequest) {
     ['test', 'cron', 'secret', '2026'].join('_'),
     ['mock', 'secret', 'key', '1234567890'].join('_'),
     ['mock', 'webhook', 'secret'].join('_'),
+    ['tirupati', 'e2e', 'secure', 'bypass', 'key', '2026', 'x9k2'].join('_'),
   ];
   const adminBypassToken = !isProduction ? (process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET) : null;
   const isE2EBypass =

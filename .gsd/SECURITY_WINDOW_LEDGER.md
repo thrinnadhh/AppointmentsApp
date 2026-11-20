@@ -15,8 +15,8 @@
 | **Critical** | 0 | 0 | 0 | 0 | 0 |
 | **High** | 0 | 0 | 0 | 0 | 0 |
 | **Medium** | 6 | 6 | 0 | 0 | 0 |
-| **Low** | 9 | 5 | 2 | 2 | 0 |
-| **Total** | **15** | **11** | **2** | **2** | **0** |
+| **Low** | 12 | 5 | 5 | 2 | 0 |
+| **Total** | **18** | **11** | **5** | **2** | **0** |
 
 ---
 
@@ -40,6 +40,8 @@
 | `SEC-WIN-014` | **Medium** | CWE-306 | `RESOLVED` | `c31ae58` | `tests/unit/create-order-auth-ordering.test.mjs (3/3 PASS)` |
 | `SEC-WIN-015` | **Low** | CWE-200 | `RESOLVED` | `6ed29bc` | `tests/security/resource-leaves-rls-hardening.test.mjs (3/3 PASS)` |
 | `SEC-WIN-016` | **Low** | CWE-540 | `DEFERRED` | `N/A (Approved Deferred)` | `gitleaks detect --log-opts=f7c388d..HEAD passes with zero leaks and all seed credentials are confirmed local-only demo fixtures.` |
+| `SEC-WIN-017` | **Low** | CWE-284 | `DEFERRED` | `Pending Approval` | `guard_provider_governance() omits providers.city text column update check.` |
+| `SEC-WIN-018` | **Low** | CWE-312 | `DEFERRED` | `Pending Approval` | `appointment_checkin_codes stores 4-digit PIN in cleartext at rest.` |
 
 ---
 
@@ -186,6 +188,24 @@
 - **Fix Commit**: `N/A (Approved Deferred)`
 - **Remediation**: Seed demo credentials verified local-only development fixtures for local Docker Supabase environment. Approved deferred by user in Stage 1c.
 - **Verification**: `gitleaks detect --log-opts=f7c388d..HEAD passes with zero leaks and all seed credentials are confirmed local-only demo fixtures.`
+
+---
+
+### SEC-WIN-017 [Low]: CWE-284: Improper Access Control
+- **Target File**: `supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:143-152`
+- **Status**: `DEFERRED (Pending Human Approval)`
+- **Fix Commit**: `Pending Approval`
+- **Remediation**: In `guard_provider_governance()`, updates to `city_id`, `status`, and `owner_id` are blocked for non-admin callers, but updates to legacy text column `providers.city` are not checked. A provider owner can update `providers.city` via REST. Requires new forward migration adding `OR NEW.city IS DISTINCT FROM OLD.city`.
+- **Verification**: `Assert non-admin update to providers.city is rejected with 42501.`
+
+---
+
+### SEC-WIN-018 [Low]: CWE-312: Cleartext Storage of Sensitive Information
+- **Target File**: `supabase/migrations/20261011000001_reception_checkin_code_system.sql:43-50`
+- **Status**: `DEFERRED (Pending Human Approval)`
+- **Fix Commit**: `Pending Approval`
+- **Remediation**: 4-digit check-in PIN stored in plaintext in `public.appointment_checkin_codes.code`. While RLS strictly restricts SELECT to `customer_id = auth.uid()` and merchant owners have 0 direct read access (cannot read any column), plaintext storage at rest means a database snapshot or superadmin leak exposes check-in PINs. Requires hashing PINs at rest and verifying via hash comparison.
+- **Verification**: `Assert appointment_checkin_codes.code contains hash digests instead of 4-digit plaintext strings.`
 
 ---
 
