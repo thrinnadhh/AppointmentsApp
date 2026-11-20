@@ -44,6 +44,7 @@ const COMMITTED_DEFAULT_E2E_SECRETS = new Set([
   ['test', 'cron', 'secret', '2026'].join('_'),
   ['mock', 'secret', 'key', '1234567890'].join('_'),
   ['mock', 'webhook', 'secret'].join('_'),
+  ['tirupati', 'e2e', 'secure', 'bypass', 'key', '2026', 'x9k2'].join('_'),
 ]);
 
 export function isE2EBypassEnabled(): boolean {

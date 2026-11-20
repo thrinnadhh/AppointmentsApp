@@ -22,6 +22,7 @@ export interface CashfreeCheckoutWebViewProps {
   onSuccess: (paymentDetails?: { orderId: string; paymentId?: string }) => void;
   onFailure: (errorMsg: string) => void;
   onClose: () => void;
+  onFallbackVerify?: () => void;
 }
 
 export const UPI_SCHEMES = [
@@ -65,6 +66,7 @@ export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = (
   onSuccess,
   onFailure,
   onClose,
+  onFallbackVerify,
 }) => {
   if (!visible || !paymentSessionId) {
     return null;
@@ -222,24 +224,42 @@ export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = (
 
   const handleMessage = (event: { nativeEvent: { data: string; url?: string } }) => {
     try {
-      // SEC-WIN-003: Inspect nativeEvent.url (origin property is not available on native WebView)
-      const currentUrl = event.nativeEvent.url;
-      if (currentUrl && !isAllowedCashfreeUrl(currentUrl) && currentUrl !== 'about:blank') {
-        console.warn('[CashfreeWebView] Ignored postMessage from untrusted URL:', currentUrl);
+      // SEC-WIN-003: Fail-closed URL validation. Require nativeEvent.url to be present and explicitly allowed.
+      const currentUrl = event.nativeEvent?.url;
+      if (!currentUrl || (!isAllowedCashfreeUrl(currentUrl) && currentUrl !== 'about:blank')) {
+        console.warn('[CashfreeWebView] Ignored postMessage from untrusted or missing URL:', currentUrl);
+        // Fail-closed against untrusted origins; if URL is missing from native event, trigger server-authoritative verification fallback
+        if (!currentUrl && onFallbackVerify) {
+          onFallbackVerify();
+        }
         return;
       }
 
-      const data = JSON.parse(event.nativeEvent.data);
-      // Treat postMessage as an untrusted trigger to initiate backend verification
+      let data: any;
+      try {
+        data = JSON.parse(event.nativeEvent.data);
+      } catch (parseErr) {
+        console.warn('[CashfreeWebView] Ignored postMessage with invalid JSON payload:', parseErr);
+        return;
+      }
+
+      if (!data || typeof data !== 'object') {
+        console.warn('[CashfreeWebView] Ignored non-object postMessage payload');
+        return;
+      }
+
+      // Treat postMessage strictly as an untrusted notification trigger; ignore unknown types fail-closed
       if (data.type === 'PAYMENT_SUCCESS') {
         onSuccess({ orderId });
       } else if (data.type === 'PAYMENT_ERROR') {
         onFailure(data.message || 'Payment failed or was cancelled');
       } else if (data.type === 'ERROR') {
         onFailure(data.message || 'Payment gateway error');
+      } else {
+        console.warn('[CashfreeWebView] Ignored unknown postMessage event type:', data.type);
       }
     } catch (e) {
-      console.warn('[CashfreeWebView] Error parsing postMessage:', e);
+      console.warn('[CashfreeWebView] Unexpected error in handleMessage:', e);
     }
   };
 

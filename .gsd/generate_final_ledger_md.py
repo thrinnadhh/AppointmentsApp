@@ -55,7 +55,7 @@ all_findings = [
         'file_path': 'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts',
         'line_range': '1-150',
         'status': 'RESOLVED',
-        'fix_commit': 'c31ae58 / 090b220',
+        'fix_commit': 'c31ae58 / 9d787f2',
         'fix_description': 'Decommissioned Razorpay webhook route unconditionally returning HTTP 410 Gone without parsing body, reading secrets, or invoking DB calls.',
         'acceptance_test': 'tests/unit/razorpay-decommission.test.mjs (4/4 PASS), pnpm run test:security (225/225 PASS)'
     },
@@ -73,13 +73,13 @@ all_findings = [
     {
         'vuln_id': 'SEC-WIN-007',
         'severity': 'Low',
-        'cwe': 'CWE-540: Inclusion of Sensitive Information in Source Code',
-        'file_path': 'supabase/seed.sql',
-        'line_range': '1-100',
+        'cwe': 'CWE-20: Improper Input Validation',
+        'file_path': 'apps/merchant-web/src/app/api/hospital/departments/route.ts',
+        'line_range': '1-80',
         'status': 'DEFERRED',
-        'fix_commit': 'N/A (Pre-approved Disposition)',
-        'fix_description': 'Seed file credentials verified local-only development fixtures for local Docker Supabase environment. Approved deferred by user in Stage 1c.',
-        'acceptance_test': 'Local database only; gitleaks branch scan clean'
+        'fix_commit': 'N/A (Approved Deferred)',
+        'fix_description': 'Drift report: Screen 2 documents DELETE /api/hospital/departments for removing empty departments. In actual implementation, DELETE is unimplemented. Approved deferred pending human design approval.',
+        'acceptance_test': 'tests/unit/cross-tenant-authorization-matrix.test.mjs (Matrix documented)'
     },
     {
         'vuln_id': 'SEC-WIN-008',
@@ -165,9 +165,20 @@ all_findings = [
         'file_path': 'supabase/migrations/20261107000001_resource_leaves_schema.sql',
         'line_range': 'public.resource_leaves',
         'status': 'RESOLVED',
-        'fix_commit': 'pending (SEC-WIN-015)',
+        'fix_commit': '6ed29bc',
         'fix_description': 'Applied forward migration 20261120000003_harden_resource_leaves_rls.sql revoking anon SELECT and scoping SELECT strictly to authorized merchant staff/admins. Written rollback migration 20261120000003_rollback.sql provided.',
         'acceptance_test': 'tests/security/resource-leaves-rls-hardening.test.mjs (3/3 PASS)'
+    },
+    {
+        'vuln_id': 'SEC-WIN-016',
+        'severity': 'Low',
+        'cwe': 'CWE-540: Inclusion of Sensitive Information in Source Code',
+        'file_path': 'supabase/seed.sql',
+        'line_range': '1-100',
+        'status': 'DEFERRED',
+        'fix_commit': 'N/A (Approved Deferred)',
+        'fix_description': 'Seed demo credentials verified local-only development fixtures for local Docker Supabase environment. Approved deferred by user in Stage 1c.',
+        'acceptance_test': 'gitleaks detect --log-opts=f7c388d..HEAD passes with zero leaks and all seed credentials are confirmed local-only demo fixtures.'
     }
 ]
 

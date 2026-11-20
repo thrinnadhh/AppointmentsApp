@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+const COMMITTED_DEFAULT_E2E_SECRETS = new Set([
+  ['tirupati', 'superadmin', 'e2e', '2026'].join('-'),
+  ['test', 'cron', 'secret', '2026'].join('_'),
+  ['mock', 'secret', 'key', '1234567890'].join('_'),
+  ['mock', 'webhook', 'secret'].join('_'),
+  ['tirupati', 'e2e', 'secure', 'bypass', 'key', '2026', 'x9k2'].join('_'),
+]);
+
 function verifyCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
+  if (!cronSecret || (process.env.NODE_ENV === 'production' && COMMITTED_DEFAULT_E2E_SECRETS.has(cronSecret))) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('[Security Monitor Cron] CRON_SECRET is not configured');
+      console.error('[Security Monitor Cron] CRON_SECRET is not configured or uses a blacklisted committed default');
     }
     return false;
   }

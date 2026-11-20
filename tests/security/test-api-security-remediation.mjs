@@ -49,12 +49,13 @@ test('Plan 6.2 API & Storage Security Remediation Verification', async (t) => {
       const userRes = await client.query("SELECT id FROM public.profiles LIMIT 1");
       const testUserId = userRes.rows[0]?.id || '99999999-9999-9999-9999-999999999991';
 
+      const adminBypass = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
       const res = await fetch(`${BASE_URL}/api/account/export`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'x-test-bypass-user': testUserId,
-          'x-admin-bypass-key': 'tirupati_e2e_secure_bypass_key_2026_x9k2',
+          'x-admin-bypass-key': adminBypass,
         },
       });
 

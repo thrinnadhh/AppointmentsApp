@@ -209,7 +209,7 @@ jobs:
           docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
+          npx --yes supabase@latest db reset || (sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true; sleep 8; npx --yes supabase@latest db reset)
 
       - name: Provision local and production env templates
         run: |
@@ -219,9 +219,14 @@ jobs:
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          RUNNER_E2E_KEY=$(openssl rand -hex 32)
+          echo "SUPERADMIN_E2E_TOKEN=${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
+          echo "ADMIN_SECRET=${ADMIN_SECRET:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}"
+          export ADMIN_SECRET="${ADMIN_SECRET:-$RUNNER_E2E_KEY}"
           node scripts/generate-ci-env.mjs
 
           if [ ! -f .env.production ]; then
@@ -246,8 +251,8 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
-          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN:-tirupati_e2e_secure_bypass_key_2026_x9k2}"
-          export ADMIN_SECRET="${ADMIN_SECRET:-tirupati_e2e_secure_bypass_key_2026_x9k2}"
+          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN}"
+          export ADMIN_SECRET="${ADMIN_SECRET}"
           export CRON_SECRET="${CRON_SECRET:-test_cron_secret_2026}"
           export DELETION_TOKEN_SECRET="${DELETION_TOKEN_SECRET:-d24831bb6c322697ea855e7464e8e9767191d1f4d340548e400bab603f927cfe}"
           export ALLOW_MOCK_PAYMENTS="false"
@@ -389,16 +394,21 @@ jobs:
           docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
+          npx --yes supabase@latest db reset || (sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true; sleep 8; npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          RUNNER_E2E_KEY=$(openssl rand -hex 32)
+          echo "SUPERADMIN_E2E_TOKEN=${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
+          echo "ADMIN_SECRET=${ADMIN_SECRET:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}"
+          export ADMIN_SECRET="${ADMIN_SECRET:-$RUNNER_E2E_KEY}"
           node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
@@ -524,16 +534,21 @@ jobs:
           docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
+          npx --yes supabase@latest db reset || (sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true; sleep 8; npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          RUNNER_E2E_KEY=$(openssl rand -hex 32)
+          echo "SUPERADMIN_E2E_TOKEN=${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
+          echo "ADMIN_SECRET=${ADMIN_SECRET:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}"
+          export ADMIN_SECRET="${ADMIN_SECRET:-$RUNNER_E2E_KEY}"
           node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
@@ -659,16 +674,21 @@ jobs:
           docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
+          npx --yes supabase@latest db reset || (sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true; sleep 8; npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          RUNNER_E2E_KEY=$(openssl rand -hex 32)
+          echo "SUPERADMIN_E2E_TOKEN=${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
+          echo "ADMIN_SECRET=${ADMIN_SECRET:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}"
+          export ADMIN_SECRET="${ADMIN_SECRET:-$RUNNER_E2E_KEY}"
           node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
@@ -789,16 +809,21 @@ jobs:
           docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
+          npx --yes supabase@latest db reset || (sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true; sleep 8; npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          RUNNER_E2E_KEY=$(openssl rand -hex 32)
+          echo "SUPERADMIN_E2E_TOKEN=${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
+          echo "ADMIN_SECRET=${ADMIN_SECRET:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}"
+          export ADMIN_SECRET="${ADMIN_SECRET:-$RUNNER_E2E_KEY}"
           node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data
@@ -924,16 +949,21 @@ jobs:
           docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
           sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true
           npx --yes supabase@latest start
-          npx --yes supabase@latest db reset || (sleep 4 && npx --yes supabase@latest db reset)
+          npx --yes supabase@latest db reset || (sudo fuser -k 5432/tcp 54321/tcp 54322/tcp 54323/tcp 54324/tcp 54325/tcp 54326/tcp 2>/dev/null || true; sleep 8; npx --yes supabase@latest db reset)
           eval "$(npx --yes supabase@latest status -o env)"
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          RUNNER_E2E_KEY=$(openssl rand -hex 32)
+          echo "SUPERADMIN_E2E_TOKEN=${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
+          echo "ADMIN_SECRET=${ADMIN_SECRET:-$RUNNER_E2E_KEY}" >> $GITHUB_ENV
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
           export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          export SUPERADMIN_E2E_TOKEN="${SUPERADMIN_E2E_TOKEN:-$RUNNER_E2E_KEY}"
+          export ADMIN_SECRET="${ADMIN_SECRET:-$RUNNER_E2E_KEY}"
           node scripts/generate-ci-env.mjs
 
       - name: Seed hospital and tenant test data

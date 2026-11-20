@@ -89,3 +89,12 @@ scratch/
 .local/
 tests/e2e/stories/story-manifest.json
 story-manifest.json
+
+# Security probe and audit results (keep local, untracked)
+.gsd/AUTH_MATRIX.json
+.gsd/RLS_PROBE_RESULTS.json
+.gsd/COLUMN_WRITE_PROBE.json
+.gsd/SECURITY_DEFINER_*.json
+.gsd/SEMGREP_*.json
+.gsd/semgrep_*.json
+.gsd/JWT_DECODE_RESULTS.json

@@ -242,3 +242,36 @@ The following security configurations cannot be proven by local Docker execution
    - Verify hosted Supabase project remains pinned to `ap-south-1` (Mumbai).
    - Verify Vercel production deployment remains pinned to `bom1` (Mumbai).
    - In Sentry (`matrisoftwaresolutions`), confirm `sendDefaultPii: false` and Session Replay sample rates remain `0` across production merchant and customer projects.
+
+
+---
+
+## 6. Recent Hardening & Ledger Updates (Branch `security/window-closure`)
+
+### A. SEC-WIN-019: Merchant Operational Settings RPC Guard
+- **Status:** DEFERRED (Pending User Approval: Migration Drafted & Verified)
+- **Problem:** Tenant owners could overwrite `cashfree_vendor_id` and `cashfree_app_id` via `merchant_save_operational_settings` RPC because the RPC executed under `PERFORM set_config('app.trusted_write', 'true', true);`, which bypassed the table-level `guard_provider_governance()` trigger.
+- **Remediation:**
+  - Authored draft forward migration `supabase/migrations_draft/20261120000005_ignore_client_cashfree_settings.sql` (and rollback `supabase/migrations_rollback/20261120000005_rollback_ignore_client_cashfree_settings.sql`).
+  - Updated RPC body to omit `cashfree_app_id` and `cashfree_vendor_id` from the `UPDATE public.providers` SET clause (retaining existing stored credentials).
+  - In `apps/merchant-web/src/app/settings/page.tsx`, stripped `p_cashfree_app_id` and `p_cashfree_vendor_id` from the `handleSave` payload.
+  - Verified with `tests/security/merchant-settings-rpc-guard.test.mjs` (4/4 PASS): proves tenant owner cannot overwrite cashfree credentials via the RPC while allowed fields (`payout_upi_id`) remain writable, direct UPDATE is blocked with 42501, and service-role writes succeed.
+
+### B. Schema Reconciliation: Real `public.providers` Columns (48 Columns)
+- **Reconciliation:** Confirmed against live PostgreSQL container `supabase_db_Appointments` (`current_database() = postgres`).
+- **Correction:** The earlier speculative probe tested hypothetical column names (`hospital_type`, `total_beds`, `registration_verified`, `accreditations`, `is_verified`, `is_promoted`, `rank_multiplier`, `upi_vpa`, `bank_account_number`, `consultation_fee`) which do NOT exist in the database.
+- **Current Probe:** `.gsd/COLUMN_WRITE_PROBE.json` was completely regenerated probing all 77 real columns across `providers` (48), `resources` (15), `push_tokens` (6), and `user_consents` (8).
+- **Invariants:** 16 governance and payout columns in `public.providers` are blocked by `guard_provider_governance()` with SQLSTATE 42501; 3 identity columns are protected by foreign key constraints; 29 operational and profile columns are safely writable by authorized tenant owners.
+
+### C. CI Pipeline & Cron Auth Alignment
+- **Problem:** `apps/merchant-web/src/app/api/cron/security-monitor/route.ts` and `middleware.ts` checked `COMMITTED_DEFAULT_E2E_SECRETS` unconditionally, causing local test runs and CI runners using default test secrets (`test_cron_secret_2026`) to receive HTTP 401 instead of 200. Furthermore, `tests/scripts/test-expired-holds-limit.mjs` hardcoded the blacklisted bypass string `tirupati_e2e_secure_bypass_key_2026_x9k2`, causing 401 failures during CI availability checks.
+- **Fix:**
+  - Gated the blacklisted committed secret check behind `process.env.NODE_ENV === 'production'`, allowing development and CI test suites to authenticate while strictly prohibiting committed defaults in production.
+  - In `test-expired-holds-limit.mjs`, dynamically resolved `SUPERADMIN_E2E_TOKEN` / `ADMIN_SECRET` from environment and passed `x-test-bypass-user: customerId` to ensure non-bypass test compatibility.
+  - In `.github/workflows/ci.yml`, robustified `supabase db reset` retry with `sudo fuser -k` and extended sleep to prevent inbucket port 54324 contention.
+- **Verification:**
+  - `tests/unit/cron-deduplication.test.mjs` (10/10 PASS).
+  - `tests/scripts/test-expired-holds-limit.mjs` (4/4 PASS).
+  - `tests/unit/cross-tenant-authorization-matrix.test.mjs` (41/41 PASS, 100% route coverage across all 40 routes on disk).
+  - **Full CI Matrix Run `44716767746` on Commit `0131c06`:** 100% Green across all 10 jobs (Security Audit, Lint/Typecheck, Unit/Scripts, Build, Admin E2E, Stress Tests, Customer E2E, Merchant E2E, Integration E2E, All CI Gates Passed).
+  - **Gitleaks Audit:** 23 commits scanned (`f7c388d..0131c06`), 0 leaks detected.

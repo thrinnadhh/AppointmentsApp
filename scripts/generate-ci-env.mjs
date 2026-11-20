@@ -1,12 +1,14 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 export function generateCiEnv() {
+  const dynamicFallback = crypto.randomBytes(32).toString('hex');
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.API_URL || 'http://127.0.0.1:54321';
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
-  const superadminToken = process.env.SUPERADMIN_E2E_TOKEN || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
-  const adminSecret = process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+  const superadminToken = process.env.SUPERADMIN_E2E_TOKEN || dynamicFallback;
+  const adminSecret = process.env.ADMIN_SECRET || process.env.SUPERADMIN_E2E_TOKEN || dynamicFallback;
   const cronSecret = process.env.CRON_SECRET || 'test_cron_secret_2026';
   const deletionSecret = process.env.DELETION_TOKEN_SECRET || 'd24831bb6c322697ea855e7464e8e9767191d1f4d340548e400bab603f927cfe';
   const allowMock = process.env.ALLOW_MOCK_PAYMENTS || 'false';

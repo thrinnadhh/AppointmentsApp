@@ -359,6 +359,104 @@ export default function CheckoutModal({
     }
   };
 
+  const handleFallbackVerificationAndPoll = async () => {
+    if (!cashfreePaymentData) {
+      setIsProcessing(false);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // 1. Initial verification call to /api/payments/verify
+      const initialVerify = await verifyRazorpayPayment({
+        booking_id: cashfreePaymentData.bookingId,
+        gateway_provider: 'cashfree',
+        order_id: cashfreePaymentData.orderId,
+        payment_id: `cf_pay_${cashfreePaymentData.orderId}`,
+        attachment_url: cashfreePaymentData.attachedPath,
+        customerId,
+      });
+
+      if (initialVerify.success) {
+        const assignedToken = initialVerify.queue_position || 1;
+        onPaymentSuccess(
+          cashfreePaymentData.bookingId,
+          cashfreePaymentData.holdReferenceCode,
+          false,
+          assignedToken
+        );
+        setIsProcessing(false);
+        return;
+      }
+
+      const terminalStatuses = ['CANCELLED', 'EXPIRED', 'REJECTED', 'FAILED', 'REFUNDED'];
+      if (initialVerify.status && terminalStatuses.includes(initialVerify.status.toUpperCase())) {
+        setIsProcessing(false);
+        setPayError(`Payment ${initialVerify.status.toLowerCase()}. Please initiate a new booking.`);
+        return;
+      }
+
+      // 2. Poll server /api/payments/verify for up to 60s (5s base interval, max 12 req/min, 429 backoff)
+      let elapsedMs = 0;
+      let pollIntervalMs = 5000;
+      const maxPollMs = 60000;
+
+      const executePoll = async () => {
+        if (elapsedMs >= maxPollMs) {
+          setIsProcessing(false);
+          setPayError('Payment verification pending or cancelled. If money was debited, your appointment will confirm shortly.');
+          return;
+        }
+
+        elapsedMs += pollIntervalMs;
+
+        try {
+          const pollRes = await verifyRazorpayPayment({
+            booking_id: cashfreePaymentData.bookingId,
+            gateway_provider: 'cashfree',
+            order_id: cashfreePaymentData.orderId,
+            payment_id: `cf_pay_${cashfreePaymentData.orderId}`,
+            attachment_url: cashfreePaymentData.attachedPath,
+            customerId,
+          });
+
+          if (pollRes.success) {
+            const assignedToken = pollRes.queue_position || 1;
+            onPaymentSuccess(
+              cashfreePaymentData.bookingId,
+              cashfreePaymentData.holdReferenceCode,
+              false,
+              assignedToken
+            );
+            setIsProcessing(false);
+            return;
+          }
+
+          // Stop on terminal status
+          if (pollRes.status && terminalStatuses.includes(pollRes.status.toUpperCase())) {
+            setIsProcessing(false);
+            setPayError(`Payment ${pollRes.status.toLowerCase()}. Please initiate a new booking.`);
+            return;
+          }
+
+          // Back off on HTTP 429 rate limit
+          if (pollRes.statusCode === 429 || (pollRes.error && pollRes.error.includes('429'))) {
+            pollIntervalMs = Math.min(pollIntervalMs * 2, 20000);
+          }
+        } catch {
+          // ignore transient poll error and retry next interval
+        }
+
+        setTimeout(executePoll, pollIntervalMs);
+      };
+
+      setTimeout(executePoll, pollIntervalMs);
+    } catch (err: any) {
+      console.warn('Fallback verification error:', err);
+      setIsProcessing(false);
+    }
+  };
+
   const handlePay = async () => {
     if (!resource || !slot) return;
     setIsProcessing(true);
@@ -1342,9 +1440,13 @@ export default function CheckoutModal({
           setIsProcessing(false);
           setPayError(errorMsg);
         }}
-        onClose={() => {
+        onClose={async () => {
           setCashfreeModalVisible(false);
-          setIsProcessing(false);
+          await handleFallbackVerificationAndPoll();
+        }}
+        onFallbackVerify={async () => {
+          setCashfreeModalVisible(false);
+          await handleFallbackVerificationAndPoll();
         }}
       />
     )}

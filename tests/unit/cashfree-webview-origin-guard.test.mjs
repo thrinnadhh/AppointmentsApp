@@ -51,7 +51,25 @@ describe('SEC-WIN-002 & SEC-WIN-003: Cashfree WebView Origin & Scheme Lockdown',
     );
   });
 
-  it('5. Manual verification marker for physical UPI deep link', () => {
+  it('5. Fail-closed message handling: requires nativeEvent.url, wraps JSON.parse, and drops unknown types', () => {
+    assert.match(
+      source,
+      /!currentUrl\s*\|\|\s*\(!isAllowedCashfreeUrl\(currentUrl\)/,
+      'Must reject messages when nativeEvent.url is missing/falsy or not allowed'
+    );
+    assert.match(
+      source,
+      /try\s*\{\s*data\s*=\s*JSON\.parse\(event\.nativeEvent\.data\);\s*\}\s*catch/,
+      'Must wrap JSON.parse in try/catch to prevent unhandled parse exceptions'
+    );
+    assert.match(
+      source,
+      /Ignored unknown postMessage event type/,
+      'Must log and safely drop unknown postMessage types fail-closed'
+    );
+  });
+
+  it('6. Manual verification marker for physical UPI deep link', () => {
     const verificationStatus = {
       test: 'UPI Scheme Deep Linking on Physical Devices',
       status: 'NEEDS_MANUAL_VERIFICATION',

@@ -3,7 +3,7 @@
 > **Monorepo**: AppointmentsApp (Tirupati Hyperlocal Multi-Tenant Platform)
 > **Branch**: `security/window-closure`
 > **Base Commit**: `f7c388df0c1de710b4048a1af18ed908ee45be61`
-> **Updated At**: 2026-11-19T21:40:48.219890+00:00
+> **Updated At**: 2026-11-20T09:52:01.546926+00:00
 > **Status**: Campaign Complete — All Approved Remediations Verified Green
 
 ---
@@ -28,9 +28,9 @@
 | `SEC-WIN-002` | **Medium** | CWE-749 | `RESOLVED` | `22d37e0` | `tests/unit/cashfree-webview-origin-guard.test.mjs (5/5 PASS)` |
 | `SEC-WIN-003` | **Medium** | CWE-346 | `RESOLVED` | `22d37e0` | `tests/unit/cashfree-webview-origin-guard.test.mjs (5/5 PASS)` |
 | `SEC-WIN-004` | **Medium** | CWE-285 | `RESOLVED` | `c31ae58` | `tests/unit/prescriptions-signed-url-bypass.test.mjs (4/4 PASS)` |
-| `SEC-WIN-005` | **Low** | CWE-294 | `RESOLVED` | `c31ae58 / 090b220` | `tests/unit/razorpay-decommission.test.mjs (4/4 PASS), pnpm run test:security (225/225 PASS)` |
+| `SEC-WIN-005` | **Low** | CWE-294 | `RESOLVED` | `c31ae58 / 9d787f2` | `tests/unit/razorpay-decommission.test.mjs (4/4 PASS), pnpm run test:security (225/225 PASS)` |
 | `SEC-WIN-006` | **Low** | CWE-284 | `RESOLVED` | `b962eb0` | `tests/security/security-definer-schema-guard.test.mjs (3/3 PASS)` |
-| `SEC-WIN-007` | **Low** | CWE-540 | `DEFERRED` | `N/A (Pre-approved Disposition)` | `Local database only; gitleaks branch scan clean` |
+| `SEC-WIN-007` | **Low** | CWE-20 | `DEFERRED` | `N/A (Approved Deferred)` | `tests/unit/cross-tenant-authorization-matrix.test.mjs (Matrix documented)` |
 | `SEC-WIN-008` | **Low** | CWE-1021 | `RESOLVED` | `22d37e0` | `tests/unit/checkin-pin-terminology.test.mjs (3/3 PASS)` |
 | `SEC-WIN-009` | **Low** | CWE-1188 | `FALSE_POSITIVE` | `N/A (Dispositioned Stage 1b)` | `scripts/audit-dependencies.mjs passes with 0 high/critical` |
 | `SEC-WIN-010` | **Low** | CWE-798 | `FALSE_POSITIVE` | `N/A (Dispositioned Stage 1b)` | `git ls-files strix_runs/ returns 0 files` |
@@ -38,7 +38,8 @@
 | `SEC-WIN-012` | **Medium** | CWE-799 | `RESOLVED` | `c31ae58` | `tests/security/anon-log-throttle.test.mjs (2/2 PASS)` |
 | `SEC-WIN-013` | **Low** | CWE-200 | `DEFERRED` | `N/A (Approved Deferred)` | `Verified actual service_role JWT is NOT leaked in client bundles` |
 | `SEC-WIN-014` | **Medium** | CWE-306 | `RESOLVED` | `c31ae58` | `tests/unit/create-order-auth-ordering.test.mjs (3/3 PASS)` |
-| `SEC-WIN-015` | **Low** | CWE-200 | `RESOLVED` | `pending (SEC-WIN-015)` | `tests/security/resource-leaves-rls-hardening.test.mjs (3/3 PASS)` |
+| `SEC-WIN-015` | **Low** | CWE-200 | `RESOLVED` | `6ed29bc` | `tests/security/resource-leaves-rls-hardening.test.mjs (3/3 PASS)` |
+| `SEC-WIN-016` | **Low** | CWE-540 | `DEFERRED` | `N/A (Approved Deferred)` | `gitleaks detect --log-opts=f7c388d..HEAD passes with zero leaks and all seed credentials are confirmed local-only demo fixtures.` |
 
 ---
 
@@ -83,7 +84,7 @@
 ### SEC-WIN-005 [Low]: CWE-294: Authentication Bypass by Capture-replay
 - **Target File**: `apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:1-150`
 - **Status**: `RESOLVED`
-- **Fix Commit**: `c31ae58 / 090b220`
+- **Fix Commit**: `c31ae58 / 9d787f2`
 - **Remediation**: Decommissioned Razorpay webhook route unconditionally returning HTTP 410 Gone without parsing body, reading secrets, or invoking DB calls.
 - **Verification**: `tests/unit/razorpay-decommission.test.mjs (4/4 PASS), pnpm run test:security (225/225 PASS)`
 
@@ -98,12 +99,12 @@
 
 ---
 
-### SEC-WIN-007 [Low]: CWE-540: Inclusion of Sensitive Information in Source Code
-- **Target File**: `supabase/seed.sql:1-100`
+### SEC-WIN-007 [Low]: CWE-20: Improper Input Validation
+- **Target File**: `apps/merchant-web/src/app/api/hospital/departments/route.ts:1-80`
 - **Status**: `DEFERRED`
-- **Fix Commit**: `N/A (Pre-approved Disposition)`
-- **Remediation**: Seed file credentials verified local-only development fixtures for local Docker Supabase environment. Approved deferred by user in Stage 1c.
-- **Verification**: `Local database only; gitleaks branch scan clean`
+- **Fix Commit**: `N/A (Approved Deferred)`
+- **Remediation**: Drift report: Screen 2 documents DELETE /api/hospital/departments for removing empty departments. In actual implementation, DELETE is unimplemented. Approved deferred pending human design approval.
+- **Verification**: `tests/unit/cross-tenant-authorization-matrix.test.mjs (Matrix documented)`
 
 ---
 
@@ -173,9 +174,18 @@
 ### SEC-WIN-015 [Low]: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
 - **Target File**: `supabase/migrations/20261107000001_resource_leaves_schema.sql:public.resource_leaves`
 - **Status**: `RESOLVED`
-- **Fix Commit**: `pending (SEC-WIN-015)`
+- **Fix Commit**: `6ed29bc`
 - **Remediation**: Applied forward migration 20261120000003_harden_resource_leaves_rls.sql revoking anon SELECT and scoping SELECT strictly to authorized merchant staff/admins. Written rollback migration 20261120000003_rollback.sql provided.
 - **Verification**: `tests/security/resource-leaves-rls-hardening.test.mjs (3/3 PASS)`
+
+---
+
+### SEC-WIN-016 [Low]: CWE-540: Inclusion of Sensitive Information in Source Code
+- **Target File**: `supabase/seed.sql:1-100`
+- **Status**: `DEFERRED`
+- **Fix Commit**: `N/A (Approved Deferred)`
+- **Remediation**: Seed demo credentials verified local-only development fixtures for local Docker Supabase environment. Approved deferred by user in Stage 1c.
+- **Verification**: `gitleaks detect --log-opts=f7c388d..HEAD passes with zero leaks and all seed credentials are confirmed local-only demo fixtures.`
 
 ---
 

@@ -25,7 +25,7 @@ if (!RAZORPAY_WEBHOOK_SECRET) {
   console.error('FATAL: RAZORPAY_WEBHOOK_SECRET environment variable is missing.');
   process.exit(1);
 }
-const ADMIN_SECRET = getEnvVal('ADMIN_SECRET') || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+const ADMIN_SECRET = getEnvVal('SUPERADMIN_E2E_TOKEN') || getEnvVal('ADMIN_SECRET') || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
 const API_BASE = 'http://localhost:3000';
 
 const testResourceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // SVIMS doctor resource
