@@ -251,6 +251,7 @@ jobs:
           export CRON_SECRET="${CRON_SECRET:-test_cron_secret_2026}"
           export DELETION_TOKEN_SECRET="${DELETION_TOKEN_SECRET:-d24831bb6c322697ea855e7464e8e9767191d1f4d340548e400bab603f927cfe}"
           export ALLOW_MOCK_PAYMENTS="false"
+          export ENABLE_E2E_BYPASS="true"
 
           pnpm --filter @appointments/merchant-web dev --port 3000 > /tmp/merchant-web-ci.log 2>&1 &
           SERVER_PID=$!
