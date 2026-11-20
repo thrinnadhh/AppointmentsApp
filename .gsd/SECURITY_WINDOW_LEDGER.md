@@ -194,10 +194,10 @@
 ### SEC-WIN-017 [Low]: CWE-284: Improper Access Control
 - **Target File**: `supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:143-152`
 - **Status**: `DEFERRED (Pending Human Approval: Migration Drafted & Verified)`
-- **Fix Commit**: `Pending Human Approval (Draft: supabase/migrations_draft/20261120000004_guard_provider_city.sql)`
-- **Rollback Script**: `supabase/migrations_rollback/20261120000004_rollback.sql`
+- **Fix Commit**: `Pending Human Approval (Draft: supabase/migrations_draft/20261120000004_guard_provider_payout_and_city.sql)`
+- **Rollback Script**: `supabase/migrations_rollback/20261120000004_rollback_provider_payout_and_city.sql`
 - **Remediation**: Forward migration drafted to extend `guard_provider_governance()` with `OR NEW.city IS DISTINCT FROM OLD.city`. Replaces trigger function to block tenant owners from modifying `providers.city` (error code 42501). Unapplied to keep live DB clean.
-- **Verification**: `tests/security/guard-provider-city.test.mjs` (4/4 PASS via transactional isolation).
+- **Verification**: `tests/security/guard-provider-payout-and-city.test.mjs` (4/4 PASS via transactional isolation).
 
 ---
 
@@ -217,10 +217,10 @@
 ### SEC-WIN-019 [Medium]: CWE-284: Improper Access Control (Cashfree Vendor Status & Payout Credential Bypass)
 - **Target File**: `supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:128-155`
 - **Status**: `DEFERRED (Pending Human Approval: Migration Drafted & Verified)`
-- **Fix Commit**: `Pending Human Approval (Draft: supabase/migrations_draft/20261120000004_guard_provider_city.sql)`
-- **Rollback Script**: `supabase/migrations_rollback/20261120000004_rollback.sql`
-- **Remediation**: Forward migration drafted to extend `guard_provider_governance()` with protection for `cashfree_vendor_status`, `cashfree_vendor_id`, `cashfree_app_id`, `bank_account_holder`, `bank_account_last4`, `bank_ifsc`, and `pan_last4`. Blocks tenant owners from self-activating EasySplit status or altering payout routing (error code 42501). Unapplied to keep live DB clean.
-- **Verification**: `tests/security/guard-provider-city.test.mjs` (4/4 PASS via transactional isolation).
+- **Fix Commit**: `Pending Human Approval (Draft: supabase/migrations_draft/20261120000004_guard_provider_payout_and_city.sql)`
+- **Rollback Script**: `supabase/migrations_rollback/20261120000004_rollback_provider_payout_and_city.sql`
+- **Remediation**: Forward migration drafted to extend `guard_provider_governance()` with protection for `cashfree_vendor_status`, `cashfree_vendor_id`, `cashfree_app_id`, `bank_account_holder`, `bank_account_last4`, `bank_ifsc`, `pan_last4`, and `payout_upi_id`. Blocks tenant owners from self-activating EasySplit status or altering payout routing (error code 42501). Unapplied to keep live DB clean.
+- **Verification**: `tests/security/guard-provider-payout-and-city.test.mjs` (4/4 PASS via transactional isolation).
 
 ---
 

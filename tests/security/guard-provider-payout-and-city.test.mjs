@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
-const DRAFT_PATH = 'supabase/migrations_draft/20261120000004_guard_provider_city.sql';
-const ROLLBACK_PATH = 'supabase/migrations_rollback/20261120000004_rollback.sql';
+const DRAFT_PATH = 'supabase/migrations_draft/20261120000004_guard_provider_payout_and_city.sql';
+const ROLLBACK_PATH = 'supabase/migrations_rollback/20261120000004_rollback_provider_payout_and_city.sql';
 
 function runSql(query) {
   const cmd = 'docker exec -i supabase_db_Appointments psql -U postgres -d postgres -t -A';
@@ -16,7 +16,7 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
     assert.ok(existsSync(DRAFT_PATH), `Draft migration must exist at ${DRAFT_PATH}`);
     assert.ok(existsSync(ROLLBACK_PATH), `Rollback script must exist at ${ROLLBACK_PATH}`);
     assert.ok(
-      !existsSync('supabase/migrations/20261120000004_guard_provider_city.sql'),
+      !existsSync('supabase/migrations/20261120000004_guard_provider_payout_and_city.sql'),
       'Draft migration must NOT exist in supabase/migrations/ to prevent auto-execution during db reset'
     );
 
@@ -27,6 +27,7 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
     assert.match(draftContent, /NEW\.cashfree_vendor_status IS DISTINCT FROM OLD\.cashfree_vendor_status/);
     assert.match(draftContent, /NEW\.cashfree_vendor_id IS DISTINCT FROM OLD\.cashfree_vendor_id/);
     assert.match(draftContent, /NEW\.bank_ifsc IS DISTINCT FROM OLD\.bank_ifsc/);
+    assert.match(draftContent, /NEW\.payout_upi_id IS DISTINCT FROM OLD\.payout_upi_id/);
 
     assert.doesNotMatch(rollbackContent, /NEW\.city IS DISTINCT FROM OLD\.city/);
     assert.doesNotMatch(rollbackContent, /NEW\.cashfree_vendor_status IS DISTINCT FROM OLD\.cashfree_vendor_status/);
@@ -36,7 +37,7 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
     const draftSql = readFileSync(DRAFT_PATH, 'utf-8');
 
     // Get an existing provider and owner id
-    const provRow = runSql(`SELECT id || ':' || owner_id FROM public.providers LIMIT 1;`);
+    const provRow = runSql(`SELECT id || ':' || owner_id FROM public.providers WHERE owner_id IS NOT NULL LIMIT 1;`);
     const [provId, ownerId] = provRow.split(':');
     assert.ok(provId && ownerId, 'Must have a test provider');
 
@@ -80,7 +81,15 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
       EXCEPTION WHEN SQLSTATE '42501' THEN NULL;
       END $$;
 
-      -- 5. Allowed merchant fields -> MUST SUCCEED
+      -- 5. Attempt to update payout_upi_id -> MUST FAIL with 42501
+      DO $$
+      BEGIN
+        UPDATE public.providers SET payout_upi_id = 'attacker@okaxis' WHERE id = '${provId}';
+        RAISE EXCEPTION 'UNEXPECTED_SUCCESS: payout_upi_id modification should have been blocked';
+      EXCEPTION WHEN SQLSTATE '42501' THEN NULL;
+      END $$;
+
+      -- 6. Allowed merchant fields -> MUST SUCCEED
       UPDATE public.providers SET description = 'Updated Description By Owner', min_deposit_amount = 25 WHERE id = '${provId}';
 
       ROLLBACK;
@@ -99,13 +108,14 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
       BEGIN;
       ${draftSql}
 
-      -- Under service_role, vendor status, city, and bank credentials update must succeed
+      -- Under service_role, vendor status, city, bank credentials, and payout_upi_id update must succeed
       SET LOCAL ROLE service_role;
       UPDATE public.providers 
       SET city = 'AdminCity',
           cashfree_vendor_status = 'ACTIVE',
           cashfree_vendor_id = 'legit_vendor_123',
-          bank_ifsc = 'SBIN0001234'
+          bank_ifsc = 'SBIN0001234',
+          payout_upi_id = 'legit@okaxis'
       WHERE id = '${provId}';
 
       -- Under app.trusted_write context, update must succeed
@@ -125,7 +135,7 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
   it('4. Rollback script restores previous definition where city and payout fields are unblocked', () => {
     const draftSql = readFileSync(DRAFT_PATH, 'utf-8');
     const rollbackSql = readFileSync(ROLLBACK_PATH, 'utf-8');
-    const provRow = runSql(`SELECT id || ':' || owner_id FROM public.providers LIMIT 1;`);
+    const provRow = runSql(`SELECT id || ':' || owner_id FROM public.providers WHERE owner_id IS NOT NULL LIMIT 1;`);
     const [provId, ownerId] = provRow.split(':');
 
     const script = `

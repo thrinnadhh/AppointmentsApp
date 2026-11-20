@@ -27,15 +27,28 @@ describe('CashfreeCheckoutWebView & CheckoutModal: Fail-Closed On-Close Verifica
     assert.match(modalSource, /gateway_provider:\s*['"]cashfree['"]/);
   });
 
-  it('4. CheckoutModal polls server for up to 60 seconds with 3-second intervals', () => {
+  it('4. CheckoutModal polls server for up to 60s with 5s base interval (max 12 req/min)', () => {
     assert.match(modalSource, /const maxPollMs = 60000;/);
-    assert.match(modalSource, /const pollIntervalMs = 3000;/);
+    assert.match(modalSource, /let pollIntervalMs = 5000;/);
     assert.match(modalSource, /elapsedMs \+= pollIntervalMs;/);
     assert.match(modalSource, /if \(pollRes\.success\)/);
     assert.match(modalSource, /onPaymentSuccess\(/);
   });
 
-  it('5. Server remains the sole authority for confirmation (no client-side forging)', () => {
+  it('5. CheckoutModal backs off on HTTP 429 rate limit responses', () => {
+    // Verifies 429 backoff logic: checks pollRes.statusCode === 429 or error containing 429 and increases interval
+    assert.match(modalSource, /pollRes\.statusCode === 429/);
+    assert.match(modalSource, /pollIntervalMs = Math\.min\(pollIntervalMs \* 2, 20000\);/);
+  });
+
+  it('6. CheckoutModal stops polling immediately on terminal/final status', () => {
+    // Terminal statuses: CANCELLED, EXPIRED, REJECTED, FAILED, REFUNDED
+    assert.match(modalSource, /terminalStatuses = \['CANCELLED', 'EXPIRED', 'REJECTED', 'FAILED', 'REFUNDED'\]/);
+    assert.match(modalSource, /if \(pollRes\.status && terminalStatuses\.includes\(pollRes\.status\.toUpperCase\(\)\)\)/);
+    assert.match(modalSource, /setIsProcessing\(false\);/);
+  });
+
+  it('7. Server remains the sole authority for confirmation (no client-side forging)', () => {
     // onPaymentSuccess is ONLY called when verifyRes.success, initialVerify.success, or pollRes.success is true
     const matches = [...modalSource.matchAll(/onPaymentSuccess\(/g)];
     assert.ok(matches.length >= 2, 'Must have at least 2 guarded onPaymentSuccess invocations');

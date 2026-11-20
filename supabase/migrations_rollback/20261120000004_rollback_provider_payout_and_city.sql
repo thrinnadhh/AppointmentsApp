@@ -1,5 +1,5 @@
--- Rollback Migration: 20261120000004_rollback.sql
--- Description: Revert guard_provider_governance() to pre-20261120000004 definition (city text unconstrained).
+-- Rollback Migration: 20261120000004_rollback_provider_payout_and_city.sql
+-- Description: Revert guard_provider_governance() to pre-20261120000004 definition (city text and payout fields unconstrained in direct table updates).
 
 CREATE OR REPLACE FUNCTION public.guard_provider_governance()
 RETURNS TRIGGER

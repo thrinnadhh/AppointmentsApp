@@ -832,6 +832,7 @@ export interface VerifyPaymentResult {
   payment_status?: string;
   platform_payment_status?: string;
   consultation_payment_status?: string;
+  statusCode?: number;
   error?: string;
 }
 
@@ -866,7 +867,7 @@ export async function verifyRazorpayPayment(params: {
 
     const json = await resp.json();
     if (!resp.ok || !json.success) {
-      return { success: false, error: json.error || 'Payment verification failed' };
+      return { success: false, error: json.error || 'Payment verification failed', statusCode: resp.status, status: json.status };
     }
 
     return {

@@ -389,13 +389,27 @@ export default function CheckoutModal({
         return;
       }
 
-      // 2. Poll server /api/payments/verify for up to 60s
+      const terminalStatuses = ['CANCELLED', 'EXPIRED', 'REJECTED', 'FAILED', 'REFUNDED'];
+      if (initialVerify.status && terminalStatuses.includes(initialVerify.status.toUpperCase())) {
+        setIsProcessing(false);
+        setPayError(`Payment ${initialVerify.status.toLowerCase()}. Please initiate a new booking.`);
+        return;
+      }
+
+      // 2. Poll server /api/payments/verify for up to 60s (5s base interval, max 12 req/min, 429 backoff)
       let elapsedMs = 0;
-      const pollIntervalMs = 3000;
+      let pollIntervalMs = 5000;
       const maxPollMs = 60000;
 
-      const pollTimer = setInterval(async () => {
+      const executePoll = async () => {
+        if (elapsedMs >= maxPollMs) {
+          setIsProcessing(false);
+          setPayError('Payment verification pending or cancelled. If money was debited, your appointment will confirm shortly.');
+          return;
+        }
+
         elapsedMs += pollIntervalMs;
+
         try {
           const pollRes = await verifyRazorpayPayment({
             booking_id: cashfreePaymentData.bookingId,
@@ -407,7 +421,6 @@ export default function CheckoutModal({
           });
 
           if (pollRes.success) {
-            clearInterval(pollTimer);
             const assignedToken = pollRes.queue_position || 1;
             onPaymentSuccess(
               cashfreePaymentData.bookingId,
@@ -418,16 +431,26 @@ export default function CheckoutModal({
             setIsProcessing(false);
             return;
           }
+
+          // Stop on terminal status
+          if (pollRes.status && terminalStatuses.includes(pollRes.status.toUpperCase())) {
+            setIsProcessing(false);
+            setPayError(`Payment ${pollRes.status.toLowerCase()}. Please initiate a new booking.`);
+            return;
+          }
+
+          // Back off on HTTP 429 rate limit
+          if (pollRes.statusCode === 429 || (pollRes.error && pollRes.error.includes('429'))) {
+            pollIntervalMs = Math.min(pollIntervalMs * 2, 20000);
+          }
         } catch {
           // ignore transient poll error and retry next interval
         }
 
-        if (elapsedMs >= maxPollMs) {
-          clearInterval(pollTimer);
-          setIsProcessing(false);
-          setPayError('Payment verification pending or cancelled. If money was debited, your appointment will confirm shortly.');
-        }
-      }, pollIntervalMs);
+        setTimeout(executePoll, pollIntervalMs);
+      };
+
+      setTimeout(executePoll, pollIntervalMs);
     } catch (err: any) {
       console.warn('Fallback verification error:', err);
       setIsProcessing(false);

@@ -1,6 +1,6 @@
--- Migration Draft: 20261120000004_guard_provider_city.sql
+-- Migration Draft: 20261120000004_guard_provider_payout_and_city.sql
 -- Description: Extend guard_provider_governance() to protect providers.city, cashfree_vendor_id, cashfree_vendor_status,
---              cashfree_app_id, and masked bank/PAN credentials against unauthorized client modification (SEC-WIN-017 & SEC-WIN-019).
+--              cashfree_app_id, payout_upi_id, and masked bank/PAN credentials against unauthorized client modification (SEC-WIN-017 & SEC-WIN-019).
 -- Note: DRAFT ONLY - DO NOT MOVE TO supabase/migrations/ until authorized.
 
 CREATE OR REPLACE FUNCTION public.guard_provider_governance()
@@ -32,7 +32,8 @@ BEGIN
      OR NEW.bank_account_holder IS DISTINCT FROM OLD.bank_account_holder
      OR NEW.bank_account_last4 IS DISTINCT FROM OLD.bank_account_last4
      OR NEW.bank_ifsc IS DISTINCT FROM OLD.bank_ifsc
-     OR NEW.pan_last4 IS DISTINCT FROM OLD.pan_last4 THEN
+     OR NEW.pan_last4 IS DISTINCT FROM OLD.pan_last4
+     OR NEW.payout_upi_id IS DISTINCT FROM OLD.payout_upi_id THEN
     RAISE EXCEPTION 'Unauthorized provider modification: governance, status, strikes, penalty balance, booking freeze, city, ownership, and payout credentials are protected'
       USING ERRCODE = '42501';
   END IF;
