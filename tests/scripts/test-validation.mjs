@@ -566,16 +566,16 @@ describe('24. NV Item 4: Preview Wildcard CORS Dynamic Subdomain Matching', () =
   });
 });
 
-describe('25. NV Item 5: Backend Webhook Ingress (HMAC SHA-256 Validation)', () => {
+describe('25. NV Item 5: Backend Webhook Ingress (Decommissioned Invariant)', () => {
   const webhookRoutePath = path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts');
 
-  it('verifies /api/webhooks/razorpay verifies raw body HMAC SHA-256 signature using constant-time comparison', () => {
+  it('verifies /api/webhooks/razorpay is decommissioned (410, no secret read, no body parsing)', () => {
     const code = fs.readFileSync(webhookRoutePath, 'utf8');
-    assert.match(code, /req\.text\(\)/, 'Must read rawBody via req.text() to preserve unmutated byte sequence');
-    assert.match(code, /crypto\s*\.\s*createHmac\('sha256',\s*webhookSecret\)/, 'Must compute HMAC SHA-256 with webhook secret');
-    assert.match(code, /crypto\.timingSafeEqual/, 'Must use crypto.timingSafeEqual to prevent timing attacks');
-    assert.match(code, /Missing x-razorpay-signature header/, 'Must reject requests missing signature header with 401');
-    assert.match(code, /Invalid webhook signature/, 'Must reject mismatched signatures with 400');
+    assert.match(code, /status:\s*410/, 'Must return HTTP 410 Gone status');
+    assert.match(code, /RAZORPAY_DECOMMISSIONED/, 'Must return decommissioned error code');
+    assert.doesNotMatch(code, /RAZORPAY_WEBHOOK_SECRET|webhookSecret/, 'Must not access or read webhook secrets');
+    assert.doesNotMatch(code, /req\.text\(\)|req\.json\(\)/, 'Must not parse request body');
+    assert.doesNotMatch(code, /supabaseAdmin|rpc\(/, 'Must not invoke database RPCs');
   });
 
   it('executes functional HMAC SHA-256 verification calculation asserting exact behavior', async () => {

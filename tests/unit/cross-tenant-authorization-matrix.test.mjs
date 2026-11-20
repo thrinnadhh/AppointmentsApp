@@ -696,11 +696,11 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
       ''
     );
     try {
-      fs.mkdirSync('docs/hospital', { recursive: true });
-      fs.writeFileSync('docs/hospital/AUTHZ_MATRIX.md', matrixDocLines.join('\n'), 'utf8');
-      console.log('SUCCESS: Written docs/hospital/AUTHZ_MATRIX.md with 100% matrix ledger coverage.');
+      fs.mkdirSync('.temp', { recursive: true });
+      fs.writeFileSync('.temp/AUTHZ_MATRIX.md', matrixDocLines.join('\n'), 'utf8');
+      console.log('SUCCESS: Written .temp/AUTHZ_MATRIX.md (ignored path) with 100% matrix ledger coverage.');
     } catch (writeErr) {
-      console.error('Failed to write docs/hospital/AUTHZ_MATRIX.md:', writeErr);
+      console.error('Failed to write .temp/AUTHZ_MATRIX.md:', writeErr);
     }
 
     console.log('\n=== PROGRAMMATIC COMPLETENESS ASSERTION ===');
