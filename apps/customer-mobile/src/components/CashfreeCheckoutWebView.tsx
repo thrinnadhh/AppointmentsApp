@@ -22,6 +22,7 @@ export interface CashfreeCheckoutWebViewProps {
   onSuccess: (paymentDetails?: { orderId: string; paymentId?: string }) => void;
   onFailure: (errorMsg: string) => void;
   onClose: () => void;
+  onFallbackVerify?: () => void;
 }
 
 export const UPI_SCHEMES = [
@@ -226,6 +227,10 @@ export const CashfreeCheckoutWebView: React.FC<CashfreeCheckoutWebViewProps> = (
       const currentUrl = event.nativeEvent?.url;
       if (!currentUrl || (!isAllowedCashfreeUrl(currentUrl) && currentUrl !== 'about:blank')) {
         console.warn('[CashfreeWebView] Ignored postMessage from untrusted or missing URL:', currentUrl);
+        // Fail-closed against untrusted origins; if URL is missing from native event, trigger server-authoritative verification fallback
+        if (!currentUrl && onFallbackVerify) {
+          onFallbackVerify();
+        }
         return;
       }
 

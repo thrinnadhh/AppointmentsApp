@@ -20,7 +20,7 @@ A full gate was executed serially from a clean database reset (`supabase db rese
 
 ---
 
-## 1. Master Findings Ledger & Dispositions (18 Findings Total)
+## 1. Master Findings Ledger & Dispositions (19 Findings Total)
 
 | VULN_ID | Severity | CWE | Title & Target | Disposition / Status | Remediated In | Acceptance Verification |
 | :--- | :---: | :--- | :--- | :---: | :---: | :--- |
@@ -40,8 +40,9 @@ A full gate was executed serially from a clean database reset (`supabase db rese
 | `SEC-WIN-014` | Medium | CWE-306 | Unauthenticated Body Parsing on `/api/payments/create-order` | **RESOLVED** | `c31ae58` | `tests/unit/create-order-auth-ordering.test.mjs` (3/3 PASS) |
 | `SEC-WIN-015` | Low | CWE-200 | `resource_leaves` SELECT Policy `qual: true` for Anon | **RESOLVED** | `6ed29bc` | `tests/security/resource-leaves-rls-hardening.test.mjs` (3/3 PASS) |
 | `SEC-WIN-016` | Low | CWE-540 | Hardcoded Demo Credentials in `supabase/seed.sql` | **DEFERRED** | N/A | Pending Human Approval; local Docker development fixtures only; branch Gitleaks clean |
-| `SEC-WIN-017` | Low | CWE-284 | `providers.city` Column Update Not Guarded in Trigger | **DEFERRED** | N/A | Pending Human Approval; `guard_provider_governance()` omits text column `city` |
-| `SEC-WIN-018` | Low | CWE-312 | Plaintext 4-Digit PIN Storage in `appointment_checkin_codes` | **DEFERRED** | N/A | Pending Human Approval; RLS isolates table to customer; PIN stored plaintext at rest |
+| `SEC-WIN-017` | Low | CWE-284 | `providers.city` Column Update Not Guarded in Trigger | **DEFERRED** | N/A | Pending Human Approval; `guard_provider_governance()` draft migration & rollback ready |
+| `SEC-WIN-018` | Low | CWE-312 | Plaintext 4-Digit PIN Storage in `appointment_checkin_codes` | **ACCEPTED_RISK** | N/A | Pending User Approval; compensated by 5-attempt/60s lockout, arrival window, strict RLS |
+| `SEC-WIN-019` | Medium | CWE-284 | Tenant Owner Cashfree Vendor Status & Payout Credential Bypass | **DEFERRED** | N/A | Pending Human Approval; `guard_provider_governance()` extended in draft migration |
 
 ---
 
@@ -141,17 +142,19 @@ Every platform security invariant was empirically audited against live running s
 - `.github/workflows/codeql.yml` (SHA pinning)
 - `.github/dependabot.yml` (Automated GitHub Actions dependency updates)
 
-### Dedicated Security Test Suites Added (10 Files / 37 Tests)
+### Dedicated Security Test Suites Added (12 Files / 46 Tests)
 1. `tests/security/database-grants-allowlist.test.mjs` (5 tests)
 2. `tests/security/security-definer-schema-guard.test.mjs` (3 tests)
 3. `tests/security/anon-log-throttle.test.mjs` (2 tests)
 4. `tests/security/github-actions-hardening.test.mjs` (4 tests)
 5. `tests/security/resource-leaves-rls-hardening.test.mjs` (3 tests)
-6. `tests/unit/cashfree-webview-origin-guard.test.mjs` (6 tests)
-7. `tests/unit/checkin-pin-terminology.test.mjs` (3 tests)
-8. `tests/unit/create-order-auth-ordering.test.mjs` (3 tests)
-9. `tests/unit/prescriptions-signed-url-bypass.test.mjs` (4 tests)
-10. `tests/unit/razorpay-decommission.test.mjs` (4 tests)
+6. `tests/security/guard-provider-city.test.mjs` (4 tests)
+7. `tests/unit/cashfree-webview-origin-guard.test.mjs` (6 tests)
+8. `tests/unit/checkout-modal-verify-on-close.test.mjs` (5 tests)
+9. `tests/unit/checkin-pin-terminology.test.mjs` (3 tests)
+10. `tests/unit/create-order-auth-ordering.test.mjs` (3 tests)
+11. `tests/unit/prescriptions-signed-url-bypass.test.mjs` (4 tests)
+12. `tests/unit/razorpay-decommission.test.mjs` (4 tests)
 
 ---
 
@@ -182,19 +185,21 @@ Every platform security invariant was empirically audited against live running s
 7. **Branch Protection Enforcement:**  
    Configure branch protection rules on `main` requiring linear history, up-to-date branch status, and mandatory status checks (`all-checks-pass`, `codeql`).
 
-### 6.3 Findings Pending Human Approval (Deferred)
+### 6.3 Findings Pending Human Approval (Deferred / Accepted Risk)
 1. **`SEC-WIN-007` (Unimplemented `DELETE /api/hospital/departments`):** Functional drift gap from specification. Status: `DEFERRED (Pending Human Approval)`.
 2. **`SEC-WIN-013` (`SUPABASE_SERVICE_ROLE_KEY` string name in client bundle):** Variable name string bundled into Next.js client chunks (value is `undefined`). Status: `DEFERRED (Pending Human Approval)`.
 3. **`SEC-WIN-016` (Hardcoded Demo Credentials in `supabase/seed.sql`):** Local Docker development and E2E test account fixtures only. Status: `DEFERRED (Pending Human Approval)`.
-4. **`SEC-WIN-017` (`providers.city` Column Update Not Guarded in Trigger):** `guard_provider_governance()` guards `city_id`, `status`, and `owner_id`, but omits legacy text column `providers.city`. Status: `DEFERRED (Pending Human Approval)`.
-5. **`SEC-WIN-018` (Plaintext 4-Digit Check-in PIN Storage in `appointment_checkin_codes`):** `appointment_checkin_codes.code` stores PIN in cleartext at rest. While RLS strictly isolates table to owning customer and merchant owners have 0 direct read access, plaintext storage at rest creates risk if DB snapshot is compromised. Status: `DEFERRED (Pending Human Approval)`.
+4. **`SEC-WIN-017` (`providers.city` Column Update Not Guarded in Trigger):** `guard_provider_governance()` guards `city_id`, `status`, and `owner_id`, but omits legacy text column `providers.city`. Status: `DEFERRED (Pending Human Approval: Migration Drafted & Verified)`. Forward migration drafted at `supabase/migrations_draft/20261120000004_guard_provider_city.sql`, rollback script at `supabase/migrations_rollback/20261120000004_rollback.sql`, verified by `tests/security/guard-provider-city.test.mjs` (4/4 PASS in transactional isolation).
+5. **`SEC-WIN-018` (Plaintext 4-Digit Check-in PIN Storage in `appointment_checkin_codes`):** `appointment_checkin_codes.code` stores PIN in cleartext at rest. Status: `ACCEPTED_RISK (Pending User Approval)`. Compensating controls: 5-attempt/60s rate limit lockout (`20261011000001:237-255`), arrival window and date expiration (`20261108000002:196-198, 381-384`), strict RLS `customer_id = auth.uid()` with 0 merchant read grants, and fail-closed checkout verification with 60s polling.
+6. **`SEC-WIN-019` (Tenant Owner Cashfree Vendor Status & Payout Credential Bypass):** Tenant owner can update `cashfree_vendor_status='ACTIVE'` and payout columns directly. Status: `DEFERRED (Pending Human Approval: Migration Drafted & Verified)`. Covered in extended `guard_provider_governance()` draft migration, rollback, and test (`tests/security/guard-provider-city.test.mjs`).
 
 ---
 
 ## 7. Status Summary
 
-- **Total Findings Audited:** 18
+- **Total Findings Audited:** 19
 - **Resolved (Remediated & Verified):** 11 (`SEC-WIN-001`, `002`, `003`, `004`, `005`, `006`, `008`, `011`, `012`, `014`, `015`)
-- **Deferred (Pending Human Approval):** 5 (`SEC-WIN-007`, `013`, `016`, `017`, `018`)
+- **Deferred (Pending Human Approval):** 5 (`SEC-WIN-007`, `013`, `016`, `017`, `019`)
+- **Accepted Risk (Pending User Approval):** 1 (`SEC-WIN-018`)
 - **False Positives:** 2 (`SEC-WIN-009`, `010`)
 - **Open Blockers:** 0

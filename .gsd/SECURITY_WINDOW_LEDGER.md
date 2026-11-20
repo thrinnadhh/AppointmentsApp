@@ -193,19 +193,34 @@
 
 ### SEC-WIN-017 [Low]: CWE-284: Improper Access Control
 - **Target File**: `supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:143-152`
-- **Status**: `DEFERRED (Pending Human Approval)`
-- **Fix Commit**: `Pending Approval`
-- **Remediation**: In `guard_provider_governance()`, updates to `city_id`, `status`, and `owner_id` are blocked for non-admin callers, but updates to legacy text column `providers.city` are not checked. A provider owner can update `providers.city` via REST. Requires new forward migration adding `OR NEW.city IS DISTINCT FROM OLD.city`.
-- **Verification**: `Assert non-admin update to providers.city is rejected with 42501.`
+- **Status**: `DEFERRED (Pending Human Approval: Migration Drafted & Verified)`
+- **Fix Commit**: `Pending Human Approval (Draft: supabase/migrations_draft/20261120000004_guard_provider_city.sql)`
+- **Rollback Script**: `supabase/migrations_rollback/20261120000004_rollback.sql`
+- **Remediation**: Forward migration drafted to extend `guard_provider_governance()` with `OR NEW.city IS DISTINCT FROM OLD.city`. Replaces trigger function to block tenant owners from modifying `providers.city` (error code 42501). Unapplied to keep live DB clean.
+- **Verification**: `tests/security/guard-provider-city.test.mjs` (4/4 PASS via transactional isolation).
 
 ---
 
 ### SEC-WIN-018 [Low]: CWE-312: Cleartext Storage of Sensitive Information
 - **Target File**: `supabase/migrations/20261011000001_reception_checkin_code_system.sql:43-50`
-- **Status**: `DEFERRED (Pending Human Approval)`
-- **Fix Commit**: `Pending Approval`
-- **Remediation**: 4-digit check-in PIN stored in plaintext in `public.appointment_checkin_codes.code`. While RLS strictly restricts SELECT to `customer_id = auth.uid()` and merchant owners have 0 direct read access (cannot read any column), plaintext storage at rest means a database snapshot or superadmin leak exposes check-in PINs. Requires hashing PINs at rest and verifying via hash comparison.
-- **Verification**: `Assert appointment_checkin_codes.code contains hash digests instead of 4-digit plaintext strings.`
+- **Status**: `ACCEPTED_RISK (Pending User Approval)`
+- **Fix Commit**: `N/A (Accepted Risk)`
+- **Compensating Controls**: 
+  1. Rate Limit Lockout: 5 failed attempts lock staff for 60 seconds via `_record_checkin_failure` (`supabase/migrations/20261011000001_reception_checkin_code_system.sql:237-255`).
+  2. Temporal Expiry: Restricted to `appointment_date` IST and 60-min pre-slot window (`supabase/migrations/20261108000002_spec_arrival_window_and_trigger_privileges.sql:196-198, 381-384`).
+  3. Row Level Security: Table restricted to `customer_id = auth.uid()`; merchant staff and owners have zero direct read grants.
+  4. Client Verification: `CheckoutModal.tsx` fails closed; no on-close or unauthenticated client confirmations.
+- **Verification**: `Audited lockout and expiry logic. CheckoutModal fail-closed verification confirmed.`
+
+---
+
+### SEC-WIN-019 [Medium]: CWE-284: Improper Access Control (Cashfree Vendor Status & Payout Credential Bypass)
+- **Target File**: `supabase/migrations/20260924000003_remediation_fixes_and_grants.sql:128-155`
+- **Status**: `DEFERRED (Pending Human Approval: Migration Drafted & Verified)`
+- **Fix Commit**: `Pending Human Approval (Draft: supabase/migrations_draft/20261120000004_guard_provider_city.sql)`
+- **Rollback Script**: `supabase/migrations_rollback/20261120000004_rollback.sql`
+- **Remediation**: Forward migration drafted to extend `guard_provider_governance()` with protection for `cashfree_vendor_status`, `cashfree_vendor_id`, `cashfree_app_id`, `bank_account_holder`, `bank_account_last4`, `bank_ifsc`, and `pan_last4`. Blocks tenant owners from self-activating EasySplit status or altering payout routing (error code 42501). Unapplied to keep live DB clean.
+- **Verification**: `tests/security/guard-provider-city.test.mjs` (4/4 PASS via transactional isolation).
 
 ---
 

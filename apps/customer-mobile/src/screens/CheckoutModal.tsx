@@ -359,6 +359,81 @@ export default function CheckoutModal({
     }
   };
 
+  const handleFallbackVerificationAndPoll = async () => {
+    if (!cashfreePaymentData) {
+      setIsProcessing(false);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // 1. Initial verification call to /api/payments/verify
+      const initialVerify = await verifyRazorpayPayment({
+        booking_id: cashfreePaymentData.bookingId,
+        gateway_provider: 'cashfree',
+        order_id: cashfreePaymentData.orderId,
+        payment_id: `cf_pay_${cashfreePaymentData.orderId}`,
+        attachment_url: cashfreePaymentData.attachedPath,
+        customerId,
+      });
+
+      if (initialVerify.success) {
+        const assignedToken = initialVerify.queue_position || 1;
+        onPaymentSuccess(
+          cashfreePaymentData.bookingId,
+          cashfreePaymentData.holdReferenceCode,
+          false,
+          assignedToken
+        );
+        setIsProcessing(false);
+        return;
+      }
+
+      // 2. Poll server /api/payments/verify for up to 60s
+      let elapsedMs = 0;
+      const pollIntervalMs = 3000;
+      const maxPollMs = 60000;
+
+      const pollTimer = setInterval(async () => {
+        elapsedMs += pollIntervalMs;
+        try {
+          const pollRes = await verifyRazorpayPayment({
+            booking_id: cashfreePaymentData.bookingId,
+            gateway_provider: 'cashfree',
+            order_id: cashfreePaymentData.orderId,
+            payment_id: `cf_pay_${cashfreePaymentData.orderId}`,
+            attachment_url: cashfreePaymentData.attachedPath,
+            customerId,
+          });
+
+          if (pollRes.success) {
+            clearInterval(pollTimer);
+            const assignedToken = pollRes.queue_position || 1;
+            onPaymentSuccess(
+              cashfreePaymentData.bookingId,
+              cashfreePaymentData.holdReferenceCode,
+              false,
+              assignedToken
+            );
+            setIsProcessing(false);
+            return;
+          }
+        } catch {
+          // ignore transient poll error and retry next interval
+        }
+
+        if (elapsedMs >= maxPollMs) {
+          clearInterval(pollTimer);
+          setIsProcessing(false);
+          setPayError('Payment verification pending or cancelled. If money was debited, your appointment will confirm shortly.');
+        }
+      }, pollIntervalMs);
+    } catch (err: any) {
+      console.warn('Fallback verification error:', err);
+      setIsProcessing(false);
+    }
+  };
+
   const handlePay = async () => {
     if (!resource || !slot) return;
     setIsProcessing(true);
@@ -1342,9 +1417,13 @@ export default function CheckoutModal({
           setIsProcessing(false);
           setPayError(errorMsg);
         }}
-        onClose={() => {
+        onClose={async () => {
           setCashfreeModalVisible(false);
-          setIsProcessing(false);
+          await handleFallbackVerificationAndPoll();
+        }}
+        onFallbackVerify={async () => {
+          setCashfreeModalVisible(false);
+          await handleFallbackVerificationAndPoll();
         }}
       />
     )}

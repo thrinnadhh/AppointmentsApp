@@ -217,7 +217,13 @@ export async function middleware(req: NextRequest) {
 
   const cronSecret = process.env.CRON_SECRET;
   let isCronAuth = false;
-  if (pathname.startsWith('/api/cron/') && cronSecret && bearerToken && bearerToken.length === cronSecret.length) {
+  if (
+    pathname.startsWith('/api/cron/') &&
+    cronSecret &&
+    !COMMITTED_DEFAULT_E2E_SECRETS.has(cronSecret) &&
+    bearerToken &&
+    bearerToken.length === cronSecret.length
+  ) {
     let diff = 0;
     for (let i = 0; i < bearerToken.length; i++) {
       diff |= bearerToken.charCodeAt(i) ^ cronSecret.charCodeAt(i);
