@@ -9,3 +9,10 @@ updates:
       prefix: "ci"
       include: "scope"
     open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "pnpm/action-setup"
+        update-types: ["version-update:semver-major"]
