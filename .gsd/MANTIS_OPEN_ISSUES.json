@@ -1,0 +1,879 @@
+[
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-013",
+    "title": "[CWE-200] SUPABASE_SERVICE_ROLE_KEY Environment Variable Name in Client Bundle Schema",
+    "description": "ISSUE_ID: SEC-WIN-013\nSEVERITY: low\nCWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor\nATTACK_SURFACE: Frontend Client Bundle (apps/merchant-web/src/lib/env.ts)\nFILE_PATH: apps/merchant-web/src/lib/env.ts\nLINE_RANGE: 43\nROOT_CAUSE: Environment variable name literal SUPABASE_SERVICE_ROLE_KEY is mapped in getRawAuthEnv() in env.ts. While the secret value itself is never inlined on the client, referencing server-only secret names in modules shared with client components includes the variable identifier in browser bundle string tables.\nSECURITY_INVARIANT_VIOLATED: Service-role keys and backend secret identifiers never reach the client bundle.\nEXPLOITABILITY: Attacker inspects client JS bundle string table and observes backend environment variable names.\nCONFIDENCE: medium\nREQUIRED_REGRESSION_TEST: tests/unit/build-secret-safety.test.mjs",
+    "root_cause": "Environment variable name literal SUPABASE_SERVICE_ROLE_KEY is mapped in getRawAuthEnv() in env.ts. While the secret value itself is never inlined on the client, referencing server-only secret names in modules shared with client components includes the variable identifier in browser bundle string tables.",
+    "intended_behavior": "Service-role keys and backend secret identifiers never reach the client bundle.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "apps/merchant-web/src/lib/env.ts",
+        "line": 43,
+        "scope": "getRawAuthEnv",
+        "description": "Maps SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY."
+      },
+      {
+        "kind": "propagation",
+        "file": "apps/merchant-web/src/lib/env.ts",
+        "line": 53,
+        "scope": "validateAuthEnv",
+        "description": "Module imported by client-facing and server-facing authentication helpers."
+      },
+      {
+        "kind": "sink",
+        "file": "apps/merchant-web/src/lib/env.ts",
+        "line": 28,
+        "scope": "AuthEnv interface",
+        "description": "Identifier persists in bundle string table."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "apps/merchant-web/src/lib/env.ts",
+        "line": 43,
+        "description": "SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "system_configuration",
+        "description": "Client bundle compiled with shared auth environment interface."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Public web user inspecting merchant web assets.",
+      "payloads": [
+        "curl https://merchant.domain/_next/static/chunks/app.js | grep 'SUPABASE_SERVICE_ROLE_KEY'"
+      ],
+      "instructions": [
+        "1. Fetch compiled client bundle chunks.",
+        "2. Search strings for SUPABASE_SERVICE_ROLE_KEY.",
+        "3. Observe identifier is present (though value is undefined)."
+      ],
+      "observed_result": "Identifier string is present in client bundle."
+    },
+    "remediation": {
+      "strategy": "Segregate server-only secret validation into a server-only module (e.g. server-env.ts) that cannot be imported by client components.",
+      "code_changes": [
+        {
+          "file_name": "apps/merchant-web/src/lib/env.ts",
+          "fixed_code": "Remove SUPABASE_SERVICE_ROLE_KEY from client-accessible AuthEnv schema."
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Only exposes variable identifier, not the actual secret token."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Zero credential value leakage; minor disclosure of backend variable naming."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Empirically verified in apps/merchant-web/src/lib/env.ts."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-016",
+    "title": "[CWE-540] Inclusion of Demo/Mock Account Seed Credentials in Source Control",
+    "description": "ISSUE_ID: SEC-WIN-016\nSEVERITY: low\nCWE: CWE-540: Inclusion of Sensitive Information in Source Code\nATTACK_SURFACE: supabase/seed.sql\nFILE_PATH: supabase/seed.sql\nLINE_RANGE: 1-100\nROOT_CAUSE: supabase/seed.sql contains mock/demo account seed credentials (passwords, JWTs, demo phone numbers) strictly for local Docker Supabase development and E2E testing.\nSECURITY_INVARIANT_VIOLATED: Service-role keys and sensitive credentials never reach production environments.\nEXPLOITABILITY: If seed.sql is mistakenly applied against a hosted production database, predictable demo accounts with known credentials could be provisioned.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/unit/security-audit-production-env.test.mjs",
+    "root_cause": "supabase/seed.sql contains mock/demo account seed credentials (passwords, JWTs, demo phone numbers) strictly for local Docker Supabase development and E2E testing.",
+    "intended_behavior": "Service-role keys and sensitive credentials never reach production environments.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "supabase/seed.sql",
+        "line": 1,
+        "scope": "seed.sql",
+        "description": "Defines demo customer, doctor, front desk, and hospital admin users."
+      },
+      {
+        "kind": "propagation",
+        "file": "supabase/config.toml",
+        "line": 71,
+        "scope": "[db.seed]",
+        "description": "Local Supabase CLI loads seed.sql automatically during supabase db reset."
+      },
+      {
+        "kind": "sink",
+        "file": "supabase/seed.sql",
+        "line": 50,
+        "scope": "auth.users",
+        "description": "Inserts test bcrypt hashes for local accounts."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "supabase/seed.sql",
+        "line": 35,
+        "description": "Test user password hashes and phone numbers present in local seed file"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "environmental_dependency",
+        "description": "Developer or deployment pipeline executing seed.sql in production."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Attacker attempting login with known seed credentials.",
+      "payloads": [
+        "Login with phone +919999999991 and demo OTP"
+      ],
+      "instructions": [
+        "1. Check if production environment was seeded with test data.",
+        "2. Attempt authentication using documented seed identities.",
+        "3. Observe whether demo accounts exist in production."
+      ],
+      "observed_result": "In local environments demo accounts are created; in production seed is excluded."
+    },
+    "remediation": {
+      "strategy": "Maintain seed credentials strictly for local Docker development; verify 0 leaks on production branch and enforce CI/CD guard preventing supabase db seed against remote databases.",
+      "code_changes": [
+        {
+          "file_name": "docs/decisions.md",
+          "fixed_code": "ACCEPTED_RISK: seed.sql restricted to local development; production deployment skips db seed."
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Seed is only executed by local CLI supabase db reset; remote database deployments apply migrations only."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Compromise only possible if an operator explicitly overrides remote deployment safety."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Documented in .gsd/SECURITY_WINDOW_LEDGER.jsonl and verified in supabase/seed.sql."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-017",
+    "title": "[CWE-284] Missing Trigger Guard on Legacy Column providers.city",
+    "description": "ISSUE_ID: SEC-WIN-017\nSEVERITY: low\nCWE: CWE-284: Improper Access Control\nATTACK_SURFACE: PostgreSQL Database Trigger (guard_provider_governance)\nFILE_PATH: supabase/migrations/20260924000003_remediation_fixes_and_grants.sql\nLINE_RANGE: 142-152\nROOT_CAUSE: In guard_provider_governance(), updates to city_id, status, and owner_id are blocked for non-admin callers, but updates to the legacy text column providers.city are not guarded. A provider owner can directly update providers.city via PostgREST, causing territorial governance and display inconsistency with city_id.\nSECURITY_INVARIANT_VIOLATED: Multi-hospital tenant isolation: tenant admins cannot modify protected governance or territorial attributes.\nEXPLOITABILITY: An authenticated tenant owner sends a PATCH request directly to /rest/v1/providers?id=eq.<id> with payload {\"city\":\"ForeignCity\"}. The update succeeds without error, bypassing platform city governance.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/security/guard-provider-payout-and-city.test.mjs",
+    "root_cause": "In guard_provider_governance(), updates to city_id, status, and owner_id are blocked for non-admin callers, but updates to the legacy text column providers.city are not guarded. A provider owner can directly update providers.city via PostgREST, causing territorial governance and display inconsistency with city_id.",
+    "intended_behavior": "Multi-hospital tenant isolation: tenant admins cannot modify protected governance or territorial attributes.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "supabase/migrations/20260924000003_remediation_fixes_and_grants.sql",
+        "line": 142,
+        "scope": "public.guard_provider_governance",
+        "description": "Trigger function guard_provider_governance evaluates updated column set."
+      },
+      {
+        "kind": "propagation",
+        "file": "supabase/migrations/20260924000003_remediation_fixes_and_grants.sql",
+        "line": 149,
+        "scope": "public.guard_provider_governance",
+        "description": "Checks NEW.city_id IS DISTINCT FROM OLD.city_id but fails to evaluate NEW.city."
+      },
+      {
+        "kind": "sink",
+        "file": "supabase/migrations/20260924000003_remediation_fixes_and_grants.sql",
+        "line": 154,
+        "scope": "public.providers",
+        "description": "Returns NEW, persisting modified city without authorization check."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "supabase/migrations/20260924000003_remediation_fixes_and_grants.sql",
+        "line": 149,
+        "description": "guard_provider_governance trigger checks city_id but omits city"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "authorization_role",
+        "description": "Authenticated caller possessing merchant owner role on target provider row."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Authenticated merchant provider owner.",
+      "payloads": [
+        "PATCH /rest/v1/providers?id=eq.<own_id> {\"city\":\"UnauthorizedCity\"}"
+      ],
+      "instructions": [
+        "1. Authenticate as merchant tenant owner.",
+        "2. Execute direct PostgREST UPDATE on providers setting city='UnauthorizedCity'.",
+        "3. Observe database row updated with 204 No Content instead of expected 42501 exception."
+      ],
+      "observed_result": "Direct update to providers.city succeeds without triggering 42501 authorization error."
+    },
+    "remediation": {
+      "strategy": "Apply forward migration extending guard_provider_governance() to check OR NEW.city IS DISTINCT FROM OLD.city.",
+      "code_changes": [
+        {
+          "file_name": "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql",
+          "fixed_code": "OR NEW.city IS DISTINCT FROM OLD.city"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Direct PostgREST calls require tenant owner token and knowledge of database schema."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Allows display name territorial inconsistency, but core billing queries rely on city_id."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Empirically demonstrated in tests/security/guard-provider-payout-and-city.test.mjs."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-018",
+    "title": "[CWE-312] Plaintext Storage of 4-Digit Check-In PIN at Rest",
+    "description": "ISSUE_ID: SEC-WIN-018\nSEVERITY: low\nCWE: CWE-312: Cleartext Storage of Sensitive Information\nATTACK_SURFACE: public.appointment_checkin_codes.code\nFILE_PATH: supabase/migrations/20261011000001_reception_checkin_code_system.sql\nLINE_RANGE: 43-50\nROOT_CAUSE: The 4-digit reception check-in PIN is stored as cleartext in public.appointment_checkin_codes(code). While RLS limits client SELECT access strictly to customer_id = auth.uid() and brute force is mitigated by a 5-failure lockout, a database backup leak reveals active PINs.\nSECURITY_INVARIANT_VIOLATED: Authentication PINs and secrets are not stored in cleartext at rest.\nEXPLOITABILITY: If a database dump or backup file is accessed by an adversary, cleartext 4-digit check-in PINs can be extracted and used to perform fraudulent hospital arrival check-ins.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/unit/checkin-pin-collisions.test.mjs",
+    "root_cause": "The 4-digit reception check-in PIN is stored as cleartext in public.appointment_checkin_codes(code). While RLS limits client SELECT access strictly to customer_id = auth.uid() and brute force is mitigated by a 5-failure lockout, a database backup leak reveals active PINs.",
+    "intended_behavior": "Authentication PINs and secrets are not stored in cleartext at rest.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "supabase/migrations/20261011000001_reception_checkin_code_system.sql",
+        "line": 43,
+        "scope": "public.appointment_checkin_codes",
+        "description": "Table schema definition with code TEXT column."
+      },
+      {
+        "kind": "propagation",
+        "file": "supabase/migrations/20261011000001_reception_checkin_code_system.sql",
+        "line": 130,
+        "scope": "public.generate_checkin_code",
+        "description": "Generates 4-digit random string and inserts directly into table."
+      },
+      {
+        "kind": "sink",
+        "file": "supabase/migrations/20261011000001_reception_checkin_code_system.sql",
+        "line": 180,
+        "scope": "public.verify_checkin_code",
+        "description": "Compares input against stored plaintext code."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "supabase/migrations/20261011000001_reception_checkin_code_system.sql",
+        "line": 46,
+        "description": "code text not null check (code ~ '^[0-9]{4}$')"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "environmental_dependency",
+        "description": "Adversary obtains read access to raw database storage or database backup."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Adversary with database snapshot or storage volume access.",
+      "payloads": [
+        "SELECT code FROM public.appointment_checkin_codes WHERE is_active = true"
+      ],
+      "instructions": [
+        "1. Inspect database dump or backup file.",
+        "2. Query plaintext codes for today's active appointments.",
+        "3. Impersonate patient at reception desk using leaked 4-digit PIN."
+      ],
+      "observed_result": "PINs are readable in cleartext without cryptographic hashing."
+    },
+    "remediation": {
+      "strategy": "Accept risk with existing compensating controls (5-failure/60s rate limit lockout, 60-minute pre-slot window, appointment date matching, strict customer RLS) OR implement salted SHA-256 PIN hashing in verify_checkin_code.",
+      "code_changes": [
+        {
+          "file_name": "docs/decisions.md",
+          "fixed_code": "ACCEPTED_RISK: Cleartext 4-digit PIN storage accepted due to compensating controls and rapid expiry."
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Direct table read is blocked by RLS for all non-superusers; requires full DB compromise."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Check-in only marks arrival status in lobby; does not grant medical record access or financial refunds."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Verified directly in PostgreSQL table schema."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-019",
+    "title": "[CWE-284] Unrestricted Client Modification of Cashfree Vendor Status and Payout Credentials",
+    "description": "ISSUE_ID: SEC-WIN-019\nSEVERITY: medium\nCWE: CWE-284: Improper Access Control\nATTACK_SURFACE: public.providers table and merchant_save_operational_settings RPC\nFILE_PATH: supabase/migrations/20260924000003_remediation_fixes_and_grants.sql\nLINE_RANGE: 128-155\nROOT_CAUSE: Neither guard_provider_governance() nor merchant_save_operational_settings guard against tenant owners updating cashfree_vendor_status, cashfree_vendor_id, or bank/PAN payout fields. An attacker can set cashfree_vendor_status='ACTIVE' and route split payments to an unverified vendor ID in create-order.\nSECURITY_INVARIANT_VIOLATED: Financial integrity & split payout security: tenant admins cannot self-approve payout credentials or force active vendor status.\nEXPLOITABILITY: Tenant owner executes UPDATE public.providers SET cashfree_vendor_status='ACTIVE', cashfree_vendor_id='v_attacker' or calls operational settings RPC with these parameters. In create-order, split payment activates and collects consultation fee online to attacker vendor.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/security/guard-provider-payout-and-city.test.mjs and tests/security/merchant-settings-rpc-guard.test.mjs",
+    "root_cause": "Neither guard_provider_governance() nor merchant_save_operational_settings guard against tenant owners updating cashfree_vendor_status, cashfree_vendor_id, or bank/PAN payout fields. An attacker can set cashfree_vendor_status='ACTIVE' and route split payments to an unverified vendor ID in create-order.",
+    "intended_behavior": "Multi-hospital tenant isolation: tenant admins cannot modify protected governance, KYC status, or payout credentials.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "apps/merchant-web/src/app/api/payments/create-order/route.ts",
+        "line": 131,
+        "scope": "POST /api/payments/create-order",
+        "description": "Selects cashfree_vendor_id and cashfree_vendor_status from providers."
+      },
+      {
+        "kind": "propagation",
+        "file": "apps/merchant-web/src/app/api/payments/create-order/route.ts",
+        "line": 190,
+        "scope": "POST /api/payments/create-order",
+        "description": "Evaluates isEasySplitActive based on cashfreeVendorStatus === 'ACTIVE'."
+      },
+      {
+        "kind": "sink",
+        "file": "supabase/migrations/20260924000003_remediation_fixes_and_grants.sql",
+        "line": 150,
+        "scope": "public.guard_provider_governance",
+        "description": "Trigger fails to block cashfree_vendor_status and cashfree_vendor_id modifications by tenant owner."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "supabase/migrations/20260924000003_remediation_fixes_and_grants.sql",
+        "line": 143,
+        "description": "guard_provider_governance omits cashfree_vendor_status and cashfree_vendor_id"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "authorization_role",
+        "description": "Authenticated merchant owner modifying their own provider record."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Malicious merchant tenant owner.",
+      "payloads": [
+        "PATCH /rest/v1/providers?id=eq.<id> {\"cashfree_vendor_status\":\"ACTIVE\",\"cashfree_vendor_id\":\"v_rogue\"}"
+      ],
+      "instructions": [
+        "1. Authenticate as merchant tenant owner.",
+        "2. Direct PATCH to /rest/v1/providers setting cashfree_vendor_status='ACTIVE'.",
+        "3. Trigger POST /api/payments/create-order and verify orderSplits routes money to rogue vendor."
+      ],
+      "observed_result": "Database allows unverified vendor status activation, enabling unauthorized split payout routing."
+    },
+    "remediation": {
+      "strategy": "Apply forward migrations 20261120000004 and 20261120000005 to guard payout columns in trigger and ignore them in RPC.",
+      "code_changes": [
+        {
+          "file_name": "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql",
+          "fixed_code": "OR NEW.cashfree_vendor_status IS DISTINCT FROM OLD.cashfree_vendor_status OR NEW.cashfree_vendor_id IS DISTINCT FROM OLD.cashfree_vendor_id"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Requires authenticated merchant owner role and knowledge of provider schema."
+      },
+      "impact": {
+        "score": "high",
+        "reason": "Permits unauthorized diversion of customer funds to unvetted payment gateway accounts."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Demonstrated empirically via tests/security/guard-provider-payout-and-city.test.mjs."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-020",
+    "title": "[CWE-284] Excessive Default EXECUTE Grants on Database Maintenance and Queue RPCs",
+    "description": "ISSUE_ID: SEC-WIN-020\nSEVERITY: medium\nCWE: CWE-284: Improper Access Control\nATTACK_SURFACE: PostgreSQL PostgREST RPC Interface\nFILE_PATH: supabase/migrations/\nLINE_RANGE: pg_proc\nROOT_CAUSE: In PostgreSQL, functions created in schema public without explicit REVOKE inherit default EXECUTE grants for authenticated and PUBLIC. Maintenance routines such as purge_old_app_logs, expire_stale_standby_queue, dispatch_booking_notification, mask_old_notification_logs, and enqueue_refund_request are callable directly by any authenticated user.\nSECURITY_INVARIANT_VIOLATED: Database function lockdown: maintenance and queue internal procedures must be callable only by service_role.\nEXPLOITABILITY: An authenticated customer or merchant executes supabase.rpc('purge_old_app_logs') or supabase.rpc('expire_stale_standby_queue'), causing log deletion or removing patients from hospital standby queues.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/security/database-grants-allowlist.test.mjs and supabase/tests/database/05_cron_and_rate_limits.test.sql",
+    "root_cause": "In PostgreSQL, functions created in schema public without explicit REVOKE inherit default EXECUTE grants for authenticated and PUBLIC. Maintenance routines such as purge_old_app_logs, expire_stale_standby_queue, dispatch_booking_notification, mask_old_notification_logs, and enqueue_refund_request are callable directly by any authenticated user.",
+    "intended_behavior": "Database function lockdown: maintenance and queue internal procedures must be callable only by service_role.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "supabase/migrations/20261105100001_enable_power_extensions.sql",
+        "line": 40,
+        "scope": "public.purge_old_app_logs",
+        "description": "Function defined as SECURITY DEFINER without revoking EXECUTE from PUBLIC/authenticated."
+      },
+      {
+        "kind": "propagation",
+        "file": "supabase/tests/database/05_cron_and_rate_limits.test.sql",
+        "line": 15,
+        "scope": "pgTAP",
+        "description": "Test catches purge_old_app_logs callable without 42501 exception."
+      },
+      {
+        "kind": "sink",
+        "file": "supabase/migrations/20261105100001_enable_power_extensions.sql",
+        "line": 50,
+        "scope": "public.app_logs",
+        "description": "Deletes audit and security logs upon arbitrary caller request."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "supabase/tests/database/05_cron_and_rate_limits.test.sql",
+        "line": 16,
+        "description": "Failed test: purge_old_app_logs denied for authenticated role (wanted: 42501, caught: no exception)"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "authorization_role",
+        "description": "Any authenticated user holding a valid Supabase JWT."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Authenticated platform user.",
+      "payloads": [
+        "POST /rest/v1/rpc/purge_old_app_logs",
+        "POST /rest/v1/rpc/expire_stale_standby_queue"
+      ],
+      "instructions": [
+        "1. Obtain standard authenticated customer session.",
+        "2. Send POST request to /rest/v1/rpc/purge_old_app_logs.",
+        "3. Observe function executes successfully (HTTP 200) instead of being denied with 42501."
+      ],
+      "observed_result": "Maintenance function executes without authorization error."
+    },
+    "remediation": {
+      "strategy": "Apply forward migration executing REVOKE EXECUTE ON FUNCTION for all maintenance and queue procedures from PUBLIC, anon, and authenticated, granting solely to service_role.",
+      "code_changes": [
+        {
+          "file_name": "supabase/migrations/20261120000006_lockdown_maintenance_and_queue_rpcs.sql",
+          "fixed_code": "REVOKE EXECUTE ON FUNCTION public.purge_old_app_logs(int) FROM PUBLIC, anon, authenticated; GRANT EXECUTE ON FUNCTION public.purge_old_app_logs(int) TO service_role;"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Requires valid authenticated token; function names are discoverable via PostgREST OpenAPI schema."
+      },
+      "impact": {
+        "score": "medium",
+        "reason": "Allows unauthorized purging of older logs and premature expiration of patient queues."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Confirmed by failing pgTAP test in supabase/tests/database/05_cron_and_rate_limits.test.sql."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-021",
+    "title": "[CWE-440] Missing HTTP DELETE Method Handler in Hospital Department Members API",
+    "description": "ISSUE_ID: SEC-WIN-021\nSEVERITY: low\nCWE: CWE-440: Expected Behavior Violation\nATTACK_SURFACE: apps/merchant-web/src/app/api/hospital/members/route.ts\nFILE_PATH: apps/merchant-web/src/app/api/hospital/members/route.ts\nLINE_RANGE: 10-205\nROOT_CAUSE: Specification docs/hospital/screens-admin.md Screen 2 documents DELETE /api/hospital/members?id={id} for roster revocation, but route.ts only exports GET, POST, PUT. Client DELETE calls fail with HTTP 405 Method Not Allowed.\nSECURITY_INVARIANT_VIOLATED: API Contract Conformance & Administrative Roster Revocation.\nEXPLOITABILITY: Frontend administrative clients invoking DELETE /api/hospital/members?id=... receive HTTP 405, failing to revoke rogue staff members via the standard REST verb.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/unit/hospital-admin-screens.test.mjs",
+    "root_cause": "Specification docs/hospital/screens-admin.md Screen 2 documents DELETE /api/hospital/members?id={id} for roster revocation, but route.ts only exports GET, POST, PUT. Client DELETE calls fail with HTTP 405 Method Not Allowed.",
+    "intended_behavior": "Admin-only actions are enforced server-side and conform to documented API specifications.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "apps/merchant-web/src/app/api/hospital/members/route.ts",
+        "line": 10,
+        "scope": "apps/merchant-web/src/app/api/hospital/members/route.ts",
+        "description": "Route exports GET, POST, PUT handlers."
+      },
+      {
+        "kind": "propagation",
+        "file": "docs/hospital/screens-admin.md",
+        "line": 45,
+        "scope": "screens-admin.md",
+        "description": "Screen 2 documents DELETE /api/hospital/members?id={id}."
+      },
+      {
+        "kind": "sink",
+        "file": "apps/merchant-web/src/app/api/hospital/members/route.ts",
+        "line": 202,
+        "scope": "apps/merchant-web/src/app/api/hospital/members/route.ts",
+        "description": "Revocation currently routed through PUT with action: 'revoke'."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "apps/merchant-web/src/app/api/hospital/members/route.ts",
+        "line": 202,
+        "description": "Exported methods: GET, POST, PUT (DELETE absent)"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "system_configuration",
+        "description": "Admin UI or third-party client sending HTTP DELETE request."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Hospital Admin attempting roster cleanup.",
+      "payloads": [
+        "DELETE /api/hospital/members?id=<member_id>"
+      ],
+      "instructions": [
+        "1. Send HTTP DELETE request to /api/hospital/members?id=<member_id> with admin session.",
+        "2. Observe HTTP 405 Method Not Allowed."
+      ],
+      "observed_result": "HTTP 405 Method Not Allowed response returned."
+    },
+    "remediation": {
+      "strategy": "Implement DELETE method handler in apps/merchant-web/src/app/api/hospital/members/route.ts supporting id query parameter and JSON body with proper hospital admin authorization check.",
+      "code_changes": [
+        {
+          "file_name": "apps/merchant-web/src/app/api/hospital/members/route.ts",
+          "fixed_code": "export async function DELETE(req: NextRequest) { /* ... */ }"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Only affects clients utilizing the documented HTTP DELETE method rather than PUT action: revoke."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Administrative workflow inconsistency; functional revocation remains possible via PUT."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Confirmed by absence of DELETE export in route.ts."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-022",
+    "title": "[CWE-798] Hardcoded JWT Secret Literal in EasySplit Unit Test File",
+    "description": "ISSUE_ID: SEC-WIN-022\nSEVERITY: low\nCWE: CWE-798: Use of Hard-coded Credentials\nATTACK_SURFACE: tests/unit/cashfree-easysplit.test.mjs\nFILE_PATH: tests/unit/cashfree-easysplit.test.mjs\nLINE_RANGE: 488\nROOT_CAUSE: tests/unit/cashfree-easysplit.test.mjs contains literal string const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';. This triggers git working tree credential leakage assertions in tests/security/strix-regression.test.mjs.\nSECURITY_INVARIANT_VIOLATED: Secrets hygiene: test files should not embed canonical production/demo secret literals directly in code.\nEXPLOITABILITY: Automated secret scanners flag repository as vulnerable; risk of developer copying secret into production configuration.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/security/strix-regression.test.mjs",
+    "root_cause": "tests/unit/cashfree-easysplit.test.mjs contains literal string const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';. This triggers git working tree credential leakage assertions in tests/security/strix-regression.test.mjs.",
+    "intended_behavior": "Service-role keys and secret tokens never exist as hardcoded literals in the repository.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "tests/unit/cashfree-easysplit.test.mjs",
+        "line": 488,
+        "scope": "tests/unit/cashfree-easysplit.test.mjs",
+        "description": "Hardcoded JWT_SECRET literal assigned."
+      },
+      {
+        "kind": "propagation",
+        "file": "tests/security/strix-regression.test.mjs",
+        "line": 1254,
+        "scope": "strix-regression.test.mjs",
+        "description": "Scans git working tree for DEMO_JWT_SECRET string."
+      },
+      {
+        "kind": "sink",
+        "file": "tests/security/strix-regression.test.mjs",
+        "line": 1263,
+        "scope": "strix-regression.test.mjs",
+        "description": "Test fails due to detected leak."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "tests/unit/cashfree-easysplit.test.mjs",
+        "line": 488,
+        "description": "const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "system_configuration",
+        "description": "Static secret scanning pass executed across repository."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Auditor running secret scanning suite.",
+      "payloads": [
+        "node --test tests/security/strix-regression.test.mjs"
+      ],
+      "instructions": [
+        "1. Run security test suite.",
+        "2. Observe failure in section 5.1 due to hardcoded secret literal in cashfree-easysplit.test.mjs."
+      ],
+      "observed_result": "AssertionError: Credential leaks detected in git working tree."
+    },
+    "remediation": {
+      "strategy": "Replace hardcoded secret literal with process.env.JWT_SECRET || (crypto-generated string) in cashfree-easysplit.test.mjs.",
+      "code_changes": [
+        {
+          "file_name": "tests/unit/cashfree-easysplit.test.mjs",
+          "fixed_code": "const JWT_SECRET = process.env.JWT_SECRET || 'local-test-jwt-secret-placeholder-not-canonical';"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Test file only; not part of application runtime bundle."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Fails CI security scanning and pollutes secret audit signals."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Confirmed by failing assertion in tests/security/strix-regression.test.mjs."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-023",
+    "title": "[CWE-754] Stale Test Assertions Against Decommissioned Razorpay Webhook Route",
+    "description": "ISSUE_ID: SEC-WIN-023\nSEVERITY: low\nCWE: CWE-754: Improper Check for Unusual or Exceptional Conditions\nATTACK_SURFACE: tests/security/strix-regression.test.mjs\nFILE_PATH: tests/security/strix-regression.test.mjs\nLINE_RANGE: 402, 428, 453, 588\nROOT_CAUSE: tests/security/strix-regression.test.mjs tests POST /api/webhooks/razorpay expecting HTTP 400, 200, or 500 responses. However, following the migration to Cashfree PG, the Razorpay webhook route was decommissioned and hardened to return HTTP 410 Gone for all requests. The stale test assertions cause 4 false failures.\nSECURITY_INVARIANT_VIOLATED: Test suite correctness and decommission verification.\nEXPLOITABILITY: Test regression failure masks actual security issues by producing 4 test failures in strix-regression.test.mjs.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/security/strix-regression.test.mjs",
+    "root_cause": "tests/security/strix-regression.test.mjs tests POST /api/webhooks/razorpay expecting HTTP 400, 200, or 500 responses. However, following the migration to Cashfree PG, the Razorpay webhook route was decommissioned and hardened to return HTTP 410 Gone for all requests. The stale test assertions cause 4 false failures.",
+    "intended_behavior": "Decommissioned routes return HTTP 410 Gone, and regression tests assert the 410 status code.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts",
+        "line": 10,
+        "scope": "POST /api/webhooks/razorpay",
+        "description": "Decommissioned route returning HTTP 410 Gone."
+      },
+      {
+        "kind": "propagation",
+        "file": "tests/security/strix-regression.test.mjs",
+        "line": 402,
+        "scope": "strix-regression.test.mjs",
+        "description": "Sends requests to /api/webhooks/razorpay expecting 400/200."
+      },
+      {
+        "kind": "sink",
+        "file": "tests/security/strix-regression.test.mjs",
+        "line": 614,
+        "scope": "strix-regression.test.mjs",
+        "description": "Fails because route returns 410 instead of 200."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "tests/security/strix-regression.test.mjs",
+        "line": 614,
+        "description": "AssertionError: Legitimate webhook must return 200, got 410"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "system_configuration",
+        "description": "Security regression suite executed against decommissioned Razorpay route."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Test runner executing regression suite.",
+      "payloads": [
+        "POST /api/webhooks/razorpay"
+      ],
+      "instructions": [
+        "1. Execute node --test tests/security/strix-regression.test.mjs.",
+        "2. Observe 4 test failures in group 2 due to expected 400/200 vs actual 410."
+      ],
+      "observed_result": "Tests fail due to decommissioned route returning 410."
+    },
+    "remediation": {
+      "strategy": "Update tests/security/strix-regression.test.mjs to assert that /api/webhooks/razorpay returns HTTP 410 Gone in alignment with razorpay-decommission.test.mjs.",
+      "code_changes": [
+        {
+          "file_name": "tests/security/strix-regression.test.mjs",
+          "fixed_code": "assert.strictEqual(res.status, 410, 'Decommissioned route must return 410');"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Test-only assertion mismatch."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Causes test runner noise and obfuscates baseline verification."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Empirically verified in strix-regression.test.mjs."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-024",
+    "title": "[CWE-798] Historical Exposure of Supabase JWT Credentials in Git Commit History",
+    "description": "ISSUE_ID: SEC-WIN-024\nSEVERITY: high\nCWE: CWE-798: Use of Hard-coded Credentials\nATTACK_SURFACE: Git Repository Commit History\nFILE_PATH: scripts/e2e-trinadh-hospital-test.mjs\nLINE_RANGE: 19-21\nROOT_CAUSE: Previous commits (9305ab5c, 34b7d2c7, 5e515195) contained Supabase JWT keys (anon and service_role) for cloud project ynkdnwhubfknnnzjtpeg. Even though files were deleted from HEAD, the commit history retains the credentials.\nSECURITY_INVARIANT_VIOLATED: Service-role and API credentials must never be exposed in public or shared repository commit history.\nEXPLOITABILITY: An attacker cloning the repository or inspecting git log history can extract the historical service_role JWT and gain full administrative bypass on the referenced Supabase project.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: gitleaks detect -v",
+    "root_cause": "Previous commits (9305ab5c, 34b7d2c7, 5e515195) contained Supabase JWT keys (anon and service_role) for cloud project ynkdnwhubfknnnzjtpeg. Even though files were deleted from HEAD, the commit history retains the credentials.",
+    "intended_behavior": "Service-role and API credentials must never be exposed in public or shared repository commit history.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "scripts/e2e-trinadh-hospital-test.mjs",
+        "line": 19,
+        "scope": "Commit 9305ab5c",
+        "description": "Supabase JWT anon key committed in git object."
+      },
+      {
+        "kind": "propagation",
+        "file": "scripts/e2e-trinadh-hospital-test.mjs",
+        "line": 21,
+        "scope": "Commit 9305ab5c",
+        "description": "Supabase service_role key committed in git object."
+      },
+      {
+        "kind": "sink",
+        "file": "gitleaks report",
+        "line": 1,
+        "scope": "Git History",
+        "description": "Gitleaks detects 4 historical credential leaks in git history."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "scripts/e2e-trinadh-hospital-test.mjs",
+        "line": 21,
+        "description": "Commit 9305ab5c32ecc4b00eab078583cf257ea6790d2f contains Supabase service_role JWT"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "third_party_dependency",
+        "description": "Project ynkdnwhubfknnnzjtpeg active on Supabase Cloud."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "External adversary reviewing cloned git repository.",
+      "payloads": [
+        "git log -S 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' -p"
+      ],
+      "instructions": [
+        "1. Clone git repository.",
+        "2. Run git log searching for JWT header signatures.",
+        "3. Extract service_role key and make administrative requests to Supabase REST API."
+      ],
+      "observed_result": "Gitleaks flags 4 leaks in git commit objects."
+    },
+    "remediation": {
+      "strategy": "List credentials in MANUAL_ACTIONS.md for immediate rotation in Supabase project dashboard, followed by git history rewrite using git-filter-repo.",
+      "code_changes": [
+        {
+          "file_name": ".gsd/MANUAL_ACTIONS.md",
+          "fixed_code": "Rotate Supabase project ynkdnwhubfknnnzjtpeg anon and service_role keys."
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "high",
+        "reason": "Anyone with read access to the git repository can inspect git history."
+      },
+      "impact": {
+        "score": "critical",
+        "reason": "Exposed service_role key bypasses all Row Level Security policies."
+      },
+      "overall_severity": "high"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Confirmed by Gitleaks 8.30.1 report with exact commit SHAs."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-WIN-025",
+    "title": "[CWE-710] AG Toolkit Component Registry Lock Hash Stale Drift",
+    "description": "ISSUE_ID: SEC-WIN-025\nSEVERITY: low\nCWE: CWE-710: Improper Adherence to Coding Standards\nATTACK_SURFACE: .agents/manifest.lock.json\nFILE_PATH: .agents/manifest.lock.json\nLINE_RANGE: 1\nROOT_CAUSE: Updates to .agents/ skills and agent files caused manifest.lock.json to diverge from computed component checksums, causing 2 unit test failures in .agents/scripts/tests/test_toolkit.py.\nSECURITY_INVARIANT_VIOLATED: Toolkit integrity and verification self-consistency.\nEXPLOITABILITY: Developer or CI executing python3 -m unittest discover -s .agents/scripts/tests -v observes 2 failures, creating false negative audit signals.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: python3 -m unittest discover -s .agents/scripts/tests -v",
+    "root_cause": "Updates to .agents/ skills and agent files caused manifest.lock.json to diverge from computed component checksums, causing 2 unit test failures in .agents/scripts/tests/test_toolkit.py.",
+    "intended_behavior": "Toolkit lock files match component hashes exactly, ensuring clean baseline validation.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": ".agents/manifest.lock.json",
+        "line": 1,
+        "scope": ".agents/manifest.lock.json",
+        "description": "Component hashes stored in lockfile."
+      },
+      {
+        "kind": "propagation",
+        "file": ".agents/scripts/tests/test_toolkit.py",
+        "line": 42,
+        "scope": "test_toolkit_self_validation_passes",
+        "description": "Asserts errors list is empty."
+      },
+      {
+        "kind": "sink",
+        "file": ".agents/scripts/tests/test_toolkit.py",
+        "line": 189,
+        "scope": "test_component_registry_and_lock_are_synchronized",
+        "description": "Fails due to manifest.lock_stale."
+      }
+    ],
+    "evidence": [
+      {
+        "file": ".agents/manifest.lock.json",
+        "line": 1,
+        "description": "Finding(severity='error', code='manifest.lock_stale', file='manifest.lock.json', line=1, message='Lock differs from current component files; regenerate it')"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "system_configuration",
+        "description": "Running toolkit self-test suite."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Developer running verification checks.",
+      "payloads": [
+        "python3 -m unittest discover -s .agents/scripts/tests -v"
+      ],
+      "instructions": [
+        "1. Execute toolkit test runner.",
+        "2. Observe 2 test failures in test_toolkit.py."
+      ],
+      "observed_result": "FAILED (failures=2) due to stale manifest.lock.json."
+    },
+    "remediation": {
+      "strategy": "Regenerate .agents/manifest.lock.json using toolkit synchronization script.",
+      "code_changes": [
+        {
+          "file_name": ".agents/manifest.lock.json",
+          "fixed_code": "Regenerated lockfile with current component hashes."
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Internal test failure only."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Pollutes automated testing results."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Empirically demonstrated in python3 -m unittest discover -s .agents/scripts/tests -v."
+    }
+  }
+]

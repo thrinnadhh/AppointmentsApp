@@ -1,0 +1,59 @@
+# Goldfish Spec Review Log
+
+**Project:** Appointments Monorepo  
+**Workflow:** Google Mantis + Elephant-Goldfish Spec-Driven Workflow  
+**Spec Document:** [.gsd/SECURITY_REMEDIATION_SPEC.md](file:///Users/trinadh/projects/Appointments/.gsd/SECURITY_REMEDIATION_SPEC.md)  
+**Task Graph:** [.gsd/SECURITY_TASKS.json](file:///Users/trinadh/projects/Appointments/.gsd/SECURITY_TASKS.json)  
+**Catalog:** [.gsd/MANTIS_OPEN_ISSUES.json](file:///Users/trinadh/projects/Appointments/.gsd/MANTIS_OPEN_ISSUES.json)  
+
+---
+
+## Round 1 Review (2026-11-20 19:35 UTC / 2026-11-21 01:05 IST)
+**Reviewer:** Zero-Context Goldfish Spec Reviewer (`7eae1582-cb5d-45aa-90f9-0b9f0a248883` - `mantis-critic` + `plan-checker`)  
+**Verdict:** `GAPS_DETECTED`  
+
+### Catches Identified & Elephant Remediations:
+
+1. **Gap G1 (Merchant UI Regression Risk):**
+   - *Catch:* The proposed migration in Fix Packet 3 initially contemplated revoking execute grants on notification RPCs, but `dispatch_booking_notification` is directly called from `apps/merchant-web/src/app/bookings/page.tsx:445` by `authenticated` users (`handleTriggerNotification`). Revoking `EXECUTE` from `authenticated` would cause an immediate regression and crash the merchant bookings triage screen.
+   - *Remediation:* Explicitly preserved `GRANT EXECUTE ON FUNCTION public.dispatch_booking_notification TO authenticated, service_role`. Documented that `dispatch_booking_notification` already enforces internal authorization checks (caller must be an active admin, owner of the provider, or assigned consultant). Added as an explicit non-regression invariant in both the spec and `TASK-W1-03`.
+
+2. **Gap G2 (PostgreSQL Signature Mismatch on Standby Queue):**
+   - *Catch:* Fix Packet 3 listed `REVOKE EXECUTE ON FUNCTION public.expire_stale_standby_queue()` with 0 arguments. In PostgreSQL schema (`20261114000004_fix_human_journey_rpc_grants_and_triggers.sql`), the function is overloaded with parameters `(p_threshold_minutes integer DEFAULT 120, p_provider_id uuid DEFAULT NULL)`. Running zero-arg REVOKE would fail with `function public.expire_stale_standby_queue() does not exist`.
+   - *Remediation:* Updated exact signature to `public.expire_stale_standby_queue(integer, uuid)` in spec and `TASK-W1-03`.
+
+3. **Gap G3 (PostgreSQL Signature Mismatch on Refund Queue):**
+   - *Catch:* Fix Packet 3 listed `REVOKE EXECUTE ON FUNCTION public.enqueue_refund_request(uuid, numeric, text, text)`. In the database schema, `enqueue_refund_request` accepts 3 parameters: `(p_booking_id uuid, p_actor_id uuid, p_reason text)`. The 4-arg REVOKE would fail with `function public.enqueue_refund_request(...) does not exist`.
+   - *Remediation:* Updated exact signature to `public.enqueue_refund_request(uuid, uuid, text)` in spec and `TASK-W1-03`.
+
+4. **Gap G4 (Test Invalidation via Staging Check):**
+   - *Catch:* Existing draft tests `tests/security/guard-provider-payout-and-city.test.mjs` and `tests/security/merchant-settings-rpc-guard.test.mjs` contained draft-staging assertions (`assert.ok(!existsSync(migrationPath))`). When the migrations are created in `supabase/migrations/`, these tests would immediately fail on the staging check.
+   - *Remediation:* Added explicit requirement in `TASK-W1-01` and `TASK-W1-02` to update the test files in the same atomic commit, removing the draft-staging assertion and asserting live database behavior directly against the active migration.
+
+5. **Gap G5 (Standing Rule 3 Compliance for Hospital Members DELETE):**
+   - *Catch:* `tests/unit/hospital-admin-screens.test.mjs` currently passes all 6 tests and has no test case asserting `DELETE /api/hospital/members`. Implementing the route without an initial failing test would violate Standing Rule 3 ("Every bug fix starts with a failing test").
+   - *Remediation:* Added explicit requirement to author the failing test in `tests/unit/hospital-admin-screens.test.mjs` FIRST (asserting 200 for authorized admin, cancellation of pending invite, revocation of active member, and 403 for unauthorized caller), verifying pre-patch FAIL before implementing the route handler in `apps/merchant-web/src/app/api/hospital/members/route.ts`. Included test file in `target_files` of `TASK-W2-01`.
+
+6. **Gap G6 (Standing Rule 3 Compliance for Client Secret Segregation):**
+   - *Catch:* `tests/unit/build-secret-safety.test.mjs` tests cashfree import evaluations but lacks an assertion that `SUPABASE_SERVICE_ROLE_KEY` is absent from the client `AuthEnv` interface in `env.ts`.
+   - *Remediation:* Added explicit requirement to author the failing test in `tests/unit/build-secret-safety.test.mjs` FIRST, asserting that `SUPABASE_SERVICE_ROLE_KEY` is not present in the client auth schema, verifying pre-patch FAIL before editing `apps/merchant-web/src/lib/env.ts`. Included test file in `target_files` of `TASK-W3-01`.
+
+7. **Gap G7 (Task Test Target Realignment):**
+   - *Catch:* `TASK-W2-02` listed `tests/unit/hospital-server-api-matrix.test.mjs` as its regression test, but that suite tests hospital backend routes and does not cover settings page frontend forms.
+   - *Remediation:* Realigned `TASK-W2-02` regression test to `tests/scripts/test-state-machine-remediation.mjs` and verification command to `node tests/scripts/test-state-machine-remediation.mjs && pnpm --filter @appointments/merchant-web typecheck`.
+
+---
+
+## Round 2 Review (2026-11-20 19:39 UTC / 2026-11-21 01:09 IST)
+**Reviewer:** Zero-Context Goldfish Spec Reviewer (`7eae1582-cb5d-45aa-90f9-0b9f0a248883` - `mantis-critic` + `plan-checker`)  
+**Input:** Revised `.gsd/SECURITY_REMEDIATION_SPEC.md` (Round 2) and `.gsd/SECURITY_TASKS.json` (v1.1.0)  
+**Status:** Completed  
+**Verdict:** `SPEC_APPROVED`  
+
+### Reviewer Verdict & Verification Summary:
+- **Catches G1–G7 Verification:** All 7 catches verified as completely and cleanly resolved.
+- **Completeness:** 11 / 11 issues accounted for (8 mapped to code tasks across 4 waves, 2 accepted risks with documented compensating controls, 1 needs-human credential rotation).
+- **Sibling Entry Points:** Fully covered across database triggers, operational RPCs, settings UI, and service-role API endpoints.
+- **Compatibility & Non-Regression:** Zero breaking changes for customer mobile app, webhooks, or merchant bookings triage.
+- **File Disjointness:** Zero file overlap across all concurrent tasks within each wave and across waves.
+- **Standing Rule 3:** Explicit RED-GREEN test ordering mandated for all behavioral and bug fix tasks.
