@@ -37,7 +37,7 @@
     "hooks/tests/antigravity.test.mjs": "5e40131265749f54347470a6462dbfdf51ccef0a69165baf008b0b87443dbd5a",
     "hooks/validate-tool-call.mjs": "c8f0be06e8697efbfe3a2e614a3bed1a6e12c714e3faef72ca31c5fbe168e857",
     "mcp_config.json": "d74fbedc0a5bd5f31fb1dd45b0d1d9c091e7af1c18b49a3af2b0ac45585bd063",
-    "memory/MEMORY.md": "4c7006e12d0a7cf4899d1558c1044c81879bb6173dd04960b495a612e9047c59",
+    "memory/MEMORY.md": "f2875c5fd481e392ad15d28b30679d297692265dbf7233d781b83ecbe3e411ce",
     "memory/feedback-history.md": "06abb008293a359ebf30eafaacc0212c4a21e659170f251edd354f5433bfb1a5",
     "memory/project-conventions.md": "42326ba27aedb9bd7bf3185497b311a11c6a4da230f1c991d05f8d8a53bc974f",
     "memory/tech-decisions.md": "e144cdfe593a0a7192ec42baae2b197bbef71d36f276247ddfd54a450dbadac3",
