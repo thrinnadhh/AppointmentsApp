@@ -53,10 +53,8 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 500) : 'User initiated immediate account deletion';
 
-    const supabaseAdmin = getSupabaseAdmin();
-
     // 1. Execute atomic data anonymization and PII erasure immediately
-    const { data, error } = await (supabaseAdmin.rpc as any)('delete_account_immediately', {
+    const { data, error } = await (supabase.rpc as any)('delete_account_immediately', {
       p_reason: reason,
     });
 
@@ -66,6 +64,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // 2. Remove the auth user record to revoke active auth sessions/tokens
+    const supabaseAdmin = getSupabaseAdmin();
     try {
       await supabaseAdmin.auth.admin.deleteUser(user.id);
     } catch (authDelErr) {
