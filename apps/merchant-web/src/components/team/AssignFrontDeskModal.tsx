@@ -13,6 +13,7 @@ import {
   Check,
   Sparkles
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export interface FrontDeskManager {
   assignment_id: string;
@@ -171,9 +172,15 @@ export function AssignFrontDeskModal({
         payload.idCardNumber = newFdIdCard.trim() || undefined;
       }
 
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch('/api/admin/doctor-assignments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 

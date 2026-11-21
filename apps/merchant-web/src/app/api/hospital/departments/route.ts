@@ -23,9 +23,98 @@ export async function GET(req: NextRequest) {
       query = query.eq('id', ctx.departmentId!);
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    // Auto-detect and sync doctor departments from hospital resources
+    if (ctx.role !== 'department_member' && ctx.merchantId) {
+      try {
+        const { data: resList } = await supabaseAdmin
+          .from('resources')
+          .select('id, name, type, department, department_id, attributes')
+          .eq('provider_id', ctx.merchantId);
+
+        const existingNames = new Set((data || []).map((d: any) => (d.name || '').toLowerCase().trim()));
+        const missingDeptsToCreate: { name: string; resourceIds: string[] }[] = [];
+
+        (resList || []).forEach((res: any) => {
+          const attr = res.attributes || {};
+          const customDept = (attr.department && typeof attr.department === 'string' && attr.department.trim() && attr.department.trim() !== 'General')
+            ? attr.department.trim()
+            : null;
+          const colDept = (res.department && typeof res.department === 'string' && res.department.trim() && res.department.trim() !== 'General')
+            ? res.department.trim()
+            : null;
+          const typeDept = (res.type && typeof res.type === 'string' && res.type.trim() && res.type.trim() !== 'doctor' && res.type.trim() !== 'General')
+            ? res.type.trim()
+            : null;
+
+          const deptName = customDept || colDept || typeDept || (attr.department && attr.department !== 'doctor' ? attr.department : null) || null;
+
+          if (deptName) {
+            const norm = deptName.toLowerCase().trim();
+            if (!existingNames.has(norm)) {
+              existingNames.add(norm);
+              const found = missingDeptsToCreate.find((m) => m.name.toLowerCase() === norm);
+              if (found) {
+                found.resourceIds.push(res.id);
+              } else {
+                missingDeptsToCreate.push({ name: deptName, resourceIds: [res.id] });
+              }
+            }
+          }
+        });
+
+        if (missingDeptsToCreate.length > 0) {
+          for (const item of missingDeptsToCreate) {
+            const { data: createdDept } = await supabaseAdmin
+              .from('departments')
+              .insert({
+                merchant_id: ctx.merchantId,
+                name: item.name,
+                is_preset: false,
+                is_active: true,
+                allowed_modules: ['appointments', 'queue_schedule', 'check_in'],
+              })
+              .select('id, name')
+              .maybeSingle();
+
+            if (createdDept && item.resourceIds.length > 0) {
+              await supabaseAdmin
+                .from('resources')
+                .update({ department_id: createdDept.id })
+                .in('id', item.resourceIds);
+            }
+          }
+
+          const { data: refreshedData } = await query;
+          if (refreshedData) {
+            data = refreshedData;
+          }
+        }
+
+        if (!data || data.length === 0) {
+          const { data: defaultDept } = await supabaseAdmin
+            .from('departments')
+            .insert({
+              merchant_id: ctx.merchantId,
+              name: 'General Medicine',
+              is_preset: true,
+              is_active: true,
+              allowed_modules: ['appointments', 'queue_schedule', 'check_in'],
+            })
+            .select()
+            .maybeSingle();
+
+          if (defaultDept) {
+            data = [{ ...defaultDept, department_members: [] } as any];
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Auto-sync doctor departments non-blocking error:', syncErr);
+      }
     }
 
     const departments: HospitalDepartment[] = (data || []).map((d: any) => {

@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify department exists and belongs to this hospital
-    const { data: dept, error: deptErr } = await supabaseAdmin
+    let { data: dept, error: deptErr } = await supabaseAdmin
       .from('departments')
       .select('id, name')
       .eq('id', department_id)
@@ -126,8 +126,39 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (deptErr || !dept) {
+      // Fallback: check if department_id was passed as a department name or synthetic ID
+      const cleanDeptQuery = typeof department_id === 'string' ? department_id.replace(/^dept-/, '').trim() : '';
+      const { data: deptByName } = await supabaseAdmin
+        .from('departments')
+        .select('id, name')
+        .eq('merchant_id', ctx.merchantId!)
+        .ilike('name', cleanDeptQuery)
+        .maybeSingle();
+
+      if (deptByName) {
+        dept = deptByName;
+      } else if (cleanDeptQuery) {
+        // Auto-create department so invitation never fails
+        const { data: createdDept } = await supabaseAdmin
+          .from('departments')
+          .insert({
+            merchant_id: ctx.merchantId!,
+            name: cleanDeptQuery,
+            is_preset: false,
+            is_active: true,
+            allowed_modules: ['appointments', 'queue_schedule', 'check_in'],
+          })
+          .select('id, name')
+          .maybeSingle();
+        dept = createdDept;
+      }
+    }
+
+    if (!dept) {
       return NextResponse.json({ success: false, error: 'Target department not found in this hospital' }, { status: 404 });
     }
+
+    const resolvedDeptId = dept.id;
 
     // Check owner email exclusion: Owner cannot add their own email
     const { data: prov } = await supabaseAdmin
@@ -173,7 +204,7 @@ export async function POST(req: NextRequest) {
     const { data: newMember, error: insertErr } = await supabaseAdmin
       .from('department_members')
       .insert({
-        department_id,
+        department_id: resolvedDeptId,
         merchant_id: ctx.merchantId!,
         email: cleanEmail,
         role: cleanRole,
@@ -194,7 +225,7 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.auth.admin.inviteUserByEmail(cleanEmail, {
         data: {
           role: 'merchant',
-          department_id,
+          department_id: resolvedDeptId,
           merchant_id: ctx.merchantId!,
           hospital_name: dept.name,
         },
@@ -209,7 +240,7 @@ export async function POST(req: NextRequest) {
       actorId: ctx.userId,
       action: 'member.invite',
       target: newMember.id,
-      metadata: { email: cleanEmail, department_id, department_name: dept.name },
+      metadata: { email: cleanEmail, department_id: resolvedDeptId, department_name: dept.name },
     });
 
     return NextResponse.json({ success: true, member: newMember });

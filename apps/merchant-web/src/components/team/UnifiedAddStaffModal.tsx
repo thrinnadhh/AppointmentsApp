@@ -1,21 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  UserPlus, 
-  Mail, 
-  KeyRound, 
-  Eye, 
-  EyeOff, 
-  CreditCard, 
-  AlertCircle, 
-  RefreshCw, 
-  Check, 
-  Stethoscope, 
-  Users, 
-  ShieldCheck, 
-  Clock, 
-  IndianRupee 
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  UserPlus,
+  Mail,
+  KeyRound,
+  Eye,
+  EyeOff,
+  CreditCard,
+  AlertCircle,
+  RefreshCw,
+  Check,
+  Stethoscope,
+  Users,
+  ShieldCheck,
+  Clock,
+  IndianRupee
 } from 'lucide-react';
 import { DoctorWithAssignments } from './AssignFrontDeskModal';
 import { supabase } from '@/lib/supabase';
@@ -82,7 +82,15 @@ export function UnifiedAddStaffModal({
     async function fetchDepartments() {
       setLoadingDepts(true);
       try {
-        const res = await fetch('/api/hospital/departments');
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const url = providerId
+          ? `/api/hospital/departments?provider_id=${providerId}`
+          : '/api/hospital/departments';
+        const res = await fetch(url, { headers });
         const json = await res.json();
         if (res.ok && json.success) {
           setDepartments(json.departments || []);
@@ -97,7 +105,61 @@ export function UnifiedAddStaffModal({
       }
     }
     fetchDepartments();
-  }, [isOpen]);
+  }, [isOpen, providerId]);
+
+  // Synthesize and merge departments from the database with any departments added on doctors
+  const displayDepartments = useMemo(() => {
+    const list = [...departments];
+    const existingNames = new Set(list.map((d) => (d.name || '').toLowerCase().trim()));
+    const existingIds = new Set(list.map((d) => d.id));
+
+    // For each doctor, if their department is not already in list, add it
+    doctors.forEach((d) => {
+      const deptName = (d.department || '').trim();
+      if (!deptName || deptName === 'General') return;
+      const norm = deptName.toLowerCase();
+      if (!existingNames.has(norm)) {
+        existingNames.add(norm);
+        const synthId = d.department_id || `dept-${norm.replace(/\s+/g, '-')}`;
+        if (!existingIds.has(synthId)) {
+          existingIds.add(synthId);
+          list.push({
+            id: synthId,
+            name: deptName,
+            member_count: 0,
+            is_active: true,
+          });
+        }
+      }
+    });
+
+    return list;
+  }, [departments, doctors]);
+
+  useEffect(() => {
+    if (displayDepartments.length > 0 && !selectedDeptId) {
+      setSelectedDeptId(displayDepartments[0].id);
+    }
+  }, [displayDepartments, selectedDeptId]);
+
+  const handleDoctorSelect = useCallback((docId: string) => {
+    setAssignDoctorId(docId);
+    if (docId) {
+      const matchDoc = doctors.find((d) => d.id === docId);
+      if (matchDoc) {
+        // Automatically select the doctor's department in the Department dropdown
+        const targetDept = displayDepartments.find(
+          (dept) => (matchDoc.department_id && dept.id === matchDoc.department_id) ||
+                    dept.name.toLowerCase() === (matchDoc.department || '').toLowerCase().trim()
+        );
+        if (targetDept) {
+          setSelectedDeptId(targetDept.id);
+        } else if (matchDoc.department) {
+          setSelectedDeptId(matchDoc.department_id || matchDoc.department);
+        }
+      }
+    }
+  }, [doctors, displayDepartments]);
 
   if (!isOpen) return null;
 
@@ -110,7 +172,7 @@ export function UnifiedAddStaffModal({
     return cleaned;
   };
 
-  const selectedDepartment = departments.find((d) => d.id === selectedDeptId);
+  const selectedDepartment = displayDepartments.find((d) => d.id === selectedDeptId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,11 +195,20 @@ export function UnifiedAddStaffModal({
 
     setSubmitting(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        authHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const activeDeptObj = displayDepartments.find((d) => d.id === selectedDeptId);
+      const finalDeptParam = activeDeptObj ? activeDeptObj.id : selectedDeptId;
+
       // 1. If administrator role selected
       if (role === 'administrator') {
         const adminRes = await fetch('/api/hospital/members', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
             merchant_id: providerId,
             email: email.trim().toLowerCase(),
@@ -155,10 +226,10 @@ export function UnifiedAddStaffModal({
       if (role !== 'administrator' && selectedDeptId) {
         const memberRes = await fetch('/api/hospital/members', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
             merchant_id: providerId,
-            department_id: selectedDeptId,
+            department_id: finalDeptParam,
             email: email.trim().toLowerCase(),
             role,
           }),
@@ -183,16 +254,16 @@ export function UnifiedAddStaffModal({
           p_capacity: 1,
           p_attributes: {
             department: docDeptName,
-            department_id: selectedDeptId,
+            department_id: finalDeptParam,
             doctor_email: email.trim().toLowerCase(),
           },
         });
         if (resError) {
           throw new Error(resError.message || 'Failed to register doctor resource');
         }
-        if (resData?.resource?.id && selectedDeptId) {
+        if (resData?.resource?.id && finalDeptParam && !finalDeptParam.startsWith('dept-')) {
           await (supabase.from('resources') as any)
-            .update({ department_id: selectedDeptId })
+            .update({ department_id: finalDeptParam })
             .eq('id', resData.resource.id);
         }
       }
@@ -201,7 +272,7 @@ export function UnifiedAddStaffModal({
       if (role === 'front_desk' && assignDoctorId && providerId) {
         const assignRes = await fetch('/api/admin/doctor-assignments', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
             providerId,
             doctorId: assignDoctorId,
@@ -210,7 +281,7 @@ export function UnifiedAddStaffModal({
             password: password || 'TempPass123!',
             phone: phone.trim() || undefined,
             idCardNumber: idCardNumber.trim() || undefined,
-            departmentId: selectedDeptId || undefined,
+            departmentId: finalDeptParam || undefined,
           }),
         });
         const assignJson = await assignRes.json();
@@ -219,9 +290,8 @@ export function UnifiedAddStaffModal({
         }
       }
 
-      onSuccess(`Successfully added ${fullName.trim()} as ${
-        role === 'consultant' ? 'Consultant' : role === 'front_desk' ? 'Front Desk Staff' : 'Hospital Admin'
-      }.`);
+      onSuccess(`Successfully added ${fullName.trim()} as ${role === 'consultant' ? 'Consultant' : role === 'front_desk' ? 'Front Desk Staff' : 'Hospital Admin'
+        }.`);
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to provision staff member';
@@ -232,11 +302,11 @@ export function UnifiedAddStaffModal({
   };
 
   return (
-    <div 
+    <div
       onClick={onClose}
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
     >
-      <div 
+      <div
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150"
       >
@@ -268,11 +338,10 @@ export function UnifiedAddStaffModal({
           <button
             type="button"
             onClick={() => setRole('consultant')}
-            className={`py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-              role === 'consultant'
-                ? 'bg-white text-emerald-800 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className={`py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${role === 'consultant'
+              ? 'bg-white text-emerald-800 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+              }`}
           >
             <Stethoscope className="w-3.5 h-3.5" />
             <span>Consultant / Doctor</span>
@@ -280,11 +349,10 @@ export function UnifiedAddStaffModal({
           <button
             type="button"
             onClick={() => setRole('front_desk')}
-            className={`py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-              role === 'front_desk'
-                ? 'bg-white text-emerald-800 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className={`py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${role === 'front_desk'
+              ? 'bg-white text-emerald-800 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+              }`}
           >
             <Users className="w-3.5 h-3.5" />
             <span>Front Desk</span>
@@ -293,11 +361,10 @@ export function UnifiedAddStaffModal({
             <button
               type="button"
               onClick={() => setRole('administrator')}
-              className={`py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                role === 'administrator'
-                  ? 'bg-white text-emerald-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${role === 'administrator'
+                ? 'bg-white text-emerald-800 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Hospital Admin</span>
@@ -331,7 +398,7 @@ export function UnifiedAddStaffModal({
                   onChange={(e) => setSelectedDeptId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
                 >
-                  {departments.map((dept) => {
+                  {displayDepartments.map((dept) => {
                     const count = dept.member_count || 0;
                     return (
                       <option key={dept.id} value={dept.id}>
@@ -499,7 +566,7 @@ export function UnifiedAddStaffModal({
                   <select
                     id="assign-doc"
                     value={assignDoctorId}
-                    onChange={(e) => setAssignDoctorId(e.target.value)}
+                    onChange={(e) => handleDoctorSelect(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white"
                   >
                     <option value="">-- General Department Desk --</option>
@@ -509,6 +576,14 @@ export function UnifiedAddStaffModal({
                       </option>
                     ))}
                   </select>
+                  {assignDoctorId && (
+                    <div className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 mt-2 flex items-center gap-1.5">
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        Linked to <strong>Dr. {doctors.find((d) => d.id === assignDoctorId)?.name}</strong> in <strong>{doctors.find((d) => d.id === assignDoctorId)?.department}</strong>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

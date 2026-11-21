@@ -106,7 +106,18 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      const deptName = doc.departments?.name || doc.department || attr.department || 'General Medicine';
+      // Extract custom department name prioritizing custom specialty over default 'General'
+      const customDept = (attr.department && typeof attr.department === 'string' && attr.department.trim() && attr.department.trim() !== 'General')
+        ? attr.department.trim()
+        : null;
+      const colDept = (doc.department && typeof doc.department === 'string' && doc.department.trim() && doc.department.trim() !== 'General')
+        ? doc.department.trim()
+        : null;
+      const typeDept = (doc.type && typeof doc.type === 'string' && doc.type.trim() && doc.type.trim() !== 'doctor' && doc.type.trim() !== 'General')
+        ? doc.type.trim()
+        : null;
+
+      const deptName = doc.departments?.name || customDept || colDept || typeDept || doc.department || attr.department || 'General Medicine';
       const resolvedDeptId = doc.department_id || doc.departments?.id || attr.department_id || null;
 
       return {
@@ -192,7 +203,7 @@ export async function POST(request: NextRequest) {
     // Verify doctor exists and belongs to this venue
     const { data: doctor, error: docError } = await supabaseAdmin
       .from('resources')
-      .select('id, name, provider_id, attributes, department_id, department')
+      .select('id, name, type, provider_id, attributes, department_id, department')
       .eq('id', doctorId)
       .eq('provider_id', providerId)
       .maybeSingle();
@@ -304,7 +315,56 @@ export async function POST(request: NextRequest) {
     }
 
     // BUG-06: Persist department assignment into department_members
-    const targetDeptId = body.departmentId || body.department_id || (doctor as any)?.department_id;
+    let targetDeptId = body.departmentId || body.department_id || (doctor as any)?.department_id;
+
+    // If targetDeptId is missing or synthetic, resolve or auto-create from doctor's department
+    if ((!targetDeptId || (typeof targetDeptId === 'string' && targetDeptId.startsWith('dept-'))) && doctor) {
+      const docAttr = (doctor as any).attributes || {};
+      const docDeptName = (docAttr.department && docAttr.department !== 'General')
+        ? docAttr.department
+        : (doctor.department && doctor.department !== 'General')
+          ? doctor.department
+          : (doctor.type && doctor.type !== 'doctor' && doctor.type !== 'General')
+            ? doctor.type
+            : (docAttr.department || doctor.department || 'General Medicine');
+
+      if (docDeptName) {
+        const { data: foundDept } = await supabaseAdmin
+          .from('departments')
+          .select('id')
+          .eq('merchant_id', providerId)
+          .ilike('name', docDeptName.trim())
+          .maybeSingle();
+
+        if (foundDept?.id) {
+          targetDeptId = foundDept.id;
+        } else {
+          const { data: createdDept } = await supabaseAdmin
+            .from('departments')
+            .insert({
+              merchant_id: providerId,
+              name: docDeptName.trim(),
+              is_preset: false,
+              is_active: true,
+              allowed_modules: ['appointments', 'queue_schedule', 'check_in'],
+            })
+            .select('id')
+            .maybeSingle();
+          if (createdDept?.id) {
+            targetDeptId = createdDept.id;
+          }
+        }
+
+        // Link doctor resource to this department if not yet linked
+        if (targetDeptId && !(doctor as any).department_id) {
+          await supabaseAdmin
+            .from('resources')
+            .update({ department_id: targetDeptId })
+            .eq('id', doctorId);
+        }
+      }
+    }
+
     if (targetDeptId && targetUserId && providerId && targetEmail) {
       try {
         const cleanTargetEmail = targetEmail.toLowerCase().trim();
