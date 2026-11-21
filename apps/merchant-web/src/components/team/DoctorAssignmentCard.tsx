@@ -176,7 +176,7 @@ export const DoctorAssignmentCard = React.memo(function DoctorAssignmentCard({
             </div>
           ) : (
             <div className="space-y-2">
-              {doctor.front_desk_managers.map((fd, index) => (
+              {(doctor.front_desk_managers || []).map((fd, index) => (
                 <div
                   key={fd.user_id || index}
                   className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 hover:border-slate-300 transition-colors shadow-2xs"

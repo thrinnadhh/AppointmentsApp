@@ -25,9 +25,10 @@ function TeamManagementContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const doctorParam = searchParams.get('doctorId');
+  const providerParam = searchParams.get('providerId');
   const handledDoctorParamRef = useRef<string | null>(null);
 
-  const { activeProvider, isSuperAdmin, isHospitalAdmin, verticalConfig } = useMerchantTenant();
+  const { activeProvider, isSuperAdmin, isHospitalAdmin, verticalConfig, switchActiveProvider, isLoading: tenantLoading } = useMerchantTenant();
   
   // State
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -39,6 +40,13 @@ function TeamManagementContent() {
   const [doctorSearch, setDoctorSearch] = useState('');
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Auto-sync activeProvider with providerParam if URL query param was provided
+  useEffect(() => {
+    if (providerParam && activeProvider?.id !== providerParam) {
+      switchActiveProvider(providerParam);
+    }
+  }, [providerParam, activeProvider?.id, switchActiveProvider]);
 
   const copyToClipboard = useCallback((text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -71,16 +79,25 @@ function TeamManagementContent() {
   }, [doctors]);
 
   const loadTeam = useCallback(async () => {
+    const currentProviderId = providerParam || activeProvider?.id;
+    if (!currentProviderId && !isSuperAdmin) {
+      if (!tenantLoading) {
+        setMembers([]);
+        setLoading(false);
+      }
+      return;
+    }
+
     setLoading(true);
     try {
-      if (isSuperAdmin) {
+      if (isSuperAdmin && !currentProviderId) {
         const data = await fetchAllProfiles();
         setMembers(data as TeamMember[]);
-      } else if (activeProvider?.id) {
+      } else if (currentProviderId) {
         const { data, error } = await supabase
           .from('merchant_memberships' as any)
           .select('user_id, role, profile:profiles(id, full_name, email, phone, created_at)')
-          .eq('provider_id', activeProvider.id);
+          .eq('provider_id', currentProviderId);
         if (!error && data) {
           const mapped = data
             .map((m: any) => (m.profile ? { ...m.profile, membershipRole: m.role } : null))
@@ -98,17 +115,25 @@ function TeamManagementContent() {
     } finally {
       setLoading(false);
     }
-  }, [activeProvider?.id, isSuperAdmin]);
+  }, [providerParam, activeProvider?.id, isSuperAdmin, tenantLoading]);
 
   const loadDoctorAssignments = useCallback(async () => {
-    if (!activeProvider?.id) {
-      setDoctors([]);
-      setLoadingDoctors(false);
+    const currentProviderId = providerParam || activeProvider?.id;
+    if (!currentProviderId) {
+      if (!tenantLoading) {
+        setDoctors([]);
+        setLoadingDoctors(false);
+      }
       return;
     }
     setLoadingDoctors(true);
     try {
-      const res = await fetch(`/api/admin/doctor-assignments?providerId=${activeProvider.id}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch(`/api/admin/doctor-assignments?providerId=${currentProviderId}`, { headers });
       const json = await res.json();
       if (res.ok && json.success) {
         setDoctors(json.doctors || []);
@@ -121,7 +146,7 @@ function TeamManagementContent() {
     } finally {
       setLoadingDoctors(false);
     }
-  }, [activeProvider?.id]);
+  }, [providerParam, activeProvider?.id, tenantLoading]);
 
   useEffect(() => {
     loadTeam();
@@ -254,7 +279,7 @@ function TeamManagementContent() {
         doc.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
         (doc.department || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
         (doc.doctor_email || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
-        doc.front_desk_managers.some((fd) => 
+        (doc.front_desk_managers || []).some((fd) => 
           (fd.full_name || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
           (fd.email || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
           (fd.id_card_number || '').toLowerCase().includes(doctorSearch.toLowerCase())
@@ -271,7 +296,16 @@ function TeamManagementContent() {
     return doctors.reduce((sum, d) => sum + (d.front_desk_managers?.length || 0), 0);
   }, [doctors]);
 
-  if (!activeProvider && !isSuperAdmin) {
+  if (tenantLoading && !activeProvider && !providerParam) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 text-center text-slate-500 bg-white rounded-2xl border border-slate-200 mt-8">
+        <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
+        Loading team and desk credentials...
+      </div>
+    );
+  }
+
+  if (!activeProvider && !providerParam && !isSuperAdmin) {
     return (
       <div className="max-w-xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-2xl text-center shadow-sm">
         <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -446,7 +480,7 @@ function TeamManagementContent() {
       {selectedDoctorForAssignment && (
         <AssignFrontDeskModal
           doctor={selectedDoctorForAssignment}
-          providerId={activeProvider?.id}
+          providerId={activeProvider?.id || providerParam || undefined}
           allRosterMembers={allRosterMembers}
           onClose={handleCloseAssignModal}
           onSuccess={(msg) => {
@@ -469,7 +503,7 @@ function TeamManagementContent() {
             loadDoctorAssignments();
             loadTeam();
           }}
-          providerId={activeProvider?.id}
+          providerId={activeProvider?.id || providerParam || undefined}
           doctors={doctors}
         />
       )}
