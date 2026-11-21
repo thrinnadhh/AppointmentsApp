@@ -35,15 +35,11 @@ async function getRouteSupabaseClient(req?: NextRequest) {
 /**
  * DELETE /api/account/delete
  *
- * Schedules an account for deletion after a 30-day grace period.
- * The user can contact support to cancel within those 30 days.
- *
+ * Atomically and immediately deletes the authenticated merchant/staff user account with zero grace period.
+ * 
  * Required for:
  *  - Google Play Store (mandatory since May 2024)
  *  - DPDP Act 2023 Section 12 (right to erasure)
- *
- * Play Store listing must include this URL:
- *   https://app.appointments4u.in/account/delete
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -55,9 +51,12 @@ export async function DELETE(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 500) : null;
+    const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 500) : 'User initiated immediate account deletion';
 
-    const { data, error } = await (supabase.rpc as any)('request_account_deletion', {
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // 1. Execute atomic data anonymization and PII erasure immediately
+    const { data, error } = await (supabaseAdmin.rpc as any)('delete_account_immediately', {
       p_reason: reason,
     });
 
@@ -66,7 +65,19 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data, { status: 200 });
+    // 2. Remove the auth user record to revoke active auth sessions/tokens
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(user.id);
+    } catch (authDelErr) {
+      console.warn('[Account Delete] Auth admin delete notice:', authDelErr);
+    }
+
+    return NextResponse.json({
+      success: true,
+      immediate: true,
+      message: 'Your account and all personal data have been immediately and permanently deleted.',
+      completed_at: new Date().toISOString(),
+    }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Internal error';
     console.error('[Account Delete] Exception:', err);

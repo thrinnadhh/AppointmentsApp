@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // 1. Fetch resources/doctors for this provider
     let query = supabaseAdmin
       .from('resources')
-      .select('id, provider_id, name, type, department, deposit_amount, duration_minutes, capacity, attributes, is_active')
+      .select('id, provider_id, name, type, department, department_id, deposit_amount, duration_minutes, capacity, attributes, is_active, departments(id, name)')
       .eq('provider_id', providerId)
       .order('name', { ascending: true });
 
@@ -106,10 +106,15 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      const deptName = doc.departments?.name || doc.department || attr.department || 'General Medicine';
+      const resolvedDeptId = doc.department_id || doc.departments?.id || attr.department_id || null;
+
       return {
         ...doc,
-        doctor_email: attr.email || null,
-        has_login: Boolean(attr.email || attr.user_id),
+        department: deptName,
+        department_id: resolvedDeptId,
+        doctor_email: attr.email || attr.doctor_email || null,
+        has_login: Boolean(attr.email || attr.doctor_email || attr.user_id),
         front_desk_managers: combined,
       };
     });
@@ -160,10 +165,34 @@ export async function POST(request: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
+    // BUG-04/05: Enforce strictly ONE hospitalAdmin per hospital
+    if (body.role === 'hospitalAdmin' || body.role === 'administrator') {
+      const { data: existingAdmin } = await supabaseAdmin
+        .from('merchant_memberships')
+        .select('id')
+        .eq('provider_id', providerId)
+        .in('role', ['hospitalAdmin', 'admin', 'owner'])
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      const { data: prov } = await supabaseAdmin
+        .from('providers')
+        .select('owner_id')
+        .eq('id', providerId)
+        .maybeSingle();
+
+      if (existingAdmin || prov?.owner_id) {
+        return NextResponse.json(
+          { error: 'Conflict: This hospital already has an active Hospital Administrator. Only one administrator is permitted per hospital.' },
+          { status: 409 }
+        );
+      }
+    }
+
     // Verify doctor exists and belongs to this venue
     const { data: doctor, error: docError } = await supabaseAdmin
       .from('resources')
-      .select('id, name, provider_id, attributes')
+      .select('id, name, provider_id, attributes, department_id, department')
       .eq('id', doctorId)
       .eq('provider_id', providerId)
       .maybeSingle();
@@ -272,6 +301,23 @@ export async function POST(request: NextRequest) {
       }
     } catch (err) {
       console.warn('doctor_front_desk_assignments upsert error, falling back to attributes:', err);
+    }
+
+    // BUG-06: Persist department assignment into department_members
+    const targetDeptId = body.departmentId || body.department_id || (doctor as any)?.department_id;
+    if (targetDeptId && targetUserId && providerId && targetEmail) {
+      try {
+        await supabaseAdmin.from('department_members').upsert({
+          department_id: targetDeptId,
+          merchant_id: providerId,
+          email: targetEmail.toLowerCase().trim(),
+          user_id: targetUserId,
+          role: 'front_desk',
+          status: 'active',
+        }, { onConflict: 'department_id, email' });
+      } catch (deptErr) {
+        console.warn('Failed to upsert department_members for front desk:', deptErr);
+      }
     }
 
     // 2. Synchronize onto doctor's resource.attributes for client resilience (strip id_card_number from public attributes)

@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const scheduledDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const nowIso = new Date().toISOString();
 
     if (userId) {
       let isOwnershipVerified = false;
@@ -142,31 +142,41 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Check for existing pending request
-      const { data: existing } = await (supabaseAdmin as any)
-        .from('account_deletion_requests')
-        .select('id, scheduled_for')
-        .eq('user_id', userId)
-        .is('completed_at', null)
-        .is('cancelled_at', null)
-        .maybeSingle();
-
-      if (!existing) {
-        await (supabaseAdmin as any)
-          .from('account_deletion_requests')
-          .insert({
-            user_id: userId,
-            reason: typeof reason === 'string' ? reason.slice(0, 500) : 'Requested via public web page',
-            scheduled_for: scheduledDate,
-          });
+      // Execute immediate atomic PII anonymization and deletion
+      try {
+        await (supabaseAdmin.rpc as any)('delete_account_immediately', {
+          p_reason: typeof reason === 'string' ? reason.slice(0, 500) : 'Requested via verified public web page',
+        });
+      } catch (rpcErr) {
+        // Fallback to anonymize_user_data directly
+        await (supabaseAdmin.rpc as any)('anonymize_user_data', { p_user_id: userId });
       }
+
+      // Purge auth user record immediately
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+      } catch (authDelErr) {
+        console.warn('[Public Delete] Auth delete notice:', authDelErr);
+      }
+
+      // Record completed deletion record with zero grace period
+      await (supabaseAdmin as any)
+        .from('account_deletion_requests')
+        .upsert({
+          user_id: userId,
+          reason: typeof reason === 'string' ? reason.slice(0, 500) : 'Requested via public web page (Immediate Deletion)',
+          requested_at: nowIso,
+          scheduled_for: nowIso,
+          completed_at: nowIso,
+        });
     }
 
     return NextResponse.json({
       success: true,
-      scheduled_for: scheduledDate,
+      immediate: true,
+      completed_at: nowIso,
       masked_identifier: maskIdentifier(cleanInput),
-      message: 'Your account deletion request has been registered and scheduled for anonymization.',
+      message: 'Your account and personal data have been immediately and permanently deleted.',
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';

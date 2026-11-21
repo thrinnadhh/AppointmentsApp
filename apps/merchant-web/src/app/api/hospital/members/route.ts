@@ -80,18 +80,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // BUG-04/05: Enforce strictly ONE hospitalAdmin per hospital
+    if (role === 'hospitalAdmin' || role === 'administrator') {
+      const { data: existingAdmin } = await supabaseAdmin
+        .from('merchant_memberships')
+        .select('id')
+        .eq('provider_id', ctx.merchantId!)
+        .in('role', ['hospitalAdmin', 'admin', 'owner'])
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      const { data: prov } = await supabaseAdmin
+        .from('providers')
+        .select('owner_id')
+        .eq('id', ctx.merchantId!)
+        .maybeSingle();
+
+      if (existingAdmin || prov?.owner_id) {
+        return NextResponse.json(
+          { success: false, error: 'Conflict: This hospital already has an active Hospital Administrator. Only one administrator is permitted per hospital.' },
+          { status: 409 }
+        );
+      }
+    }
+
     if (!department_id || !email) {
       return NextResponse.json({ success: false, error: 'Missing department_id or email' }, { status: 400 });
     }
 
-    const cleanRole = role === 'front_desk' ? 'front_desk' : 'consultant';
+    const cleanRole = role === 'front_desk' ? 'front_desk' : role === 'hospitalAdmin' ? 'hospitalAdmin' : 'consultant';
 
     const cleanEmail = email.toLowerCase().trim();
     if (cleanEmail.length > 254 || !EMAIL_REGEX.test(cleanEmail)) {
       return NextResponse.json({ success: false, error: 'Invalid email address format' }, { status: 400 });
     }
-
-    const supabaseAdmin = getSupabaseAdmin();
 
     // Verify department exists and belongs to this hospital
     const { data: dept, error: deptErr } = await supabaseAdmin
