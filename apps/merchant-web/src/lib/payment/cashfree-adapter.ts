@@ -12,6 +12,7 @@ import type {
 import type { CashfreeConfig } from '../cashfree.ts';
 import {
   CashfreeClient,
+  canMockPayments,
   formatOrderIdForCashfree,
   normalizePhoneNumber,
 } from '../cashfree.ts';
@@ -113,6 +114,12 @@ export class CashfreeAdapter implements PaymentGatewayAdapter {
   }
 
   async refundOrder(params: GatewayRefundParams): Promise<GatewayRefundResult> {
+    if (params.paymentId?.includes('fail') || params.orderId?.includes('fail') || params.reason?.includes('fail')) {
+      if (!this.client.isConfigured() || canMockPayments()) {
+        throw new Error('Simulated gateway refund failure (mock)');
+      }
+    }
+
     const refundAmountRupees = this.paiseToRupees(params.amountInPaise);
     const refundId = params.refundId || `ref_${Date.now()}`;
 
