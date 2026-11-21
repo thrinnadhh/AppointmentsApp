@@ -307,14 +307,43 @@ export async function POST(request: NextRequest) {
     const targetDeptId = body.departmentId || body.department_id || (doctor as any)?.department_id;
     if (targetDeptId && targetUserId && providerId && targetEmail) {
       try {
-        await supabaseAdmin.from('department_members').upsert({
-          department_id: targetDeptId,
-          merchant_id: providerId,
-          email: targetEmail.toLowerCase().trim(),
-          user_id: targetUserId,
-          role: 'front_desk',
-          status: 'active',
-        }, { onConflict: 'department_id, email' });
+        const cleanTargetEmail = targetEmail.toLowerCase().trim();
+        const { data: existingDeptMember } = await supabaseAdmin
+          .from('department_members')
+          .select('id')
+          .eq('merchant_id', providerId)
+          .eq('email', cleanTargetEmail)
+          .maybeSingle();
+
+        if (existingDeptMember) {
+          const { error: updErr } = await supabaseAdmin
+            .from('department_members')
+            .update({
+              department_id: targetDeptId,
+              user_id: targetUserId,
+              role: 'front_desk',
+              status: 'active',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingDeptMember.id);
+          if (updErr) {
+            console.error('[BUG-06] Failed to update department_members:', updErr);
+          }
+        } else {
+          const { error: insErr } = await supabaseAdmin
+            .from('department_members')
+            .insert({
+              department_id: targetDeptId,
+              merchant_id: providerId,
+              email: cleanTargetEmail,
+              user_id: targetUserId,
+              role: 'front_desk',
+              status: 'active',
+            });
+          if (insErr) {
+            console.error('[BUG-06] Failed to insert department_members:', insErr);
+          }
+        }
       } catch (deptErr) {
         console.warn('Failed to upsert department_members for front desk:', deptErr);
       }
