@@ -453,5 +453,60 @@ describe('Phase 14: Merchant App 6 Bug Verification Suite', () => {
       assert.strictEqual(matched.department_id, testDept.id, 'Doctor must have persisted department_id');
       assert.strictEqual(matched.department, testDept.name, 'Doctor must have persisted department name');
     });
+
+    it('allows unlimited doctors and members per department (no 3-member limit)', async () => {
+      const deptsRes = await fetch(`${appBaseUrl}/api/hospital/departments`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const deptsJson = await deptsRes.json();
+      const testDept = deptsJson.departments[0];
+      const timestamp = Date.now();
+
+      const memberIds = [];
+      try {
+        // Add 4 members sequentially to the same department to verify removal of the 3-member limit
+        for (let i = 1; i <= 4; i++) {
+          const email = `doctor.unlimited.${i}.${timestamp}@test-tirupati.local`;
+          const res = await fetch(`${appBaseUrl}/api/hospital/members`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${adminToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              department_id: testDept.id,
+              email,
+              role: 'consultant',
+            }),
+          });
+          const json = await res.json();
+          assert.strictEqual(res.status, 200, `Member ${i} addition must return 200, got ${res.status}: ${JSON.stringify(json)}`);
+          assert.strictEqual(json.success, true, `Member ${i} addition must succeed`);
+          assert.ok(json.member?.id, `Member ${i} ID must be returned`);
+          memberIds.push(json.member.id);
+        }
+
+        // Verify all 4 are present in the department members query
+        const getRes = await fetch(`${appBaseUrl}/api/hospital/members?department_id=${testDept.id}`, {
+          headers: { Authorization: `Bearer ${adminToken}` },
+        });
+        const getJson = await getRes.json();
+        assert.strictEqual(getRes.status, 200);
+        assert.ok(getJson.success);
+        const emailsInDept = getJson.members.map((m) => m.email);
+        for (let i = 1; i <= 4; i++) {
+          const email = `doctor.unlimited.${i}.${timestamp}@test-tirupati.local`;
+          assert.ok(emailsInDept.includes(email), `Department must include 4th member ${email}`);
+        }
+      } finally {
+        // Cleanup added members
+        for (const id of memberIds) {
+          await fetch(`${appBaseUrl}/api/hospital/members?id=${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${adminToken}` },
+          });
+        }
+      }
+    });
   });
 });

@@ -198,11 +198,11 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
   // ---------------------------------------------------------------------------
   // A4: 4th Member Rejection Trigger
   // ---------------------------------------------------------------------------
-  describe('A4: Max 3 Members Per Department Rule', () => {
-    it('strictly rejects adding a 4th member when department already has 3 members', async () => {
+  describe('A4: Unlimited Members Per Department Rule (Removal of 3-Member Ceiling)', () => {
+    it('successfully allows adding a 4th member to a department with no ceiling', async () => {
       const neuroDeptId = hospA.departments.find(d => d.name === 'Neurology').id;
 
-      // Clean any prior stray member records for Neurology before testing limits
+      // Clean any prior stray member records for Neurology before testing
       await fetch(`${url}/rest/v1/department_members?department_id=eq.${neuroDeptId}&email=in.(third.member@test-tirupati.local,fourth.member@test-tirupati.local)`, {
         method: 'DELETE',
         headers: serviceHeaders
@@ -225,8 +225,9 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
       assert.ok(Array.isArray(data3rd) && data3rd[0]?.id, '3rd member allowed');
       const thirdId = data3rd[0].id;
 
+      let fourthId = null;
       try {
-        // Try to add 4th member (MUST BE REJECTED BY TRIGGER)
+        // Add 4th member (MUST SUCCEED PER USER SPEC: ANY NUMBER OF MEMBERS ALLOWED)
         const res4th = await fetch(`${url}/rest/v1/department_members`, {
           method: 'POST',
           headers: serviceHeaders,
@@ -240,15 +241,12 @@ describe('Hospital Vertical: RBAC, Security & Data Isolation', () => {
         });
         const data4th = await res4th.json();
         
-        // Verify database trigger prevented the 4th member
-        assert.ok(!Array.isArray(data4th), '4th member must not be inserted');
-        assert.ok(
-          data4th.message?.includes('already has 3 members') || data4th.code === 'P0001',
-          `Rejection error returned: ${data4th.message}`
-        );
+        // Verify database trigger allows the 4th member
+        assert.ok(Array.isArray(data4th) && data4th[0]?.id, '4th member must be successfully inserted');
+        fourthId = data4th[0].id;
       } finally {
-        // Cleanup 3rd member
-        await fetch(`${url}/rest/v1/department_members?id=eq.${thirdId}`, {
+        // Cleanup test members
+        await fetch(`${url}/rest/v1/department_members?id=in.(${thirdId},${fourthId || thirdId})`, {
           method: 'DELETE',
           headers: serviceHeaders
         });

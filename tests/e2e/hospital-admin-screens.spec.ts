@@ -90,8 +90,8 @@ test.describe.serial('Phase 5a: Hospital Admin UI Screens & Workflows', () => {
       await expect(modal.getByRole('button', { name: /Front Desk/i })).toBeVisible();
       await expect(modal.getByRole('button', { name: /Hospital Admin/i })).toBeVisible();
 
-      // Verify department quota notification
-      await expect(modal.getByText('Policy: Max 3 members per department')).toBeVisible();
+      // Verify department assignment available
+      await expect(modal.getByText(/Assign to Department/i)).toBeVisible();
 
       // Close modal
       await modal.getByRole('button', { name: '✕' }).click();
