@@ -94,18 +94,68 @@ function TeamManagementContent() {
         const data = await fetchAllProfiles();
         setMembers(data as TeamMember[]);
       } else if (currentProviderId) {
-        const { data, error } = await supabase
-          .from('merchant_memberships' as any)
-          .select('user_id, role, profile:profiles(id, full_name, email, phone, created_at)')
-          .eq('provider_id', currentProviderId);
-        if (!error && data) {
-          const mapped = data
-            .map((m: any) => (m.profile ? { ...m.profile, membershipRole: m.role } : null))
-            .filter(Boolean);
-          setMembers(mapped as TeamMember[]);
-        } else {
-          setMembers([]);
+        const [membershipsRes, deptMembersRes] = await Promise.all([
+          supabase
+            .from('merchant_memberships' as any)
+            .select('user_id, role, profile:profiles(id, full_name, email, phone, created_at)')
+            .eq('provider_id', currentProviderId)
+            .is('deleted_at', null),
+          supabase
+            .from('department_members' as any)
+            .select('user_id, email, role, department_id, departments(name), profile:profiles(id, full_name, email, phone, created_at)')
+            .eq('merchant_id', currentProviderId)
+            .eq('status', 'active'),
+        ]);
+
+        const rosterMap = new Map<string, TeamMember>();
+
+        if (membershipsRes.data) {
+          membershipsRes.data.forEach((m: any) => {
+            if (m.profile) {
+              rosterMap.set(m.profile.id, {
+                ...m.profile,
+                membershipRole: m.role,
+              });
+            }
+          });
         }
+
+        if (deptMembersRes.data) {
+          deptMembersRes.data.forEach((dm: any) => {
+            const profileId = dm.profile?.id || dm.user_id;
+            const existing = profileId ? rosterMap.get(profileId) : null;
+            const deptName = dm.departments?.name || null;
+            if (existing) {
+              if (dm.role === 'consultant' || dm.role === 'doctor') {
+                existing.membershipRole = 'doctor';
+              }
+              (existing as any).department = deptName || (existing as any).department;
+              (existing as any).department_id = dm.department_id || (existing as any).department_id;
+            } else if (dm.profile) {
+              rosterMap.set(dm.profile.id, {
+                ...dm.profile,
+                membershipRole: (dm.role === 'consultant' || dm.role === 'doctor') ? 'doctor' : dm.role,
+                department: deptName,
+                department_id: dm.department_id,
+              } as any);
+            } else if (dm.email) {
+              const syntheticId = dm.user_id || `dept-member-${dm.email}`;
+              rosterMap.set(syntheticId, {
+                id: syntheticId,
+                email: dm.email,
+                full_name: dm.email.split('@')[0],
+                role: 'merchant',
+                membershipRole: (dm.role === 'consultant' || dm.role === 'doctor') ? 'doctor' : dm.role,
+                phone: null,
+                created_at: new Date().toISOString(),
+                department: deptName,
+                department_id: dm.department_id,
+              } as any);
+            }
+          });
+        }
+
+        setMembers(Array.from(rosterMap.values()));
       } else {
         setMembers([]);
       }
@@ -216,7 +266,24 @@ function TeamManagementContent() {
     doctors.forEach((doc) => {
       const email = doc.doctor_email?.toLowerCase();
       const attrUserId = (doc as any)?.attributes?.user_id;
-      if (attrUserId && !existingIds.has(attrUserId)) {
+
+      // If already in list, ensure marked as doctor with department
+      const existingMember = list.find(
+        (m) => (attrUserId && m.id === attrUserId) || (email && (m.email || '').toLowerCase() === email)
+      );
+
+      if (existingMember) {
+        existingMember.membershipRole = 'doctor';
+        if (!(existingMember as any).department && doc.department) {
+          (existingMember as any).department = doc.department;
+        }
+        if (!(existingMember as any).department_id && (doc as any).department_id) {
+          (existingMember as any).department_id = (doc as any).department_id;
+        }
+        if (!existingMember.full_name?.toLowerCase().startsWith('dr.') && doc.name) {
+          existingMember.full_name = `Dr. ${doc.name}`;
+        }
+      } else if (attrUserId && !existingIds.has(attrUserId)) {
         list.push({
           id: attrUserId,
           email: doc.doctor_email || null,
@@ -225,7 +292,9 @@ function TeamManagementContent() {
           membershipRole: 'doctor',
           phone: null,
           created_at: new Date().toISOString(),
-        });
+          department: doc.department || null,
+          department_id: (doc as any).department_id || null,
+        } as any);
         existingIds.add(attrUserId);
         if (email) existingEmails.add(email);
       } else if (email && !existingEmails.has(email)) {
@@ -237,8 +306,23 @@ function TeamManagementContent() {
           membershipRole: 'doctor',
           phone: null,
           created_at: new Date().toISOString(),
-        });
+          department: doc.department || null,
+          department_id: (doc as any).department_id || null,
+        } as any);
         existingEmails.add(email);
+      } else if (!existingIds.has(`doc-${doc.id}`)) {
+        list.push({
+          id: `doc-${doc.id}`,
+          email: null,
+          full_name: `Dr. ${doc.name}`,
+          role: 'merchant',
+          membershipRole: 'doctor',
+          phone: null,
+          created_at: new Date().toISOString(),
+          department: doc.department || null,
+          department_id: (doc as any).department_id || null,
+        } as any);
+        existingIds.add(`doc-${doc.id}`);
       }
 
       doc.front_desk_managers?.forEach((fd) => {
@@ -505,6 +589,7 @@ function TeamManagementContent() {
           }}
           providerId={activeProvider?.id || providerParam || undefined}
           doctors={doctors}
+          hasHospitalAdmin={adminCount > 0 || isHospitalAdmin || Boolean(activeProvider?.owner_id)}
         />
       )}
     </div>

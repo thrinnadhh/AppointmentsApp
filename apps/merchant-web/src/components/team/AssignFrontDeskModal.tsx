@@ -30,6 +30,7 @@ export interface DoctorWithAssignments {
   name: string;
   type: string;
   department: string;
+  department_id?: string | null;
   deposit_amount: number;
   duration_minutes: number;
   capacity: number;
@@ -45,6 +46,8 @@ export interface TeamMember {
   full_name: string | null;
   role: 'admin' | 'merchant' | 'customer';
   membershipRole?: string;
+  department?: string | null;
+  department_id?: string | null;
   phone: string | null;
   created_at: string;
 }
@@ -125,6 +128,7 @@ export function AssignFrontDeskModal({
       const payload: any = {
         providerId,
         doctorId: doctor.id,
+        departmentId: doctor.department_id || undefined,
       };
 
       const requiresIdCard = (doctor.front_desk_managers?.length || 0) >= 1;

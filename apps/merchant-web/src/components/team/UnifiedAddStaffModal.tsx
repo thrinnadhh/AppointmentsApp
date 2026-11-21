@@ -34,6 +34,7 @@ interface UnifiedAddStaffModalProps {
   onSuccess: (msg: string) => void;
   providerId: string | null | undefined;
   doctors: DoctorWithAssignments[];
+  hasHospitalAdmin?: boolean;
 }
 
 export function UnifiedAddStaffModal({
@@ -42,6 +43,7 @@ export function UnifiedAddStaffModal({
   onSuccess,
   providerId,
   doctors,
+  hasHospitalAdmin = true,
 }: UnifiedAddStaffModalProps) {
   const [role, setRole] = useState<'consultant' | 'front_desk' | 'administrator'>('consultant');
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
@@ -139,12 +141,31 @@ export function UnifiedAddStaffModal({
 
     setSubmitting(true);
     try {
-      // 1. If department member (consultant or front_desk), invite/add to department
+      // 1. If administrator role selected
+      if (role === 'administrator') {
+        const adminRes = await fetch('/api/hospital/members', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchant_id: providerId,
+            email: email.trim().toLowerCase(),
+            role: 'hospitalAdmin',
+          }),
+        });
+
+        const adminJson = await adminRes.json();
+        if (!adminRes.ok || !adminJson.success) {
+          throw new Error(adminJson.error || 'Failed to add hospital administrator');
+        }
+      }
+
+      // 2. If department member (consultant or front_desk), invite/add to department
       if (role !== 'administrator' && selectedDeptId) {
         const memberRes = await fetch('/api/hospital/members', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            merchant_id: providerId,
             department_id: selectedDeptId,
             email: email.trim().toLowerCase(),
             role,
@@ -157,10 +178,10 @@ export function UnifiedAddStaffModal({
         }
       }
 
-      // 2. If Consultant, create or link doctor resource
+      // 3. If Consultant, create or link doctor resource
       if (role === 'consultant' && providerId) {
         const docDeptName = selectedDepartment?.name || 'General';
-        const { error: resError } = await (supabase.rpc as any)('merchant_upsert_resource', {
+        const { data: resData, error: resError } = await (supabase.rpc as any)('merchant_upsert_resource', {
           p_provider_id: providerId,
           p_name: fullName.trim(),
           p_category: 'doctor',
@@ -170,15 +191,21 @@ export function UnifiedAddStaffModal({
           p_capacity: 1,
           p_attributes: {
             department: docDeptName,
+            department_id: selectedDeptId,
             doctor_email: email.trim().toLowerCase(),
           },
         });
         if (resError) {
-          console.warn('Consultant resource registration notice:', resError);
+          throw new Error(resError.message || 'Failed to register doctor resource');
+        }
+        if (resData?.resource?.id && selectedDeptId) {
+          await (supabase.from('resources') as any)
+            .update({ department_id: selectedDeptId })
+            .eq('id', resData.resource.id);
         }
       }
 
-      // 3. If Front Desk and doctor assigned, create assignment
+      // 4. If Front Desk and doctor assigned, create assignment
       if (role === 'front_desk' && assignDoctorId && providerId) {
         const assignRes = await fetch('/api/admin/doctor-assignments', {
           method: 'POST',
@@ -191,11 +218,12 @@ export function UnifiedAddStaffModal({
             password: password || 'TempPass123!',
             phone: phone.trim() || undefined,
             idCardNumber: idCardNumber.trim() || undefined,
+            departmentId: selectedDeptId || undefined,
           }),
         });
         const assignJson = await assignRes.json();
-        if (!assignRes.ok && assignJson.error) {
-          console.warn('Doctor assignment notice:', assignJson.error);
+        if (!assignRes.ok || assignJson.error) {
+          throw new Error(assignJson.error || 'Failed to assign front desk manager');
         }
       }
 
@@ -244,7 +272,7 @@ export function UnifiedAddStaffModal({
         </div>
 
         {/* Role Selection Tabs */}
-        <div className="grid grid-cols-3 gap-2 mt-4 p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+        <div className={`grid ${hasHospitalAdmin ? 'grid-cols-2' : 'grid-cols-3'} gap-2 mt-4 p-1 bg-slate-100 rounded-xl text-xs font-semibold`}>
           <button
             type="button"
             onClick={() => setRole('consultant')}
@@ -269,18 +297,20 @@ export function UnifiedAddStaffModal({
             <Users className="w-3.5 h-3.5" />
             <span>Front Desk</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setRole('administrator')}
-            className={`py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-              role === 'administrator'
-                ? 'bg-white text-emerald-800 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Hospital Admin</span>
-          </button>
+          {!hasHospitalAdmin && (
+            <button
+              type="button"
+              onClick={() => setRole('administrator')}
+              className={`py-2 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                role === 'administrator'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Hospital Admin</span>
+            </button>
+          )}
         </div>
 
         {error && (
