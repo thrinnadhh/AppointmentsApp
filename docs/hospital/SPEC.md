@@ -1,6 +1,6 @@
 # Hospital vertical specification
 ## Roles
-- Hospital Admin (owner/in-charge): sees everything in their hospital. Only this role can create departments, add or remove Front Desk members and Consultants (max 3 member emails per department), manage each doctor's services (name, fee, duration), and assign Front Desk members to Consultants.
+- Hospital Admin (owner/in-charge): sees everything in their hospital. Only this role can create departments, add or remove Front Desk members and Consultants (any number of doctors and staff members per department), manage each doctor's services (name, fee, duration), and assign Front Desk members to Consultants.
 - Front Desk: assigned to one or more Consultants and can act ONLY on those Consultants' appointments and queues: verify check-in codes, mark present manually, mark No Show, admit patients, start and end consultations.
 - Consultant: sees and acts only on their own appointments and queue.
 - Customer: sees only their own bookings and their own check-in code.
