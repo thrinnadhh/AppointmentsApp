@@ -87,9 +87,7 @@ export function UnifiedAddStaffModal({
         if (res.ok && json.success) {
           setDepartments(json.departments || []);
           if (json.departments?.length > 0) {
-            // Pick first non-full department if possible
-            const available = json.departments.find((d: DepartmentOption) => (d.member_count || 0) < 3);
-            setSelectedDeptId((prev) => prev || (available ? available.id : json.departments[0].id));
+            setSelectedDeptId((prev) => prev || json.departments[0].id);
           }
         }
       } catch (err) {
@@ -113,7 +111,6 @@ export function UnifiedAddStaffModal({
   };
 
   const selectedDepartment = departments.find((d) => d.id === selectedDeptId);
-  const isDeptFull = (selectedDepartment?.member_count || 0) >= 3;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,11 +123,6 @@ export function UnifiedAddStaffModal({
 
     if (role !== 'administrator' && !selectedDeptId) {
       setError('Please select a department for this staff member.');
-      return;
-    }
-
-    if (role !== 'administrator' && isDeptFull) {
-      setError('Selected department already has 3 members (maximum allowed by hospital policy).');
       return;
     }
 
@@ -328,7 +320,7 @@ export function UnifiedAddStaffModal({
                 <label htmlFor="staff-dept" className="block text-xs font-semibold text-slate-700">
                   Assign to Department *
                 </label>
-                <span className="text-[11px] text-slate-400">Policy: Max 3 members per department</span>
+                <span className="text-[11px] text-slate-400">Clinical Specialty Unit</span>
               </div>
               {loadingDepts ? (
                 <div className="text-xs text-slate-500 py-2">Loading departments...</div>
@@ -341,19 +333,13 @@ export function UnifiedAddStaffModal({
                 >
                   {departments.map((dept) => {
                     const count = dept.member_count || 0;
-                    const full = count >= 3;
                     return (
-                      <option key={dept.id} value={dept.id} disabled={full}>
-                        {dept.name} ({count}/3 Members) {full ? '— [FULL]' : ''}
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({count} {count === 1 ? 'member' : 'members'})
                       </option>
                     );
                   })}
                 </select>
-              )}
-              {isDeptFull && (
-                <p className="text-[11px] text-rose-600 mt-1 font-medium">
-                  ⚠️ This department already has 3 members. Please select another department or revoke an existing member.
-                </p>
               )}
             </div>
           )}
@@ -538,7 +524,7 @@ export function UnifiedAddStaffModal({
             </button>
             <button
               type="submit"
-              disabled={submitting || (role !== 'administrator' && isDeptFull)}
+              disabled={submitting}
               className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-[0.97] rounded-lg shadow-sm transition-all duration-75 disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2 cursor-pointer"
             >
               {submitting ? (

@@ -186,10 +186,6 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertErr) {
-      // Map database trigger error directly to friendly UI error
-      if (insertErr.message?.includes('already has 3 members')) {
-        return NextResponse.json({ success: false, error: 'This department already has 3 members.' }, { status: 400 });
-      }
       return NextResponse.json({ success: false, error: insertErr.message }, { status: 500 });
     }
 
