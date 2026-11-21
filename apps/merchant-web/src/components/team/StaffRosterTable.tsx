@@ -23,7 +23,7 @@ interface StaffRosterTableProps {
   ownerId?: string | null;
 }
 
-export function StaffRosterTable({
+export const StaffRosterTable = React.memo(function StaffRosterTable({
   members,
   doctors,
   loading,
@@ -296,4 +296,4 @@ export function StaffRosterTable({
       </div>
     </div>
   );
-}
+});

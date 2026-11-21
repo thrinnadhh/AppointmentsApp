@@ -11,7 +11,7 @@ interface TeamMetricsCardsProps {
   resourceLabelPlural: string;
 }
 
-export function TeamMetricsCards({
+export const TeamMetricsCards = React.memo(function TeamMetricsCards({
   totalStaffCount,
   doctorCount,
   frontDeskCount,
@@ -57,4 +57,4 @@ export function TeamMetricsCards({
       </div>
     </div>
   );
-}
+});

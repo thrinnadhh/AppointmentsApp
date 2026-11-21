@@ -149,7 +149,11 @@ function TeamManagementContent() {
     }
   }, [doctorParam, pathname, router, searchParams]);
 
-  const handleUnassignFrontDesk = async (
+  const handleOpenAssignModal = useCallback((d: DoctorWithAssignments) => {
+    setSelectedDoctorForAssignment(d);
+  }, []);
+
+  const handleUnassignFrontDesk = useCallback(async (
     doctorId: string, 
     doctorName: string, 
     userId: string, 
@@ -176,7 +180,7 @@ function TeamManagementContent() {
       const msg = err instanceof Error ? err.message : 'Error unassigning front desk manager';
       setSuccessBanner(`Error: ${msg}`);
     }
-  };
+  }, [activeProvider?.id, loadDoctorAssignments]);
 
   // Merge members with doctors or front desk staff
   const allRosterMembers = useMemo(() => {
@@ -310,7 +314,7 @@ function TeamManagementContent() {
           {isHospitalAdmin && (
             <button
               onClick={() => setIsAddStaffOpen(true)}
-              className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm cursor-pointer gap-2"
+              className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-[0.97] text-white text-sm font-semibold rounded-xl transition-all duration-75 select-none shadow-sm cursor-pointer gap-2"
             >
               <UserPlus className="w-4 h-4" />
               <span>+ Provision Staff</span>
@@ -322,7 +326,7 @@ function TeamManagementContent() {
               loadTeam();
               loadDoctorAssignments();
             }}
-            className="inline-flex items-center px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 active:bg-slate-100 active:scale-[0.97] transition-all duration-75 select-none shadow-xs cursor-pointer"
             title="Refresh All"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${(loading || loadingDoctors) ? 'animate-spin text-emerald-600' : ''}`} />
@@ -422,7 +426,7 @@ function TeamManagementContent() {
                 isHospitalAdmin={isHospitalAdmin}
                 copiedId={copiedId}
                 onCopy={copyToClipboard}
-                onOpenAssignModal={(d: DoctorWithAssignments) => setSelectedDoctorForAssignment(d)}
+                onOpenAssignModal={handleOpenAssignModal}
                 onUnassign={handleUnassignFrontDesk}
               />
             ))}

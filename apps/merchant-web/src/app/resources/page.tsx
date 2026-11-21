@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { 
@@ -114,6 +114,7 @@ function ResourcesManagementContent() {
     doctorPassword: '',
   });
   const [isUpdatingResource, setIsUpdatingResource] = useState(false);
+  const [isCreatingResource, setIsCreatingResource] = useState(false);
 
   // Doctor Emergency Cancellation Modal State
   const [emergencyResource, setEmergencyResource] = useState<Resource | null>(null);
@@ -237,6 +238,7 @@ function ResourcesManagementContent() {
       return;
     }
 
+    setIsCreatingResource(true);
     try {
       const { data, error } = await (supabase.rpc as any)('merchant_upsert_resource', {
         p_provider_id: targetProviderId,
@@ -262,6 +264,7 @@ function ResourcesManagementContent() {
       const msg = err instanceof Error ? err.message : 'Error adding resource';
       setFeedbackToast(`Error: ${msg}`);
     } finally {
+      setIsCreatingResource(false);
       setIsAdding(false);
       setFormData({
         name: '',
@@ -380,18 +383,20 @@ function ResourcesManagementContent() {
   };
 
   // Group resources by department
-  const departments = Array.from(
-    new Set(resources.map((r) => r.department || 'General'))
-  );
+  const departments = useMemo(() => {
+    return Array.from(new Set(resources.map((r) => r.department || 'General')));
+  }, [resources]);
 
-  const filteredResources = resources.filter((r) => {
-    const matchesSearch =
-      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.department || '').toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredResources = useMemo(() => {
+    return resources.filter((r) => {
+      const matchesSearch =
+        r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (r.department || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-    if (selectedDepartment === 'all') return matchesSearch;
-    return matchesSearch && (r.department || 'General') === selectedDepartment;
-  });
+      if (selectedDepartment === 'all') return matchesSearch;
+      return matchesSearch && (r.department || 'General') === selectedDepartment;
+    });
+  }, [resources, searchQuery, selectedDepartment]);
 
   const selectedVenue = providers.find((p) => p.id === selectedProviderId);
 
@@ -530,7 +535,7 @@ function ResourcesManagementContent() {
           {isHospitalAdmin ? (
             <button
               onClick={() => setIsAdding(true)}
-              className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm cursor-pointer"
+              className="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 active:scale-[0.97] transition-all duration-75 select-none shadow-sm cursor-pointer"
             >
               <Plus className="w-4 h-4 mr-1.5" />
               Add {verticalConfig.resourceLabelSingular} / Service
@@ -864,10 +869,20 @@ function ResourcesManagementContent() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                  disabled={isCreatingResource}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-[0.97] rounded-lg shadow-sm transition-all duration-75 select-none disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2 cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
-                  Save {verticalConfig.resourceLabelSingular}
+                  {isCreatingResource ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Save {verticalConfig.resourceLabelSingular}
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1063,7 +1078,7 @@ function ResourcesManagementContent() {
                 <button
                   type="submit"
                   disabled={isUpdatingResource}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-[0.97] rounded-lg shadow-sm transition-all duration-75 select-none flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:active:scale-100"
                 >
                   {isUpdatingResource ? (
                     <>

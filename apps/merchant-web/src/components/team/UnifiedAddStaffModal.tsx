@@ -509,7 +509,7 @@ export function UnifiedAddStaffModal({
             <button
               type="submit"
               disabled={submitting || (role !== 'administrator' && isDeptFull)}
-              className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-[0.97] rounded-lg shadow-sm transition-all duration-75 disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2 cursor-pointer"
             >
               {submitting ? (
                 <>
