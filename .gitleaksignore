@@ -78,3 +78,5 @@ tests/scripts/verify-logging.mjs:stripe-access-token:18
 tests/scripts/run-mission-full-verification.mjs:jwt:27
 # generic-api-key in .agents/manifest.lock.json:68 (sha256 hash in lockfile)
 .agents/manifest.lock.json:generic-api-key:68
+# generic-api-key false positive in .gsd/generate_master_coverage_ledger.py:823
+.gsd/generate_master_coverage_ledger.py:generic-api-key:823

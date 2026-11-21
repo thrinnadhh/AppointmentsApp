@@ -57,3 +57,63 @@
 - **Compatibility & Non-Regression:** Zero breaking changes for customer mobile app, webhooks, or merchant bookings triage.
 - **File Disjointness:** Zero file overlap across all concurrent tasks within each wave and across waves.
 - **Standing Rule 3:** Explicit RED-GREEN test ordering mandated for all behavioral and bug fix tasks.
+
+---
+
+## Round 1 Review — Campaign `security/window-closure-20261121` (2026-11-21 18:50 UTC / 2026-11-22 00:20 IST)
+**Reviewer:** Zero-Context Goldfish Spec Reviewer (`goldfish` - `mantis-critic` + `plan-checker`)  
+**Input:** `.gsd/SECURITY_OPEN_WINDOWS.json`, `.gsd/SECURITY_WAVE_PLAN.json`, `.gsd/SECURITY_REMEDIATION_SPEC.md`, `.gsd/SECURITY_TASKS.json`, `.gsd/COVERAGE_LEDGER.json`, `.gsd/MANUAL_ACTIONS.md`  
+**Verdict:** `SPEC_APPROVED`
+
+### Systematic Verification Against 5 Mandatory Criteria:
+
+1. **Criterion 1: Mapping & Non-Overlap (Confirmed Windows ↔ Wave Plan Tasks)**
+   - *Result:* **PASS** (Exit code 0, evidence in `.gsd/evidence/STAGE3_GOLDFISH/criterion1_mapping_and_overlap.*`).
+   - Confirmed WINDOW_IDs: `SEC-DISC-001` (CWE-285, High), `SEC-DISC-002` (CWE-798, High).
+   - `SEC-DISC-001` maps 1-to-1 to `TASK-W2-01` in Wave 2.
+   - `SEC-DISC-002` maps 1-to-1 to `TASK-W4-01` in Wave 4 (`NEEDS_HUMAN` governance item per Global Rule R5).
+   - Zero orphans, zero unmapped confirmed windows, zero redundant task mappings.
+   - Zero file overlap between tasks: `TASK-W2-01` exclusively touches `apps/merchant-web/src/app/api/account/delete/route.ts` and `tests/security/account-deletion-auth.test.mjs`; `TASK-W4-01` exclusively touches `.gsd/MANUAL_ACTIONS.md`.
+
+2. **Criterion 2: Sibling Entry Points Coverage**
+   - *Result:* **PASS** (Exit code 0, evidence in `.gsd/evidence/STAGE3_GOLDFISH/criterion2_sibling_entrypoints.*` and `criterion2_check_all_deletion_routes.*`).
+   - Server Actions: Verified 0 `'use server'` directives exist in `apps/merchant-web`.
+   - API Routes: Audited all account deletion routes:
+     - `DELETE /api/account/delete`: Patched by `TASK-W2-01` to invoke `delete_account_immediately` with the authenticated user-scoped client `supabase.rpc`, fixing the `auth.uid() IS NULL` exception.
+     - `POST /api/account/delete-public-request`: Verified proof-of-ownership flow with fallback to `service_role` RPC `public.anonymize_user_data(userId)` and zero grace period.
+     - `GET /api/account/delete`: Verified read-only inspection of deletion status.
+   - Database RPCs:
+     - `public.delete_account_immediately(p_reason)`: Verified `(SELECT auth.uid())` requirement, granted to `authenticated` and `service_role`.
+     - `public.request_account_deletion(p_reason)`: Delegates to `delete_account_immediately(p_reason)`.
+     - `public.anonymize_user_data(p_user_id)`: Granted exclusively to `service_role`.
+   - Client Bridges & Mobile App:
+     - `apps/customer-mobile/src/screens/AccountScreen.tsx`: Calls `supabase.rpc('request_account_deletion')` directly, with fallback to `fetch('/api/account/delete', { method: 'DELETE' })`. The `TASK-W2-01` fix ensures both direct RPC and API route invocations succeed under the caller's JWT context.
+
+3. **Criterion 3: Browser Policies & Client Compatibility**
+   - *Result:* **PASS** (Exit code 0, evidence in `.gsd/evidence/STAGE3_GOLDFISH/criterion3_browser_policies.*`).
+   - Wave 3 is marked `CLEAN` with 0 tasks; all 10 modern web candidates (`MODWEB-001` through `MODWEB-010`) were verified safe / defense-in-depth hygiene.
+   - Zero breaking header modifications: no restrictive CSP changes that would break Cashfree checkout SDK (`https://sdk.cashfree.com`), UPI deep-linking schemes (`upi://`), or `CashfreeCheckoutWebView` origin whitelisting (`CASHFREE_ALLOWED_ORIGINS`).
+   - Mobile WebView postMessage bridge retains strict fail-closed origin validation without regressions.
+
+4. **Criterion 4: File and Line Range Citation Verification**
+   - *Result:* **PASS** (Exit code 0, evidence in `.gsd/evidence/STAGE3_GOLDFISH/criterion4_spotcheck_citations.*` and `criterion4_comprehensive_spotcheck.*`).
+   - 100% of CRITICAL and HIGH citations verified:
+     - `SEC-DISC-001`: `apps/merchant-web/src/app/api/account/delete/route.ts:44-70` and `supabase/migrations/20261121000002_immediate_account_deletion_and_single_admin.sql:51` verified exist and contain claimed code.
+     - `SEC-DISC-002`: Leaked Supabase Cloud credentials verified in git commit history objects for commits `9305ab5c`, `34b7d2c7`, and `5e515195`.
+     - `MODWEB-003`: `apps/merchant-web/src/lib/supabase.ts:58` verified.
+     - `MODWEB-004`: `apps/merchant-web/src/middleware.ts` headers verified.
+   - REST citations spot-checked (>30% sample): `SEC-DISC-003`, `MODWEB-006`, `MODWEB-010` verified.
+   - All 100 coverage units in `.gsd/COVERAGE_LEDGER.json` verified against repository paths.
+
+5. **Criterion 5: Wave Dependency Ordering**
+   - *Result:* **PASS** (Exit code 0, evidence in `.gsd/evidence/STAGE3_GOLDFISH/criterion5_wave_dependencies.*`).
+   - Wave 1 (Database): 0 tasks (clean).
+   - Wave 2 (API Routes): `TASK-W2-01` depends only on existing database stored procedures in migration `20261121000002_immediate_account_deletion_and_single_admin.sql`.
+   - Wave 3 (Frontend): 0 tasks (clean).
+   - Wave 4 (DevOps & Governance): `TASK-W4-01` targets `.gsd/MANUAL_ACTIONS.md` for human governance.
+   - Strict topological forward independence: No task depends on an artifact or migration introduced in a later wave.
+
+### Conclusion & Approval:
+The remediation specification and wave plan meet all quality and safety criteria. Round 1 review passes with zero defects.
+Verdict: **SPEC_APPROVED**
+

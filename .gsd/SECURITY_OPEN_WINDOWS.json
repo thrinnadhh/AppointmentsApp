@@ -1,0 +1,167 @@
+[
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-DISC-001",
+    "title": "[VERIFIED_CLOSED] [CWE-285] In-App Account Deletion Route Fails with HTTP 500 Due to Service-Role RPC Call Without User Context",
+    "description": "ISSUE_ID: SEC-DISC-001\nSTATUS: VERIFIED_CLOSED\nEVIDENCE_RED: .gsd/evidence/SEC-DISC-001/red_test.meta.json (exit_code=1)\nEVIDENCE_GREEN: .gsd/evidence/SEC-DISC-001/green_test.meta.json (exit_code=0)\nEVIDENCE_MUTATION: .gsd/evidence/SEC-DISC-001/mutation_check.meta.json (exit_code=0)\nSEVERITY: high\nCWE: CWE-285: Improper Authorization\nATTACK_SURFACE: Backend API / Account Deletion (apps/merchant-web/src/app/api/account/delete/route.ts)\nFILE_PATH: apps/merchant-web/src/app/api/account/delete/route.ts\nLINE_RANGE: 44-70\nROOT_CAUSE: In apps/merchant-web/src/app/api/account/delete/route.ts line 59, the route invokes the delete_account_immediately RPC using supabaseAdmin (service role). The SQL function public.delete_account_immediately reads v_uid := (SELECT auth.uid()) and raises an exception 'Not authenticated' (ERRCODE 42501) if v_uid IS NULL. Because supabaseAdmin operates as service_role without a client auth.uid() claim, the RPC unconditionally fails with HTTP 500, blocking users from immediately exercising their mandatory right to erasure under DPDP Act 2023 Section 12 and Google Play Store account deletion requirements.\nSECURITY_INVARIANT_VIOLATED: Data principals must be able to immediately delete their account and personal data via authenticated in-app self-service.\nEXPLOITABILITY: Any authenticated merchant, staff, or customer attempting in-app account deletion receives an HTTP 500 error; account data is never anonymized or erased.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: tests/security/account-deletion-auth.test.mjs",
+    "root_cause": "In apps/merchant-web/src/app/api/account/delete/route.ts line 59, the route invokes delete_account_immediately via supabaseAdmin (service_role) rather than the user-scoped client supabase (or without passing the authenticated user's ID). The SQL function public.delete_account_immediately enforces IF (SELECT auth.uid()) IS NULL THEN RAISE EXCEPTION 'Not authenticated'. Because service-role requests carry no user JWT claim, auth.uid() evaluates to NULL and the deletion request unconditionally fails.",
+    "intended_behavior": "Authenticated callers requesting account deletion must have their account immediately anonymized and erased with zero postponement, returning HTTP 200.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "apps/merchant-web/src/app/api/account/delete/route.ts",
+        "line": 44,
+        "scope": "DELETE",
+        "description": "Authenticated user submits HTTP DELETE request to /api/account/delete with optional reason."
+      },
+      {
+        "kind": "propagation",
+        "file": "apps/merchant-web/src/app/api/account/delete/route.ts",
+        "line": 59,
+        "scope": "DELETE",
+        "description": "Route calls supabaseAdmin.rpc('delete_account_immediately', { p_reason: reason }) instead of user-scoped supabase client."
+      },
+      {
+        "kind": "sink",
+        "file": "supabase/migrations/20261121000002_immediate_account_deletion_and_single_admin.sql",
+        "line": 51,
+        "scope": "public.delete_account_immediately",
+        "description": "v_uid := (SELECT auth.uid()); evaluates to NULL under service_role, raising SQL exception 'Not authenticated' (ERRCODE 42501) and aborting the transaction."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "apps/merchant-web/src/app/api/account/delete/route.ts",
+        "line": 59,
+        "description": "const { data, error } = await (supabaseAdmin.rpc as any)('delete_account_immediately', { p_reason: reason });"
+      },
+      {
+        "file": "supabase/migrations/20261121000002_immediate_account_deletion_and_single_admin.sql",
+        "line": 51,
+        "description": "IF v_uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501'; END IF;"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "system_configuration",
+        "description": "Authenticated user executes DELETE /api/account/delete against the merchant web server."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Authenticated merchant or staff user attempting to delete their account.",
+      "payloads": [
+        "curl -X DELETE http://localhost:3000/api/account/delete -H 'Authorization: Bearer <valid_user_jwt>' -H 'Content-Type: application/json' -d '{\"reason\":\"Immediate deletion request\"}'"
+      ],
+      "instructions": [
+        "1. Authenticate as a user and obtain a valid session JWT.",
+        "2. Send an HTTP DELETE request to /api/account/delete with Authorization Bearer header.",
+        "3. Observe HTTP 500 response with error 'Not authenticated' and verify that the user profile remains untouched in public.profiles."
+      ],
+      "observed_result": "HTTP 500 Internal Server Error returned with body {\"error\": \"Not authenticated\"}. Account deletion fails completely."
+    },
+    "remediation": {
+      "strategy": "VERIFIED_CLOSED: Route fixed by invoking delete_account_immediately with user-scoped supabase client (const supabase = await getRouteSupabaseClient(req); supabase.rpc(delete_account_immediately, { p_reason: reason })). Tested and verified by tests/security/account-deletion-auth.test.mjs with RED, GREEN, and MUTATION checks verified.",
+      "code_changes": [
+        {
+          "file_name": "apps/merchant-web/src/app/api/account/delete/route.ts",
+          "fixed_code": "const { data, error } = await (supabase.rpc as any)('delete_account_immediately', { p_reason: reason });"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "high",
+        "reason": "100% reproducible for every authenticated user invoking the in-app account deletion endpoint."
+      },
+      "impact": {
+        "score": "high",
+        "reason": "Critical regulatory compliance violation (DPDPA Section 12 right to erasure and Google Play Store account deletion mandate); complete denial of service for account deletion."
+      },
+      "overall_severity": "high"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Empirically demonstrated and confirmed against live local database and Next.js route runner."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "SEC-DISC-002",
+    "title": "[NEEDS_HUMAN] [CWE-798] Leaked Supabase Cloud Credentials in Historical Git Commits",
+    "description": "ISSUE_ID: SEC-DISC-002\nSTATUS: NEEDS_HUMAN\nCLASSIFICATION: NEEDS_HUMAN (Global Rule R5)\nGOVERNANCE_DOC: .gsd/MANUAL_ACTIONS.md\nSEVERITY: high\nCWE: CWE-798: Use of Hard-coded Credentials\nATTACK_SURFACE: Git History (Repository Commits)\nFILE_PATH: scripts/e2e-trinadh-hospital-test.mjs\nLINE_RANGE: 19-21\nROOT_CAUSE: Historical git commits (e.g. 9305ab5c32ecc4b00eab078583cf257ea6790d2f, 34b7d2c76c3f4008f2d56b9f3c75937ba9583b75, 5e51519501ec2fbdab1291da76d27e2adba7ae51) contain hardcoded Supabase project credentials (JWTs for remote project ynkdnwhubfknnnzjtpeg). Detected by gitleaks detect and gitleaks git --log-opts=\"--all\" -v.\nSECURITY_INVARIANT_VIOLATED: Production cloud credentials and live infrastructure secrets must never exist in git history.\nEXPLOITABILITY: Anyone with read access to the git repository can extract the credentials from historical commits.\nCONFIDENCE: high\nREQUIRED_REGRESSION_TEST: gitleaks detect --source . -v",
+    "root_cause": "Historical commits in the git log contain hardcoded Supabase API keys for project ynkdnwhubfknnnzjtpeg. While cleaned from the current working tree, the commit blobs remain in git packfiles.",
+    "intended_behavior": "Live cloud credentials must not exist in any git commit or branch history.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "scripts/e2e-trinadh-hospital-test.mjs",
+        "line": 19,
+        "scope": "Commit 9305ab5c32ecc4b00eab078583cf257ea6790d2f",
+        "description": "Hardcoded Supabase credentials committed to historical test script."
+      },
+      {
+        "kind": "propagation",
+        "file": "tests/e2e/payment-full-flow.spec.ts",
+        "line": 7,
+        "scope": "Commit 34b7d2c76c3f4008f2d56b9f3c75937ba9583b75",
+        "description": "Hardcoded Supabase anon key committed to historical Playwright test spec."
+      },
+      {
+        "kind": "sink",
+        "file": "tests/e2e/compliance-pages.spec.ts",
+        "line": 342,
+        "scope": "Commit 5e51519501ec2fbdab1291da76d27e2adba7ae51",
+        "description": "Hardcoded Supabase anon key committed to historical compliance test spec."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "scripts/e2e-trinadh-hospital-test.mjs",
+        "line": 19,
+        "description": "Commit 9305ab5c32ecc4b00eab078583cf257ea6790d2f contains live project ynkdnwhubfknnnzjtpeg credentials."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "system_configuration",
+        "description": "Git repository history contains historical commit blobs."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Attacker inspecting git commit history.",
+      "payloads": [
+        "gitleaks git --log-opts=\"--all\" -v"
+      ],
+      "instructions": [
+        "1. Clone git repository.",
+        "2. Run gitleaks detect or git log -S 'ynkdnwhubfknnnzjtpeg'.",
+        "3. Extract API keys from commit blobs."
+      ],
+      "observed_result": "Gitleaks detects 4 secret leaks across 3 historical files in commit history."
+    },
+    "remediation": {
+      "strategy": "Perform upstream secret rotation in Supabase Cloud Console for project ynkdnwhubfknnnzjtpeg, and execute git-filter-repo to scrub the commit history as documented in .gsd/MANUAL_ACTIONS.md (SEC-WIN-024).",
+      "code_changes": [
+        {
+          "file_name": ".gsd/MANUAL_ACTIONS.md",
+          "fixed_code": "Documented manual rotation and history scrubbing procedure."
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "high",
+        "reason": "Plaintext secret strings are readily readable in git log."
+      },
+      "impact": {
+        "score": "high",
+        "reason": "Potential unauthorized access to remote Supabase project if keys remain active."
+      },
+      "overall_severity": "high"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Empirically verified by gitleaks detect and git log inspect."
+    }
+  }
+]

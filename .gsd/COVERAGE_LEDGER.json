@@ -1,0 +1,4306 @@
+[
+  {
+    "canonical_refs": {
+      "surface": ".github/workflows/ci.yml#CIWorkflow",
+      "boundary": ".github/workflows/ci.yml#WorkflowHardening",
+      "subsystem": ".github/workflows",
+      "attack_class": "ATTACK-CLASSES.md#Software integrity"
+    },
+    "surface": ".github/workflows/ci.yml#CIWorkflow",
+    "boundary": ".github/workflows/ci.yml#WorkflowHardening",
+    "subsystem": ".github/workflows",
+    "attack_class": "Software integrity",
+    "starting_paths": [
+      ".github/workflows/ci.yml"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Software integrity",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      ".github/workflows/ci.yml"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          ".github/workflows/ci.yml"
+        ],
+        "invariant": "GitHub Actions workflow actions must be pinned to full immutable commit SHAs with minimum permissions.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/security/github-actions-hardening.test.mjs): All actions pinned to immutable SHAs, frozen-lockfile enforced.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": ".github%2Fworkflows%2Fci.yml%23CIWorkflow::.github%2Fworkflows%2Fci.yml%23WorkflowHardening::.github%2Fworkflows::ATTACK-CLASSES.md%23Software%20integrity"
+  },
+  {
+    "canonical_refs": {
+      "surface": ".github/workflows/codeql.yml#CodeQLWorkflow",
+      "boundary": ".github/workflows/codeql.yml#StaticAnalysis",
+      "subsystem": ".github/workflows",
+      "attack_class": "ATTACK-CLASSES.md#Software integrity"
+    },
+    "surface": ".github/workflows/codeql.yml#CodeQLWorkflow",
+    "boundary": ".github/workflows/codeql.yml#StaticAnalysis",
+    "subsystem": ".github/workflows",
+    "attack_class": "Software integrity",
+    "starting_paths": [
+      ".github/workflows/codeql.yml"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Software integrity",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      ".github/workflows/codeql.yml"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          ".github/workflows/codeql.yml"
+        ],
+        "invariant": "CodeQL static security analysis workflow must be pinned to immutable SHAs.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:55): CodeQL workflow verified present and pinned.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": ".github%2Fworkflows%2Fcodeql.yml%23CodeQLWorkflow::.github%2Fworkflows%2Fcodeql.yml%23StaticAnalysis::.github%2Fworkflows::ATTACK-CLASSES.md%23Software%20integrity"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#handleMessage",
+      "boundary": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#MessageHandling",
+      "subsystem": "apps/customer-mobile",
+      "attack_class": "ATTACK-CLASSES.md#Origin validation"
+    },
+    "surface": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#handleMessage",
+    "boundary": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#MessageHandling",
+    "subsystem": "apps/customer-mobile",
+    "attack_class": "Origin validation",
+    "starting_paths": [
+      "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Origin validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+        ],
+        "invariant": "handleMessage must validate message origin and discard unverified client postMessage events.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/cashfree-webview-origin-guard.test.mjs): Origin verified against CASHFREE_ALLOWED_ORIGINS, treats events as non-authoritative hints.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23handleMessage::apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23MessageHandling::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Origin%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#originWhitelist",
+      "boundary": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#WebViewBridge",
+      "subsystem": "apps/customer-mobile",
+      "attack_class": "ATTACK-CLASSES.md#Origin validation"
+    },
+    "surface": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#originWhitelist",
+    "boundary": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx#WebViewBridge",
+    "subsystem": "apps/customer-mobile",
+    "attack_class": "Origin validation",
+    "starting_paths": [
+      "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Origin validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
+        ],
+        "invariant": "CashfreeCheckoutWebView originWhitelist must restrict navigation to authorized Cashfree domains and verified UPI schemes.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/cashfree-webview-origin-guard.test.mjs): Strict CASHFREE_ALLOWED_ORIGINS and UPI scheme isolation.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23originWhitelist::apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23WebViewBridge::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Origin%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/customer-mobile/src/screens/BookingPassModal.tsx#ModalCopy",
+      "boundary": "apps/customer-mobile/src/screens/BookingPassModal.tsx#UI",
+      "subsystem": "apps/customer-mobile",
+      "attack_class": "ATTACK-CLASSES.md#Information exposure"
+    },
+    "surface": "apps/customer-mobile/src/screens/BookingPassModal.tsx#ModalCopy",
+    "boundary": "apps/customer-mobile/src/screens/BookingPassModal.tsx#UI",
+    "subsystem": "apps/customer-mobile",
+    "attack_class": "Information exposure",
+    "starting_paths": [
+      "apps/customer-mobile/src/screens/BookingPassModal.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Information exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/customer-mobile/src/screens/BookingPassModal.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/customer-mobile/src/screens/BookingPassModal.tsx"
+        ],
+        "invariant": "Check-in PIN must be clearly labeled as '4-digit check-in PIN' and never labeled as authentication OTP.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/checkin-pin-terminology.test.mjs): BookingPassModal.tsx verified free of OTP terminology.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fscreens%2FBookingPassModal.tsx%23ModalCopy::apps%2Fcustomer-mobile%2Fsrc%2Fscreens%2FBookingPassModal.tsx%23UI::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Information%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src#EdgeRuntimeInventory",
+      "boundary": "apps/merchant-web/src#EdgeRuntimeBoundary",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "apps/merchant-web/src#EdgeRuntimeInventory",
+    "boundary": "apps/merchant-web/src#EdgeRuntimeBoundary",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "apps/merchant-web/src/middleware.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/middleware.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/middleware.ts"
+        ],
+        "invariant": "Next.js Edge Runtime handlers must be verified; confirmed 0 edge route handlers.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:95): grep -rn \"runtime = 'edge'\" apps/ returns 0 hits; only edge middleware is active.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%23EdgeRuntimeInventory::apps%2Fmerchant-web%2Fsrc%23EdgeRuntimeBoundary::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app#ServerActionsInventory",
+      "boundary": "apps/merchant-web/src/app#ServerActionsBoundary",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "apps/merchant-web/src/app#ServerActionsInventory",
+    "boundary": "apps/merchant-web/src/app#ServerActionsBoundary",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "apps/merchant-web/src/app/page.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/page.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/page.tsx"
+        ],
+        "invariant": "Server Actions must not introduce ungated mutation entrypoints; confirmed 0 Server Actions in monorepo.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:115): grep -rn 'use server' apps/ returns 0 hits; 100% of mutations are REST route handlers.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%23ServerActionsInventory::apps%2Fmerchant-web%2Fsrc%2Fapp%23ServerActionsBoundary::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/admin/login/page.tsx#dangerouslySetInnerHTML",
+      "boundary": "apps/merchant-web/src/app/admin/login/page.tsx#AdminMfaEnrollment",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Cross-site scripting"
+    },
+    "surface": "apps/merchant-web/src/app/admin/login/page.tsx#dangerouslySetInnerHTML",
+    "boundary": "apps/merchant-web/src/app/admin/login/page.tsx#AdminMfaEnrollment",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Cross-site scripting",
+    "starting_paths": [
+      "apps/merchant-web/src/app/admin/login/page.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Cross-site scripting",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/admin/login/page.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/admin/login/page.tsx"
+        ],
+        "invariant": "Admin MFA QR code SVG rendering must sanitize markup and not process attacker-controlled scripts.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(DISMISSED_FINDINGS.md#MODWEB-001): sanitizeQrSvg enforces DOMParser tag whitelist; source SVG is trusted GoTrue Auth MFA response.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fadmin%2Flogin%2Fpage.tsx%23dangerouslySetInnerHTML::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fadmin%2Flogin%2Fpage.tsx%23AdminMfaEnrollment::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Cross-site%20scripting"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/admin/page.tsx#handleAdminSignOut",
+      "boundary": "apps/merchant-web/src/app/admin/page.tsx#SessionRevocation",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Authentication bypass"
+    },
+    "surface": "apps/merchant-web/src/app/admin/page.tsx#handleAdminSignOut",
+    "boundary": "apps/merchant-web/src/app/admin/page.tsx#SessionRevocation",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Authentication bypass",
+    "starting_paths": [
+      "apps/merchant-web/src/app/admin/page.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Authentication bypass",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/admin/page.tsx"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/admin/page.tsx"
+        ],
+        "invariant": "Admin signout must revoke active session on Supabase Auth server and clear client cookies.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(DISMISSED_FINDINGS.md#MODWEB-002): supabase.auth.signOut() invalidates server session, client redirects to login.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fadmin%2Fpage.tsx%23handleAdminSignOut::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fadmin%2Fpage.tsx%23SessionRevocation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/account/delete/route.ts#DELETE",
+      "boundary": "apps/merchant-web/src/app/api/account/delete/route.ts#AccountDeletion",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/account/delete/route.ts#DELETE",
+    "boundary": "apps/merchant-web/src/app/api/account/delete/route.ts#AccountDeletion",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/account/delete/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/account/delete/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/account/delete/route.ts"
+        ],
+        "invariant": "Authenticated caller requesting in-app account deletion must execute deletion immediately under caller session context.",
+        "method": "source",
+        "result": "FINDING(SEC-DISC-001): Route invokes delete_account_immediately via supabaseAdmin (service_role without auth.uid() claim), returning HTTP 500 'Not authenticated'. Verified RED via .gsd/evidence/DISCOVERY_MANTIS/test_account_delete_failure.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [
+      "SEC-DISC-001"
+    ],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fdelete%2Froute.ts%23DELETE::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fdelete%2Froute.ts%23AccountDeletion::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/account/delete-public-request/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/account/delete-public-request/route.ts#PublicErasureRequest",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Rate limiting and input validation"
+    },
+    "surface": "apps/merchant-web/src/app/api/account/delete-public-request/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/account/delete-public-request/route.ts#PublicErasureRequest",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Rate limiting and input validation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/account/delete-public-request/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Rate limiting and input validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/account/delete-public-request/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/account/delete-public-request/route.ts"
+        ],
+        "invariant": "Public account erasure requests must verify caller token, rate-limit submissions, and handle ownership proof.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/phase14-merchant-fixes.test.mjs:124): HMAC proof-of-ownership and phone rate limiting enforced.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fdelete-public-request%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fdelete-public-request%2Froute.ts%23PublicErasureRequest::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Rate%20limiting%20and%20input%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/account/export/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/account/export/route.ts#DataPrincipalExport",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Authentication bypass"
+    },
+    "surface": "apps/merchant-web/src/app/api/account/export/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/account/export/route.ts#DataPrincipalExport",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Authentication bypass",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/account/export/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Authentication bypass",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/account/export/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/account/export/route.ts"
+        ],
+        "invariant": "Account export must require authenticated user session; non-production test bypass headers must not function in production.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(DISMISSED_FINDINGS.md#SEC-DISC-003): Inactive in production builds via NODE_ENV !== 'production'; returns 401 Unauthorized for invalid test user IDs.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fexport%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fexport%2Froute.ts%23DataPrincipalExport::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/admin/cities/status/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/admin/cities/status/route.ts#CityGovernance",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Privilege escalation"
+    },
+    "surface": "apps/merchant-web/src/app/api/admin/cities/status/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/admin/cities/status/route.ts#CityGovernance",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Privilege escalation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/admin/cities/status/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Privilege escalation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/admin/cities/status/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/admin/cities/status/route.ts"
+        ],
+        "invariant": "City status updates require platform superadmin privilege via verifyAdminRequest.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:126): Superadmin verification and update_city_status transactional RPC.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Fcities%2Fstatus%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Fcities%2Fstatus%2Froute.ts%23CityGovernance::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Privilege%20escalation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts#RouteHandlers",
+      "boundary": "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts#DoctorAssignments",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Tenant isolation"
+    },
+    "surface": "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts#RouteHandlers",
+    "boundary": "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts#DoctorAssignments",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Tenant isolation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Tenant isolation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts"
+        ],
+        "invariant": "Doctor front desk assignments require hospital admin verification scoped to provider.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:127): verifyStaffManagerRequest check and single-admin conflict checks.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Fdoctor-assignments%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Fdoctor-assignments%2Froute.ts%23DoctorAssignments::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/admin/refunds/route.ts#RouteHandlers",
+      "boundary": "apps/merchant-web/src/app/api/admin/refunds/route.ts#RefundGovernance",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Privilege escalation"
+    },
+    "surface": "apps/merchant-web/src/app/api/admin/refunds/route.ts#RouteHandlers",
+    "boundary": "apps/merchant-web/src/app/api/admin/refunds/route.ts#RefundGovernance",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Privilege escalation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/admin/refunds/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Privilege escalation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/admin/refunds/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/admin/refunds/route.ts"
+        ],
+        "invariant": "Manual refund dispatch requires platform superadmin and immutable audit logging.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:128): verifyAdminRequest guard and admin_audit_logs dispatch.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Frefunds%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Frefunds%2Froute.ts%23RefundGovernance::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Privilege%20escalation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/auth/me/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/auth/me/route.ts#SessionResolution",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Credential exposure"
+    },
+    "surface": "apps/merchant-web/src/app/api/auth/me/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/auth/me/route.ts#SessionResolution",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Credential exposure",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/auth/me/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Credential exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/auth/me/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/auth/me/route.ts"
+        ],
+        "invariant": "Resolves caller identity from validated GoTrue session token without credential leakage.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:97): Verified GoTrue JWT session parsing via getRouteSupabaseClient.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fme%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fme%2Froute.ts%23SessionResolution::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Credential%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/auth/otp/send/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/auth/otp/send/route.ts#SmsRateLimit",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Rate limiting and input validation"
+    },
+    "surface": "apps/merchant-web/src/app/api/auth/otp/send/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/auth/otp/send/route.ts#SmsRateLimit",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Rate limiting and input validation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/auth/otp/send/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Rate limiting and input validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/auth/otp/send/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/auth/otp/send/route.ts"
+        ],
+        "invariant": "SMS OTP dispatch must be rate limited per IP and phone number to prevent SMS toll fraud.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/otp-circuit-breaker.test.mjs): IP & phone rate limits enforced, libphonenumber normalization.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fotp%2Fsend%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fotp%2Fsend%2Froute.ts%23SmsRateLimit::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Rate%20limiting%20and%20input%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/auth/otp/verify/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/auth/otp/verify/route.ts#OtpVerification",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Authentication bypass"
+    },
+    "surface": "apps/merchant-web/src/app/api/auth/otp/verify/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/auth/otp/verify/route.ts#OtpVerification",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Authentication bypass",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/auth/otp/verify/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Authentication bypass",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/auth/otp/verify/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/auth/otp/verify/route.ts"
+        ],
+        "invariant": "OTP verification must defend against brute force and return secure session tokens.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/otp-circuit-breaker.test.mjs): GoTrue token exchange with rate limit circuit breaker.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fotp%2Fverify%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fotp%2Fverify%2Froute.ts%23OtpVerification::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/admit/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/admit/route.ts#PatientAdmission",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Tenant isolation"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/admit/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/admit/route.ts#PatientAdmission",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Tenant isolation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/admit/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Tenant isolation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/admit/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/admit/route.ts"
+        ],
+        "invariant": "Patient admission requires assigned doctor or front desk staff authorization with optimistic locking.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-server-api-matrix.test.mjs): isCallerAuthorizedForBooking check and version/updated_at lock.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fadmit%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fadmit%2Froute.ts%23PatientAdmission::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/cancel/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/cancel/route.ts#BookingCancellation",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/cancel/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/cancel/route.ts#BookingCancellation",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/cancel/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/cancel/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/cancel/route.ts"
+        ],
+        "invariant": "Booking cancellation must verify caller ownership and enforce 60-minute refund fee retention.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-no-show-policy.test.mjs): cancel_booking transactional RPC with policy enforcement.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcancel%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcancel%2Froute.ts%23BookingCancellation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/checkin/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/checkin/route.ts#CheckinGate",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Rate limiting and input validation"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/checkin/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/checkin/route.ts#CheckinGate",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Rate limiting and input validation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/checkin/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Rate limiting and input validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/checkin/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/checkin/route.ts"
+        ],
+        "invariant": "In-person check-in requires 4-digit PIN presentation and 5-failure rate limit lockout.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-noshow-and-pin-gate.test.mjs): staff_checkin_rate_limits verification and assigned staff check.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcheckin%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcheckin%2Froute.ts%23CheckinGate::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Rate%20limiting%20and%20input%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/collect-fee/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/collect-fee/route.ts#FeeCollection",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Financial validation"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/collect-fee/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/collect-fee/route.ts#FeeCollection",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Financial validation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/collect-fee/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Financial validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/collect-fee/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/collect-fee/route.ts"
+        ],
+        "invariant": "Offline fee collection requires authorized front desk staff and atomic ledger update.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-split-payment.test.mjs): collect_consultation_fee RPC updates ledger transactionally.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcollect-fee%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcollect-fee%2Froute.ts%23FeeCollection::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Financial%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/confirm/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/confirm/route.ts#PaymentConfirmation",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Idempotency and race conditions"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/confirm/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/confirm/route.ts#PaymentConfirmation",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Idempotency and race conditions",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/confirm/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Idempotency and race conditions",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/confirm/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/confirm/route.ts"
+        ],
+        "invariant": "Payment confirmation must be idempotent and transition status to CONFIRMED.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-server-api-matrix.test.mjs): confirm_booking_payment transactional RPC.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fconfirm%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fconfirm%2Froute.ts%23PaymentConfirmation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Idempotency%20and%20race%20conditions"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts#EmergencyChoiceResolution",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts#EmergencyChoiceResolution",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts"
+        ],
+        "invariant": "Customer emergency resolution choice (refund vs reschedule) requires booking owner auth.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:136): choose_emergency_option RPC with caller authorization.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Femergency-choice%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Femergency-choice%2Froute.ts%23EmergencyChoiceResolution::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/end/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/end/route.ts#ConsultationLifecycle",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/end/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/end/route.ts#ConsultationLifecycle",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/end/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/end/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/end/route.ts"
+        ],
+        "invariant": "Ending consultation requires assigned doctor identity.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-server-api-matrix.test.mjs): isCallerAuthorizedForBooking check and completed status transition.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fend%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fend%2Froute.ts%23ConsultationLifecycle::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/offline/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/offline/route.ts#OfflineSlotReservation",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Idempotency and race conditions"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/offline/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/offline/route.ts#OfflineSlotReservation",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Idempotency and race conditions",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/offline/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Idempotency and race conditions",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/offline/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/offline/route.ts"
+        ],
+        "invariant": "Front-desk walk-in appointment creation requires provider authorization and slot locking.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-server-api-matrix.test.mjs): Transactional offline booking RPC with GiST exclusion.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Foffline%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Foffline%2Froute.ts%23OfflineSlotReservation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Idempotency%20and%20race%20conditions"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/override/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/override/route.ts#QueueOverride",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Privilege escalation"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/override/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/override/route.ts#QueueOverride",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Privilege escalation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/override/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Privilege escalation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/override/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/override/route.ts"
+        ],
+        "invariant": "Queue position override requires doctor or authorized staff privilege.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/phase3-hospital-queue.test.mjs): override_hospital_queue_position transactional RPC.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Foverride%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Foverride%2Froute.ts%23QueueOverride::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Privilege%20escalation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/reorder/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/reorder/route.ts#QueueReorder",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Privilege escalation"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/reorder/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/reorder/route.ts#QueueReorder",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Privilege escalation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/reorder/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Privilege escalation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/reorder/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/reorder/route.ts"
+        ],
+        "invariant": "Queue reordering requires doctor or authorized staff privilege.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/phase3-hospital-queue.test.mjs): reorder_hospital_queue transactional RPC.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Freorder%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Freorder%2Froute.ts%23QueueReorder::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Privilege%20escalation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/bookings/start/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/bookings/start/route.ts#ConsultationStart",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/bookings/start/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/bookings/start/route.ts#ConsultationStart",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/bookings/start/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/bookings/start/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/bookings/start/route.ts"
+        ],
+        "invariant": "Starting consultation requires assigned doctor identity.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-server-api-matrix.test.mjs): isCallerAuthorizedForBooking check and in_consultation status transition.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fstart%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fstart%2Froute.ts%23ConsultationStart::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/cities/waitlist/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/cities/waitlist/route.ts#WaitlistSubmission",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Rate limiting and input validation"
+    },
+    "surface": "apps/merchant-web/src/app/api/cities/waitlist/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/cities/waitlist/route.ts#WaitlistSubmission",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Rate limiting and input validation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/cities/waitlist/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Rate limiting and input validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/cities/waitlist/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/cities/waitlist/route.ts"
+        ],
+        "invariant": "City waitlist submissions must be rate-limited per IP and phone to prevent spam.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:140): IP (10/hr) and phone (3/day) rate limits with database deduplication.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcities%2Fwaitlist%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcities%2Fwaitlist%2Froute.ts%23WaitlistSubmission::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Rate%20limiting%20and%20input%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/cron/security-monitor/route.ts#CronHandler",
+      "boundary": "apps/merchant-web/src/app/api/cron/security-monitor/route.ts#CronAuth",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Authentication bypass"
+    },
+    "surface": "apps/merchant-web/src/app/api/cron/security-monitor/route.ts#CronHandler",
+    "boundary": "apps/merchant-web/src/app/api/cron/security-monitor/route.ts#CronAuth",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Authentication bypass",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/cron/security-monitor/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Authentication bypass",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/cron/security-monitor/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/cron/security-monitor/route.ts"
+        ],
+        "invariant": "Cron endpoints require constant-time verification of CRON_SECRET.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/cron-deduplication.test.mjs): crypto.timingSafeEqual on CRON_SECRET.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcron%2Fsecurity-monitor%2Froute.ts%23CronHandler::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcron%2Fsecurity-monitor%2Froute.ts%23CronAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts#CustomerIsolation",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Tenant isolation"
+    },
+    "surface": "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts#CustomerIsolation",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Tenant isolation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Tenant isolation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts"
+        ],
+        "invariant": "Queue and appointment history queries must be isolated strictly to the authenticated customer.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-customer-screens.test.mjs): auth.uid() scope query against customer bookings.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcustomer%2Fqueue-and-history%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcustomer%2Fqueue-and-history%2Froute.ts%23CustomerIsolation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts#AdminProfileAccess",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts#AdminProfileAccess",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts"
+        ],
+        "invariant": "Inspect customer profiles requires platform admin authorization to prevent BOLA.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/security-human-journey-bola.test.mjs): verifyAdminRequest guard prevents BOLA.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcustomers%2F%5Bid%5D%2Fprofile%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcustomers%2F%5Bid%5D%2Fprofile%2Froute.ts%23AdminProfileAccess::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts#DoctorEmergencyAuth",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts#DoctorEmergencyAuth",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts"
+        ],
+        "invariant": "Emergency cancellation must be restricted to the assigned doctor or hospital admin.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-per-consultant-gaps.test.mjs): Consultant or hospital admin authorization check.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fdoctor%2Femergency-cancel%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fdoctor%2Femergency-cancel%2Froute.ts%23DoctorEmergencyAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/health/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/health/route.ts#PublicHealthStatus",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Information exposure"
+    },
+    "surface": "apps/merchant-web/src/app/api/health/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/health/route.ts#PublicHealthStatus",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Information exposure",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/health/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Information exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/health/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/health/route.ts"
+        ],
+        "invariant": "Public health endpoint returns operational status without exposing environment secrets.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:83): Unauthenticated GET returns status without sensitive configuration.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhealth%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhealth%2Froute.ts%23PublicHealthStatus::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Information%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts#TenantAuditLogs",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Tenant isolation"
+    },
+    "surface": "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts#TenantAuditLogs",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Tenant isolation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Tenant isolation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts"
+        ],
+        "invariant": "Hospital audit logs must be scoped strictly to the caller's tenant provider.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-audit-logging.test.mjs): Hospital admin authorization with provider_id filter.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Faudit-logs%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Faudit-logs%2Froute.ts%23TenantAuditLogs::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/hospital/context/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/hospital/context/route.ts#StaffContextResolution",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/hospital/context/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/hospital/context/route.ts#StaffContextResolution",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/hospital/context/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/hospital/context/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/hospital/context/route.ts"
+        ],
+        "invariant": "Context resolution must return only the doctor IDs and roles accessible to caller.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-access-helpers.test.mjs): Resolves memberships and doctor_front_desk_assignments.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fcontext%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fcontext%2Froute.ts%23StaffContextResolution::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/hospital/departments/route.ts#RouteHandlers",
+      "boundary": "apps/merchant-web/src/app/api/hospital/departments/route.ts#DepartmentManagement",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Tenant isolation"
+    },
+    "surface": "apps/merchant-web/src/app/api/hospital/departments/route.ts#RouteHandlers",
+    "boundary": "apps/merchant-web/src/app/api/hospital/departments/route.ts#DepartmentManagement",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Tenant isolation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/hospital/departments/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Tenant isolation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/hospital/departments/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/hospital/departments/route.ts"
+        ],
+        "invariant": "Department management requires hospital admin; delete blocked if active appointments exist.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-admin-screens.test.mjs): isHospitalAdmin check and appointment cascade protection.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fdepartments%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fdepartments%2Froute.ts%23DepartmentManagement::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/hospital/members/route.ts#RouteHandlers",
+      "boundary": "apps/merchant-web/src/app/api/hospital/members/route.ts#HospitalStaffRoster",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/hospital/members/route.ts#RouteHandlers",
+    "boundary": "apps/merchant-web/src/app/api/hospital/members/route.ts#HospitalStaffRoster",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/hospital/members/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/hospital/members/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/hospital/members/route.ts"
+        ],
+        "invariant": "Hospital member invitation and revocation requires manager authority.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-admin-screens.test.mjs:166): verifyStaffManagerRequest check on GET/POST/PATCH/DELETE.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fmembers%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fmembers%2Froute.ts%23HospitalStaffRoster::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts#RouteHandlers",
+      "boundary": "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts#DoctorAvailabilityToggle",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts#RouteHandlers",
+    "boundary": "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts#DoctorAvailabilityToggle",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts"
+        ],
+        "invariant": "Doctor status toggle requires assigned doctor or hospital admin authority.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-per-consultant-gaps.test.mjs): Verified caller is doctor or hospital owner.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fmerchant%2Fdoctor-status%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fmerchant%2Fdoctor-status%2Froute.ts%23DoctorAvailabilityToggle::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts#RouteHandlers",
+      "boundary": "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts#EasySplitOnboarding",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Financial validation"
+    },
+    "surface": "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts#RouteHandlers",
+    "boundary": "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts#EasySplitOnboarding",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Financial validation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Financial validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts"
+        ],
+        "invariant": "Cashfree EasySplit vendor onboarding requires verified hospital ownership; bank details masked.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/cashfree-easysplit.test.mjs): isCallerAuthorizedForProvider and masked PAN/account checks.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fmerchants%2Fcashfree-vendor%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fmerchants%2Fcashfree-vendor%2Froute.ts%23EasySplitOnboarding::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Financial%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/notifications/push/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/notifications/push/route.ts#PushNotificationDispatch",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Information exposure"
+    },
+    "surface": "apps/merchant-web/src/app/api/notifications/push/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/notifications/push/route.ts#PushNotificationDispatch",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Information exposure",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/notifications/push/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Information exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/notifications/push/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/notifications/push/route.ts"
+        ],
+        "invariant": "Push notification payloads must not contain sensitive patient medical data.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-push-notifications.test.mjs): Privacy-preserving notification templates only.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fnotifications%2Fpush%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fnotifications%2Fpush%2Froute.ts%23PushNotificationDispatch::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Information%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/payments/create-order/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/payments/create-order/route.ts#OrderCreationAuth",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Authentication bypass"
+    },
+    "surface": "apps/merchant-web/src/app/api/payments/create-order/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/payments/create-order/route.ts#OrderCreationAuth",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Authentication bypass",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/payments/create-order/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Authentication bypass",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/payments/create-order/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/payments/create-order/route.ts"
+        ],
+        "invariant": "Payment order creation must authenticate caller before performing database or gateway calls.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/create-order-auth-ordering.test.mjs): verifyAuthenticatedUser executes first, rate limits enforced.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fpayments%2Fcreate-order%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fpayments%2Fcreate-order%2Froute.ts%23OrderCreationAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/payments/verify/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/payments/verify/route.ts#ClientReturnVerification",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Financial validation"
+    },
+    "surface": "apps/merchant-web/src/app/api/payments/verify/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/payments/verify/route.ts#ClientReturnVerification",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Financial validation",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/payments/verify/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Financial validation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/payments/verify/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/payments/verify/route.ts"
+        ],
+        "invariant": "Client-side payment return verification must validate cryptographic gateway signature.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/production-hardening-and-cashfree.test.mjs): HMAC-SHA256 signature verification via adapter.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fpayments%2Fverify%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fpayments%2Fverify%2Froute.ts%23ClientReturnVerification::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Financial%20validation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts#SignedUrlGating",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts#SignedUrlGating",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts"
+        ],
+        "invariant": "Signed URL generation for prescriptions requires booking customer or doctor authority and audit logging.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/prescriptions-signed-url-bypass.test.mjs): Path ownership check (${booking.id}/) and audit logging.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fprescriptions%2Fsigned-url%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fprescriptions%2Fsigned-url%2Froute.ts%23SignedUrlGating::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/queue/broadcast/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/queue/broadcast/route.ts#RealtimeBroadcast",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Improper authorization"
+    },
+    "surface": "apps/merchant-web/src/app/api/queue/broadcast/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/queue/broadcast/route.ts#RealtimeBroadcast",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Improper authorization",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/queue/broadcast/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Improper authorization",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/queue/broadcast/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/queue/broadcast/route.ts"
+        ],
+        "invariant": "Realtime queue broadcast requires doctor or staff authorization for that resource.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/phase3-hospital-queue.test.mjs): authorizeHospitalResourceOrMerchant check.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fqueue%2Fbroadcast%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fqueue%2Fbroadcast%2Froute.ts%23RealtimeBroadcast::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/slots/availability/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/slots/availability/route.ts#PublicSlotInspection",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Information exposure"
+    },
+    "surface": "apps/merchant-web/src/app/api/slots/availability/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/slots/availability/route.ts#PublicSlotInspection",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Information exposure",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/slots/availability/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Information exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/slots/availability/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/slots/availability/route.ts"
+        ],
+        "invariant": "Slot availability returns timing data without leaking patient identity or booking details.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:154): Only slot_start and slot_end intervals returned.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fslots%2Favailability%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fslots%2Favailability%2Froute.ts%23PublicSlotInspection::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Information%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/ticket/[id]/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/api/ticket/[id]/route.ts#TicketPreview",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Information exposure"
+    },
+    "surface": "apps/merchant-web/src/app/api/ticket/[id]/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/api/ticket/[id]/route.ts#TicketPreview",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Information exposure",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/ticket/[id]/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Information exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/ticket/[id]/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/ticket/[id]/route.ts"
+        ],
+        "invariant": "Public ticket view masks customer PII and hides 4-digit check-in PIN until <= 60m pre-slot.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-lifetime-pin-and-patient-gap.test.mjs): PII masking and 60m time-gated check-in PIN.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fticket%2F%5Bid%5D%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fticket%2F%5Bid%5D%2Froute.ts%23TicketPreview::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Information%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/webhooks/cashfree/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/webhooks/cashfree/route.ts#CashfreeWebhookAuth",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Replay attacks"
+    },
+    "surface": "apps/merchant-web/src/app/api/webhooks/cashfree/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/webhooks/cashfree/route.ts#CashfreeWebhookAuth",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Replay attacks",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/webhooks/cashfree/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Replay attacks",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/webhooks/cashfree/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/webhooks/cashfree/route.ts"
+        ],
+        "invariant": "Webhook must verify HMAC-SHA256 in constant time, check 300s timestamp freshness, and enforce idempotency.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/production-hardening-and-cashfree.test.mjs): crypto.timingSafeEqual, timestamp drift check, paise check.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Fcashfree%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Fcashfree%2Froute.ts%23CashfreeWebhookAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Replay%20attacks"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts#POST",
+      "boundary": "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts#DecommissionedGateway",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Replay attacks"
+    },
+    "surface": "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts#POST",
+    "boundary": "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts#DecommissionedGateway",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Replay attacks",
+    "starting_paths": [
+      "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Replay attacks",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/api/webhooks/razorpay/route.ts"
+        ],
+        "invariant": "Decommissioned payment routes must return HTTP 410 Gone without processing bodies or reading secrets.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/unit/razorpay-decommission.test.mjs): Unconditionally returns 410 Gone.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Frazorpay%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Frazorpay%2Froute.ts%23DecommissionedGateway::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Replay%20attacks"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/app/auth/callback/route.ts#GET",
+      "boundary": "apps/merchant-web/src/app/auth/callback/route.ts#OAuthExchange",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Authentication bypass"
+    },
+    "surface": "apps/merchant-web/src/app/auth/callback/route.ts#GET",
+    "boundary": "apps/merchant-web/src/app/auth/callback/route.ts#OAuthExchange",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Authentication bypass",
+    "starting_paths": [
+      "apps/merchant-web/src/app/auth/callback/route.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Authentication bypass",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/app/auth/callback/route.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/app/auth/callback/route.ts"
+        ],
+        "invariant": "Auth callback securely exchanges OAuth code for session cookies with path validation.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:95): createServerClient session exchange with path validation.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fauth%2Fcallback%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fauth%2Fcallback%2Froute.ts%23OAuthExchange::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass"
+  },
+  {
+    "canonical_refs": {
+      "surface": "apps/merchant-web/src/lib/supabase.ts#createBrowserClient",
+      "boundary": "apps/merchant-web/src/lib/supabase.ts#BrowserCookieStorage",
+      "subsystem": "apps/merchant-web",
+      "attack_class": "ATTACK-CLASSES.md#Credential exposure"
+    },
+    "surface": "apps/merchant-web/src/lib/supabase.ts#createBrowserClient",
+    "boundary": "apps/merchant-web/src/lib/supabase.ts#BrowserCookieStorage",
+    "subsystem": "apps/merchant-web",
+    "attack_class": "Credential exposure",
+    "starting_paths": [
+      "apps/merchant-web/src/lib/supabase.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Credential exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "apps/merchant-web/src/lib/supabase.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "apps/merchant-web/src/lib/supabase.ts"
+        ],
+        "invariant": "Browser client session tokens must be validated cryptographically on server and database layers.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(DISMISSED_FINDINGS.md#MODWEB-003): Standard Supabase SSR client architecture; all API handlers and RLS enforce server-side validation.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Flib%2Fsupabase.ts%23createBrowserClient::apps%2Fmerchant-web%2Fsrc%2Flib%2Fsupabase.ts%23BrowserCookieStorage::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Credential%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "scripts/e2e-trinadh-hospital-test.mjs#CommitHistory",
+      "boundary": "scripts/e2e-trinadh-hospital-test.mjs#GitHistorySecrets",
+      "subsystem": "scripts",
+      "attack_class": "ATTACK-CLASSES.md#Credential exposure"
+    },
+    "surface": "scripts/e2e-trinadh-hospital-test.mjs#CommitHistory",
+    "boundary": "scripts/e2e-trinadh-hospital-test.mjs#GitHistorySecrets",
+    "subsystem": "scripts",
+    "attack_class": "Credential exposure",
+    "starting_paths": [
+      "scripts/e2e-trinadh-hospital-test.mjs"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Credential exposure",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "scripts/e2e-trinadh-hospital-test.mjs"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "scripts/e2e-trinadh-hospital-test.mjs"
+        ],
+        "invariant": "Historical git commits must not contain active cloud credentials.",
+        "method": "source",
+        "result": "FINDING(SEC-DISC-002): Gitleaks detected historical Supabase project JWTs in commits 9305ab5c, 34b7d2c7, 5e515195. Tracked in .gsd/MANUAL_ACTIONS.md (SEC-WIN-024) as ROTATION REQUIRED.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [
+      "SEC-DISC-002"
+    ],
+    "unresolved": [],
+    "coverage_id": "scripts%2Fe2e-trinadh-hospital-test.mjs%23CommitHistory::scripts%2Fe2e-trinadh-hospital-test.mjs%23GitHistorySecrets::scripts::ATTACK-CLASSES.md%23Credential%20exposure"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/crash-alert#main",
+      "boundary": "supabase/functions/crash-alert#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/crash-alert#main",
+    "boundary": "supabase/functions/crash-alert#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/crash-alert/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/crash-alert/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/crash-alert/index.ts"
+        ],
+        "invariant": "Edge function crash-alert must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Validates crash alert payloads and deduplicates alerts.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fcrash-alert%23main::supabase%2Ffunctions%2Fcrash-alert%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/generate-invoice#main",
+      "boundary": "supabase/functions/generate-invoice#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/generate-invoice#main",
+    "boundary": "supabase/functions/generate-invoice#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/generate-invoice/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/generate-invoice/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/generate-invoice/index.ts"
+        ],
+        "invariant": "Edge function generate-invoice must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Generates PDF invoice receipts for completed appointments.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fgenerate-invoice%23main::supabase%2Ffunctions%2Fgenerate-invoice%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/process-cancellation#main",
+      "boundary": "supabase/functions/process-cancellation#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/process-cancellation#main",
+    "boundary": "supabase/functions/process-cancellation#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/process-cancellation/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/process-cancellation/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/process-cancellation/index.ts"
+        ],
+        "invariant": "Edge function process-cancellation must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Handles background cancellation cascading and notification dispatch.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fprocess-cancellation%23main::supabase%2Ffunctions%2Fprocess-cancellation%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/process-notification-queue#main",
+      "boundary": "supabase/functions/process-notification-queue#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/process-notification-queue#main",
+    "boundary": "supabase/functions/process-notification-queue#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/process-notification-queue/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/process-notification-queue/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/process-notification-queue/index.ts"
+        ],
+        "invariant": "Edge function process-notification-queue must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Pulls notification items from pgmq and sends via channels.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fprocess-notification-queue%23main::supabase%2Ffunctions%2Fprocess-notification-queue%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/process-refund-queue#main",
+      "boundary": "supabase/functions/process-refund-queue#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/process-refund-queue#main",
+    "boundary": "supabase/functions/process-refund-queue#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/process-refund-queue/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/process-refund-queue/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/process-refund-queue/index.ts"
+        ],
+        "invariant": "Edge function process-refund-queue must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Processes automated gateway refund dispatch with retry backoff.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fprocess-refund-queue%23main::supabase%2Ffunctions%2Fprocess-refund-queue%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/send-booking-notification#main",
+      "boundary": "supabase/functions/send-booking-notification#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/send-booking-notification#main",
+    "boundary": "supabase/functions/send-booking-notification#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/send-booking-notification/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/send-booking-notification/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/send-booking-notification/index.ts"
+        ],
+        "invariant": "Edge function send-booking-notification must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Formats booking confirmation SMS and push alerts.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fsend-booking-notification%23main::supabase%2Ffunctions%2Fsend-booking-notification%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/whatsapp-auth-hook#main",
+      "boundary": "supabase/functions/whatsapp-auth-hook#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/whatsapp-auth-hook#main",
+    "boundary": "supabase/functions/whatsapp-auth-hook#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/whatsapp-auth-hook/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/whatsapp-auth-hook/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/whatsapp-auth-hook/index.ts"
+        ],
+        "invariant": "Edge function whatsapp-auth-hook must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Verifies WhatsApp Webhook token subscription challenge.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fwhatsapp-auth-hook%23main::supabase%2Ffunctions%2Fwhatsapp-auth-hook%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/whatsapp-sender#main",
+      "boundary": "supabase/functions/whatsapp-sender#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/whatsapp-sender#main",
+    "boundary": "supabase/functions/whatsapp-sender#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/whatsapp-sender/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/whatsapp-sender/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/whatsapp-sender/index.ts"
+        ],
+        "invariant": "Edge function whatsapp-sender must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Worker claiming up to 20 notifications using FOR UPDATE SKIP LOCKED.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fwhatsapp-sender%23main::supabase%2Ffunctions%2Fwhatsapp-sender%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/functions/whatsapp-webhook#main",
+      "boundary": "supabase/functions/whatsapp-webhook#EdgeFunction",
+      "subsystem": "supabase/functions",
+      "attack_class": "ATTACK-CLASSES.md#Direct request execution"
+    },
+    "surface": "supabase/functions/whatsapp-webhook#main",
+    "boundary": "supabase/functions/whatsapp-webhook#EdgeFunction",
+    "subsystem": "supabase/functions",
+    "attack_class": "Direct request execution",
+    "starting_paths": [
+      "supabase/functions/whatsapp-webhook/index.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Direct request execution",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/functions/whatsapp-webhook/index.ts"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/functions/whatsapp-webhook/index.ts"
+        ],
+        "invariant": "Edge function whatsapp-webhook must validate caller credentials and sanitize input parameters.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Meta webhook validating x-hub-signature-256 HMAC-SHA256 signature in constant time.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Ffunctions%2Fwhatsapp-webhook%23main::supabase%2Ffunctions%2Fwhatsapp-webhook%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.account_deletion_requests",
+      "boundary": "public.account_deletion_requests#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.account_deletion_requests",
+    "boundary": "public.account_deletion_requests#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.account_deletion_requests must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.account_deletion_requests RLS confirmed active; User-isolated SELECT, zero public INSERT, processed via delete_account_immediately RPC.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.account_deletion_requests::public.account_deletion_requests%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.admin_audit_logs",
+      "boundary": "public.admin_audit_logs#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.admin_audit_logs",
+    "boundary": "public.admin_audit_logs#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.admin_audit_logs must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.admin_audit_logs RLS confirmed active; RLS active, service_role ALL, admin-only SELECT; audited platform operations.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.admin_audit_logs::public.admin_audit_logs%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.app_logs",
+      "boundary": "public.app_logs#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.app_logs",
+    "boundary": "public.app_logs#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.app_logs must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.app_logs RLS confirmed active; RLS active, service_role ALL, admin SELECT; anonymized client telemetry.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.app_logs::public.app_logs%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.appointment_checkin_codes",
+      "boundary": "public.appointment_checkin_codes#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.appointment_checkin_codes",
+    "boundary": "public.appointment_checkin_codes#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.appointment_checkin_codes must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.appointment_checkin_codes RLS confirmed active; Customer-only SELECT; 4-digit PIN revealed <= 60m pre-slot.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.appointment_checkin_codes::public.appointment_checkin_codes%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.audit_logs",
+      "boundary": "public.audit_logs#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.audit_logs",
+    "boundary": "public.audit_logs#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.audit_logs must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.audit_logs RLS confirmed active; Authenticated insert/select scoped to merchant and actor; immutable trail.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.audit_logs::public.audit_logs%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.bookings",
+      "boundary": "public.bookings#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.bookings",
+    "boundary": "public.bookings#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.bookings must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.bookings RLS confirmed active; Authenticated SELECT; direct INSERT/UPDATE revoked; slot holds managed by RPC.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.bookings::public.bookings%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.categories",
+      "boundary": "public.categories#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.categories",
+    "boundary": "public.categories#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.categories must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.categories RLS confirmed active; Public read-only catalog; modifications restricted to platform admin.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.categories::public.categories%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.cities",
+      "boundary": "public.cities#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.cities",
+    "boundary": "public.cities#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.cities must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.cities RLS confirmed active; Public read-only; admin-only manage via update_city_status RPC.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.cities::public.cities%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.city_settlements",
+      "boundary": "public.city_settlements#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.city_settlements",
+    "boundary": "public.city_settlements#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.city_settlements must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.city_settlements RLS confirmed active; Admin-only manage; tenant payout settlement tracking.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.city_settlements::public.city_settlements%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.city_waitlist",
+      "boundary": "public.city_waitlist#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.city_waitlist",
+    "boundary": "public.city_waitlist#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.city_waitlist must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.city_waitlist RLS confirmed active; Ingested via RPC; authenticated manage with phone deduplication.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.city_waitlist::public.city_waitlist%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.contact_reveal_audit",
+      "boundary": "public.contact_reveal_audit#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.contact_reveal_audit",
+    "boundary": "public.contact_reveal_audit#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.contact_reveal_audit must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.contact_reveal_audit RLS confirmed active; Admin read-only; audits contact reveal frequency.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.contact_reveal_audit::public.contact_reveal_audit%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.crash_alert_dedup",
+      "boundary": "public.crash_alert_dedup#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.crash_alert_dedup",
+    "boundary": "public.crash_alert_dedup#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.crash_alert_dedup must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.crash_alert_dedup RLS confirmed active; Service role ALL, admin SELECT; deduplication window for alerts.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.crash_alert_dedup::public.crash_alert_dedup%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.department_members",
+      "boundary": "public.department_members#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.department_members",
+    "boundary": "public.department_members#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.department_members must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.department_members RLS confirmed active; Hospital-scoped SELECT, INSERT, UPDATE, DELETE; member capacity enforcement.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.department_members::public.department_members%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.departments",
+      "boundary": "public.departments#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.departments",
+    "boundary": "public.departments#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.departments must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.departments RLS confirmed active; Hospital-scoped manage; delete blocked if active appointments exist.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.departments::public.departments%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.doctor_front_desk_assignments",
+      "boundary": "public.doctor_front_desk_assignments#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.doctor_front_desk_assignments",
+    "boundary": "public.doctor_front_desk_assignments#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.doctor_front_desk_assignments must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.doctor_front_desk_assignments RLS confirmed active; Hospital-scoped manage; binds front desk staff to assigned doctors.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.doctor_front_desk_assignments::public.doctor_front_desk_assignments%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.merchant_memberships",
+      "boundary": "public.merchant_memberships#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.merchant_memberships",
+    "boundary": "public.merchant_memberships#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.merchant_memberships must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.merchant_memberships RLS confirmed active; Merchant-scoped manage; partial unique admin index prevents dual-admin.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.merchant_memberships::public.merchant_memberships%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.merchant_vendor_splits",
+      "boundary": "public.merchant_vendor_splits#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.merchant_vendor_splits",
+    "boundary": "public.merchant_vendor_splits#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.merchant_vendor_splits must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.merchant_vendor_splits RLS confirmed active; Service role ALL, owner SELECT; stores Cashfree EasySplit account config.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.merchant_vendor_splits::public.merchant_vendor_splits%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.notification_logs",
+      "boundary": "public.notification_logs#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.notification_logs",
+    "boundary": "public.notification_logs#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.notification_logs must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.notification_logs RLS confirmed active; Service role and trusted_write manage, customer SELECT; notification audit.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.notification_logs::public.notification_logs%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.payments",
+      "boundary": "public.payments#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.payments",
+    "boundary": "public.payments#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.payments must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.payments RLS confirmed active; Customer-only read, service_role manage; gateway payment records.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.payments::public.payments%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.platform_config",
+      "boundary": "public.platform_config#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.platform_config",
+    "boundary": "public.platform_config#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.platform_config must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.platform_config RLS confirmed active; Service role only; platform parameters and feature flags.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.platform_config::public.platform_config%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.profiles",
+      "boundary": "public.profiles#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.profiles",
+    "boundary": "public.profiles#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.profiles must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.profiles RLS confirmed active; Owner-only read/write, admin manage; data principal personal records.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.profiles::public.profiles%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.providers",
+      "boundary": "public.providers#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.providers",
+    "boundary": "public.providers#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.providers must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.providers RLS confirmed active; Public read, owner UPDATE guarded by guard_provider_governance trigger.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.providers::public.providers%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.push_tokens",
+      "boundary": "public.push_tokens#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.push_tokens",
+    "boundary": "public.push_tokens#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.push_tokens must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.push_tokens RLS confirmed active; Owner-only manage; device push token storage.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.push_tokens::public.push_tokens%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.resource_availability",
+      "boundary": "public.resource_availability#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.resource_availability",
+    "boundary": "public.resource_availability#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.resource_availability must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.resource_availability RLS confirmed active; Public read, owner manage; locked down to SELECT only for client roles.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.resource_availability::public.resource_availability%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.resource_leaves",
+      "boundary": "public.resource_leaves#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.resource_leaves",
+    "boundary": "public.resource_leaves#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.resource_leaves must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.resource_leaves RLS confirmed active; Owner and hospital admin manage; doctor scheduling leaves.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.resource_leaves::public.resource_leaves%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.resources",
+      "boundary": "public.resources#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.resources",
+    "boundary": "public.resources#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.resources must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.resources RLS confirmed active; Public read, owner and hospital admin manage; doctor resources.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.resources::public.resources%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.staff_checkin_rate_limits",
+      "boundary": "public.staff_checkin_rate_limits#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.staff_checkin_rate_limits",
+    "boundary": "public.staff_checkin_rate_limits#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.staff_checkin_rate_limits must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.staff_checkin_rate_limits RLS confirmed active; Deny all to client roles; 5-fail lockout in 60s window.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.staff_checkin_rate_limits::public.staff_checkin_rate_limits%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.sub_categories",
+      "boundary": "public.sub_categories#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.sub_categories",
+    "boundary": "public.sub_categories#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.sub_categories must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.sub_categories RLS confirmed active; Public read-only catalog; modifications restricted to platform admin.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.sub_categories::public.sub_categories%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.test_provider_clock_links",
+      "boundary": "public.test_provider_clock_links#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.test_provider_clock_links",
+    "boundary": "public.test_provider_clock_links#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.test_provider_clock_links must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.test_provider_clock_links RLS confirmed active; Deny all to client roles; internal test harness clock links.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.test_provider_clock_links::public.test_provider_clock_links%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.test_tenant_clocks",
+      "boundary": "public.test_tenant_clocks#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.test_tenant_clocks",
+    "boundary": "public.test_tenant_clocks#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.test_tenant_clocks must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.test_tenant_clocks RLS confirmed active; Deny all to client roles; internal test harness clock fixtures.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.test_tenant_clocks::public.test_tenant_clocks%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.user_consents",
+      "boundary": "public.user_consents#RowLevelSecurity",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260908000001_initial_schema.sql#public.user_consents",
+    "boundary": "public.user_consents#RowLevelSecurity",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "Table public.user_consents must enforce Row Level Security (rowsecurity = true) and isolate data access.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.user_consents RLS confirmed active; Owner-only manage; records DPDP Act §6 notices and consents.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.user_consents::public.user_consents%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20260923000004_reveal_abuse_limits_and_pii_lockdown.sql#public.contact_reveal_anomalies",
+      "boundary": "public.contact_reveal_anomalies#AdminView",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20260923000004_reveal_abuse_limits_and_pii_lockdown.sql#public.contact_reveal_anomalies",
+    "boundary": "public.contact_reveal_anomalies#AdminView",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260923000004_reveal_abuse_limits_and_pii_lockdown.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260923000004_reveal_abuse_limits_and_pii_lockdown.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260923000004_reveal_abuse_limits_and_pii_lockdown.sql"
+        ],
+        "invariant": "Anomaly view must be restricted to platform administrators.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Underlying contact_reveal_audit table limits SELECT to admins.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20260923000004_reveal_abuse_limits_and_pii_lockdown.sql%23public.contact_reveal_anomalies::public.contact_reveal_anomalies%23AdminView::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20261026000001_harden_pii_security_and_erasure.sql#public.merchant_bookings",
+      "boundary": "public.merchant_bookings#ViewSecurityInvoker",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20261026000001_harden_pii_security_and_erasure.sql#public.merchant_bookings",
+    "boundary": "public.merchant_bookings#ViewSecurityInvoker",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20261026000001_harden_pii_security_and_erasure.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20261026000001_harden_pii_security_and_erasure.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20261026000001_harden_pii_security_and_erasure.sql"
+        ],
+        "invariant": "View public.merchant_bookings must execute with security_invoker = true to respect underlying RLS policies.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Created WITH (security_invoker = true) enforcing caller table RLS.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20261026000001_harden_pii_security_and_erasure.sql%23public.merchant_bookings::public.merchant_bookings%23ViewSecurityInvoker::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20261105100001_enable_power_extensions.sql#SECURITY_DEFINER",
+      "boundary": "supabase/migrations/20261105100001_enable_power_extensions.sql#search_path",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Privilege escalation"
+    },
+    "surface": "supabase/migrations/20261105100001_enable_power_extensions.sql#SECURITY_DEFINER",
+    "boundary": "supabase/migrations/20261105100001_enable_power_extensions.sql#search_path",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Privilege escalation",
+    "starting_paths": [
+      "supabase/migrations/20261105100001_enable_power_extensions.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Privilege escalation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20261105100001_enable_power_extensions.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20261105100001_enable_power_extensions.sql"
+        ],
+        "invariant": "100% of PostgreSQL SECURITY DEFINER functions must pin search_path to prevent schema hijacking.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/security/security-definer-schema-guard.test.mjs): Verified 100% of definer functions pin search_path = '' or 'public', 'pg_temp'.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20261105100001_enable_power_extensions.sql%23SECURITY_DEFINER::supabase%2Fmigrations%2F20261105100001_enable_power_extensions.sql%23search_path::supabase%2Fmigrations::ATTACK-CLASSES.md%23Privilege%20escalation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql#public.device_push_tokens",
+      "boundary": "public.device_push_tokens#ViewSecurityInvoker",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql#public.device_push_tokens",
+    "boundary": "public.device_push_tokens#ViewSecurityInvoker",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql"
+        ],
+        "invariant": "View public.device_push_tokens must execute with security_invoker = true.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Created WITH (security_invoker = true) preventing privilege escalation.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20261105100003_pgmq_queues_and_helpers.sql%23public.device_push_tokens::public.device_push_tokens%23ViewSecurityInvoker::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql#guard_provider_governance",
+      "boundary": "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql#GovernanceTrigger",
+      "subsystem": "supabase/migrations",
+      "attack_class": "ATTACK-CLASSES.md#Privilege escalation"
+    },
+    "surface": "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql#guard_provider_governance",
+    "boundary": "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql#GovernanceTrigger",
+    "subsystem": "supabase/migrations",
+    "attack_class": "Privilege escalation",
+    "starting_paths": [
+      "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Privilege escalation",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql"
+        ],
+        "invariant": "Merchant owners must not modify platform governance columns (city, payout_upi_id, cashfree_vendor_id).",
+        "method": "source",
+        "result": "REVIEWED_SAFE(tests/security/guard-provider-payout-and-city.test.mjs): Trigger raises SQL exception on unauthorized field mutation.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fmigrations%2F20261120000004_guard_provider_payout_and_city.sql%23guard_provider_governance::supabase%2Fmigrations%2F20261120000004_guard_provider_payout_and_city.sql%23GovernanceTrigger::supabase%2Fmigrations::ATTACK-CLASSES.md%23Privilege%20escalation"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/storage/prescriptions-and-records#PrivateBucket",
+      "boundary": "supabase/storage/prescriptions-and-records#StorageAccessPolicy",
+      "subsystem": "supabase/storage",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/storage/prescriptions-and-records#PrivateBucket",
+    "boundary": "supabase/storage/prescriptions-and-records#StorageAccessPolicy",
+    "subsystem": "supabase/storage",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "prescriptions-and-records bucket must have zero public read policies; downloads require HMAC signed URLs.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:214): Zero public policies; downloads gated by /api/prescriptions/signed-url and logged.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fstorage%2Fprescriptions-and-records%23PrivateBucket::supabase%2Fstorage%2Fprescriptions-and-records%23StorageAccessPolicy::supabase%2Fstorage::ATTACK-CLASSES.md%23Access%20control"
+  },
+  {
+    "canonical_refs": {
+      "surface": "supabase/storage/venue-assets#PublicBucket",
+      "boundary": "supabase/storage/venue-assets#StorageAccessPolicy",
+      "subsystem": "supabase/storage",
+      "attack_class": "ATTACK-CLASSES.md#Access control"
+    },
+    "surface": "supabase/storage/venue-assets#PublicBucket",
+    "boundary": "supabase/storage/venue-assets#StorageAccessPolicy",
+    "subsystem": "supabase/storage",
+    "attack_class": "Access control",
+    "starting_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "synthesizer",
+    "reviewed_paths": [
+      "supabase/migrations/20260908000001_initial_schema.sql"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "synthesizer",
+        "reviewed_paths": [
+          "supabase/migrations/20260908000001_initial_schema.sql"
+        ],
+        "invariant": "venue-assets bucket allows public read for clinic logos/photos; write access restricted to verified provider owners.",
+        "method": "source",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:211): Public read policy active, write restricted to authenticated provider owner.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [],
+    "unresolved": [],
+    "coverage_id": "supabase%2Fstorage%2Fvenue-assets%23PublicBucket::supabase%2Fstorage%2Fvenue-assets%23StorageAccessPolicy::supabase%2Fstorage::ATTACK-CLASSES.md%23Access%20control"
+  }
+]

@@ -1,177 +1,109 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "version": "1.1.0",
-  "generated_at": "2026-11-21T01:10:00+05:30",
+  "version": "2.0.0",
+  "generated_at": "2026-11-21T18:40:00Z",
+  "campaign": "security/window-closure-20261121",
   "waves": [
     {
       "wave": 1,
-      "name": "Database Schema, Triggers, RLS & Function Lockdown",
-      "description": "PostgreSQL database migrations executed strictly against local Supabase",
-      "tasks": [
-        {
-          "task_id": "TASK-W1-01",
-          "issue_ids": ["SEC-WIN-017", "SEC-WIN-019"],
-          "title": "Harden guard_provider_governance trigger for city and payout credentials",
-          "layer": "database",
-          "target_files": [
-            "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql",
-            "tests/security/guard-provider-payout-and-city.test.mjs"
-          ],
-          "regression_test": "tests/security/guard-provider-payout-and-city.test.mjs",
-          "commit_message": "fix(db): harden guard_provider_governance trigger for city and payout credentials (SEC-WIN-017, SEC-WIN-019)",
-          "verification_command": "node --test tests/security/guard-provider-payout-and-city.test.mjs",
-          "notes": "Removes draft staging assertion (!existsSync) and directly verifies migration 20261120000004_guard_provider_payout_and_city.sql against local PostgreSQL."
-        },
-        {
-          "task_id": "TASK-W1-02",
-          "issue_ids": ["SEC-WIN-019"],
-          "title": "Ignore client-supplied cashfree parameters in operational settings RPC",
-          "layer": "database",
-          "target_files": [
-            "supabase/migrations/20261120000005_ignore_client_cashfree_settings.sql",
-            "tests/security/merchant-settings-rpc-guard.test.mjs"
-          ],
-          "regression_test": "tests/security/merchant-settings-rpc-guard.test.mjs",
-          "commit_message": "fix(db): ignore client cashfree parameters in operational settings RPC (SEC-WIN-019)",
-          "verification_command": "node --test tests/security/merchant-settings-rpc-guard.test.mjs",
-          "notes": "Removes draft staging assertion (!existsSync) and directly verifies migration 20261120000005_ignore_client_cashfree_settings.sql against local PostgreSQL."
-        },
-        {
-          "task_id": "TASK-W1-03",
-          "issue_ids": ["SEC-WIN-020"],
-          "title": "Lockdown public execute grants on maintenance and queue RPCs",
-          "layer": "database",
-          "target_files": [
-            "supabase/migrations/20261120000006_lockdown_maintenance_and_queue_rpcs.sql",
-            "tests/security/database-grants-allowlist.test.mjs"
-          ],
-          "regression_test": "tests/security/database-grants-allowlist.test.mjs",
-          "commit_message": "fix(db): lockdown maintenance and queue RPC execute grants (SEC-WIN-020)",
-          "verification_command": "node --test tests/security/database-grants-allowlist.test.mjs",
-          "notes": "Revokes EXECUTE from PUBLIC/anon/authenticated on purge_old_app_logs(integer), expire_stale_standby_queue(integer, uuid), mask_old_notification_logs(integer), and enqueue_refund_request(uuid, uuid, text). Explicitly preserves EXECUTE on dispatch_booking_notification for authenticated users (with in-function auth) to prevent breaking bookings UI."
-        }
-      ]
+      "name": "Database Schema, RLS, & SQL Functions",
+      "description": "Supabase PostgreSQL database schema, migrations, RLS policies, and function definitions",
+      "lead_role": "database-architect",
+      "status": "CLEAN",
+      "notes": "Stage 1 verification confirmed 31/31 public tables have active RLS, 3 views enforce security_invoker, and 100% of SECURITY DEFINER functions have search_path pinned. 0 open windows in database plane.",
+      "tasks": []
     },
     {
       "wave": 2,
-      "name": "Backend APIs & Merchant Settings Handlers",
-      "description": "Next.js App Router API handlers and merchant UI payload sanitization",
+      "name": "API Routes, Server Actions, Edge Functions, & Webhooks",
+      "description": "Next.js App Router API handlers, Server Actions, Supabase Edge Functions, payment webhooks, and Fetch Metadata guards",
+      "lead_role": "backend-specialist",
+      "status": "OPEN",
       "tasks": [
         {
           "task_id": "TASK-W2-01",
-          "issue_ids": ["SEC-WIN-021"],
-          "title": "Implement DELETE method handler in hospital members API",
+          "issue_ids": [
+            "SEC-DISC-001"
+          ],
+          "title": "Fix auth context mismatch in DELETE /api/account/delete by invoking delete_account_immediately with user-scoped client",
           "layer": "api",
+          "assignee": "backend-specialist",
           "target_files": [
-            "apps/merchant-web/src/app/api/hospital/members/route.ts",
-            "tests/unit/hospital-admin-screens.test.mjs"
+            "apps/merchant-web/src/app/api/account/delete/route.ts",
+            "tests/security/account-deletion-auth.test.mjs"
           ],
-          "regression_test": "tests/unit/hospital-admin-screens.test.mjs",
-          "commit_message": "fix(api): implement DELETE method handler in hospital members route (SEC-WIN-021)",
-          "verification_command": "node --test tests/unit/hospital-admin-screens.test.mjs",
-          "notes": "Mandatory Standing Rule 3: Author failing test in tests/unit/hospital-admin-screens.test.mjs first (showing pre-patch FAIL), then implement DELETE handler in route.ts (showing post-patch PASS)."
-        },
-        {
-          "task_id": "TASK-W2-02",
-          "issue_ids": ["SEC-WIN-019"],
-          "title": "Strip client-supplied cashfree parameters from merchant settings mutation payload",
-          "layer": "ui",
-          "target_files": [
-            "apps/merchant-web/src/app/settings/page.tsx"
-          ],
-          "regression_test": "tests/scripts/test-state-machine-remediation.mjs",
-          "commit_message": "fix(web): strip client-supplied cashfree gateway inputs in settings page (SEC-WIN-019)",
-          "verification_command": "node tests/scripts/test-state-machine-remediation.mjs && pnpm --filter @appointments/merchant-web typecheck",
-          "notes": "Removes client-supplied cashfree form inputs from mutation payload in settings/page.tsx. Verified via state-machine validation and Next.js typecheck."
+          "regression_test": "tests/security/account-deletion-auth.test.mjs",
+          "commit_message": "fix(api): invoke delete_account_immediately with user-scoped auth client (SEC-DISC-001)",
+          "verification_command": "node --test tests/security/account-deletion-auth.test.mjs",
+          "notes": "Standing Rule 3: Author failing test in tests/security/account-deletion-auth.test.mjs first (showing pre-patch FAIL due to HTTP 500 'Not authenticated'), then update apps/merchant-web/src/app/api/account/delete/route.ts to invoke delete_account_immediately via user-scoped supabase client (showing post-patch PASS)."
         }
       ]
     },
     {
       "wave": 3,
-      "name": "Frontend & Shared Security Boundaries",
-      "description": "Module schema separation to eliminate secret naming leakage",
-      "tasks": [
-        {
-          "task_id": "TASK-W3-01",
-          "issue_ids": ["SEC-WIN-013"],
-          "title": "Segregate server-only secret identifier from client auth env schema",
-          "layer": "shared",
-          "target_files": [
-            "apps/merchant-web/src/lib/env.ts",
-            "tests/unit/build-secret-safety.test.mjs"
-          ],
-          "regression_test": "tests/unit/build-secret-safety.test.mjs",
-          "commit_message": "fix(env): segregate server secret names from client auth env schema (SEC-WIN-013)",
-          "verification_command": "node --test tests/unit/build-secret-safety.test.mjs",
-          "notes": "Mandatory Standing Rule 3: Author failing test in tests/unit/build-secret-safety.test.mjs first (asserting SUPABASE_SERVICE_ROLE_KEY is absent from client schema, showing pre-patch FAIL), then edit env.ts (showing post-patch PASS)."
-        }
-      ]
+      "name": "Next.js Headers, CSP, Cookies, DOM Sinks, & Mobile WebView Bridges",
+      "description": "Frontend security boundaries, modern web headers, cookie security, postMessage validation, and React Native WebView bridges",
+      "lead_role": "frontend-specialist",
+      "status": "CLEAN",
+      "notes": "Stage 1 verification evaluated 10 modern web candidates (MODWEB-001 through MODWEB-010); all were reviewed safe, unconfirmed, or defense-in-depth hygiene. 0 open windows requiring code changes in Wave 3.",
+      "tasks": []
     },
     {
       "wave": 4,
-      "name": "Tests, CI Hardening & Tooling Synchronization",
-      "description": "Test fixture hardening, regression assertion alignment, and toolkit lock synchronization",
+      "name": "CI/CD, CodeQL/Gitleaks Rules, & Infrastructure Governance",
+      "description": "CI workflows, secret scanning rules, dependency updates, and manual infrastructure rotation tracking",
+      "lead_role": "devops-engineer",
+      "status": "OPEN",
       "tasks": [
         {
           "task_id": "TASK-W4-01",
-          "issue_ids": ["SEC-WIN-022"],
-          "title": "Remove hardcoded JWT secret literal in cashfree-easysplit test",
-          "layer": "tests",
-          "target_files": [
-            "tests/unit/cashfree-easysplit.test.mjs"
+          "issue_ids": [
+            "SEC-DISC-002"
           ],
-          "regression_test": "tests/unit/cashfree-easysplit.test.mjs",
-          "commit_message": "test(unit): remove hardcoded JWT secret literal in cashfree-easysplit test (SEC-WIN-022)",
-          "verification_command": "node --test tests/unit/cashfree-easysplit.test.mjs",
-          "notes": "Replaces hardcoded JWT secret string literal with environment variable fallback."
-        },
-        {
-          "task_id": "TASK-W4-02",
-          "issue_ids": ["SEC-WIN-023"],
-          "title": "Align strix-regression tests with decommissioned Razorpay webhook route",
-          "layer": "tests",
+          "title": "Document upstream credential rotation and git-filter-repo procedures in .gsd/MANUAL_ACTIONS.md",
+          "layer": "governance",
+          "assignee": "devops-engineer",
           "target_files": [
-            "tests/security/strix-regression.test.mjs"
+            ".gsd/MANUAL_ACTIONS.md"
           ],
-          "regression_test": "tests/security/strix-regression.test.mjs",
-          "commit_message": "test(security): assert HTTP 410 on decommissioned Razorpay webhook route (SEC-WIN-023)",
-          "verification_command": "node --test tests/security/strix-regression.test.mjs",
-          "notes": "Updates legacy 400 assertions in strix-regression.test.mjs to expect HTTP 410 Gone on decommissioned Razorpay webhook endpoint."
-        },
-        {
-          "task_id": "TASK-W4-03",
-          "issue_ids": ["SEC-WIN-025"],
-          "title": "Regenerate AG toolkit manifest lock checksums",
-          "layer": "tooling",
-          "target_files": [
-            ".agents/manifest.lock.json"
-          ],
-          "regression_test": ".agents/scripts/tests/test_toolkit.py",
-          "commit_message": "chore(agents): synchronize manifest lock checksums (SEC-WIN-025)",
-          "verification_command": "python3 -m unittest discover -s .agents/scripts/tests -v",
-          "notes": "Synchronizes toolkit component checksums in manifest.lock.json."
+          "regression_test": "gitleaks detect -v",
+          "commit_message": "docs(security): document credential rotation and git-filter-repo procedures (SEC-DISC-002)",
+          "verification_command": "test -f .gsd/MANUAL_ACTIONS.md && grep -q 'SEC-DISC-002' .gsd/MANUAL_ACTIONS.md",
+          "notes": "Global Rule R5 (NEEDS_HUMAN): Production cloud credentials leaked in historical commits 9305ab5c, 34b7d2c7, and 5e515195 require human rotation in Supabase Cloud Console and subsequent git-filter-repo scrubbing. No git history rewriting or force-pushing will be executed during automated campaign."
         }
       ]
     }
   ],
   "governance_items": [
     {
-      "issue_id": "SEC-WIN-018",
-      "title": "Plaintext Storage of 4-Digit Check-In PIN at Rest",
-      "status": "ACCEPTED_RISK",
-      "rationale": "Cleartext 4-digit PIN storage accepted with compensating controls: 5-failure/60s rate limit lockout, 60-minute pre-slot window, appointment date matching, strict customer RLS (customer_id = auth.uid()), zero merchant read grants, and fail-closed CheckoutModal verification."
-    },
-    {
-      "issue_id": "SEC-WIN-016",
-      "title": "Inclusion of Demo/Mock Account Seed Credentials in Source Control",
-      "status": "ACCEPTED_RISK",
-      "rationale": "supabase/seed.sql contains mock/demo account seed credentials strictly for local Docker development and E2E testing. Remote hosted deployments execute migrations only and skip db seed."
-    },
-    {
-      "issue_id": "SEC-WIN-024",
-      "title": "Historical Exposure of Supabase JWT Credentials in Git Commit History",
+      "issue_id": "SEC-DISC-002",
+      "title": "Leaked Supabase Cloud Credentials in Historical Git Commits",
       "status": "NEEDS_HUMAN",
-      "rationale": "Exposed keys in commits 9305ab5c, 34b7d2c7, and 5e515195 require secret rotation in the upstream Supabase dashboard for project ynkdnwhubfknnnzjtpeg, followed by git history rewrite via git-filter-repo. Documented in .gsd/MANUAL_ACTIONS.md."
+      "rationale": "Historical commits 9305ab5c, 34b7d2c7, and 5e515195 contain hardcoded Supabase API keys for project ynkdnwhubfknnnzjtpeg. Governed by Rule R5: Human rotation in Supabase Console followed by git-filter-repo. Documented in .gsd/MANUAL_ACTIONS.md."
+    },
+    {
+      "issue_id": "SEC-DISC-003",
+      "title": "Inconsistent Test Bypass Guard in Account Export",
+      "status": "UNCONFIRMED",
+      "rationale": "Bypass logic is gated by process.env.NODE_ENV !== 'production' and completely dead in compiled production release builds. No failing RED reproduction on unfixed production code."
+    },
+    {
+      "issue_id": "MODWEB-001",
+      "title": "Admin MFA QR Code SVG DOM Sink",
+      "status": "REVIEWED_SAFE",
+      "rationale": "Sanitized via DOMParser whitelist and sourced directly from trusted Supabase Auth GoTrue service. Defense-in-depth Trusted Types recommendation."
+    },
+    {
+      "issue_id": "MODWEB-002",
+      "title": "Absence of Clear-Site-Data Header on Session Logout",
+      "status": "REVIEWED_SAFE",
+      "rationale": "Client invokes supabase.auth.signOut() immediately invalidating refresh token and server session. Defense-in-depth header recommendation."
+    },
+    {
+      "issue_id": "MODWEB-003",
+      "title": "Browser Client Auth Storage Prefix Hygiene",
+      "status": "REVIEWED_SAFE",
+      "rationale": "Complies with standard @supabase/ssr Next.js App Router browser client architecture."
     }
   ]
 }

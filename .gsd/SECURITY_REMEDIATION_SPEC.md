@@ -1,10 +1,12 @@
-# Security Remediation Specification — Elephant Session (Revised Round 2)
+# Security Remediation Specification — Elephant Session
 
-**Date:** 2026-11-21  
+**Campaign:** Security Window Closure 2026-11-21  
+**Target Branch:** `security/window-closure-20261121`  
 **Architecture:** Google Mantis + Elephant-Goldfish Spec-Driven Workflow  
-**Scope:** Appointments Monorepo (PostgreSQL Schema, Next.js 15 App Router, React Native Mobile, Tests & CI)  
-**Input Catalog:** [.gsd/MANTIS_OPEN_ISSUES.json](file:///Users/trinadh/projects/Appointments/.gsd/MANTIS_OPEN_ISSUES.json)  
-**Review Iteration:** Round 2 (Incorporating Goldfish Review Catches G1–G7)
+**Scope:** Appointments Monorepo (Next.js 15 App Router, Supabase PostgreSQL, CI/CD, Git Infrastructure)  
+**Input Catalog:** [.gsd/SECURITY_OPEN_WINDOWS.json](file:///Users/trinadh/projects/Appointments/.gsd/SECURITY_OPEN_WINDOWS.json), [.gsd/COVERAGE_LEDGER.json](file:///Users/trinadh/projects/Appointments/.gsd/COVERAGE_LEDGER.json)  
+**Stage:** Stage 2 (Elephant Remediation Spec & Wave Graph)  
+**Governing Standard:** Autonomous, unattended execution governed by GLOBAL RULES R1 through R6.
 
 ---
 
@@ -12,199 +14,240 @@
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│ Layer 1: PostgreSQL Schema, Triggers & Function Lockdown (Wave 1)       │
-│ - SEC-WIN-017: providers.city missing from guard_provider_governance   │
-│ - SEC-WIN-019: cashfree_vendor_* and payout fields unblocked in trigger│
-│ - SEC-WIN-020: EXECUTE grant leak on maintenance & queue procedures    │
-│ - SEC-WIN-018: 4-digit check-in PIN cleartext storage [ACCEPTED_RISK]  │
-│ - SEC-WIN-016: Demo seed credentials in supabase/seed.sql [ACCEPTED]   │
+│ Wave 1: Database Schema, Triggers, RLS & SQL Functions (database-arch)  │
+│ - 31/31 public tables with RLS active; 3 views security_invoker        │
+│ - 100% SECURITY DEFINER functions have search_path pinned               │
+│ - Zero open finding windows in database layer for this campaign        │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
 ┌───────────────────────────────────▼────────────────────────────────────┐
-│ Layer 2: Backend API & Merchant Settings Handlers (Wave 2)             │
-│ - SEC-WIN-021: Missing DELETE handler on /api/hospital/members         │
-│ - SEC-WIN-019 (Part 2): Strip client cashfree_* in merchant settings UI│
+│ Wave 2: Backend API Routes & Auth Synchronization (backend-specialist) │
+│ - SEC-DISC-001: DELETE /api/account/delete auth context mismatch       │
+│   (service_role lacks user auth.uid() context for RPC invocation)      │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
 ┌───────────────────────────────────▼────────────────────────────────────┐
-│ Layer 3: Frontend & Shared Security Boundaries (Wave 3)                │
-│ - SEC-WIN-013: Segregate server secret names from client env.ts schema │
+│ Wave 3: Frontend Headers, CSP, Cookies & Bridges (frontend/mobile)     │
+│ - All 10 Modern Web candidates reviewed safe / defense-in-depth        │
+│ - Zero open finding windows requiring code changes in Wave 3           │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
 ┌───────────────────────────────────▼────────────────────────────────────┐
-│ Layer 4: Tests, CI Hardening & Tooling Synchronization (Wave 4)        │
-│ - SEC-WIN-022: Strip hardcoded JWT_SECRET literal in test suite        │
-│ - SEC-WIN-023: Align strix-regression.test.mjs with Razorpay 410 route │
-│ - SEC-WIN-025: Synchronize .agents/manifest.lock.json checksums        │
-│ - SEC-WIN-024: Supabase Cloud credentials in git history [NEEDS_HUMAN] │
+│ Wave 4: CI/CD, Scanning Rules & Infrastructure Governance (devops-eng) │
+│ - SEC-DISC-002: Historical commit secret leaks in git log [NEEDS_HUMAN]│
+│   (Documented rotation & git-filter-repo protocol in MANUAL_ACTIONS.md)│
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Detailed Technical Specifications & Invariants per Fix
+## 2. Detailed Technical Specifications & Invariants per Finding
 
-### Fix Packet 1: Database Governance Trigger & Column Lockdown (`SEC-WIN-017` & `SEC-WIN-019`)
-- **Target Migration File:** `supabase/migrations/20261120000004_guard_provider_payout_and_city.sql`
-- **Target Test File:** `tests/security/guard-provider-payout-and-city.test.mjs`
-- **Root Cause:** `public.guard_provider_governance()` triggers on `BEFORE UPDATE ON public.providers` but omitted `city` (text), `cashfree_vendor_id`, `cashfree_vendor_status`, `cashfree_app_id`, `payout_upi_id`, and masked bank/PAN credentials from the protected column comparison list.
-- **Code Invariants:**
-  ```sql
-  CREATE OR REPLACE FUNCTION public.guard_provider_governance()
-  RETURNS TRIGGER
-  LANGUAGE plpgsql
-  SECURITY DEFINER
-  SET search_path = public, pg_temp
-  AS $$
-  BEGIN
-    IF (session_user IN ('postgres', 'supabase_admin') AND auth.jwt() IS NULL)
-       OR auth.role() = 'service_role'
-       OR current_setting('app.trusted_write', true) = 'true'
-       OR public.is_admin(auth.uid()) THEN
-      RETURN NEW;
+### Fix Packet 1: Backend API Account Deletion Auth Context Synchronization (`SEC-DISC-001`)
+
+- **Finding Identifier:** `SEC-DISC-001` (CWE-285: Improper Authorization)
+- **Target Source File:** `apps/merchant-web/src/app/api/account/delete/route.ts`
+- **Target Test File:** `tests/security/account-deletion-auth.test.mjs`
+- **Assigned Wave & Role:** Wave 2 (`backend-specialist`)
+- **Task Identifier:** `TASK-W2-01`
+
+#### A. Root Cause Analysis
+In `apps/merchant-web/src/app/api/account/delete/route.ts` (lines 44–70), the HTTP `DELETE` handler validates the authenticated user session via `getRouteSupabaseClient(req)` and retrieves the authenticated caller object `user` via `supabase.auth.getUser()`. However, at line 56–61, the handler invokes the database stored procedure `delete_account_immediately`:
+```typescript
+const supabaseAdmin = getSupabaseAdmin();
+
+// 1. Execute atomic data anonymization and PII erasure immediately
+const { data, error } = await (supabaseAdmin.rpc as any)('delete_account_immediately', {
+  p_reason: reason,
+});
+```
+The underlying SQL function `public.delete_account_immediately(p_reason TEXT)` in `supabase/migrations/20261121000002_immediate_account_deletion_and_single_admin.sql` (lines 46–54) enforces an explicit authentication check:
+```sql
+DECLARE
+    v_uid UUID := (SELECT auth.uid());
+    v_req_id UUID;
+    v_anonymize_res JSONB;
+BEGIN
+    IF v_uid IS NULL THEN
+        RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
     END IF;
+    ...
+```
+When `supabaseAdmin` (the `service_role` client) invokes the RPC, the request carries the service key JWT without a user context. In Supabase/PostgREST, `auth.uid()` evaluates to `NULL` for `service_role` requests unless explicitly set via user impersonation. Consequently, the stored procedure raises an unhandled PostgreSQL exception `'Not authenticated'` (ERRCODE `42501`), causing `apps/merchant-web/src/app/api/account/delete/route.ts` to log an error and unconditionally respond with `HTTP 500 Internal Server Error`:
+```json
+{ "error": "Not authenticated" }
+```
+This defect was empirically confirmed on the baseline branch with a RED reproduction script (`.gsd/evidence/DISCOVERY_MANTIS/test_account_delete_failure.*`), aborting all legitimate self-service account deletion attempts.
 
-    IF NEW.owner_id IS DISTINCT FROM OLD.owner_id
-       OR NEW.status IS DISTINCT FROM OLD.status
-       OR NEW.cancellation_strikes IS DISTINCT FROM OLD.cancellation_strikes
-       OR NEW.strike_reset_date IS DISTINCT FROM OLD.strike_reset_date
-       OR NEW.penalty_balance IS DISTINCT FROM OLD.penalty_balance
-       OR NEW.is_booking_frozen IS DISTINCT FROM OLD.is_booking_frozen
-       OR NEW.city_id IS DISTINCT FROM OLD.city_id
-       OR NEW.city IS DISTINCT FROM OLD.city
-       OR NEW.cashfree_vendor_id IS DISTINCT FROM OLD.cashfree_vendor_id
-       OR NEW.cashfree_vendor_status IS DISTINCT FROM OLD.cashfree_vendor_status
-       OR NEW.cashfree_app_id IS DISTINCT FROM OLD.cashfree_app_id
-       OR NEW.bank_account_holder IS DISTINCT FROM OLD.bank_account_holder
-       OR NEW.bank_account_last4 IS DISTINCT FROM OLD.bank_account_last4
-       OR NEW.bank_ifsc IS DISTINCT FROM OLD.bank_ifsc
-       OR NEW.pan_last4 IS DISTINCT FROM OLD.pan_last4
-       OR NEW.payout_upi_id IS DISTINCT FROM OLD.payout_upi_id THEN
-      RAISE EXCEPTION 'Unauthorized provider modification: governance, status, strikes, penalty balance, booking freeze, city, ownership, and payout credentials are protected'
-        USING ERRCODE = '42501';
-    END IF;
+#### B. Security & Regulatory Invariants
+1. **DPDP Act 2023 §12 (Right to Erasure)**:
+   - Data principals must be able to immediately and permanently delete their personal data without artificial roadblocks, delays, or unhandled 500 exceptions.
+2. **Google Play Store Account Deletion Mandate (May 2024 Policy)**:
+   - In-app account deletion must be fully functional for authenticated users, initiating immediate deletion with zero grace period.
+3. **IDOR & Authorization Isolation**:
+   - The deletion target MUST be bound exclusively to the authenticated session (`user.id` from `supabase.auth.getUser()` / `auth.uid()`). A caller must never be able to trigger deletion of another user's account by specifying an arbitrary user ID or identifier in the payload.
+4. **Context Propagation**:
+   - The route handler already constructs a user-scoped Supabase client `supabase` using `getRouteSupabaseClient(req)` that forwards the user's `Bearer` token or session cookies.
+   - Invoking `supabase.rpc('delete_account_immediately', { p_reason: reason })` directly propagates the caller's JWT to PostgREST, enabling `(SELECT auth.uid())` in the SQL function to resolve to the authenticated user's UUID.
+5. **Session Revocation & Cleanup**:
+   - After atomic database anonymization and erasure via `supabase.rpc('delete_account_immediately')`, the administrative client `supabaseAdmin.auth.admin.deleteUser(user.id)` purges the auth user record from `auth.users`, invalidating all active refresh tokens, sessions, and credentials.
 
-    RETURN NEW;
-  END;
-  $$;
-  ```
-- **Test Alignment (Addressing Catch G4):** Update `tests/security/guard-provider-payout-and-city.test.mjs` to remove draft-staging assertion (`!existsSync`) and verify the active migration directly against the local PostgreSQL database.
-- **Regression Test:** `tests/security/guard-provider-payout-and-city.test.mjs` (Proves non-admin UPDATE fails with 42501, service role succeeds).
+#### C. Code Invariants & Remediation Design
+In `apps/merchant-web/src/app/api/account/delete/route.ts`:
+```typescript
+// Replace:
+// const { data, error } = await (supabaseAdmin.rpc as any)('delete_account_immediately', {
+//   p_reason: reason,
+// });
 
----
+// With user-scoped client invocation:
+const { data, error } = await (supabase.rpc as any)('delete_account_immediately', {
+  p_reason: reason,
+});
+```
 
-### Fix Packet 2: Operational Settings RPC Hardening (`SEC-WIN-019` Part 2 & Part 3)
-- **Target Migration File:** `supabase/migrations/20261120000005_ignore_client_cashfree_settings.sql`
-- **Target UI File:** `apps/merchant-web/src/app/settings/page.tsx`
-- **Target Test File:** `tests/security/merchant-settings-rpc-guard.test.mjs`
-- **Root Cause:** `merchant_save_operational_settings` accepted `p_cashfree_app_id` and `p_cashfree_vendor_id` and updated `public.providers`.
-- **Code Invariants:** In `merchant_save_operational_settings`, client parameters `p_cashfree_app_id` and `p_cashfree_vendor_id` are completely ignored in the SQL `UPDATE` statement. In `apps/merchant-web/src/app/settings/page.tsx`, client payloads omit these keys.
-- **Test Alignment (Addressing Catch G4):** Update `tests/security/merchant-settings-rpc-guard.test.mjs` to remove draft-staging assertion (`!existsSync`) and verify that calling the RPC with spoofed vendor IDs leaves stored credentials untouched on the live database.
-- **Regression Test:** `tests/security/merchant-settings-rpc-guard.test.mjs`.
+**Full Proposed Handler Logic:**
+```typescript
+export async function DELETE(req: NextRequest) {
+  try {
+    const supabase = await getRouteSupabaseClient(req);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
----
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-### Fix Packet 3: Maintenance & Queue RPC Execution Lockdown (`SEC-WIN-020`)
-- **Target Migration File:** `supabase/migrations/20261120000006_lockdown_maintenance_and_queue_rpcs.sql`
-- **Root Cause:** PostgreSQL default function execution privileges granted `EXECUTE` to `PUBLIC` and `authenticated` on newly created maintenance functions.
-- **Code Invariants (Addressing Catches G1, G2, G3):**
-  - **Non-Regression Invariant (G1):** `dispatch_booking_notification` is explicitly PRESERVED with `GRANT EXECUTE ... TO authenticated` because it is invoked by `apps/merchant-web/src/app/bookings/page.tsx:445` (`handleTriggerNotification`) and already enforces granular in-function authorization (`is_admin`, provider owner, consultant assignment).
-  - **Accurate Function Overloads (G2 & G3):**
-    ```sql
-    -- 1. Purge old app logs: service_role only
-    REVOKE EXECUTE ON FUNCTION public.purge_old_app_logs(integer) FROM PUBLIC, anon, authenticated;
-    GRANT EXECUTE ON FUNCTION public.purge_old_app_logs(integer) TO service_role;
+    const body = await req.json().catch(() => ({}));
+    const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 500) : 'User initiated immediate account deletion';
 
-    -- 2. Expire stale standby queue: service_role only (exact overload: int, uuid)
-    REVOKE EXECUTE ON FUNCTION public.expire_stale_standby_queue(integer, uuid) FROM PUBLIC, anon, authenticated;
-    GRANT EXECUTE ON FUNCTION public.expire_stale_standby_queue(integer, uuid) TO service_role;
+    // 1. Execute atomic data anonymization and PII erasure using user-scoped client
+    const { data, error } = await (supabase.rpc as any)('delete_account_immediately', {
+      p_reason: reason,
+    });
 
-    -- 3. Mask old notification logs: service_role only
-    REVOKE EXECUTE ON FUNCTION public.mask_old_notification_logs(integer) FROM PUBLIC, anon, authenticated;
-    GRANT EXECUTE ON FUNCTION public.mask_old_notification_logs(integer) TO service_role;
+    if (error) {
+      console.error('[Account Delete] RPC error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    -- 4. Enqueue refund request: service_role only (exact overload: uuid, uuid, text)
-    REVOKE EXECUTE ON FUNCTION public.enqueue_refund_request(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
-    GRANT EXECUTE ON FUNCTION public.enqueue_refund_request(uuid, uuid, text) TO service_role;
-    ```
-- **Regression Tests:** `tests/security/database-grants-allowlist.test.mjs` and `supabase/tests/database/05_cron_and_rate_limits.test.sql`.
+    // 2. Remove the auth user record to revoke active auth sessions/tokens
+    const supabaseAdmin = getSupabaseAdmin();
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(user.id);
+    } catch (authDelErr) {
+      console.warn('[Account Delete] Auth admin delete notice:', authDelErr);
+    }
 
----
+    return NextResponse.json({
+      success: true,
+      immediate: true,
+      message: 'Your account and all personal data have been immediately and permanently deleted.',
+      completed_at: new Date().toISOString(),
+    }, { status: 200 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Internal error';
+    console.error('[Account Delete] Exception:', err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+```
 
-### Fix Packet 4: Hospital Members API HTTP DELETE Implementation (`SEC-WIN-021`)
-- **Target File:** `apps/merchant-web/src/app/api/hospital/members/route.ts`
-- **Target Test File:** `tests/unit/hospital-admin-screens.test.mjs`
-- **Standing Rule 3 Requirement (Addressing Catch G5):** Author the failing test in `tests/unit/hospital-admin-screens.test.mjs` FIRST (asserting `DELETE /api/hospital/members?id=...` returns 200 for authorized admin, removes pending invite or revokes active member, and returns 403 for non-admin). Run test to confirm pre-patch FAIL.
-- **Code Invariants:**
-  - Export `DELETE` handler.
-  - Require authenticated hospital admin (`isHospitalAdmin(ctx)`).
-  - Accept `id` query parameter (`req.nextUrl.searchParams.get('id')`) or request body `{ member_id }`.
-  - If invite status is `invited`, delete row from `department_members` (cancel invite).
-  - If member status is `active`, transition status to `revoked` and update `updated_at`.
-  - Log audit event with `logHospitalAuditEvent` (`action: 'member.cancel_invite'` or `'member.revoke'`).
-- **Regression Test:** `tests/unit/hospital-admin-screens.test.mjs`.
+#### D. Rollout Safety & Failure Modes
+- **Session Expiry / Invalid Token**: Handled at line 49 returning HTTP 401 Unauthorized before any RPC or deletion logic is attempted.
+- **RPC Error Handling**: If database deletion fails (e.g. database connectivity issue), error is returned with HTTP 500 without calling `auth.admin.deleteUser`, preventing orphan state where auth is deleted but user data remains un-anonymized.
+- **Auth Deletion Notice**: Wrapped in a try/catch block so that if the user auth record is already purged, the response still successfully confirms account data erasure to the user.
+- **IDOR Protection**: Request body cannot inject `user_id` or `email`; deletion target is strictly bound to the authenticated caller session.
 
----
-
-### Fix Packet 5: Client Environment Variable Schema Segregation (`SEC-WIN-013`)
-- **Target File:** `apps/merchant-web/src/lib/env.ts`
-- **Target Test File:** `tests/unit/build-secret-safety.test.mjs`
-- **Standing Rule 3 Requirement (Addressing Catch G6):** Author the failing test in `tests/unit/build-secret-safety.test.mjs` FIRST, asserting that `SUPABASE_SERVICE_ROLE_KEY` is completely absent from the client `AuthEnv` interface and `getRawAuthEnv()`. Run test to confirm pre-patch FAIL.
-- **Code Invariants:** Remove `SUPABASE_SERVICE_ROLE_KEY` from `AuthEnv` and `getRawAuthEnv()` in `env.ts`.
-- **Regression Test:** `tests/unit/build-secret-safety.test.mjs`.
-
----
-
-### Fix Packet 6: Test Suite & Tooling Synchronization (`SEC-WIN-022`, `SEC-WIN-023`, `SEC-WIN-025`)
-- **Target Files:**
-  - `tests/unit/cashfree-easysplit.test.mjs:488`
-  - `tests/security/strix-regression.test.mjs:402,428,453,588`
-  - `.agents/manifest.lock.json`
-- **Code Invariants:**
-  - In `cashfree-easysplit.test.mjs`, replace string literal with `process.env.JWT_SECRET || 'local-test-jwt-secret-placeholder-not-canonical'`.
-  - In `strix-regression.test.mjs`, update Razorpay webhook assertions to expect HTTP 410 Gone (matching `tests/unit/razorpay-decommission.test.mjs`).
-  - In `.agents/manifest.lock.json`, regenerate lockfile checksums to synchronize with current components.
-- **Regression Tests:**
-  - `node --test tests/security/strix-regression.test.mjs`
-  - `python3 -m unittest discover -s .agents/scripts/tests -v`
+#### E. Mandatory Regression Test (`tests/security/account-deletion-auth.test.mjs`)
+Per Standing Rule 3 ("Every bug fix starts with a failing test"), `tests/security/account-deletion-auth.test.mjs` must be authored and executed to demonstrate RED (failing before patch) and GREEN (passing after patch):
+1. **Test Case 1 (401 on Unauthenticated Request)**: Submitting `DELETE /api/account/delete` with no headers or invalid token returns `HTTP 401 Unauthorized`.
+2. **Test Case 2 (200 on Authenticated Request & Immediate Anonymization)**: Submitting `DELETE /api/account/delete` with a valid session JWT returns `HTTP 200 OK`, scrubs PII in `public.profiles` (`full_name = 'Deleted User'`), inserts record into `public.account_deletion_requests` with `completed_at` populated, and deletes the user from `auth.users`.
+3. **Test Case 3 (IDOR Prevention)**: Submitting a request body containing `{ "user_id": "<target_victim_uuid>" }` is completely ignored; only the caller's account is deleted.
+4. **Test Case 4 (DPDP Act §12 & Play Store Invariant)**: Confirms zero grace period (`scheduled_for = completed_at = NOW()`), verifying zero delay before erasure.
 
 ---
 
-## 3. Row-Level Security (RLS) Test Matrix for Touched Tables
+### Fix Packet 2: Git History Credential Exposure & Manual Upstream Rotation (`SEC-DISC-002`)
 
-Wave 1 touches `public.providers`. RLS permissions must be strictly verified across all roles:
+- **Finding Identifier:** `SEC-DISC-002` (CWE-798: Use of Hard-coded Credentials)
+- **Target Documentation File:** `.gsd/MANUAL_ACTIONS.md`
+- **Assigned Wave & Role:** Wave 4 (`devops-engineer`)
+- **Task Identifier:** `TASK-W4-01`
+- **Classification:** `NEEDS_HUMAN` per Global Rule R5
 
-| Table: `public.providers` | `anon` | `authenticated` (Owner) | `authenticated` (Other Tenant) | `service_role` |
-|:---|:---:|:---:|:---:|:---:|
-| **SELECT (Catalog Columns: `name`, `category_id`, `city`, `city_id`, `is_active`)** | **ALLOW** | **ALLOW** | **ALLOW** | **ALLOW** |
-| **SELECT (Financial / Governance: `cashfree_*`, `bank_*`, `penalty_balance`)** | **DENY** | **ALLOW** | **DENY** | **ALLOW** |
-| **INSERT (Direct Table Row)** | **DENY** (42501) | **DENY** (42501 - provisioned via RPC) | **DENY** (42501) | **ALLOW** |
-| **UPDATE (Operational: `name`, `support_phone`, `payout_upi_id`)** | **DENY** (42501) | **ALLOW** (Own row only) | **DENY** (42501) | **ALLOW** |
-| **UPDATE (Protected: `city`, `city_id`, `cashfree_vendor_*`, `strikes`)** | **DENY** (42501) | **DENY** (Blocked by Trigger 42501) | **DENY** (42501) | **ALLOW** |
-| **DELETE** | **DENY** (42501) | **DENY** (42501) | **DENY** (42501) | **ALLOW** |
+#### A. Root Cause Analysis
+During discovery (`gitleaks detect -v` and `gitleaks git --log-opts="--all" -v`), gitleaks identified historical commit objects containing Supabase credentials for remote project `ynkdnwhubfknnnzjtpeg`:
+- Commit `9305ab5c32ecc4b00eab078583cf257ea6790d2f`: `scripts/e2e-trinadh-hospital-test.mjs` (lines 19, 21) contained anon and service role keys.
+- Commit `34b7d2c76c3f4008f2d56b9f3c75937ba9583b75`: `tests/e2e/payment-full-flow.spec.ts` (line 7) contained anon key.
+- Commit `5e51519501ec2fbdab1291da76d27e2adba7ae51`: `tests/e2e/compliance-pages.spec.ts` (line 342) contained anon key.
+
+While these credentials were removed from the working tree in subsequent commits, the commit blobs remain in the git packfiles and commit history.
+
+#### B. Governing Standard: Global Rule R5
+Global Rule R5 explicitly governs credential exposures and git history manipulation:
+> "No force-push, no pushes to main/default, no merging. Never print, commit, or log secrets. For any secret found in history, record it in the report as 'ROTATION REQUIRED (human action)'. Do not attempt rotation."
+
+Rewriting git history via `git-filter-repo` alters commit hashes across the repository and requires a force push to upstream remotes, which could disrupt active collaborators and break downstream branches. Furthermore, removing credentials from git history does not revoke them at the provider; only upstream key rotation revokes exposed credentials.
+
+#### C. Exact Remediation Protocol Documented in `.gsd/MANUAL_ACTIONS.md`
+1. Document affected commit SHAs, files, and project IDs in `.gsd/MANUAL_ACTIONS.md`.
+2. Human administrator rotates both Anon Public Key and Service Role Key in Supabase Cloud Dashboard (`Project Settings -> API`).
+3. Human administrator propagates new keys to hosting environments (Vercel, GitHub Actions repository secrets, developer environments).
+4. Repository administrator coordinates maintenance window and executes `git-filter-repo` to purge blob references from commit objects, followed by controlled force push.
 
 ---
 
-## 4. Backward Compatibility & Shipped Mobile Client Protection
+## 3. Wave Execution Graph & Dependency Invariants
 
-- **Mobile App (`apps/customer-mobile`):**
-  - Uses customer-scoped endpoints: `/api/bookings/*`, `/api/slots/availability`, `/api/payments/*`, `/api/customer/*`, `/api/ticket/*`.
-  - Does NOT call `DELETE /api/hospital/members` (merchant administrative route).
-  - Does NOT call maintenance RPCs (`purge_old_app_logs`, `expire_stale_standby_queue`).
-  - Does NOT update `providers` directly.
-  - **Verdict:** Zero breaking changes for shipped mobile app clients.
-- **Web App (`apps/merchant-web`):**
-  - Roster management gains `DELETE /api/hospital/members` while preserving backward compatibility with `PUT action: 'revoke'`.
-  - Notification dispatch in `apps/merchant-web/src/app/bookings/page.tsx:445` remains functional (`dispatch_booking_notification` execution preserved for authenticated users with in-function auth).
-  - Settings page strips read-only / server-managed Cashfree vendor input fields.
+```mermaid
+graph TD
+  subgraph Wave 1: Database
+    W1[Wave 1: Supabase DB / RLS / RPCs]
+    W1_NOTE[31 Tables RLS Enforced<br/>100% search_path pinned<br/>0 Open Tasks]
+    W1 --- W1_NOTE
+  end
+
+  subgraph Wave 2: Backend API
+    W2[Wave 2: API Routes & Webhooks]
+    TASK_W2_01[TASK-W2-01: SEC-DISC-001<br/>DELETE /api/account/delete route.ts<br/>tests/security/account-deletion-auth.test.mjs]
+    W2 --> TASK_W2_01
+  end
+
+  subgraph Wave 3: Frontend & Clients
+    W3[Wave 3: Headers, Cookies & Bridges]
+    W3_NOTE[10 Modern Web checks verified<br/>0 Open Tasks]
+    W3 --- W3_NOTE
+  end
+
+  subgraph Wave 4: Governance & DevOps
+    W4[Wave 4: CI/CD & Governance]
+    TASK_W4_01[TASK-W4-01: SEC-DISC-002<br/>Document Rotation in MANUAL_ACTIONS.md<br/>gitleaks regression check]
+    W4 --> TASK_W4_01
+  end
+
+  W1 --> W2
+  W2 --> W3
+  W3 --> W4
+```
+
+### File-Disjointness Matrix
+
+| Task ID | Assigned Wave | Target Files | Regression Test | File Overlap with Other Tasks |
+|:---|:---|:---|:---|:---|
+| **TASK-W2-01** | Wave 2 (Backend) | `apps/merchant-web/src/app/api/account/delete/route.ts`<br/>`tests/security/account-deletion-auth.test.mjs` | `node --test tests/security/account-deletion-auth.test.mjs` | **NONE** (Zero overlap) |
+| **TASK-W4-01** | Wave 4 (DevOps) | `.gsd/MANUAL_ACTIONS.md` | `gitleaks detect -v` | **NONE** (Zero overlap) |
 
 ---
 
-## 5. Non-Code & Governance Items (Documented Risk Justifications)
+## 4. Verification & Non-Regression Standard
 
-1. **`SEC-WIN-018` [ACCEPTED_RISK] (Cleartext 4-Digit PIN at Rest):**
-   - **Compensating Controls:** PIN generation is tied to slot time; visibility is server-masked until $\le 60$ minutes pre-slot; direct SELECT is blocked for all merchant roles via RLS (`customer_id = auth.uid()`); brute-force is blocked by a 5-failure lockout in `_record_checkin_failure`. Full cryptographic hashing of a 4-digit code ($10^4$) offers negligible security gains against an attacker with full database volume dump access.
-2. **`SEC-WIN-016` [ACCEPTED_RISK] (Demo Seeds in `supabase/seed.sql`):**
-   - **Compensating Controls:** `seed.sql` is strictly executed by local Docker CLI (`supabase db reset`). Hosted database deployments apply migrations only, ignoring `seed.sql`.
-3. **`SEC-WIN-024` [NEEDS_HUMAN] (Historical Supabase Keys in Git History):**
-   - **Action Required:** Human operator must log in to the Supabase Cloud dashboard for project `ynkdnwhubfknnnzjtpeg`, regenerate the `anon` and `service_role` keys, update environment secrets, and purge git history via `git-filter-repo`.
+1. **Standing Rule 3 Order**:
+   - For `TASK-W2-01`: Author `tests/security/account-deletion-auth.test.mjs` demonstrating FAIL (exit code 1) on current branch.
+   - Patch `apps/merchant-web/src/app/api/account/delete/route.ts`.
+   - Re-run `node --test tests/security/account-deletion-auth.test.mjs` demonstrating PASS (exit code 0).
+2. **Typecheck & Linting**:
+   - Run `pnpm -r --if-present typecheck` (must exit 0).
+   - Run `pnpm -r --if-present lint` (must exit 0).
+3. **Monorepo Non-Regression**:
+   - `node scripts/run-all-unit-tests-serially.mjs` (must maintain or improve baseline pass rate).
+   - `pnpm test:security` (must pass 0 regressions).
