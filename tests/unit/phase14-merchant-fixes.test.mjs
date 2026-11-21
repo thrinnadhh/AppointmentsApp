@@ -341,7 +341,7 @@ describe('Phase 14: Merchant App 6 Bug Verification Suite', () => {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
       const deptsJson = await deptsRes.json();
-      let testDept = deptsJson.departments.find((d) => (d.member_count || 0) < 3);
+      let testDept = deptsJson.departments?.[0];
       if (!testDept) {
         const createDeptRes = await fetch(`${appBaseUrl}/api/hospital/departments`, {
           method: 'POST',
@@ -455,12 +455,25 @@ describe('Phase 14: Merchant App 6 Bug Verification Suite', () => {
     });
 
     it('allows unlimited doctors and members per department (no 3-member limit)', async () => {
-      const deptsRes = await fetch(`${appBaseUrl}/api/hospital/departments`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      const deptsJson = await deptsRes.json();
-      const testDept = deptsJson.departments[0];
       const timestamp = Date.now();
+
+      // Create an isolated department specifically for this capacity test
+      const deptRes = await fetch(`${appBaseUrl}/api/hospital/departments`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `Capacity Unit ${timestamp}`,
+          is_preset: false,
+          allowed_modules: ['appointments'],
+          is_active: true,
+        }),
+      });
+      const deptJson = await deptRes.json();
+      assert.strictEqual(deptRes.status, 200, `Expected 200 creating department: ${JSON.stringify(deptJson)}`);
+      const testDept = deptJson.department;
 
       const memberIds = [];
       try {
@@ -499,13 +512,17 @@ describe('Phase 14: Merchant App 6 Bug Verification Suite', () => {
           assert.ok(emailsInDept.includes(email), `Department must include 4th member ${email}`);
         }
       } finally {
-        // Cleanup added members
+        // Cleanup added members and department
         for (const id of memberIds) {
           await fetch(`${appBaseUrl}/api/hospital/members?id=${id}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${adminToken}` },
           });
         }
+        await fetch(`${supabaseUrl}/rest/v1/departments?id=eq.${testDept.id}`, {
+          method: 'DELETE',
+          headers: serviceHeaders,
+        });
       }
     });
   });
