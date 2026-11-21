@@ -156,7 +156,6 @@ test.describe('Customer — Edge & Boundary Cases', () => {
 
   // ─── EC-CUST-03: No-show strike threshold ─────────────────────────────────
   test('EC-CUST-03: Customer flagged after 3 no-show strikes cannot create new booking @wip', async ({ request }) => {
-    test.skip(true, 'WIP: /api/customers/:id/profile endpoint not yet implemented');
     // Check customer flag status first
     const profileRes = await request.get(
       `${BASE}/api/customers/${SEED_CUSTOMER_ID}/profile`,
@@ -339,32 +338,57 @@ test.describe('Customer — Edge & Boundary Cases', () => {
 
   // ─── EC-CUST-09: Browse non-live city shows waitlist ──────────────────────
   test('EC-CUST-09: Customer selecting a PLANNED city sees waitlist CTA, not merchant catalog @wip', async ({ page }) => {
-    test.skip(true, 'WIP: Requires customer mobile web app running at http://localhost:8081');
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('dpdp_consent_granted', 'true');
+      } catch {}
+    });
     await page.goto(MOBILE_BASE);
 
+    // If DPDP modal is visible, accept it
+    const acceptBtn = page.getByRole('button', { name: /Accept & Continue|Accept and continue/i });
+    if (await acceptBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await acceptBtn.click();
+    }
+
     // Open city switcher
-    const locationBtn = page.getByRole('button', { name: /Select Territory/i });
+    const locationBtn = page.getByTestId('badge-location-selector').or(page.getByText(/📍 Tirupati|Tirupati/i)).first();
     await expect(locationBtn).toBeVisible({ timeout: 15000 });
     await locationBtn.click();
 
-    // Chennai is PLANNED — verify no "Book Now" visible, only waitlist
-    const chennaiCard = page.getByText('Chennai').first();
-    await expect(chennaiCard).toBeVisible({ timeout: 5000 });
-    // Should show COMING SOON / waitlist badge, not LIVE NOW
-    const parentCard = chennaiCard.locator('xpath=ancestor::*[contains(@class,"card") or contains(@class,"item")][1]');
-    await expect(parentCard.getByText(/COMING SOON|PLANNED|Waitlist/i).first()).toBeVisible();
-    await expect(parentCard.getByText(/LIVE NOW/i)).toHaveCount(0);
+    // Verify Choose Territory / City Switcher Modal opens
+    await expect(page.getByText(/Choose Territory|Select City|Switch Territory/i).first()).toBeVisible({ timeout: 10000 });
+
+    // Chittoor/Nellore are EXPANDING SOON — verify waitlist CTA, not live booking
+    const plannedCity = page.getByText(/Chittoor|Nellore/i).first();
+    await expect(plannedCity).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/EXPANDING SOON|PLANNED/i).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Notify Me/i })).toBeVisible();
   });
 
   // ─── EC-CUST-10: XSS injection in search field ────────────────────────────
   test('EC-CUST-10: XSS payload in search field is sanitised — no script execution @wip', async ({ page }) => {
-    test.skip(true, 'WIP: Requires customer mobile web app running at http://localhost:8081');
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('dpdp_consent_granted', 'true');
+      } catch {}
+    });
     await page.goto(MOBILE_BASE);
+
+    const acceptBtn = page.getByRole('button', { name: /Accept & Continue|Accept and continue/i });
+    if (await acceptBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await acceptBtn.click();
+    }
+
+    // Enter a category so search bar appears
+    const clinicsChip = page.getByText('Hospitals & Clinics').or(page.getByTestId('cat-chip-clinics')).first();
+    await expect(clinicsChip).toBeVisible({ timeout: 10000 });
+    await clinicsChip.click();
 
     const xssPayload = '<script>window.__xss_executed=true</script>';
 
     // Find search input
-    const searchInput = page.getByPlaceholder(/search|find/i).first();
+    const searchInput = page.getByTestId('search-input-field').or(page.getByPlaceholder(/search/i)).first();
     await expect(searchInput).toBeVisible({ timeout: 5000 });
 
     await searchInput.fill(xssPayload);

@@ -125,7 +125,7 @@ export class CustomerAppPage {
 
     // Checkout Modal
     this.checkoutTitle = page.getByText('Confirm Reservation');
-    this.timerCard = page.getByText('Slot Held for You').locator('..');
+    this.timerCard = page.getByText(/Slot Held for You|Confirm your booking details|Reserving Slot/i).locator('..');
     this.paymentDetailsCard = page.getByText('Payment Details');
     this.cancelModalBtn = page.getByText('✕ Cancel');
     this.payDepositBtn = page.getByTestId('btn-pay-now')
@@ -142,7 +142,12 @@ export class CustomerAppPage {
     this.confirmationToast = page.getByTestId('app-toast-banner').or(page.locator('text=/Booking Confirmed|Appointment Confirmed|Token #|Assigned & Registered/i')).first();
 
     // Profile & Auth
-    this.profileBtn = page.getByRole('button', { name: 'Customer Profile' }).or(page.getByLabel('Customer Profile')).or(page.getByText('👤')).first();
+    this.profileBtn = page.getByTestId('tab-nav-account')
+      .or(page.getByRole('button', { name: 'Customer Profile' }))
+      .or(page.getByLabel('Customer Profile'))
+      .or(page.getByLabel('My Profile'))
+      .or(page.getByRole('button', { name: 'Manage Profile and Account Settings' }))
+      .first();
     this.profileModalTitle = page.getByText(/Customer Profile & Sign In/i);
     this.authNameInput = page.getByTestId('input-customer-name');
     this.authPhoneInput = page.getByTestId('input-phone-auth').or(page.locator('input[type="tel"]')).or(page.getByPlaceholder('+919999999991')).first();
@@ -168,7 +173,7 @@ export class CustomerAppPage {
     this.passModalTitle = page.getByText(/Digital Booking Pass|Hospital OPD Live Pass & Queue|My Token Pass/i).first();
     this.passQrVerification = page.getByText(/Scan at reception desk|Scan at hospital reception desk/i).first();
     this.passRefCode = page.getByTestId('pass-reference-code').or(page.locator('text=/TPT-[A-Z0-9]+/i')).first();
-    this.passExpectedTime = page.getByTestId('pass-expected-time').or(page.getByText(/Expected Time & Zero-Wait Advice/i)).first();
+    this.passExpectedTime = page.getByTestId('pass-expected-time').or(page.getByText(/YOUR EXPECTED TIME|Expected Time & Zero-Wait Advice|Arrival Window/i)).first();
     this.passDirectionsBtn = page.getByText('Directions');
     this.passSaveBtn = page.getByText('Save Pass');
     this.passCloseBtn = page.getByText('✕').first();
@@ -387,6 +392,7 @@ export class CustomerAppPage {
   async submitPayment() {
     await this.dismissStrikeWarningIfNeeded();
     await expect(this.payDepositBtn).toBeVisible();
+    await this.payDepositBtn.scrollIntoViewIfNeeded().catch(() => {});
     await this.payDepositBtn.click();
 
     // Wait for checkout modal to finish processing and dismiss
@@ -476,14 +482,15 @@ export class CustomerAppPage {
     if (!(await this.passModalTitle.isVisible().catch(() => false))) {
       return;
     }
-    const modal = this.page.locator('.fixed.inset-0, [role="dialog"]').filter({ has: this.passModalTitle }).first();
-    const closeBtn = (await modal.isVisible().catch(() => false))
-      ? modal.getByText('✕').or(modal.getByLabel('Close')).first()
-      : this.page.getByText('✕').first();
-    if (await closeBtn.isVisible().catch(() => false)) {
-      await closeBtn.click().catch(() => {});
+    const closeBtn = this.page.getByTestId('btn-close-booking-pass')
+      .or(this.page.getByLabel('Close appointment pass'))
+      .or(this.page.getByText('✕'))
+      .first();
+    if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await closeBtn.click({ force: true }).catch(() => {});
     }
-    await expect(this.passModalTitle).not.toBeVisible({ timeout: 10000 }).catch(() => {});
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await expect(this.passModalTitle).not.toBeVisible({ timeout: 3000 }).catch(() => {});
   }
 
   async cancelBookingFromList(identifier?: string) {

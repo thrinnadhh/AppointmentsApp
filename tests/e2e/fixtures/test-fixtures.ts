@@ -1,8 +1,28 @@
 import { test as base, expect, Page, BrowserContext } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 import { CustomerAppPage } from '../pages/customer-app.page';
 import { MerchantPortalPage } from '../pages/merchant-portal.page';
 import { AdminDashboardPage } from '../pages/admin-dashboard.page';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+// Ensure active local test secrets from merchant-web env are loaded
+try {
+  const envPath = path.resolve(process.cwd(), 'apps/merchant-web/.env.local');
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf8');
+    for (const line of content.split('\n')) {
+      const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        const val = match[2].trim().replace(/^["']|["']$/g, '');
+        if (!process.env[key] || process.env[key] === 'tirupati_e2e_secure_bypass_key_2026_x9k2') {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+} catch {}
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -231,69 +251,152 @@ export const test = base.extend<AppTestFixtures>({
   },
 
   multiRole: async ({ browser }, use) => {
-    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
     const customerContext: BrowserContext = await browser.newContext();
+    await customerContext.addInitScript(() => {
+      try {
+        localStorage.setItem('dpdp_consent_granted', 'true');
+      } catch {}
+    });
     const customerPage = await customerContext.newPage();
     const customerApp = new CustomerAppPage(customerPage);
     await customerApp.goto();
+    await customerApp.ensureAuthenticated();
 
-    const merchantContext: BrowserContext = await browser.newContext({
-      extraHTTPHeaders: {
-        'x-merchant-bypass-key': adminToken,
+    let merchantContext: BrowserContext | null = null;
+    let merchantPage: Page | null = null;
+    let merchantPortalInstance: MerchantPortalPage | null = null;
+
+    const getMerchantPortal = async (): Promise<MerchantPortalPage> => {
+      if (!merchantPortalInstance) {
+        merchantContext = await browser.newContext({
+          timezoneId: 'Asia/Kolkata',
+          locale: 'en-IN',
+        });
+        merchantPage = await merchantContext.newPage();
+        merchantPortalInstance = new MerchantPortalPage(merchantPage);
+      }
+      return merchantPortalInstance;
+    };
+
+    const merchantPortal = new Proxy({} as MerchantPortalPage, {
+      get(target, prop: string | symbol) {
+        if (prop === 'then') return undefined;
+        return (...args: any[]) => {
+          return getMerchantPortal().then((instance) => {
+            const val = (instance as any)[prop];
+            if (typeof val === 'function') {
+              return val.apply(instance, args);
+            }
+            return val;
+          });
+        };
       },
     });
-    const merchantPage = await merchantContext.newPage();
-    const merchantPortal = new MerchantPortalPage(merchantPage);
-    await merchantPortal.goto();
 
     await use({
       customerApp,
       customerPage,
       merchantPortal,
-      merchantPage,
+      get merchantPage() { return merchantPage!; },
     });
 
     await customerContext.close();
-    await merchantContext.close();
+    if (merchantContext) {
+      await merchantContext.close();
+    }
   },
 
   triRole: async ({ browser }, use) => {
-    const adminToken = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
     const customerContext: BrowserContext = await browser.newContext();
+    await customerContext.addInitScript(() => {
+      try {
+        localStorage.setItem('dpdp_consent_granted', 'true');
+      } catch {}
+    });
     const customerPage = await customerContext.newPage();
     const customerApp = new CustomerAppPage(customerPage);
     await customerApp.goto();
+    await customerApp.ensureAuthenticated();
 
-    const merchantContext: BrowserContext = await browser.newContext({
-      extraHTTPHeaders: {
-        'x-merchant-bypass-key': adminToken,
+    let merchantContext: BrowserContext | null = null;
+    let merchantPage: Page | null = null;
+    let merchantPortalInstance: MerchantPortalPage | null = null;
+
+    const getMerchantPortal = async (): Promise<MerchantPortalPage> => {
+      if (!merchantPortalInstance) {
+        merchantContext = await browser.newContext({
+          timezoneId: 'Asia/Kolkata',
+          locale: 'en-IN',
+        });
+        merchantPage = await merchantContext.newPage();
+        merchantPortalInstance = new MerchantPortalPage(merchantPage);
+      }
+      return merchantPortalInstance;
+    };
+
+    const merchantPortal = new Proxy({} as MerchantPortalPage, {
+      get(target, prop: string | symbol) {
+        if (prop === 'then') return undefined;
+        return (...args: any[]) => {
+          return getMerchantPortal().then((instance) => {
+            const val = (instance as any)[prop];
+            if (typeof val === 'function') {
+              return val.apply(instance, args);
+            }
+            return val;
+          });
+        };
       },
     });
-    const merchantPage = await merchantContext.newPage();
-    const merchantPortal = new MerchantPortalPage(merchantPage);
-    await merchantPortal.goto();
 
-    const adminContext: BrowserContext = await browser.newContext({
-      extraHTTPHeaders: {
-        'x-admin-bypass-key': adminToken,
+    let adminContext: BrowserContext | null = null;
+    let adminPage: Page | null = null;
+    let adminDashboardInstance: AdminDashboardPage | null = null;
+
+    const getAdminDashboard = async (): Promise<AdminDashboardPage> => {
+      if (!adminDashboardInstance) {
+        adminContext = await browser.newContext({
+          timezoneId: 'Asia/Kolkata',
+          locale: 'en-IN',
+        });
+        adminPage = await adminContext.newPage();
+        adminDashboardInstance = new AdminDashboardPage(adminPage);
+        await adminDashboardInstance.goto();
+      }
+      return adminDashboardInstance;
+    };
+
+    const adminDashboard = new Proxy({} as AdminDashboardPage, {
+      get(target, prop: string | symbol) {
+        if (prop === 'then') return undefined;
+        return (...args: any[]) => {
+          return getAdminDashboard().then((instance) => {
+            const val = (instance as any)[prop];
+            if (typeof val === 'function') {
+              return val.apply(instance, args);
+            }
+            return val;
+          });
+        };
       },
     });
-    const adminPage = await adminContext.newPage();
-    const adminDashboard = new AdminDashboardPage(adminPage);
-    await adminDashboard.goto();
 
     await use({
       customerApp,
       customerPage,
       merchantPortal,
-      merchantPage,
+      get merchantPage() { return merchantPage!; },
       adminDashboard,
-      adminPage,
+      get adminPage() { return adminPage!; },
     });
 
     await customerContext.close();
-    await merchantContext.close();
-    await adminContext.close();
+    if (merchantContext) {
+      await merchantContext.close();
+    }
+    if (adminContext) {
+      await adminContext.close();
+    }
   },
 });
 

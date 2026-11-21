@@ -95,7 +95,7 @@ export class AdminDashboardPage {
 
     // Header
     this.pageHeading = page.getByRole('heading', { name: /Super Admin City Rollout & Expansion Hub/i });
-    this.refreshBtn = page.getByRole('button', { name: /Refresh/i });
+    this.refreshBtn = page.getByRole('button', { name: /Refresh/i }).first();
     this.expandNewCityBtn = page.getByRole('button', { name: /Expand New City/i });
 
     // Time Horizons
