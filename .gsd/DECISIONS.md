@@ -80,3 +80,48 @@
 - **Ambiguity / Dilemma:** Keep `local_smtp` enabled and rely on shell retry loops, or disable the container in `supabase/config.toml`?
 - **Conservative Decision:** In `supabase/config.toml`, set `[local_smtp] enabled = false`. Zero production, unit, or E2E tests depend on the inbucket SMTP web interface on port 54324 (all notification tests inspect database rows directly or mock delivery providers).
 - **Impact:** Eliminates port 54324 binding contention, speeds up Supabase local startup, and stabilizes CI runner execution without impacting application functionality.
+
+---
+
+## DEC-009: Positive Fail-Closed Authorization Guard for `public.anonymize_user_data`
+- **Date / Stage:** 2026-11-22 / Stage 5 (Phase 3 Security Remediation)
+- **Context:** `public.anonymize_user_data` previously asserted `IF auth.role() != 'service_role' AND v_caller_role != 'admin' THEN RAISE EXCEPTION ...`. This caused immediate failure (42501) when non-admin data subjects attempted self-service in-app deletion via `delete_account_immediately`, while also exposing the function to NULL evaluation bypasses under SQL 3-valued logic.
+- **Ambiguity / Dilemma:** Should `anonymize_user_data` be made executable directly by `authenticated`, or should authorization be checked positively inside the security definer function?
+- **Conservative Decision:** Created forward migration `20261122000004_fix_customer_deletion_and_vendor_split_unique.sql`. Enforced a fail-closed positive check: `IF NOT (auth.role() = 'service_role' OR COALESCE(v_caller_role, '') = 'admin' OR ((SELECT auth.uid()) IS NOT NULL AND (SELECT auth.uid()) = p_user_id)) THEN RAISE EXCEPTION ...`. Revoked `EXECUTE` on `anonymize_user_data` from `authenticated`, anon, and PUBLIC so normal users must call `delete_account_immediately`, which verifies `auth.uid()`.
+- **Impact:** Enables full compliance with DPDP Act 2023 Section 12 right to erasure for all registered customers and merchants without permitting cross-tenant deletion attacks.
+
+---
+
+## DEC-010: Database-Level Idempotency Constraint for EasySplit Vendor Splits
+- **Date / Stage:** 2026-11-22 / Stage 5 (Phase 3 Security Remediation)
+- **Context:** `public.merchant_vendor_splits` lacked a UNIQUE constraint on `booking_id`, and `apps/merchant-web/src/app/api/webhooks/cashfree/route.ts` executed direct inserts. Concurrent payment webhooks for the same order could insert duplicate split rows.
+- **Ambiguity / Dilemma:** Rely on application-level checks in the webhook handler or enforce at the database layer?
+- **Conservative Decision:** Added `CONSTRAINT uq_merchant_vendor_splits_booking UNIQUE (booking_id)` in migration `20261122000004`, and updated `route.ts` to perform upsert with `{ onConflict: 'booking_id', ignoreDuplicates: true }`.
+- **Impact:** Guaranteed idempotency against duplicate webhook events and network retries, preventing split accounting anomalies.
+
+---
+
+## DEC-011: Early Transactional Advisory Lock in `private.create_booking_hold`
+- **Date / Stage:** 2026-11-22 / Stage 5 (Phase 3 Security Remediation)
+- **Context:** In `20261118000007`, `PERFORM pg_advisory_xact_lock(hashtext('hold_limit:' || p_customer_id::text));` was acquired after the 1-hour time gap checks, permitting concurrent requests for different resources to bypass the 1-hour appointment separation invariant.
+- **Ambiguity / Dilemma:** Move the lock up or introduce a separate secondary advisory lock key?
+- **Conservative Decision:** Moved the per-customer advisory lock acquisition to function entry immediately following caller authorization checks.
+- **Impact:** Fully serializes 1-hour time gap queries and 3-hold quota evaluation within transaction scope, completely closing the TOCTOU gap race.
+
+---
+
+## DEC-012: Enforcing CSRF Protection on Public Account Deletion Sibling Path
+- **Date / Stage:** 2026-11-22 / Stage 5 (Phase 3 Security Remediation)
+- **Context:** `/api/account/delete-public-request` was previously listed in `WEBHOOK_OR_EXEMPT_ROUTES` in `csrf-guard.ts`, allowing ambient-credential browser requests to bypass `Origin` and `Sec-Fetch-Site` checks.
+- **Ambiguity / Dilemma:** Keep route exempt for public forms or enforce CSRF guard?
+- **Conservative Decision:** Removed `/api/account/delete-public-request` from `WEBHOOK_OR_EXEMPT_ROUTES`. Browser requests must pass same-origin / non-cross-site validation.
+- **Impact:** Prevents cross-site forgery attacks while continuing to allow legitimate web page submissions and token-authenticated requests.
+
+---
+
+## DEC-013: Addition of Nonce-Based CSP and COOP Report-Only Security Headers
+- **Date / Stage:** 2026-11-22 / Stage 5 (Phase 3 Security Remediation)
+- **Context:** Task T6 requires adding nonce-based `script-src` in `Content-Security-Policy-Report-Only` and `Cross-Origin-Opener-Policy-Report-Only: same-origin-allow-popups` alongside existing policies.
+- **Ambiguity / Dilemma:** Enforce immediately vs report-only?
+- **Conservative Decision:** Added both headers strictly in report-only mode in `apps/merchant-web/next.config.mjs`. Documented promotion criteria in `.gsd/MANUAL_ACTIONS.md`.
+- **Impact:** Protects against unexpected production hydration breakage or payment popup isolation while collecting violation reports for future enforcement promotion.

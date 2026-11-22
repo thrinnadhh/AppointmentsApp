@@ -3,7 +3,7 @@
 ## 1. Product Architecture, State & Core Docs
 - [project] Primary Docs: `docs/architecture/PRD-hyperlocal-booking-mvp.md`, `docs/hospital/SPEC.md` (binding source of truth for Hospital vertical), `docs/PRODUCTION_READINESS_ROADMAP.md`, `docs/backlog.md`, and `docs/decisions.md` (append architectural decisions here) → project-conventions.md
 - [project] Apps & Packages: `apps/customer-mobile` (React Native / Expo SDK 58, port `8081`), `apps/merchant-web` (Next.js 15 App Router, port `3000`), `packages/shared` (`evaluateConsultantQueue`, `buildRollingTenSlotQueue`, PII-safe logger), `supabase/` (136+ monotonic migrations through `20261115000001`, local API `:54321`, DB `:54322`) → tech-decisions.md
-- [project] Active Branch & Status: `phase-security-hardening-bola` (24/24 human journey flows & BOLA security suites verified; final UI state-machine polish, Sentry PII-scrubbed observability, and cloud cutover to `ynkdnwhubfknnnzjtpeg` remaining). Never edit old migrations, rewrite git history, or force-push → project-conventions.md
+- [project] Active Branch & Status: [SUPERSEDED by 2026-11-22: Active branch is security/window-closure-20261121 (PR #25)] `phase-security-hardening-bola` (24/24 human journey flows & BOLA security suites verified; final UI state-machine polish, Sentry PII-scrubbed observability, and cloud cutover to `ynkdnwhubfknnnzjtpeg` remaining). Never edit old migrations, rewrite git history, or force-push → project-conventions.md
 
 ## 2. Binding Domain, Security & Privacy Invariants
 - [project] RBAC Boundaries (`docs/hospital/SPEC.md`): Hospital Admin (depts, max 3 staff emails/dept, fees, front-desk-to-consultant mapping), Front Desk (acts ONLY on assigned consultants), Consultant (acts ONLY on own queue), Customer (own bookings & pass) → tech-decisions.md
@@ -40,4 +40,18 @@
   3. Pre-existing test failures cataloged in Stage 0 baseline (hospital-hardened-rpcs test suite, adversarial tests).
   4. Customer E2E search failure regression in PR #25 was isolated to 'Specialty' vs 'Orthodontist' string search.
 - **Verification Evidence:** `.gsd/PREFLIGHT_PHASE2.md`, `.gsd/evidence/PREFLIGHT/`, `FULL_SECURITY_CLOSURE_REPORT.md`
+- **Confidence:** VERIFIED
+
+### Entry 2026-11-22 (Phase 3 Security Remediation & Window Closure)
+- **Date (UTC):** 2026-11-22
+- **Phase:** Phase 3 Security Remediation & Window Closure
+- **Commit SHA:** bc3ae02227478dc0f892250a8337bfeb599d7ea1
+- **What was learned:**
+  1. Re-derived 100 coverage units across 5 independent subagent audits, replacing bare filenames/notes citations with strict REVIEWED_SAFE(<full repo path>[:line]): <invariant and where enforced>.
+  2. Discovered and fixed customer DPDP self-service account deletion authorization bug in public.anonymize_user_data (enforcing positive fail-closed owner authorization).
+  3. Added uq_merchant_vendor_splits_booking unique constraint and webhook upsert handling for EasySplit idempotency.
+  4. Eliminated TOCTOU race on 1-hour appointment gap by acquiring customer advisory lock at function entry in private.create_booking_hold.
+  5. Hardened public deletion endpoint /api/account/delete-public-request with CSRF protection and verified fail-closed PII anonymization.
+  6. Added nonce-based Content-Security-Policy-Report-Only and Cross-Origin-Opener-Policy-Report-Only headers in next.config.mjs.
+- **Verification Evidence:** `.gsd/COVERAGE_LEDGER.json`, `.gsd/SECURITY_REMEDIATION_SPEC_PHASE3.md`, `tests/security/customer-self-deletion.test.mjs`, `tests/security/vendor-split-idempotency.test.mjs`, `tests/security/account-deletion-public-anonymization.test.mjs`.
 - **Confidence:** VERIFIED

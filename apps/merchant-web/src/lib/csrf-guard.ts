@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 function isPrivateIpv4(host: string): boolean {
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
@@ -80,7 +80,6 @@ const WEBHOOK_OR_EXEMPT_ROUTES = [
   '/api/auth/otp/send',
   '/api/auth/otp/verify',
   '/api/cities/waitlist',
-  '/api/account/delete-public-request',
 ];
 
 /**

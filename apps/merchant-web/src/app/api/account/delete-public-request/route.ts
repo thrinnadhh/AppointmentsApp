@@ -142,14 +142,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Execute immediate atomic PII anonymization and deletion
-      try {
-        await supabaseAdmin.rpc('delete_account_immediately' as never, {
-          p_reason: typeof reason === 'string' ? reason.slice(0, 500) : 'Requested via verified public web page',
-        } as never);
-      } catch (rpcErr) {
-        // Fallback to anonymize_user_data directly
-        await supabaseAdmin.rpc('anonymize_user_data' as never, { p_user_id: userId } as never);
+      // Execute immediate atomic PII anonymization directly via service_role
+      const { error: anonErr } = await supabaseAdmin.rpc('anonymize_user_data' as never, {
+        p_user_id: userId,
+      } as never);
+
+      if (anonErr) {
+        console.error('[Public Delete] Failed to anonymize user data:', anonErr);
+        return NextResponse.json(
+          { error: 'Failed to erase personal data. Please contact support.' },
+          { status: 500 }
+        );
       }
 
       // Purge auth user record immediately

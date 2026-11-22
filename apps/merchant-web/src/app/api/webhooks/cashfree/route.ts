@@ -276,20 +276,25 @@ export async function POST(req: NextRequest) {
           .eq('id', booking.id);
 
         if (prov?.cashfree_vendor_id) {
-          await supabaseAdmin.from('merchant_vendor_splits').insert({
-            booking_id: booking.id,
-            provider_id: booking.provider_id,
-            cashfree_vendor_id: prov.cashfree_vendor_id,
-            cf_order_id: orderId || booking.id,
-            gross_amount: rawAmountInRupees,
-            merchant_share: Number(booking.merchant_share_amount || 0),
-            platform_fee: Number(booking.platform_fee_amount || booking.platform_fee || 10),
-            status: 'SUCCESS',
-            metadata: {
-              payment_id: paymentId,
-              processed_at: new Date().toISOString(),
-            },
-          });
+          await supabaseAdmin
+            .from('merchant_vendor_splits')
+            .upsert(
+              {
+                booking_id: booking.id,
+                provider_id: booking.provider_id,
+                cashfree_vendor_id: prov.cashfree_vendor_id,
+                cf_order_id: orderId || booking.id,
+                gross_amount: rawAmountInRupees,
+                merchant_share: Number(booking.merchant_share_amount || 0),
+                platform_fee: Number(booking.platform_fee_amount || booking.platform_fee || 10),
+                status: 'SUCCESS',
+                metadata: {
+                  payment_id: paymentId,
+                  processed_at: new Date().toISOString(),
+                },
+              },
+              { onConflict: 'booking_id', ignoreDuplicates: true }
+            );
         }
       }
 

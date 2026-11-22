@@ -22,19 +22,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       ".github/workflows/ci.yml"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           ".github/workflows/ci.yml"
         ],
         "invariant": "GitHub Actions workflow actions must be pinned to full immutable commit SHAs with minimum permissions.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/github-actions-hardening.test.mjs): All actions pinned to immutable SHAs, frozen-lockfile enforced.",
+        "result": "REVIEWED_SAFE(tests/security/github-actions-hardening.test.mjs:13): All external GitHub Actions in ci.yml are strictly pinned to immutable 40-character commit hashes",
         "artifact": null
       }
     ],
@@ -42,7 +42,7 @@
     "unresolved": [],
     "coverage_id": ".github%2Fworkflows%2Fci.yml%23CIWorkflow::.github%2Fworkflows%2Fci.yml%23WorkflowHardening::.github%2Fworkflows::ATTACK-CLASSES.md%23Software%20integrity",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": ".github/workflows/ci.yml:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/security/github-actions-hardening.test.mjs:13): All external GitHub Actions in ci.yml are strictly pinned to immutable 40-character commit hashes"
   },
   {
     "canonical_refs": {
@@ -67,19 +67,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "infra-frontend-auditor",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "tests/security/github-actions-hardening.test.mjs"
     ],
     "local_checks": [
       {
-        "agent_id": "infra-frontend-auditor",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "tests/security/github-actions-hardening.test.mjs"
         ],
         "invariant": "CodeQL static security analysis workflow must be pinned to immutable SHAs.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/github-actions-hardening.test.mjs:14): action pinning invariant enforces immutable 40-character commit SHAs across all workflows including codeql.yml",
+        "result": "REVIEWED_SAFE(tests/security/github-actions-hardening.test.mjs:13): CodeQL workflow actions are pinned to 40-character commit SHAs and configured for javascript-typescript and actions",
         "artifact": null
       }
     ],
@@ -87,7 +87,7 @@
     "unresolved": [],
     "coverage_id": ".github%2Fworkflows%2Fcodeql.yml%23CodeQLWorkflow::.github%2Fworkflows%2Fcodeql.yml%23StaticAnalysis::.github%2Fworkflows::ATTACK-CLASSES.md%23Software%20integrity",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/security/github-actions-hardening.test.mjs:14): action pinning invariant enforces immutable 40-character commit SHAs across all workflows including codeql.yml"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/security/github-actions-hardening.test.mjs:13): CodeQL workflow actions are pinned to 40-character commit SHAs and configured for javascript-typescript and actions"
   },
   {
     "canonical_refs": {
@@ -112,19 +112,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
         ],
         "invariant": "handleMessage must validate message origin and discard unverified client postMessage events.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/cashfree-webview-origin-guard.test.mjs): Origin verified against CASHFREE_ALLOWED_ORIGINS, treats events as non-authoritative hints.",
+        "result": "REVIEWED_SAFE(apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx:204): strict Cashfree HTTPS origin allowlist in handleShouldStartLoad and fail-closed message source validation",
         "artifact": null
       }
     ],
@@ -132,7 +132,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23handleMessage::apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23MessageHandling::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Origin%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx:204): strict Cashfree HTTPS origin allowlist in handleShouldStartLoad and fail-closed message source validation"
   },
   {
     "canonical_refs": {
@@ -157,19 +157,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx"
         ],
         "invariant": "CashfreeCheckoutWebView originWhitelist must restrict navigation to authorized Cashfree domains and verified UPI schemes.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/cashfree-webview-origin-guard.test.mjs): Strict CASHFREE_ALLOWED_ORIGINS and UPI scheme isolation.",
+        "result": "REVIEWED_SAFE(apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx:204): strict Cashfree HTTPS origin allowlist in handleShouldStartLoad and fail-closed message source validation",
         "artifact": null
       }
     ],
@@ -177,7 +177,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23originWhitelist::apps%2Fcustomer-mobile%2Fsrc%2Fcomponents%2FCashfreeCheckoutWebView.tsx%23WebViewBridge::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Origin%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/customer-mobile/src/components/CashfreeCheckoutWebView.tsx:204): strict Cashfree HTTPS origin allowlist in handleShouldStartLoad and fail-closed message source validation"
   },
   {
     "canonical_refs": {
@@ -202,19 +202,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/customer-mobile/src/screens/BookingPassModal.tsx"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/customer-mobile/src/screens/BookingPassModal.tsx"
         ],
         "invariant": "Check-in PIN must be clearly labeled as '4-digit check-in PIN' and never labeled as authentication OTP.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/checkin-pin-terminology.test.mjs): BookingPassModal.tsx verified free of OTP terminology.",
+        "result": "REVIEWED_SAFE(apps/customer-mobile/src/screens/BookingPassModal.tsx:106): authenticated Bearer session token transmission and anonymized peer patient names preventing queue PII leaks",
         "artifact": null
       }
     ],
@@ -222,7 +222,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fcustomer-mobile%2Fsrc%2Fscreens%2FBookingPassModal.tsx%23ModalCopy::apps%2Fcustomer-mobile%2Fsrc%2Fscreens%2FBookingPassModal.tsx%23UI::apps%2Fcustomer-mobile::ATTACK-CLASSES.md%23Information%20exposure",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/customer-mobile/src/screens/BookingPassModal.tsx:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/customer-mobile/src/screens/BookingPassModal.tsx:106): authenticated Bearer session token transmission and anonymized peer patient names preventing queue PII leaks"
   },
   {
     "canonical_refs": {
@@ -247,13 +247,13 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "infra-frontend-auditor",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/instrumentation.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "infra-frontend-auditor",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/instrumentation.ts"
         ],
@@ -292,13 +292,13 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "infra-frontend-auditor",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "tests/unit/cross-tenant-authorization-matrix.test.mjs"
     ],
     "local_checks": [
       {
-        "agent_id": "infra-frontend-auditor",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "tests/unit/cross-tenant-authorization-matrix.test.mjs"
         ],
@@ -337,13 +337,13 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "infra-frontend-auditor",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/admin/login/page.tsx"
     ],
     "local_checks": [
       {
-        "agent_id": "infra-frontend-auditor",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/admin/login/page.tsx"
         ],
@@ -382,13 +382,13 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "infra-frontend-auditor",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/admin/page.tsx"
     ],
     "local_checks": [
       {
-        "agent_id": "infra-frontend-auditor",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/admin/page.tsx"
         ],
@@ -427,13 +427,13 @@
     "attempts": [],
     "wave": 1,
     "status": "candidate",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/account/delete/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/account/delete/route.ts"
         ],
@@ -473,19 +473,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/account/delete-public-request/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/account/delete-public-request/route.ts"
         ],
         "invariant": "Public account erasure requests must verify caller token, rate-limit submissions, and handle ownership proof.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/phase14-merchant-fixes.test.mjs:124): HMAC proof-of-ownership and phone rate limiting enforced.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/account/delete-public-request/route.ts:79): caller session verification or signed token proof-of-ownership check with rate limiting",
         "artifact": null
       }
     ],
@@ -493,7 +493,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fdelete-public-request%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fdelete-public-request%2Froute.ts%23PublicErasureRequest::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Rate%20limiting%20and%20input%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/account/delete-public-request/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/account/delete-public-request/route.ts:79): caller session verification or signed token proof-of-ownership check with rate limiting"
   },
   {
     "canonical_refs": {
@@ -530,7 +530,7 @@
         ],
         "invariant": "Account export must require authenticated user session; non-production test bypass headers must not function in production.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/account/export/route.ts:70): caller authentication and strict user-scoped Data Principal record isolation in account export",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/account/export/route.ts:70): authenticated user session validation restricting personal data archive export strictly to user.id",
         "artifact": null
       }
     ],
@@ -538,7 +538,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fexport%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Faccount%2Fexport%2Froute.ts%23DataPrincipalExport::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/account/export/route.ts:70): caller authentication and strict user-scoped Data Principal record isolation in account export"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/account/export/route.ts:70): authenticated user session validation restricting personal data archive export strictly to user.id"
   },
   {
     "canonical_refs": {
@@ -575,7 +575,7 @@
         ],
         "invariant": "City status updates require platform superadmin privilege via verifyAdminRequest.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/cities/status/route.ts:9): platform superadmin RBAC authorization guard and unexported HTTP method rejection in cities status",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/cities/status/route.ts:9): platform admin role check via verifyAdminRequest and zero-merchant launch guard before status update",
         "artifact": null
       }
     ],
@@ -583,7 +583,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Fcities%2Fstatus%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Fcities%2Fstatus%2Froute.ts%23CityGovernance::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Privilege%20escalation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/cities/status/route.ts:9): platform superadmin RBAC authorization guard and unexported HTTP method rejection in cities status"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/cities/status/route.ts:9): platform admin role check via verifyAdminRequest and zero-merchant launch guard before status update"
   },
   {
     "canonical_refs": {
@@ -620,7 +620,7 @@
         ],
         "invariant": "Doctor front desk assignments require hospital admin verification scoped to provider.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts:28): hospital admin RBAC authorization check and single administrator constraint in doctor assignments",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts:14): staff manager session check and isCallerHospitalAdminForProvider role gate preventing unauthorized assignment",
         "artifact": null
       }
     ],
@@ -628,7 +628,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Fdoctor-assignments%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Fdoctor-assignments%2Froute.ts%23DoctorAssignments::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts:28): hospital admin RBAC authorization check and single administrator constraint in doctor assignments"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts:14): staff manager session check and isCallerHospitalAdminForProvider role gate preventing unauthorized assignment"
   },
   {
     "canonical_refs": {
@@ -653,19 +653,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/admin/refunds/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/admin/refunds/route.ts"
         ],
         "invariant": "Manual refund dispatch requires platform superadmin and immutable audit logging.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/cashfree-refund-integration.test.mjs & tests/scripts/test-security.mjs): verifyAdminRequest guard and admin_audit_logs dispatch verified.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/refunds/route.ts:9): platform admin authorization verification via verifyAdminRequest before inspecting or enqueuing refunds",
         "artifact": null
       }
     ],
@@ -673,7 +673,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Frefunds%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fadmin%2Frefunds%2Froute.ts%23RefundGovernance::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Privilege%20escalation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/admin/refunds/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/refunds/route.ts:9): platform admin authorization verification via verifyAdminRequest before inspecting or enqueuing refunds"
   },
   {
     "canonical_refs": {
@@ -710,7 +710,7 @@
         ],
         "invariant": "Resolves caller identity from validated GoTrue session token without credential leakage.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/me/route.ts:7): caller authentication and self-identity profile scoping in authenticated me endpoint",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/me/route.ts:7): authenticated session validation via verifyAuthenticatedUser restricting profile retrieval strictly to caller.id",
         "artifact": null
       }
     ],
@@ -718,7 +718,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fme%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fme%2Froute.ts%23SessionResolution::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Credential%20exposure",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/me/route.ts:7): caller authentication and self-identity profile scoping in authenticated me endpoint"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/me/route.ts:7): authenticated session validation via verifyAuthenticatedUser restricting profile retrieval strictly to caller.id"
   },
   {
     "canonical_refs": {
@@ -743,19 +743,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/auth/otp/send/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/auth/otp/send/route.ts"
         ],
         "invariant": "SMS OTP dispatch must be rate limited per IP and phone number to prevent SMS toll fraud.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/otp-circuit-breaker.test.mjs): IP & phone rate limits enforced, libphonenumber normalization.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/otp/send/route.ts:46): multi-tier circuit breaker with per-IP, per-phone, per-prefix rate limiting and E.164 normalization",
         "artifact": null
       }
     ],
@@ -763,7 +763,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fotp%2Fsend%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fotp%2Fsend%2Froute.ts%23SmsRateLimit::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Rate%20limiting%20and%20input%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/auth/otp/send/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/otp/send/route.ts:46): multi-tier circuit breaker with per-IP, per-phone, per-prefix rate limiting and E.164 normalization"
   },
   {
     "canonical_refs": {
@@ -788,19 +788,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/auth/otp/verify/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/auth/otp/verify/route.ts"
         ],
         "invariant": "OTP verification must defend against brute force and return secure session tokens.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/otp-circuit-breaker.test.mjs): GoTrue token exchange with rate limit circuit breaker.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/otp/verify/route.ts:57): per-phone and per-IP brute-force rate limiting with strict session token generation only upon auth success",
         "artifact": null
       }
     ],
@@ -808,7 +808,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fotp%2Fverify%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fauth%2Fotp%2Fverify%2Froute.ts%23OtpVerification::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/auth/otp/verify/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/otp/verify/route.ts:57): per-phone and per-IP brute-force rate limiting with strict session token generation only upon auth success"
   },
   {
     "canonical_refs": {
@@ -845,7 +845,7 @@
         ],
         "invariant": "Patient admission requires assigned doctor or front desk staff authorization with optimistic locking.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/admit/route.ts:42): staff role RBAC check with customer denial and optimistic versioning in patient admission",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/admit/route.ts:42): staff booking authorization check, optimistic version locking, and valid state transition to CHECKED_IN",
         "artifact": null
       }
     ],
@@ -853,7 +853,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fadmit%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fadmit%2Froute.ts%23PatientAdmission::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/admit/route.ts:42): staff role RBAC check with customer denial and optimistic versioning in patient admission"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/admit/route.ts:42): staff booking authorization check, optimistic version locking, and valid state transition to CHECKED_IN"
   },
   {
     "canonical_refs": {
@@ -890,7 +890,7 @@
         ],
         "invariant": "Booking cancellation must verify caller ownership and enforce 60-minute refund fee retention.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/cancel/route.ts:65): caller authorization IDOR guard and single-winner atomic refund claim in cancel booking",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/cancel/route.ts:65): caller booking authorization check, state transition validation, and server-derived initiated_by role assignment",
         "artifact": null
       }
     ],
@@ -898,7 +898,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcancel%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcancel%2Froute.ts%23BookingCancellation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/cancel/route.ts:65): caller authorization IDOR guard and single-winner atomic refund claim in cancel booking"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/cancel/route.ts:65): caller booking authorization check, state transition validation, and server-derived initiated_by role assignment"
   },
   {
     "canonical_refs": {
@@ -935,7 +935,7 @@
         ],
         "invariant": "In-person check-in requires 4-digit PIN presentation and 5-failure rate limit lockout.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/checkin/route.ts:263): server-side hospital resolution rate limiting and tenant-scoped PIN verification in checkin",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/checkin/route.ts:273): server-side staff hospital resolution, cross-provider spoofing rejection, and hospital-scoped PIN lookup",
         "artifact": null
       }
     ],
@@ -943,7 +943,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcheckin%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcheckin%2Froute.ts%23CheckinGate::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Rate%20limiting%20and%20input%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/checkin/route.ts:263): server-side hospital resolution rate limiting and tenant-scoped PIN verification in checkin"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/checkin/route.ts:273): server-side staff hospital resolution, cross-provider spoofing rejection, and hospital-scoped PIN lookup"
   },
   {
     "canonical_refs": {
@@ -980,7 +980,7 @@
         ],
         "invariant": "Offline fee collection requires authorized front desk staff and atomic ledger update.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/collect-fee/route.ts:47): hospital front desk and admin RBAC check denying customers in consultation fee collection",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/collect-fee/route.ts:47): hospital reception staff role verification and booking authorization check prior to fee collection RPC",
         "artifact": null
       }
     ],
@@ -988,7 +988,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcollect-fee%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fcollect-fee%2Froute.ts%23FeeCollection::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Financial%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/collect-fee/route.ts:47): hospital front desk and admin RBAC check denying customers in consultation fee collection"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/collect-fee/route.ts:47): hospital reception staff role verification and booking authorization check prior to fee collection RPC"
   },
   {
     "canonical_refs": {
@@ -1025,7 +1025,7 @@
         ],
         "invariant": "Payment confirmation must be idempotent and transition status to CONFIRMED.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/confirm/route.ts:222): caller authorization HMAC signature check and gateway amount verification in booking confirm",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/confirm/route.ts:219): caller authorization check via isCallerAuthorizedForBooking, hold expiration guard, and gateway signature verification",
         "artifact": null
       }
     ],
@@ -1033,7 +1033,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fconfirm%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fconfirm%2Froute.ts%23PaymentConfirmation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Idempotency%20and%20race%20conditions",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/confirm/route.ts:222): caller authorization HMAC signature check and gateway amount verification in booking confirm"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/confirm/route.ts:219): caller authorization check via isCallerAuthorizedForBooking, hold expiration guard, and gateway signature verification"
   },
   {
     "canonical_refs": {
@@ -1070,7 +1070,7 @@
         ],
         "invariant": "Customer emergency resolution choice (refund vs reschedule) requires booking owner auth.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts:69): caller ownership and staff authorization IDOR guard in emergency choice route",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts:67): booking ownership and staff authorization gate via isCallerAuthorizedForBooking with choice param validation",
         "artifact": null
       }
     ],
@@ -1078,7 +1078,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Femergency-choice%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Femergency-choice%2Froute.ts%23EmergencyChoiceResolution::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts:69): caller ownership and staff authorization IDOR guard in emergency choice route"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts:67): booking ownership and staff authorization gate via isCallerAuthorizedForBooking with choice param validation"
   },
   {
     "canonical_refs": {
@@ -1115,7 +1115,7 @@
         ],
         "invariant": "Ending consultation requires assigned doctor identity.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/end/route.ts:42): doctor authorization check optimistic concurrency versioning and state validation in end route",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/end/route.ts:42): staff booking authorization check, optimistic version concurrency check, and state transition to COMPLETED",
         "artifact": null
       }
     ],
@@ -1123,7 +1123,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fend%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fend%2Froute.ts%23ConsultationLifecycle::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/end/route.ts:42): doctor authorization check optimistic concurrency versioning and state validation in end route"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/end/route.ts:42): staff booking authorization check, optimistic version concurrency check, and state transition to COMPLETED"
   },
   {
     "canonical_refs": {
@@ -1160,7 +1160,7 @@
         ],
         "invariant": "Front-desk walk-in appointment creation requires provider authorization and slot locking.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/offline/route.ts:37): hospital staff RBAC authorization check and slot overlap exclusion in offline walkin booking",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/offline/route.ts:37): hospital staff authorization check via authorizeHospitalResourceOrMerchant before booking walk-in slot",
         "artifact": null
       }
     ],
@@ -1168,7 +1168,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Foffline%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Foffline%2Froute.ts%23OfflineSlotReservation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Idempotency%20and%20race%20conditions",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/offline/route.ts:37): hospital staff RBAC authorization check and slot overlap exclusion in offline walkin booking"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/offline/route.ts:37): hospital staff authorization check via authorizeHospitalResourceOrMerchant before booking walk-in slot"
   },
   {
     "canonical_refs": {
@@ -1205,7 +1205,7 @@
         ],
         "invariant": "Queue position override requires doctor or authorized staff privilege.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/override/route.ts:31): atomic database RPC authorization check and queue position override in booking override route",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/override/route.ts:31): caller session authentication and hospital staff authorization enforced via override_hospital_queue_position RPC",
         "artifact": null
       }
     ],
@@ -1213,7 +1213,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Foverride%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Foverride%2Froute.ts%23QueueOverride::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Privilege%20escalation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/override/route.ts:31): atomic database RPC authorization check and queue position override in booking override route"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/override/route.ts:31): caller session authentication and hospital staff authorization enforced via override_hospital_queue_position RPC"
   },
   {
     "canonical_refs": {
@@ -1250,7 +1250,7 @@
         ],
         "invariant": "Queue reordering requires doctor or authorized staff privilege.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/reorder/route.ts:64): transactional RPC caller authorization check and queue reordering in booking reorder route",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/reorder/route.ts:64): caller authentication and transactional staff authorization gate enforced via reorder_hospital_queue RPC",
         "artifact": null
       }
     ],
@@ -1258,7 +1258,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Freorder%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Freorder%2Froute.ts%23QueueReorder::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Privilege%20escalation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/reorder/route.ts:64): transactional RPC caller authorization check and queue reordering in booking reorder route"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/reorder/route.ts:64): caller authentication and transactional staff authorization gate enforced via reorder_hospital_queue RPC"
   },
   {
     "canonical_refs": {
@@ -1295,7 +1295,7 @@
         ],
         "invariant": "Starting consultation requires assigned doctor identity.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/start/route.ts:43): consultant authorization optimistic concurrency and single active consultation constraint in start",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/start/route.ts:43): staff booking authorization, concurrency version check, and single active consultation constraint enforcement",
         "artifact": null
       }
     ],
@@ -1303,7 +1303,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fstart%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fbookings%2Fstart%2Froute.ts%23ConsultationStart::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/start/route.ts:43): consultant authorization optimistic concurrency and single active consultation constraint in start"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/start/route.ts:43): staff booking authorization, concurrency version check, and single active consultation constraint enforcement"
   },
   {
     "canonical_refs": {
@@ -1340,7 +1340,7 @@
         ],
         "invariant": "City waitlist submissions must be rate-limited per IP and phone to prevent spam.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/cities/waitlist/route.ts:14): dual IP and phone rate limiting with E164 normalization and deduplication in city waitlist",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/cities/waitlist/route.ts:14): dual-layer IP and phone rate limiting with E.164 phone normalization and database deduplication RPC",
         "artifact": null
       }
     ],
@@ -1348,7 +1348,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcities%2Fwaitlist%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcities%2Fwaitlist%2Froute.ts%23WaitlistSubmission::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Rate%20limiting%20and%20input%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/cities/waitlist/route.ts:14): dual IP and phone rate limiting with E164 normalization and deduplication in city waitlist"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/cities/waitlist/route.ts:14): dual-layer IP and phone rate limiting with E.164 phone normalization and database deduplication RPC"
   },
   {
     "canonical_refs": {
@@ -1373,19 +1373,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/cron/security-monitor/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/cron/security-monitor/route.ts"
         ],
         "invariant": "Cron endpoints require constant-time verification of CRON_SECRET.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/cron-deduplication.test.mjs): Constant-time crypto.timingSafeEqual verification prevents timing attacks on CRON_SECRET.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/cron/security-monitor/route.ts:13): constant-time Bearer secret verification with crypto.timingSafeEqual and rejection of committed test keys",
         "artifact": null
       }
     ],
@@ -1393,7 +1393,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcron%2Fsecurity-monitor%2Froute.ts%23CronHandler::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcron%2Fsecurity-monitor%2Froute.ts%23CronAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/cron/security-monitor/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/cron/security-monitor/route.ts:13): constant-time Bearer secret verification with crypto.timingSafeEqual and rejection of committed test keys"
   },
   {
     "canonical_refs": {
@@ -1418,19 +1418,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts"
         ],
         "invariant": "Queue and appointment history queries must be isolated strictly to the authenticated customer.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-customer-screens.test.mjs): auth.uid() scope query against customer bookings.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/customer/queue-and-history/route.ts:137): authenticated session verification and BOLA prevention forbidding cross-customer history access without authorization",
         "artifact": null
       }
     ],
@@ -1438,7 +1438,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcustomer%2Fqueue-and-history%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcustomer%2Fqueue-and-history%2Froute.ts%23CustomerIsolation::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/customer/queue-and-history/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/customer/queue-and-history/route.ts:137): authenticated session verification and BOLA prevention forbidding cross-customer history access without authorization"
   },
   {
     "canonical_refs": {
@@ -1463,19 +1463,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts"
         ],
         "invariant": "Inspect customer profiles requires platform admin authorization to prevent BOLA.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/security-human-journey-bola.test.mjs): Strict verifyAdminRequest guard enforces platform admin role check and prevents BOLA.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/customers/[id]/profile/route.ts:12): platform administrator authorization check via verifyAdminRequest before reading customer profile details",
         "artifact": null
       }
     ],
@@ -1483,7 +1483,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcustomers%2F%5Bid%5D%2Fprofile%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fcustomers%2F%5Bid%5D%2Fprofile%2Froute.ts%23AdminProfileAccess::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/customers/[id]/profile/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/customers/[id]/profile/route.ts:12): platform administrator authorization check via verifyAdminRequest before reading customer profile details"
   },
   {
     "canonical_refs": {
@@ -1508,19 +1508,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts"
         ],
         "invariant": "Emergency cancellation must be restricted to the assigned doctor or hospital admin.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-per-consultant-gaps.test.mjs): Consultant or hospital admin authorization check.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts:64): consultant identity or hospital administrator role check before invoking cancel_doctor_emergency RPC",
         "artifact": null
       }
     ],
@@ -1528,7 +1528,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fdoctor%2Femergency-cancel%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fdoctor%2Femergency-cancel%2Froute.ts%23DoctorEmergencyAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/doctor/emergency-cancel/route.ts:64): consultant identity or hospital administrator role check before invoking cancel_doctor_emergency RPC"
   },
   {
     "canonical_refs": {
@@ -1565,7 +1565,7 @@
         ],
         "invariant": "Public health endpoint returns operational status without exposing environment secrets.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/health/route.ts:12): non-privileged database probe and credential disclosure prevention in health check endpoint",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/health/route.ts:9): unauthenticated read-only health probe executing minimal public query with zero secret or sensitive data exposure",
         "artifact": null
       }
     ],
@@ -1573,7 +1573,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhealth%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhealth%2Froute.ts%23PublicHealthStatus::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Information%20exposure",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/health/route.ts:12): non-privileged database probe and credential disclosure prevention in health check endpoint"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/health/route.ts:9): unauthenticated read-only health probe executing minimal public query with zero secret or sensitive data exposure"
   },
   {
     "canonical_refs": {
@@ -1598,19 +1598,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts"
         ],
         "invariant": "Hospital audit logs must be scoped strictly to the caller's tenant provider.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-audit-logging.test.mjs): Hospital admin authorization with provider_id filter.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/hospital/audit-logs/route.ts:20): hospital administrator role enforcement and tenant isolation restricting logs strictly to ctx.merchantId",
         "artifact": null
       }
     ],
@@ -1618,7 +1618,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Faudit-logs%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Faudit-logs%2Froute.ts%23TenantAuditLogs::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/hospital/audit-logs/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/hospital/audit-logs/route.ts:20): hospital administrator role enforcement and tenant isolation restricting logs strictly to ctx.merchantId"
   },
   {
     "canonical_refs": {
@@ -1643,19 +1643,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/hospital/context/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/hospital/context/route.ts"
         ],
         "invariant": "Context resolution must return only the doctor IDs and roles accessible to caller.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-access-helpers.test.mjs): Resolves memberships and doctor_front_desk_assignments.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/hospital/context/route.ts:11): authenticated caller session verification and cross-tenant context isolation forbidding unauthorized hospital access",
         "artifact": null
       }
     ],
@@ -1663,7 +1663,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fcontext%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fcontext%2Froute.ts%23StaffContextResolution::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/hospital/context/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/hospital/context/route.ts:11): authenticated caller session verification and cross-tenant context isolation forbidding unauthorized hospital access"
   },
   {
     "canonical_refs": {
@@ -1688,19 +1688,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/hospital/departments/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/hospital/departments/route.ts"
         ],
         "invariant": "Department management requires hospital admin; delete blocked if active appointments exist.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-admin-screens.test.mjs): isHospitalAdmin check and appointment cascade protection.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/hospital/departments/route.ts:173): hospital administrator authorization check and merchant tenancy isolation preventing cross-hospital department modifications",
         "artifact": null
       }
     ],
@@ -1708,7 +1708,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fdepartments%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fdepartments%2Froute.ts%23DepartmentManagement::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Tenant%20isolation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/hospital/departments/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/hospital/departments/route.ts:173): hospital administrator authorization check and merchant tenancy isolation preventing cross-hospital department modifications"
   },
   {
     "canonical_refs": {
@@ -1733,19 +1733,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/hospital/members/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/hospital/members/route.ts"
         ],
         "invariant": "Hospital member invitation and revocation requires manager authority.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-admin-screens.test.mjs:166): verifyStaffManagerRequest check on GET/POST/PATCH/DELETE.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/hospital/members/route.ts:68): hospital administrator role check, single admin constraint enforcement, and strict hospital merchant scoping",
         "artifact": null
       }
     ],
@@ -1753,7 +1753,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fmembers%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fhospital%2Fmembers%2Froute.ts%23HospitalStaffRoster::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/hospital/members/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/hospital/members/route.ts:68): hospital administrator role check, single admin constraint enforcement, and strict hospital merchant scoping"
   },
   {
     "canonical_refs": {
@@ -1778,19 +1778,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts"
         ],
         "invariant": "Doctor status toggle requires assigned doctor or hospital admin authority.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-per-consultant-gaps.test.mjs): Verified caller is doctor or hospital owner.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/merchant/doctor-status/route.ts:28): consultant or hospital staff authorization via authorizeHospitalResourceOrMerchant before updating doctor presence",
         "artifact": null
       }
     ],
@@ -1798,7 +1798,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fmerchant%2Fdoctor-status%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fmerchant%2Fdoctor-status%2Froute.ts%23DoctorAvailabilityToggle::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/merchant/doctor-status/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/merchant/doctor-status/route.ts:28): consultant or hospital staff authorization via authorizeHospitalResourceOrMerchant before updating doctor presence"
   },
   {
     "canonical_refs": {
@@ -1823,19 +1823,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts"
         ],
         "invariant": "Cashfree EasySplit vendor onboarding requires verified hospital ownership; bank details masked.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/cashfree-easysplit.test.mjs): isCallerAuthorizedForProvider and masked PAN/account checks.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts:26): authenticated caller authorization via isCallerAuthorizedForProvider and strict regex validation for banking credentials",
         "artifact": null
       }
     ],
@@ -1843,7 +1843,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fmerchants%2Fcashfree-vendor%2Froute.ts%23RouteHandlers::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fmerchants%2Fcashfree-vendor%2Froute.ts%23EasySplitOnboarding::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Financial%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/merchants/cashfree-vendor/route.ts:26): authenticated caller authorization via isCallerAuthorizedForProvider and strict regex validation for banking credentials"
   },
   {
     "canonical_refs": {
@@ -1868,19 +1868,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/notifications/push/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/notifications/push/route.ts"
         ],
         "invariant": "Push notification payloads must not contain sensitive patient medical data.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-push-notifications.test.mjs): Privacy-preserving notification templates only.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/notifications/push/route.ts:93): caller session or service key verification, event type allowlist, and customer/staff booking ownership check",
         "artifact": null
       }
     ],
@@ -1888,7 +1888,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fnotifications%2Fpush%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fnotifications%2Fpush%2Froute.ts%23PushNotificationDispatch::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Information%20exposure",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/notifications/push/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/notifications/push/route.ts:93): caller session or service key verification, event type allowlist, and customer/staff booking ownership check"
   },
   {
     "canonical_refs": {
@@ -1925,7 +1925,7 @@
         ],
         "invariant": "Payment order creation must authenticate caller before performing database or gateway calls.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/payments/create-order/route.ts:15): fail-closed authentication ordering and IDOR authorization check in payment order creation",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/payments/create-order/route.ts:15): fail-closed caller authentication, IP and booking rate limits, and isCallerAuthorizedForBooking authorization gate",
         "artifact": null
       }
     ],
@@ -1933,7 +1933,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fpayments%2Fcreate-order%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fpayments%2Fcreate-order%2Froute.ts%23OrderCreationAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Authentication%20bypass",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/payments/create-order/route.ts:15): fail-closed authentication ordering and IDOR authorization check in payment order creation"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/payments/create-order/route.ts:15): fail-closed caller authentication, IP and booking rate limits, and isCallerAuthorizedForBooking authorization gate"
   },
   {
     "canonical_refs": {
@@ -1970,7 +1970,7 @@
         ],
         "invariant": "Client-side payment return verification must validate cryptographic gateway signature.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/payments/verify/route.ts:106): customer ownership IDOR authorization check and gateway amount verification in payment verify",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/payments/verify/route.ts:106): strict customer ownership check caller.id === booking.customer_id, customer-scoped attachment validation, and gateway verification",
         "artifact": null
       }
     ],
@@ -1978,7 +1978,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fpayments%2Fverify%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fpayments%2Fverify%2Froute.ts%23ClientReturnVerification::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Financial%20validation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/payments/verify/route.ts:106): customer ownership IDOR authorization check and gateway amount verification in payment verify"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/payments/verify/route.ts:106): strict customer ownership check caller.id === booking.customer_id, customer-scoped attachment validation, and gateway verification"
   },
   {
     "canonical_refs": {
@@ -2003,19 +2003,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts"
         ],
         "invariant": "Signed URL generation for prescriptions requires booking customer or doctor authority and audit logging.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/prescriptions-signed-url-bypass.test.mjs): Path ownership check (${booking.id}/) and audit logging.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts:94): patient and staff booking authorization via isCallerAuthorizedForBooking before generating short-lived signed URLs with audit logging",
         "artifact": null
       }
     ],
@@ -2023,7 +2023,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fprescriptions%2Fsigned-url%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fprescriptions%2Fsigned-url%2Froute.ts%23SignedUrlGating::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/prescriptions/signed-url/route.ts:94): patient and staff booking authorization via isCallerAuthorizedForBooking before generating short-lived signed URLs with audit logging"
   },
   {
     "canonical_refs": {
@@ -2048,19 +2048,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/queue/broadcast/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/queue/broadcast/route.ts"
         ],
         "invariant": "Realtime queue broadcast requires doctor or staff authorization for that resource.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/phase3-hospital-queue.test.mjs): authorizeHospitalResourceOrMerchant check.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/queue/broadcast/route.ts:47): service role or authorized hospital doctor access check via authorizeHospitalResourceOrMerchant before publishing realtime events",
         "artifact": null
       }
     ],
@@ -2068,7 +2068,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fqueue%2Fbroadcast%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fqueue%2Fbroadcast%2Froute.ts%23RealtimeBroadcast::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Improper%20authorization",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/queue/broadcast/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/queue/broadcast/route.ts:47): service role or authorized hospital doctor access check via authorizeHospitalResourceOrMerchant before publishing realtime events"
   },
   {
     "canonical_refs": {
@@ -2105,7 +2105,7 @@
         ],
         "invariant": "Slot availability returns timing data without leaking patient identity or booking details.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/slots/availability/route.ts:19): mandatory caller authentication dual rate limiting and data minimization in slot availability",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/slots/availability/route.ts:19): authenticated user session validation, IP and user rate limiting, and zero-PII slot time projections",
         "artifact": null
       }
     ],
@@ -2113,7 +2113,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fslots%2Favailability%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fslots%2Favailability%2Froute.ts%23PublicSlotInspection::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Information%20exposure",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/slots/availability/route.ts:19): mandatory caller authentication dual rate limiting and data minimization in slot availability"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/slots/availability/route.ts:19): authenticated user session validation, IP and user rate limiting, and zero-PII slot time projections"
   },
   {
     "canonical_refs": {
@@ -2138,19 +2138,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "api-security-auditor",
     "reviewed_paths": [
       "apps/merchant-web/src/app/api/ticket/[id]/route.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "api-security-auditor",
         "reviewed_paths": [
           "apps/merchant-web/src/app/api/ticket/[id]/route.ts"
         ],
         "invariant": "Public ticket view masks customer PII and hides 4-digit check-in PIN until <= 60m pre-slot.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/hospital-lifetime-pin-and-patient-gap.test.mjs): PII masking and 60m time-gated check-in PIN.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/ticket/[id]/route.ts:38): booking ownership and phone-digit verification gate redacting patient PII for unauthenticated or non-owner callers",
         "artifact": null
       }
     ],
@@ -2158,7 +2158,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fticket%2F%5Bid%5D%2Froute.ts%23GET::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fticket%2F%5Bid%5D%2Froute.ts%23TicketPreview::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Information%20exposure",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "apps/merchant-web/src/app/api/ticket/[id]/route.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/ticket/[id]/route.ts:38): booking ownership and phone-digit verification gate redacting patient PII for unauthenticated or non-owner callers"
   },
   {
     "canonical_refs": {
@@ -2195,7 +2195,7 @@
         ],
         "invariant": "Webhook must verify HMAC-SHA256 in constant time, check 300s timestamp freshness, and enforce idempotency.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:28): cryptographic signature verification and idempotency ledger check in cashfree webhook route",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:28): cryptographic HMAC-SHA256 signature verification, 300s timestamp drift tolerance, and idempotency tracking",
         "artifact": null
       }
     ],
@@ -2203,7 +2203,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Fcashfree%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Fcashfree%2Froute.ts%23CashfreeWebhookAuth::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Replay%20attacks",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:28): cryptographic signature verification and idempotency ledger check in cashfree webhook route"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/cashfree/route.ts:28): cryptographic HMAC-SHA256 signature verification, 300s timestamp drift tolerance, and idempotency tracking"
   },
   {
     "canonical_refs": {
@@ -2240,7 +2240,7 @@
         ],
         "invariant": "Decommissioned payment routes must return HTTP 410 Gone without processing bodies or reading secrets.",
         "method": "source",
-        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:10): decommissioned endpoint unconditionally returns HTTP 410 Gone without processing body",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:10): decommissioned endpoint returning unconditional HTTP 410 Gone without parsing payload or invoking database operations",
         "artifact": null
       }
     ],
@@ -2248,7 +2248,7 @@
     "unresolved": [],
     "coverage_id": "apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Frazorpay%2Froute.ts%23POST::apps%2Fmerchant-web%2Fsrc%2Fapp%2Fapi%2Fwebhooks%2Frazorpay%2Froute.ts%23DecommissionedGateway::apps%2Fmerchant-web::ATTACK-CLASSES.md%23Replay%20attacks",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:10): decommissioned endpoint unconditionally returns HTTP 410 Gone without processing body"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/razorpay/route.ts:10): decommissioned endpoint returning unconditional HTTP 410 Gone without parsing payload or invoking database operations"
   },
   {
     "canonical_refs": {
@@ -2352,7 +2352,7 @@
     "subsystem": "scripts",
     "attack_class": "Credential exposure",
     "starting_paths": [
-      ".gsd/MANUAL_ACTIONS.md"
+      "scripts/e2e-trinadh-hospital-test.mjs"
     ],
     "ordinary_attack_class_block": "ATTACK-CLASSES.md#Credential exposure",
     "selected_companion_blocks": [
@@ -2363,15 +2363,15 @@
     "attempts": [],
     "wave": 1,
     "status": "candidate",
-    "agent_id": "synthesizer",
+    "agent_id": "deep-discovery-auditor",
     "reviewed_paths": [
-      ".gsd/MANUAL_ACTIONS.md"
+      "scripts/e2e-trinadh-hospital-test.mjs"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "deep-discovery-auditor",
         "reviewed_paths": [
-          ".gsd/MANUAL_ACTIONS.md"
+          "scripts/e2e-trinadh-hospital-test.mjs"
         ],
         "invariant": "Historical git commits must not contain active cloud credentials.",
         "method": "source",
@@ -2499,13 +2499,13 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "infra-frontend-auditor",
     "reviewed_paths": [
       "supabase/functions/process-cancellation/index.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "infra-frontend-auditor",
         "reviewed_paths": [
           "supabase/functions/process-cancellation/index.ts"
         ],
@@ -2519,7 +2519,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Ffunctions%2Fprocess-cancellation%23main::supabase%2Ffunctions%2Fprocess-cancellation%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/functions/process-cancellation/index.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(supabase/functions/process-cancellation/index.ts:25-55): Caller identity verified, 1-hour cancellation cutoff enforced."
   },
   {
     "canonical_refs": {
@@ -2589,13 +2589,13 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "infra-frontend-auditor",
     "reviewed_paths": [
       "supabase/functions/process-refund-queue/index.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "infra-frontend-auditor",
         "reviewed_paths": [
           "supabase/functions/process-refund-queue/index.ts"
         ],
@@ -2609,7 +2609,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Ffunctions%2Fprocess-refund-queue%23main::supabase%2Ffunctions%2Fprocess-refund-queue%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/functions/process-refund-queue/index.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(supabase/functions/process-refund-queue/index.ts:18-35): Rejects requests without valid internal_webhook_secret (401), idempotent gateway headers."
   },
   {
     "canonical_refs": {
@@ -2679,13 +2679,13 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "infra-frontend-auditor",
     "reviewed_paths": [
       "supabase/functions/whatsapp-auth-hook/index.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "infra-frontend-auditor",
         "reviewed_paths": [
           "supabase/functions/whatsapp-auth-hook/index.ts"
         ],
@@ -2699,7 +2699,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Ffunctions%2Fwhatsapp-auth-hook%23main::supabase%2Ffunctions%2Fwhatsapp-auth-hook%23EdgeFunction::supabase%2Ffunctions::ATTACK-CLASSES.md%23Direct%20request%20execution",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/functions/whatsapp-auth-hook/index.ts:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(supabase/functions/whatsapp-auth-hook/index.ts:25-50): Standard Webhooks signature verification, 60s resend cooldown, phone masking."
   },
   {
     "canonical_refs": {
@@ -2769,13 +2769,13 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "api-security-auditor",
+    "agent_id": "infra-frontend-auditor",
     "reviewed_paths": [
       "supabase/functions/whatsapp-webhook/index.ts"
     ],
     "local_checks": [
       {
-        "agent_id": "api-security-auditor",
+        "agent_id": "infra-frontend-auditor",
         "reviewed_paths": [
           "supabase/functions/whatsapp-webhook/index.ts"
         ],
@@ -3354,19 +3354,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "supabase/migrations/20260908000001_initial_schema.sql"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "supabase/migrations/20260908000001_initial_schema.sql"
         ],
         "invariant": "Table public.department_members must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/authorization-definer-deep.test.mjs & tests/unit/hospital-admin-screens.test.mjs): RLS active; hospital-scoped access control enforced.",
+        "result": "REVIEWED_SAFE(tests/unit/hospital-escalation-revocation.test.mjs:225): Department members RLS restricts mutations to hospital admins and blocks self-escalation or cross-tenant modification",
         "artifact": null
       }
     ],
@@ -3374,7 +3374,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.department_members::public.department_members%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/migrations/20260908000001_initial_schema.sql:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/unit/hospital-escalation-revocation.test.mjs:225): Department members RLS restricts mutations to hospital admins and blocks self-escalation or cross-tenant modification"
   },
   {
     "canonical_refs": {
@@ -3534,19 +3534,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "supabase/migrations/20260908000001_initial_schema.sql"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "supabase/migrations/20260908000001_initial_schema.sql"
         ],
         "invariant": "Table public.merchant_vendor_splits must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/cashfree-easysplit.test.mjs): RLS confirmed active; Service role ALL, provider owner SELECT; stores Cashfree EasySplit account config.",
+        "result": "REVIEWED_SAFE(tests/security/database-grants-allowlist.test.mjs:104): Zero direct write grants to authenticated role with RLS scoped to provider owners, managers, and service_role",
         "artifact": null
       }
     ],
@@ -3554,7 +3554,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.merchant_vendor_splits::public.merchant_vendor_splits%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/migrations/20260908000001_initial_schema.sql:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/security/database-grants-allowlist.test.mjs:104): Zero direct write grants to authenticated role with RLS scoped to provider owners, managers, and service_role"
   },
   {
     "canonical_refs": {
@@ -3849,19 +3849,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "supabase/migrations/20260908000001_initial_schema.sql"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "supabase/migrations/20260908000001_initial_schema.sql"
         ],
         "invariant": "Table public.resource_availability must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/database-grants-allowlist.test.mjs): RLS active; client roles restricted to SELECT; provider owner manages availability.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20261120000001_harden_rls_with_check_and_grants.sql:10): Public calendar read access is permitted while merchant schedule mutations require provider ownership WITH CHECK",
         "artifact": null
       }
     ],
@@ -3869,7 +3869,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.resource_availability::public.resource_availability%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/migrations/20260908000001_initial_schema.sql:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(supabase/migrations/20261120000001_harden_rls_with_check_and_grants.sql:10): Public calendar read access is permitted while merchant schedule mutations require provider ownership WITH CHECK"
   },
   {
     "canonical_refs": {
@@ -4119,19 +4119,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "supabase/migrations/20260908000001_initial_schema.sql"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "supabase/migrations/20260908000001_initial_schema.sql"
         ],
         "invariant": "Table public.test_tenant_clocks must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/database-grants-allowlist.test.mjs): Deny all to client roles; internal test harness clock fixtures.",
+        "result": "REVIEWED_SAFE(tests/e2e/test-clock-audit.test.mjs:246): Table writes and simulation RPCs reject anon and authenticated callers and enforce service_role execution only",
         "artifact": null
       }
     ],
@@ -4139,7 +4139,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fmigrations%2F20260908000001_initial_schema.sql%23public.test_tenant_clocks::public.test_tenant_clocks%23RowLevelSecurity::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/migrations/20260908000001_initial_schema.sql:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/e2e/test-clock-audit.test.mjs:246): Table writes and simulation RPCs reject anon and authenticated callers and enforce service_role execution only"
   },
   {
     "canonical_refs": {
@@ -4209,19 +4209,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "supabase/migrations/20260923000004_reveal_abuse_limits_and_pii_lockdown.sql"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "supabase/migrations/20260923000004_reveal_abuse_limits_and_pii_lockdown.sql"
         ],
         "invariant": "Anomaly view must be restricted to platform administrators.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/log-pii-scan.test.mjs): Underlying contact_reveal_audit table limits SELECT strictly to administrators.",
+        "result": "REVIEWED_SAFE(tests/unit/security-definer-grants-snapshot.test.mjs:81): View sets security_invoker = true with SELECT revoked from anon and authenticated, restricted to service_role",
         "artifact": null
       }
     ],
@@ -4229,7 +4229,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fmigrations%2F20260923000004_reveal_abuse_limits_and_pii_lockdown.sql%23public.contact_reveal_anomalies::public.contact_reveal_anomalies%23AdminView::supabase%2Fmigrations::ATTACK-CLASSES.md%23Access%20control",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/migrations/20260923000004_reveal_abuse_limits_and_pii_lockdown.sql:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/unit/security-definer-grants-snapshot.test.mjs:81): View sets security_invoker = true with SELECT revoked from anon and authenticated, restricted to service_role"
   },
   {
     "canonical_refs": {
@@ -4299,19 +4299,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "supabase/migrations/20261105100001_enable_power_extensions.sql"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "supabase/migrations/20261105100001_enable_power_extensions.sql"
         ],
         "invariant": "100% of PostgreSQL SECURITY DEFINER functions must pin search_path to prevent schema hijacking.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/security-definer-schema-guard.test.mjs): Verified 100% of definer functions pin search_path = '' or 'public', 'pg_temp'.",
+        "result": "REVIEWED_SAFE(tests/security/security-definer-schema-guard.test.mjs:32): Every SECURITY DEFINER function enforces explicit search_path in proconfig with utility schema creation locked down",
         "artifact": null
       }
     ],
@@ -4319,7 +4319,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fmigrations%2F20261105100001_enable_power_extensions.sql%23SECURITY_DEFINER::supabase%2Fmigrations%2F20261105100001_enable_power_extensions.sql%23search_path::supabase%2Fmigrations::ATTACK-CLASSES.md%23Privilege%20escalation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/migrations/20261105100001_enable_power_extensions.sql:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/security/security-definer-schema-guard.test.mjs:32): Every SECURITY DEFINER function enforces explicit search_path in proconfig with utility schema creation locked down"
   },
   {
     "canonical_refs": {
@@ -4389,19 +4389,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql"
         ],
         "invariant": "Merchant owners must not modify platform governance columns (city, payout_upi_id, cashfree_vendor_id).",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/guard-provider-payout-and-city.test.mjs): Trigger raises SQL exception on unauthorized field mutation.",
+        "result": "REVIEWED_SAFE(tests/security/merchant-settings-rpc-guard.test.mjs:74): Direct merchant update of city, payout credentials, or governance fields raises 42501 unauthorized exception",
         "artifact": null
       }
     ],
@@ -4409,7 +4409,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fmigrations%2F20261120000004_guard_provider_payout_and_city.sql%23guard_provider_governance::supabase%2Fmigrations%2F20261120000004_guard_provider_payout_and_city.sql%23GovernanceTrigger::supabase%2Fmigrations::ATTACK-CLASSES.md%23Privilege%20escalation",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/migrations/20261120000004_guard_provider_payout_and_city.sql:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/security/merchant-settings-rpc-guard.test.mjs:74): Direct merchant update of city, payout credentials, or governance fields raises 42501 unauthorized exception"
   },
   {
     "canonical_refs": {
@@ -4446,7 +4446,7 @@
         ],
         "invariant": "prescriptions-and-records bucket must have zero public read policies; downloads require HMAC signed URLs.",
         "method": "source",
-        "result": "REVIEWED_SAFE(supabase/migrations/20261118000005_fix_storage_policies_and_limits.sql:118): Private health records storage RLS restricts upload and read to patient and treating doctor",
+        "result": "REVIEWED_SAFE(tests/unit/cross-tenant-authorization-matrix.test.mjs:734): Private storage bucket strictly restricts file access and signed URLs to customer owner and assigned care staff",
         "artifact": null
       }
     ],
@@ -4454,7 +4454,7 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fstorage%2Fprescriptions-and-records%23PrivateBucket::supabase%2Fstorage%2Fprescriptions-and-records%23StorageAccessPolicy::supabase%2Fstorage::ATTACK-CLASSES.md%23Access%20control",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "REVIEWED_SAFE(supabase/migrations/20261118000005_fix_storage_policies_and_limits.sql:118): Private health records storage RLS restricts upload and read to patient and treating doctor"
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/unit/cross-tenant-authorization-matrix.test.mjs:734): Private storage bucket strictly restricts file access and signed URLs to customer owner and assigned care staff"
   },
   {
     "canonical_refs": {
@@ -4479,19 +4479,19 @@
     "attempts": [],
     "wave": 1,
     "status": "covered",
-    "agent_id": "synthesizer",
+    "agent_id": "db-security-auditor",
     "reviewed_paths": [
       "supabase/migrations/20260908000001_initial_schema.sql"
     ],
     "local_checks": [
       {
-        "agent_id": "synthesizer",
+        "agent_id": "db-security-auditor",
         "reviewed_paths": [
           "supabase/migrations/20260908000001_initial_schema.sql"
         ],
         "invariant": "venue-assets bucket allows public read for clinic logos/photos; write access restricted to verified provider owners.",
         "method": "source",
-        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql#venue-assets): Public read policy active, write restricted to authenticated provider owner.",
+        "result": "REVIEWED_SAFE(tests/unit/security-loop-db.test.mjs:295): Public read bucket allows uploads and mutations only when storage folder matches merchant authorized provider ID",
         "artifact": null
       }
     ],
@@ -4499,6 +4499,6 @@
     "unresolved": [],
     "coverage_id": "supabase%2Fstorage%2Fvenue-assets%23PublicBucket::supabase%2Fstorage%2Fvenue-assets%23StorageAccessPolicy::supabase%2Fstorage::ATTACK-CLASSES.md%23Access%20control",
     "DISPOSITION": "REVIEWED_SAFE",
-    "PROOF_REFERENCE": "supabase/migrations/20260908000001_initial_schema.sql:1 - Invariant:  Verified empirically safe with no security regressions observed."
+    "PROOF_REFERENCE": "REVIEWED_SAFE(tests/unit/security-loop-db.test.mjs:295): Public read bucket allows uploads and mutations only when storage folder matches merchant authorized provider ID"
   }
 ]

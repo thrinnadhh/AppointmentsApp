@@ -58,6 +58,14 @@ const nextConfig = {
                 : `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:54321 http://localhost:54321 ws://127.0.0.1:54321 ws://localhost:54321 https://api.cashfree.com https://sandbox.cashfree.com ${scopedSupabase} https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io; frame-src 'self' https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none';`;
             })(),
           },
+          {
+            key: 'Content-Security-Policy-Report-Only',
+            value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://sdk.cashfree.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.cashfree.com https://sandbox.cashfree.com; frame-src 'self' https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com; report-uri /api/csp-report;`,
+          },
+          {
+            key: 'Cross-Origin-Opener-Policy-Report-Only',
+            value: 'same-origin-allow-popups',
+          },
         ],
       },
     ];
