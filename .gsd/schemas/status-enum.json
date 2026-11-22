@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StatusEnum",
+  "description": "Allowed statuses per .agents/rules/completion-honesty.md",
+  "type": "string",
+  "enum": [
+    "VERIFIED_CLOSED",
+    "FIXED_UNVERIFIED",
+    "OPEN",
+    "UNCONFIRMED",
+    "FALSE_POSITIVE",
+    "IN_PROGRESS",
+    "REVIEWED_SAFE",
+    "FINDING"
+  ],
+  "patterns": [
+    "^VERIFIED_CLOSED$",
+    "^FIXED_UNVERIFIED$",
+    "^OPEN$",
+    "^UNCONFIRMED$",
+    "^FALSE_POSITIVE$",
+    "^IN_PROGRESS$",
+    "^REVIEWED_SAFE$",
+    "^FINDING$",
+    "^BLOCKED\\([^\\)]+\\)$",
+    "^NEEDS_HUMAN\\([^\\)]+\\)$",
+    "^DEFERRED\\([^\\)]+\\)$",
+    "^NOT_EXAMINED\\([^\\)]+\\)$"
+  ],
+  "allowed_statuses": [
+    "VERIFIED_CLOSED",
+    "FIXED_UNVERIFIED",
+    "OPEN",
+    "UNCONFIRMED",
+    "FALSE_POSITIVE",
+    "IN_PROGRESS",
+    "REVIEWED_SAFE",
+    "FINDING",
+    "BLOCKED",
+    "NEEDS_HUMAN",
+    "DEFERRED",
+    "NOT_EXAMINED"
+  ]
+}

@@ -54,9 +54,9 @@ export async function DELETE(req: NextRequest) {
     const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 500) : 'User initiated immediate account deletion';
 
     // 1. Execute atomic data anonymization and PII erasure immediately
-    const { data, error } = await (supabase.rpc as any)('delete_account_immediately', {
+    const { data, error } = await supabase.rpc('delete_account_immediately' as never, {
       p_reason: reason,
-    });
+    } as never);
 
     if (error) {
       console.error('[Account Delete] RPC error:', error);

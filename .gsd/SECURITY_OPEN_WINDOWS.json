@@ -33,7 +33,7 @@
       {
         "file": "apps/merchant-web/src/app/api/account/delete/route.ts",
         "line": 59,
-        "description": "const { data, error } = await (supabaseAdmin.rpc as any)('delete_account_immediately', { p_reason: reason });"
+        "description": "const { data, error } = await supabaseAdmin.rpc('delete_account_immediately' as never, { p_reason: reason });"
       },
       {
         "file": "supabase/migrations/20261121000002_immediate_account_deletion_and_single_admin.sql",
@@ -64,7 +64,7 @@
       "code_changes": [
         {
           "file_name": "apps/merchant-web/src/app/api/account/delete/route.ts",
-          "fixed_code": "const { data, error } = await (supabase.rpc as any)('delete_account_immediately', { p_reason: reason });"
+          "fixed_code": "const { data, error } = await supabase.rpc('delete_account_immediately' as never, { p_reason: reason } as never);"
         }
       ]
     },

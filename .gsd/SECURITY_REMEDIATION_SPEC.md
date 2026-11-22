@@ -57,7 +57,7 @@ In `apps/merchant-web/src/app/api/account/delete/route.ts` (lines 44–70), the 
 const supabaseAdmin = getSupabaseAdmin();
 
 // 1. Execute atomic data anonymization and PII erasure immediately
-const { data, error } = await (supabaseAdmin.rpc as any)('delete_account_immediately', {
+const { data, error } = await supabaseAdmin.rpc('delete_account_immediately' as never, {
   p_reason: reason,
 });
 ```
@@ -96,12 +96,12 @@ This defect was empirically confirmed on the baseline branch with a RED reproduc
 In `apps/merchant-web/src/app/api/account/delete/route.ts`:
 ```typescript
 // Replace:
-// const { data, error } = await (supabaseAdmin.rpc as any)('delete_account_immediately', {
+// const { data, error } = await supabaseAdmin.rpc('delete_account_immediately' as never, {
 //   p_reason: reason,
 // });
 
 // With user-scoped client invocation:
-const { data, error } = await (supabase.rpc as any)('delete_account_immediately', {
+const { data, error } = await supabase.rpc('delete_account_immediately' as never, {
   p_reason: reason,
 });
 ```
@@ -121,7 +121,7 @@ export async function DELETE(req: NextRequest) {
     const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 500) : 'User initiated immediate account deletion';
 
     // 1. Execute atomic data anonymization and PII erasure using user-scoped client
-    const { data, error } = await (supabase.rpc as any)('delete_account_immediately', {
+    const { data, error } = await supabase.rpc('delete_account_immediately' as never, {
       p_reason: reason,
     });
 

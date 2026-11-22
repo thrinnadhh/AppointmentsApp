@@ -18,3 +18,25 @@
 ## 3. Agent Execution Protocol (`ag-kit` & Swarm)
 - [user] Orchestration: Delegate tasks across `@orchestrator`, `[Agent-Infra]`, `[Agent-Backend]`, `[Agent-Security-Auditor]`, and `[Agent-QA]` (or `[swarm]`) inside Google Antigravity / Gemini CLI / Claude Code → user-preferences.md
 - [user] Verification & Stop Gate: Never weaken test assertions (`git diff --stat HEAD tests/`), provide raw command receipts + `file:line` proofs, keep `localhost:3000` and `localhost:8081` running after verification, commit cleanly on feature branches, and STOP for review → user-preferences.md
+
+## Memory Protocol
+- Append-only. Never delete or rewrite earlier entries; mark superseded ones "SUPERSEDED by <date>".
+- Memory is a HINT, not proof. Never cite MEMORY.md as evidence for a security conclusion; re-verify from code and tests.
+- Each entry: date (UTC), phase, commit sha, what was learned, how it was verified (evidence path), and confidence (VERIFIED / UNVERIFIED).
+- Store: working commands, test setup quirks, ports, known PREEXISTING failures (with the main-branch run link), decisions and their reasons, pitfalls hit.
+- Never store: secrets, key fragments, tokens, personal data, or unverified claims worded as facts.
+- Read MEMORY.md at start; write the entry at the end of each wave (coordinator only).
+
+## Phase 2 Memory Entries
+
+### Entry 2026-11-22 (Phase 2 Campaign Kickoff & Preflight)
+- **Date (UTC):** 2026-11-22
+- **Phase:** Phase 2 Setup & Preflight
+- **Commit SHA:** abf5bc0170ee707beead9562c142c4d080127083
+- **What was learned:**
+  1. Base commit HEAD is abf5bc0 on branch security/window-closure-20261121 (PR #25).
+  2. Local stack: Next.js merchant-web on port 3000, Supabase local stack on port 54321 / DB 54322.
+  3. Pre-existing test failures cataloged in Stage 0 baseline (hospital-hardened-rpcs test suite, adversarial tests).
+  4. Customer E2E search failure regression in PR #25 was isolated to 'Specialty' vs 'Orthodontist' string search.
+- **Verification Evidence:** `.gsd/PREFLIGHT_PHASE2.md`, `.gsd/evidence/PREFLIGHT/`, `FULL_SECURITY_CLOSURE_REPORT.md`
+- **Confidence:** VERIFIED

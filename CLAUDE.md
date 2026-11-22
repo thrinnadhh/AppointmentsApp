@@ -47,3 +47,5 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 7. Every decision goes into docs/decisions.md (date, decision, reason).
 8. Work on a branch named phase-N-name created from the integration branch; commit in small steps; do not merge.
 9. End every task with a report: files changed, tests added, gate result with counts, backlog items, questions for me.
+
+Also read .agents/rules/completion-honesty.md, parallel-execution.md, security-care.md; they take precedence for security work.

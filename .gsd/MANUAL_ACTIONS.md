@@ -155,3 +155,22 @@ Per **Global Rule R5** ("No force-push, no pushes to main/default, no merging. N
 2. **Zero Cross-Origin Opener Violations**:
    - Verify that Cashfree checkout modal callbacks (`window.postMessage` / `window.opener.postMessage`) do not generate COOP violation reports in browser telemetry.
 
+---
+
+## 6. GitHub Repository Branch Protection Policy
+
+Enable branch protection on main requiring security-gate, CI, CodeQL and CODEOWNERS review. Agents cannot do this.
+
+**Required Human Configuration (GitHub Repository Settings -> Branches -> Branch Protection Rules for `main`):**
+1. Require a pull request before merging:
+   - Require approvals: minimum 1 approval.
+   - Require review from Code Owners (enforcing `.github/CODEOWNERS`).
+2. Require status checks to pass before merging:
+   - Require branches to be up to date before merging.
+   - Required status checks:
+     - `Autonomous Security Gate` (`security-gate.yml`)
+     - `CI — Tirupati Appointments Platform` (`ci.yml`)
+     - `CodeQL`
+3. Do not allow bypassing the above settings (enforce for administrators).
+
+

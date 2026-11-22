@@ -7,21 +7,24 @@
 **Orchestrator:** Native Swarm Coordinator (`coordinator-mode`)
 **PR:** [https://github.com/thrinnadhh/AppointmentsApp/pull/25](https://github.com/thrinnadhh/AppointmentsApp/pull/25)
 **Evidence Archive:** `.gsd/evidence_archive.tar.gz` (SHA-256: `8e8d3258d07b46492fc7b80f10fe6ea52c2a9d569d9cad211230a21424b31107`)
+**Evidence Manifest Entries:** 731 files verified in `.gsd/evidence/MANIFEST.sha256`
 
 ---
 
 ## 1. Executive Summary & Audit Accounting
 
-### 1.1 Discovery & Triage Accounting
-| Metric | Phase 1 (Mantis & Modern Web) | Phase 2 (Deep Pass & Re-Opened) | Combined Campaign Total |
-|---|---|---|---|
-| **Candidate Hypotheses Scanned** | 13 | 4 (Re-Opened) + 4 Deep Logic Areas | **21** |
-| **Confirmed Vulnerabilities (Rule R2)** | 2 (`SEC-DISC-001`, `002`) | 1 (`MODWEB-006` CSRF Candidate) | **3** |
-| **Reviewed Safe (Compensating Controls)** | 10 | 3 (`MODWEB-004`, `005`, `007`) | **13** |
-| **Unconfirmed / Defense-in-Depth** | 1 | 0 | **1** |
-| **VERIFIED_CLOSED (Empirically Patched)** | 1 (`SEC-DISC-001`) | 1 (`MODWEB-006` CSRF Guard) | **2** |
-| **NEEDS_HUMAN (Rule R5 Safeguards)** | 1 (`SEC-DISC-002`) | 0 | **1** |
-| **Open / Deferred / Unapproved** | 0 | 0 | **0** |
+### 1.1 Discovery & Triage Accounting (Dynamically Computed)
+| Metric | Count | Evidence Source |
+|:---|:---|:---|
+| **Total Attack Surface Units Surveyed** | **100** | `.gsd/COVERAGE_LEDGER.json` |
+| **Covered Units (Audited & Invariant Bound)** | **98** | `.gsd/COVERAGE_LEDGER.json` |
+| **Active Windows in Tracking Ledger** | **2** | `.gsd/SECURITY_OPEN_WINDOWS.json` |
+| **VERIFIED_CLOSED (Empirically Patched & Mutation Verified)** | **1** | `.gsd/SECURITY_OPEN_WINDOWS.json` (`SEC-DISC-001`) |
+| **NEEDS_HUMAN (Governance & Infrastructure Safeguards)** | **1** | `.gsd/SECURITY_OPEN_WINDOWS.json` (`SEC-DISC-002`) |
+| **OPEN / UNADDRESSED Findings** | **0** | `.gsd/SECURITY_OPEN_WINDOWS.json` |
+| **Total Recorded Evidence Commands** | **182** | `.gsd/evidence/*/*.meta.json` |
+| **Evidence Commands Passing (exit_code=0)** | **154** | `.gsd/evidence/*/*.meta.json` |
+| **Evidence Commands Failing/Red (exit_code!=0)** | **28** | Baseline pre-existing & red tests |
 
 ### 1.2 Campaign Gates Summary
 - **Stage 0 (Preflight & Baseline):** 100% of tools, agents, skills, and configs verified present and runnable. Baseline suite captured in `.gsd/evidence/BASELINE/`.
@@ -55,9 +58,10 @@
    - Confirmed `.gitleaksignore` diff added only `.gsd/generate_master_coverage_ledger.py:generic-api-key:823` referencing `20261105100003_pgmq_queues_and_helpers.sql#public.device_push_tokens`. Narrow file:rule:line suppression; zero real secrets suppressed.
 
 4. **Auditable Evidence Archive & Secret Scrubbing:**
-   - Redacted 11 mock token stdout strings from `.gsd/evidence/` dumps.
+   - Redacted mock token stdout strings from `.gsd/evidence/` dumps.
    - Verified with `gitleaks detect --no-git --source . -v`: **0 leaks found**.
    - Archived `.gsd/evidence/` into `.gsd/evidence_archive.tar.gz` with SHA-256 `8e8d3258d07b46492fc7b80f10fe6ea52c2a9d569d9cad211230a21424b31107`.
+   - Generated and verified `.gsd/evidence/MANIFEST.sha256` (731 entries).
 
 ### 2.2 Task 2: Re-Opened Weak Dismissals (MODWEB-006, 004, 005, 007)
 
@@ -155,7 +159,6 @@ All vague documentation references were replaced with exact empirical test files
 |---|---|---|---|---|---|---|---|---|---|
 | `SEC-DISC-001` | MANTIS | High<br>`CWE-285` | `apps/merchant-web/src/app/api/account/delete/route.ts:44-70` | In `DELETE /api/account/delete`, replaced `supabaseAdmin.rpc('delete_account_immediately')` with user-scoped `supabase.rpc('delete_account_immediately')` so `auth.uid()` matches `user.id`, followed by session purge via `admin.deleteUser(user.id)`. | `tests/security/account-deletion-auth.test.mjs` | `SEC-DISC-001/red_test.meta.json`<br>(exit 1) | `SEC-DISC-001/green_test.meta.json`<br>(exit 0) | `SEC-DISC-001/mutation_check.meta.json`<br>(revert=exit 1, restore=exit 0) | **`VERIFIED_CLOSED`** |
 | `SEC-DISC-002` | MANTIS | High<br>`CWE-798` | Git history commits `9305ab5c`, `34b7d2c7`, `5e515195` | Documented comprehensive upstream Supabase Cloud credential rotation protocol and `git-filter-repo` scrubbing instructions in `.gsd/MANUAL_ACTIONS.md`. Per Global Rule R5, autonomous agents must not rewrite remote history or attempt remote cloud credential rotation. | `gitleaks detect -v` | `.gsd/evidence/BASELINE/gitleaks_detect.meta.json`<br>(exit 1) | `.gsd/evidence/SEC-DISC-002/verify_manual_actions.meta.json`<br>(exit 0) | N/A (Governance) | **`NEEDS_HUMAN`** |
-| `MODWEB-006` | MODWEB | Medium<br>`CWE-352` | `apps/merchant-web/src/middleware.ts:250-280` & `apps/merchant-web/src/lib/csrf-guard.ts` | Implemented shared CSRF guard `validateCsrfRequest` enforcing `Sec-Fetch-Site` and `Origin` validation on all ambient cookie state-changing requests (`POST/PUT/PATCH/DELETE`), rejecting cross-site invocations with 403 Forbidden. | `tests/security/csrf-protection.test.mjs` & `tests/security/sec-fetch-site-guard.test.mjs` | Red test failure (exit 1) | Green test verification (exit 0) | Mutation verification (exit 1 on bypass) | **`VERIFIED_CLOSED`** |
 
 ---
 
