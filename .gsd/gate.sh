@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# .gsd/gate.sh (v2)  --  Independent security-closure gate.
+# .gsd/gate.sh (v3)  --  Independent security-closure gate.
 # Runs in CI on a machine the agent does not control. It does NOT trust agent-written
 # results: it re-proves red/green itself and validates ledgers against the real repo.
 #
@@ -47,11 +47,11 @@ BASEWT="$TMP/base"
 cleanup() { git worktree remove --force "$BASEWT" >/dev/null 2>&1 || true; rm -rf "$TMP"; }
 trap cleanup EXIT
 
-echo "gate v2: head=$HEAD_SHA scan_base=$SCAN_BASE_SHA red_base=$RED_BASE_SHA"
+echo "gate v3: head=$HEAD_SHA scan_base=$SCAN_BASE_SHA red_base=$RED_BASE_SHA"
 
 # ------------------------------------------------------------------ python helper
 cat > "$TMP/gate_lib.py" <<'PY'
-import hashlib, json, glob, os, re, sys
+import hashlib, json, glob, os, re, subprocess, sys
 
 ROOT = os.getcwd()
 LEDGER, COVERAGE, ENUM, EVID = (os.environ[k] for k in ("LEDGER", "COVERAGE", "ENUM", "EVID"))
@@ -237,12 +237,22 @@ def check_ref(uid, ref):
         tok = re.sub(r":\d+(-\d+)?$", "", tok)
         if not tok or not ("/" in tok or "." in tok):
             continue
+        if tok.startswith((".gsd/", ".agents/")) or tok in ("FULL_SECURITY_CLOSURE_REPORT.md", "MEMORY.md"):
+            err("%s: proof cites agent-authored notes (%s); cite a test or source file instead" % (uid, tok)); return False
         if not safe_repo_path(tok) or not os.path.exists(os.path.join(ROOT, tok)):
-            err("%s: proof reference %r does not exist in the repo" % (uid, tok)); return False
+            hint = " (bare filename: give the full repo path)" if "/" not in tok else ""
+            err("%s: proof reference %r does not exist in the repo%s" % (uid, tok, hint)); return False
         ok = True
     if not ok:
         err("%s: proof reference %r contains no repo path" % (uid, ref))
     return ok
+
+def existed_in_history(p):
+    try:
+        r = subprocess.run(["git", "log", "--oneline", "-1", "--", p], capture_output=True, text=True, timeout=60)
+        return bool(r.stdout.strip())
+    except Exception:
+        return False
 
 def mode_coverage():
     _, cov_allowed = load_enum()
@@ -259,6 +269,8 @@ def mode_coverage():
         for p in (u.get("reviewed_paths") or []):
             pp = re.sub(r"#.*$", "", str(p))
             if not safe_repo_path(pp) or not (os.path.exists(os.path.join(ROOT, pp)) or glob.glob(os.path.join(ROOT, pp))):
+                if st == "candidate" and safe_repo_path(pp) and existed_in_history(pp):
+                    continue
                 err("%s: reviewed path %r does not exist" % (uid, p))
         base, arg = split_status(st) if st else (None, None)
         if st == "covered" or base == "REVIEWED_SAFE":
@@ -321,6 +333,8 @@ def mode_manifest():
     for dp, _, fs in os.walk(EVID):
         for f in fs:
             rel = os.path.relpath(os.path.join(dp, f), EVID)
+            if os.path.basename(rel).startswith("._"):
+                continue
             if rel != "MANIFEST.sha256" and rel not in listed:
                 unlisted.append(rel)
     if unlisted:
