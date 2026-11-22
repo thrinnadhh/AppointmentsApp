@@ -6,7 +6,7 @@
 **Methodology:** Google Mantis + Chrome Modern Web Guidance + Elephant–Goldfish Model
 **Orchestrator:** Native Swarm Coordinator (`coordinator-mode`)
 **PR:** [https://github.com/thrinnadhh/AppointmentsApp/pull/25](https://github.com/thrinnadhh/AppointmentsApp/pull/25)
-**Evidence Archive:** `.gsd/evidence_archive.tar.gz` (SHA-256: `932b54d4299808b52c947f33ffddebf42306a8bf3b21b8aa1983c892cc7ddeb3`)
+**Evidence Archive:** `.gsd/evidence_archive.tar.gz` (SHA-256: `786a0921d16ad1417d6301980c93fd7af251dc23beff47904c78b24ca9b25ff9`)
 **Evidence Manifest Entries:** 731 files verified in `.gsd/evidence/MANIFEST.sha256`
 
 ---
@@ -63,7 +63,7 @@
 4. **Auditable Evidence Archive & Secret Scrubbing:**
    - Redacted mock token stdout strings from `.gsd/evidence/` dumps.
    - Verified with `gitleaks detect --no-git --source . -v`: **0 leaks found**.
-   - Archived `.gsd/evidence/` into `.gsd/evidence_archive.tar.gz` with SHA-256 `932b54d4299808b52c947f33ffddebf42306a8bf3b21b8aa1983c892cc7ddeb3`.
+   - Archived `.gsd/evidence/` into `.gsd/evidence_archive.tar.gz` with SHA-256 `786a0921d16ad1417d6301980c93fd7af251dc23beff47904c78b24ca9b25ff9`.
    - Generated and verified `.gsd/evidence/MANIFEST.sha256` (731 entries).
 
 ### 2.2 Task 2: Re-Opened Weak Dismissals (MODWEB-006, 004, 005, 007)

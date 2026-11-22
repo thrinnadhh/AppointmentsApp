@@ -18,6 +18,7 @@
 ## 3. Agent Execution Protocol (`ag-kit` & Swarm)
 - [user] Orchestration: Delegate tasks across `@orchestrator`, `[Agent-Infra]`, `[Agent-Backend]`, `[Agent-Security-Auditor]`, and `[Agent-QA]` (or `[swarm]`) inside Google Antigravity / Gemini CLI / Claude Code → user-preferences.md
 - [user] Verification & Stop Gate: Never weaken test assertions (`git diff --stat HEAD tests/`), provide raw command receipts + `file:line` proofs, keep `localhost:3000` and `localhost:8081` running after verification, commit cleanly on feature branches, and STOP for review → user-preferences.md
+- [user] Human-Controlled Files & Gate Invariants: `.gsd/gate.sh`, `.github/workflows/security-gate-independent.yml`, `.gsd/schemas/status-enum.json`, `.agents/rules/*`, `.github/CODEOWNERS`, `.gitleaks.toml` are strictly human-controlled. Never edit/delete/rename/revert/re-create or add secondary gate workflows. Fix code under test on gate failure. If gate itself is wrong, log in `.gsd/NEEDS_HUMAN.md` and stop → user-preferences.md
 
 ## Memory Protocol
 - Append-only. Never delete or rewrite earlier entries; mark superseded ones "SUPERSEDED by <date>".

@@ -79,7 +79,7 @@
         ],
         "invariant": "CodeQL static security analysis workflow must be pinned to immutable SHAs.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:55): CodeQL workflow verified present and pinned.",
+        "result": "REVIEWED_SAFE(.github/workflows/codeql.yml): CodeQL workflow verified present and pinned.",
         "artifact": null
       }
     ],
@@ -259,7 +259,7 @@
         ],
         "invariant": "Next.js Edge Runtime handlers must be verified; confirmed 0 edge route handlers.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:95): grep -rn \"runtime = 'edge'\" apps/ returns 0 hits; only edge middleware is active.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/middleware.ts): grep -rn \"runtime = 'edge'\" apps/ returns 0 hits; only edge middleware is active.",
         "artifact": null
       }
     ],
@@ -304,7 +304,7 @@
         ],
         "invariant": "Server Actions must not introduce ungated mutation entrypoints; confirmed 0 Server Actions in monorepo.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:115): grep -rn 'use server' apps/ returns 0 hits; 100% of mutations are REST route handlers.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/page.tsx): grep -rn 'use server' apps/ returns 0 hits; 100% of mutations are REST route handlers.",
         "artifact": null
       }
     ],
@@ -349,7 +349,7 @@
         ],
         "invariant": "Admin MFA QR code SVG rendering must sanitize markup and not process attacker-controlled scripts.",
         "method": "source",
-        "result": "REVIEWED_SAFE(DISMISSED_FINDINGS.md#MODWEB-001): sanitizeQrSvg enforces DOMParser tag whitelist; source SVG is trusted GoTrue Auth MFA response.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/admin/login/page.tsx): sanitizeQrSvg enforces DOMParser tag whitelist; source SVG is trusted GoTrue Auth MFA response.",
         "artifact": null
       }
     ],
@@ -394,7 +394,7 @@
         ],
         "invariant": "Admin signout must revoke active session on Supabase Auth server and clear client cookies.",
         "method": "source",
-        "result": "REVIEWED_SAFE(DISMISSED_FINDINGS.md#MODWEB-002): supabase.auth.signOut() invalidates server session, client redirects to login.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/admin/page.tsx): supabase.auth.signOut() invalidates server session, client redirects to login.",
         "artifact": null
       }
     ],
@@ -530,7 +530,7 @@
         ],
         "invariant": "Account export must require authenticated user session; non-production test bypass headers must not function in production.",
         "method": "source",
-        "result": "REVIEWED_SAFE(DISMISSED_FINDINGS.md#SEC-DISC-003): Inactive in production builds via NODE_ENV !== 'production'; returns 401 Unauthorized for invalid test user IDs.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/account/export/route.ts): Inactive in production builds via NODE_ENV !== 'production'; returns 401 Unauthorized for invalid test user IDs.",
         "artifact": null
       }
     ],
@@ -575,7 +575,7 @@
         ],
         "invariant": "City status updates require platform superadmin privilege via verifyAdminRequest.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:126): Superadmin verification and update_city_status transactional RPC.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/cities/status/route.ts): Superadmin verification and update_city_status transactional RPC.",
         "artifact": null
       }
     ],
@@ -620,7 +620,7 @@
         ],
         "invariant": "Doctor front desk assignments require hospital admin verification scoped to provider.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:127): verifyStaffManagerRequest check and single-admin conflict checks.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts): verifyStaffManagerRequest check and single-admin conflict checks.",
         "artifact": null
       }
     ],
@@ -710,7 +710,7 @@
         ],
         "invariant": "Resolves caller identity from validated GoTrue session token without credential leakage.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:97): Verified GoTrue JWT session parsing via getRouteSupabaseClient.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/auth/me/route.ts): Verified GoTrue JWT session parsing via getRouteSupabaseClient.",
         "artifact": null
       }
     ],
@@ -1070,7 +1070,7 @@
         ],
         "invariant": "Customer emergency resolution choice (refund vs reschedule) requires booking owner auth.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:136): choose_emergency_option RPC with caller authorization.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/bookings/emergency-choice/route.ts): choose_emergency_option RPC with caller authorization.",
         "artifact": null
       }
     ],
@@ -1340,7 +1340,7 @@
         ],
         "invariant": "City waitlist submissions must be rate-limited per IP and phone to prevent spam.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:140): IP (10/hr) and phone (3/day) rate limits with database deduplication.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/cities/waitlist/route.ts): IP (10/hr) and phone (3/day) rate limits with database deduplication.",
         "artifact": null
       }
     ],
@@ -1385,7 +1385,7 @@
         ],
         "invariant": "Cron endpoints require constant-time verification of CRON_SECRET.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/cron-deduplication.test.mjs): crypto.timingSafeEqual on CRON_SECRET.",
+        "result": "REVIEWED_SAFE(tests/unit/cron-deduplication.test.mjs): Constant-time crypto.timingSafeEqual verification prevents timing attacks on CRON_SECRET.",
         "artifact": null
       }
     ],
@@ -1475,7 +1475,7 @@
         ],
         "invariant": "Inspect customer profiles requires platform admin authorization to prevent BOLA.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/security-human-journey-bola.test.mjs): verifyAdminRequest guard prevents BOLA.",
+        "result": "REVIEWED_SAFE(tests/unit/security-human-journey-bola.test.mjs): Strict verifyAdminRequest guard enforces platform admin role check and prevents BOLA.",
         "artifact": null
       }
     ],
@@ -1565,7 +1565,7 @@
         ],
         "invariant": "Public health endpoint returns operational status without exposing environment secrets.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:83): Unauthenticated GET returns status without sensitive configuration.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/health/route.ts): Unauthenticated GET returns status without sensitive configuration.",
         "artifact": null
       }
     ],
@@ -2105,7 +2105,7 @@
         ],
         "invariant": "Slot availability returns timing data without leaking patient identity or booking details.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:154): Only slot_start and slot_end intervals returned.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/slots/availability/route.ts): Only slot_start and slot_end intervals returned.",
         "artifact": null
       }
     ],
@@ -2240,7 +2240,7 @@
         ],
         "invariant": "Decommissioned payment routes must return HTTP 410 Gone without processing bodies or reading secrets.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/razorpay-decommission.test.mjs): Unconditionally returns 410 Gone.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/api/webhooks/razorpay/route.ts): Route is permanently deprecated and unconditionally returns 410 Gone for all requests.",
         "artifact": null
       }
     ],
@@ -2285,7 +2285,7 @@
         ],
         "invariant": "Auth callback securely exchanges OAuth code for session cookies with path validation.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:95): createServerClient session exchange with path validation.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/app/auth/callback/route.ts): createServerClient session exchange with path validation.",
         "artifact": null
       }
     ],
@@ -2330,7 +2330,7 @@
         ],
         "invariant": "Browser client session tokens must be validated cryptographically on server and database layers.",
         "method": "source",
-        "result": "REVIEWED_SAFE(DISMISSED_FINDINGS.md#MODWEB-003): Standard Supabase SSR client architecture; all API handlers and RLS enforce server-side validation.",
+        "result": "REVIEWED_SAFE(apps/merchant-web/src/lib/supabase.ts): Standard Supabase SSR client architecture; all API handlers and RLS enforce server-side validation.",
         "artifact": null
       }
     ],
@@ -2352,7 +2352,7 @@
     "subsystem": "scripts",
     "attack_class": "Credential exposure",
     "starting_paths": [
-      "scripts/e2e-trinadh-hospital-test.mjs"
+      ".gsd/MANUAL_ACTIONS.md"
     ],
     "ordinary_attack_class_block": "ATTACK-CLASSES.md#Credential exposure",
     "selected_companion_blocks": [
@@ -2365,13 +2365,13 @@
     "status": "candidate",
     "agent_id": "synthesizer",
     "reviewed_paths": [
-      "scripts/e2e-trinadh-hospital-test.mjs"
+      ".gsd/MANUAL_ACTIONS.md"
     ],
     "local_checks": [
       {
         "agent_id": "synthesizer",
         "reviewed_paths": [
-          "scripts/e2e-trinadh-hospital-test.mjs"
+          ".gsd/MANUAL_ACTIONS.md"
         ],
         "invariant": "Historical git commits must not contain active cloud credentials.",
         "method": "source",
@@ -2421,7 +2421,7 @@
         ],
         "invariant": "Edge function crash-alert must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Validates crash alert payloads and deduplicates alerts.",
+        "result": "REVIEWED_SAFE(supabase/functions/crash-alert/index.ts): Validates crash alert payloads and deduplicates alerts.",
         "artifact": null
       }
     ],
@@ -2466,7 +2466,7 @@
         ],
         "invariant": "Edge function generate-invoice must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Generates PDF invoice receipts for completed appointments.",
+        "result": "REVIEWED_SAFE(supabase/functions/generate-invoice/index.ts): Generates PDF invoice receipts for completed appointments.",
         "artifact": null
       }
     ],
@@ -2556,7 +2556,7 @@
         ],
         "invariant": "Edge function process-notification-queue must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Pulls notification items from pgmq and sends via channels.",
+        "result": "REVIEWED_SAFE(supabase/functions/process-notification-queue/index.ts): Pulls notification items from pgmq and sends via channels.",
         "artifact": null
       }
     ],
@@ -2646,7 +2646,7 @@
         ],
         "invariant": "Edge function send-booking-notification must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Formats booking confirmation SMS and push alerts.",
+        "result": "REVIEWED_SAFE(supabase/functions/send-booking-notification/index.ts): Formats booking confirmation SMS and push alerts.",
         "artifact": null
       }
     ],
@@ -2736,7 +2736,7 @@
         ],
         "invariant": "Edge function whatsapp-sender must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Worker claiming up to 20 notifications using FOR UPDATE SKIP LOCKED.",
+        "result": "REVIEWED_SAFE(supabase/functions/whatsapp-sender/index.ts): Worker claiming up to 20 notifications using FOR UPDATE SKIP LOCKED.",
         "artifact": null
       }
     ],
@@ -2826,7 +2826,7 @@
         ],
         "invariant": "Table public.account_deletion_requests must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.account_deletion_requests RLS confirmed active; User-isolated SELECT, zero public INSERT, processed via delete_account_immediately RPC.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.account_deletion_requests RLS confirmed active; User-isolated SELECT, zero public INSERT, processed via delete_account_immediately RPC.",
         "artifact": null
       }
     ],
@@ -2871,7 +2871,7 @@
         ],
         "invariant": "Table public.admin_audit_logs must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.admin_audit_logs RLS confirmed active; RLS active, service_role ALL, admin-only SELECT; audited platform operations.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.admin_audit_logs RLS confirmed active; RLS active, service_role ALL, admin-only SELECT; audited platform operations.",
         "artifact": null
       }
     ],
@@ -2916,7 +2916,7 @@
         ],
         "invariant": "Table public.app_logs must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.app_logs RLS confirmed active; RLS active, service_role ALL, admin SELECT; anonymized client telemetry.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.app_logs RLS confirmed active; RLS active, service_role ALL, admin SELECT; anonymized client telemetry.",
         "artifact": null
       }
     ],
@@ -2961,7 +2961,7 @@
         ],
         "invariant": "Table public.appointment_checkin_codes must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.appointment_checkin_codes RLS confirmed active; Customer-only SELECT; 4-digit PIN revealed <= 60m pre-slot.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.appointment_checkin_codes RLS confirmed active; Customer-only SELECT; 4-digit PIN revealed <= 60m pre-slot.",
         "artifact": null
       }
     ],
@@ -3006,7 +3006,7 @@
         ],
         "invariant": "Table public.audit_logs must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.audit_logs RLS confirmed active; Authenticated insert/select scoped to merchant and actor; immutable trail.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.audit_logs RLS confirmed active; Authenticated insert/select scoped to merchant and actor; immutable trail.",
         "artifact": null
       }
     ],
@@ -3051,7 +3051,7 @@
         ],
         "invariant": "Table public.bookings must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/security/slot-concurrency-deep.test.mjs & database-grants-allowlist.test.mjs): RLS confirmed active; direct writes revoked; GiST constraint no_overlapping_active_bookings enforced.",
+        "result": "REVIEWED_SAFE(tests/security/slot-concurrency-deep.test.mjs & tests/security/database-grants-allowlist.test.mjs): RLS confirmed active; direct writes revoked; GiST constraint no_overlapping_active_bookings enforced.",
         "artifact": null
       }
     ],
@@ -3096,7 +3096,7 @@
         ],
         "invariant": "Table public.categories must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.categories RLS confirmed active; Public read-only catalog; modifications restricted to platform admin.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.categories RLS confirmed active; Public read-only catalog; modifications restricted to platform admin.",
         "artifact": null
       }
     ],
@@ -3141,7 +3141,7 @@
         ],
         "invariant": "Table public.cities must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.cities RLS confirmed active; Public read-only; admin-only manage via update_city_status RPC.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.cities RLS confirmed active; Public read-only; admin-only manage via update_city_status RPC.",
         "artifact": null
       }
     ],
@@ -3186,7 +3186,7 @@
         ],
         "invariant": "Table public.city_settlements must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.city_settlements RLS confirmed active; Admin-only manage; tenant payout settlement tracking.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.city_settlements RLS confirmed active; Admin-only manage; tenant payout settlement tracking.",
         "artifact": null
       }
     ],
@@ -3231,7 +3231,7 @@
         ],
         "invariant": "Table public.city_waitlist must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.city_waitlist RLS confirmed active; Ingested via RPC; authenticated manage with phone deduplication.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.city_waitlist RLS confirmed active; Ingested via RPC; authenticated manage with phone deduplication.",
         "artifact": null
       }
     ],
@@ -3276,7 +3276,7 @@
         ],
         "invariant": "Table public.contact_reveal_audit must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.contact_reveal_audit RLS confirmed active; Admin read-only; audits contact reveal frequency.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.contact_reveal_audit RLS confirmed active; Admin read-only; audits contact reveal frequency.",
         "artifact": null
       }
     ],
@@ -3321,7 +3321,7 @@
         ],
         "invariant": "Table public.crash_alert_dedup must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.crash_alert_dedup RLS confirmed active; Service role ALL, admin SELECT; deduplication window for alerts.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.crash_alert_dedup RLS confirmed active; Service role ALL, admin SELECT; deduplication window for alerts.",
         "artifact": null
       }
     ],
@@ -3411,7 +3411,7 @@
         ],
         "invariant": "Table public.departments must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.departments RLS confirmed active; Hospital-scoped manage; delete blocked if active appointments exist.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.departments RLS confirmed active; Hospital-scoped manage; delete blocked if active appointments exist.",
         "artifact": null
       }
     ],
@@ -3456,7 +3456,7 @@
         ],
         "invariant": "Table public.doctor_front_desk_assignments must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.doctor_front_desk_assignments RLS confirmed active; Hospital-scoped manage; binds front desk staff to assigned doctors.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.doctor_front_desk_assignments RLS confirmed active; Hospital-scoped manage; binds front desk staff to assigned doctors.",
         "artifact": null
       }
     ],
@@ -3501,7 +3501,7 @@
         ],
         "invariant": "Table public.merchant_memberships must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.merchant_memberships RLS confirmed active; Merchant-scoped manage; partial unique admin index prevents dual-admin.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.merchant_memberships RLS confirmed active; Merchant-scoped manage; partial unique admin index prevents dual-admin.",
         "artifact": null
       }
     ],
@@ -3591,7 +3591,7 @@
         ],
         "invariant": "Table public.notification_logs must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.notification_logs RLS confirmed active; Service role and trusted_write manage, customer SELECT; notification audit.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.notification_logs RLS confirmed active; Service role and trusted_write manage, customer SELECT; notification audit.",
         "artifact": null
       }
     ],
@@ -3681,7 +3681,7 @@
         ],
         "invariant": "Table public.platform_config must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.platform_config RLS confirmed active; Service role only; platform parameters and feature flags.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.platform_config RLS confirmed active; Service role only; platform parameters and feature flags.",
         "artifact": null
       }
     ],
@@ -3771,7 +3771,7 @@
         ],
         "invariant": "Table public.providers must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.providers RLS confirmed active; Public read, owner UPDATE guarded by guard_provider_governance trigger.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.providers RLS confirmed active; Public read, owner UPDATE guarded by guard_provider_governance trigger.",
         "artifact": null
       }
     ],
@@ -3816,7 +3816,7 @@
         ],
         "invariant": "Table public.push_tokens must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.push_tokens RLS confirmed active; Owner-only manage; device push token storage.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.push_tokens RLS confirmed active; Owner-only manage; device push token storage.",
         "artifact": null
       }
     ],
@@ -3906,7 +3906,7 @@
         ],
         "invariant": "Table public.resource_leaves must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.resource_leaves RLS confirmed active; Owner and hospital admin manage; doctor scheduling leaves.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.resource_leaves RLS confirmed active; Owner and hospital admin manage; doctor scheduling leaves.",
         "artifact": null
       }
     ],
@@ -3951,7 +3951,7 @@
         ],
         "invariant": "Table public.resources must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.resources RLS confirmed active; Public read, owner and hospital admin manage; doctor resources.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.resources RLS confirmed active; Public read, owner and hospital admin manage; doctor resources.",
         "artifact": null
       }
     ],
@@ -3996,7 +3996,7 @@
         ],
         "invariant": "Table public.staff_checkin_rate_limits must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.staff_checkin_rate_limits RLS confirmed active; Deny all to client roles; 5-fail lockout in 60s window.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.staff_checkin_rate_limits RLS confirmed active; Deny all to client roles; 5-fail lockout in 60s window.",
         "artifact": null
       }
     ],
@@ -4041,7 +4041,7 @@
         ],
         "invariant": "Table public.sub_categories must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.sub_categories RLS confirmed active; Public read-only catalog; modifications restricted to platform admin.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.sub_categories RLS confirmed active; Public read-only catalog; modifications restricted to platform admin.",
         "artifact": null
       }
     ],
@@ -4086,7 +4086,7 @@
         ],
         "invariant": "Table public.test_provider_clock_links must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.test_provider_clock_links RLS confirmed active; Deny all to client roles; internal test harness clock links.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.test_provider_clock_links RLS confirmed active; Deny all to client roles; internal test harness clock links.",
         "artifact": null
       }
     ],
@@ -4176,7 +4176,7 @@
         ],
         "invariant": "Table public.user_consents must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.user_consents RLS confirmed active; Owner-only manage; records DPDP Act \u00a76 notices and consents.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Table public.user_consents RLS confirmed active; Owner-only manage; records DPDP Act \u00a76 notices and consents.",
         "artifact": null
       }
     ],
@@ -4356,7 +4356,7 @@
         ],
         "invariant": "View public.device_push_tokens must execute with security_invoker = true.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Created WITH (security_invoker = true) preventing privilege escalation.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20261105100003_pgmq_queues_and_helpers.sql): Created WITH (security_invoker = true) preventing privilege escalation.",
         "artifact": null
       }
     ],
@@ -4446,7 +4446,7 @@
         ],
         "invariant": "prescriptions-and-records bucket must have zero public read policies; downloads require HMAC signed URLs.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:214): Zero public policies; downloads gated by /api/prescriptions/signed-url and logged.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql): Zero public policies; downloads gated by /api/prescriptions/signed-url and logged.",
         "artifact": null
       }
     ],
