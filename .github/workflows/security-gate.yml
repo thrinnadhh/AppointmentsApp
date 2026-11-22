@@ -42,11 +42,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies (lockfile only)
         run: |
-          if   [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile
+          if   [ -f pnpm-lock.yaml ]; then corepack enable && corepack prepare pnpm@8.15.0 --activate && pnpm install --frozen-lockfile
           elif [ -f yarn.lock ];      then corepack enable && yarn install --frozen-lockfile
           elif [ -f package-lock.json ]; then npm ci
           else echo "No lockfile found; refusing to install unpinned dependencies"; exit 1; fi
