@@ -226,8 +226,8 @@ test.describe('Customer Mobile App (Web Preview) E2E Suite', () => {
     await expect(page.getByText(/SVIMS Dental|Sri Venkateswara Dental/i).first()).toBeVisible();
     await customerApp.clearSearch();
 
-    // 5. Search by specialty ("Specialty")
-    await customerApp.search('Specialty');
+    // 5. Search by specialization ("Orthodontist")
+    await customerApp.search('Orthodontist');
     await expect(customerApp.searchResultsHeading).toContainText(/Search Results \([0-9]+\)/);
     await expect(page.getByText(/SVIMS Dental|Sri Venkateswara Dental/i).first()).toBeVisible();
     await customerApp.clearSearch();
