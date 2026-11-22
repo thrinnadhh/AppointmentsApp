@@ -1,3 +1,15 @@
+export const CASHFREE_SDK_ORIGIN = 'https://sdk.cashfree.com';
+export const CASHFREE_SDK_URL = `${CASHFREE_SDK_ORIGIN}/js/v3/cashfree.js`;
+
+export function isValidCashfreeScriptUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === CASHFREE_SDK_ORIGIN && parsed.pathname.startsWith('/js/v3/cashfree');
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Shared list of booking statuses that reserve a resource time slot.
  * Must stay strictly in sync with the PostgreSQL range exclusion constraint
