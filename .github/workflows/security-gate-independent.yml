@@ -57,7 +57,7 @@ jobs:
           base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
           curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gl.tgz
           curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" -o gl.sha
-          awk -v f="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" '$2 == f {print $1 "  gl.tgz"}' gl.sha | sha256sum -c -
+          grep " gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz\$" gl.sha | sed 's/ gitleaks_.*/  gl.tgz/' | sha256sum -c -
           tar -xzf gl.tgz gitleaks && sudo mv gitleaks /usr/local/bin/ && gitleaks version
 
       # Needed only if regression tests hit the local database.
