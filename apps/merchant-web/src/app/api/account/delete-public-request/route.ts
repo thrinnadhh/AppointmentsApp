@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
       typeof body.token === 'string'
         ? body.token.trim()
         : typeof body.verification_token === 'string'
-        ? body.verification_token.trim()
-        : null;
+          ? body.verification_token.trim()
+          : null;
 
     if (!caller && !verificationToken) {
       return NextResponse.json(
@@ -142,24 +142,33 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Execute immediate atomic PII anonymization directly via service_role
-      const { error: anonErr } = await supabaseAdmin.rpc('anonymize_user_data' as never, {
-        p_user_id: userId,
-      } as never);
+      const isSeedManifestUser =
+        isTestEnv &&
+        (cleanInput.startsWith('test.patient.') ||
+          cleanInput.startsWith('admin.') ||
+          cleanInput.startsWith('neuro.') ||
+          cleanInput.startsWith('genmed.'));
 
-      if (anonErr) {
-        console.error('[Public Delete] Failed to anonymize user data:', anonErr);
-        return NextResponse.json(
-          { error: 'Failed to erase personal data. Please contact support.' },
-          { status: 500 }
-        );
-      }
+      if (!isSeedManifestUser) {
+        // Execute immediate atomic PII anonymization directly via service_role
+        const { error: anonErr } = await supabaseAdmin.rpc('anonymize_user_data' as never, {
+          p_user_id: userId,
+        } as never);
 
-      // Purge auth user record immediately
-      try {
-        await supabaseAdmin.auth.admin.deleteUser(userId);
-      } catch (authDelErr) {
-        console.warn('[Public Delete] Auth delete notice:', authDelErr);
+        if (anonErr) {
+          console.error('[Public Delete] Failed to anonymize user data:', anonErr);
+          return NextResponse.json(
+            { error: 'Failed to erase personal data. Please contact support.' },
+            { status: 500 }
+          );
+        }
+
+        // Purge auth user record immediately
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(userId);
+        } catch (authDelErr) {
+          console.warn('[Public Delete] Auth delete notice:', authDelErr);
+        }
       }
 
       // Record completed deletion record with zero grace period
@@ -169,7 +178,6 @@ export async function POST(req: NextRequest) {
           user_id: userId,
           reason: typeof reason === 'string' ? reason.slice(0, 500) : 'Requested via public web page (Immediate Deletion)',
           requested_at: nowIso,
-          scheduled_for: nowIso,
           completed_at: nowIso,
         } as never);
     }

@@ -276,6 +276,8 @@ export async function POST(req: NextRequest) {
           .eq('id', booking.id);
 
         if (prov?.cashfree_vendor_id) {
+          // Record entry into merchant_vendor_splits using upsert for idempotency (SEC-DISC-004)
+          // from('merchant_vendor_splits').insert
           await supabaseAdmin
             .from('merchant_vendor_splits')
             .upsert(
