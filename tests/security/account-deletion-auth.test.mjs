@@ -2,7 +2,6 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createClient } from '@supabase/supabase-js';
 
 const APP_URL = process.env.TEST_API_URL || process.env.TEST_APP_URL || 'http://localhost:3000';
 
@@ -10,8 +9,6 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
   let supabaseUrl;
   let anonKey;
   let serviceRoleKey;
-  let adminClient;
-  let userClient;
 
   // Track created test users for cleanup
   const cleanupUserIds = new Set();
@@ -32,21 +29,76 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
     supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
     anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
     serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
-
-    adminClient = createClient(supabaseUrl, serviceRoleKey);
-    userClient = createClient(supabaseUrl, anonKey);
   });
 
   after(async () => {
     // Cleanup any lingering test users
     for (const userId of cleanupUserIds) {
-      try {
-        await adminClient.auth.admin.deleteUser(userId);
-      } catch {
-        // Ignored during cleanup
-      }
+      await adminDeleteUser(userId);
     }
   });
+
+  async function adminDeleteUser(userId) {
+    try {
+      await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      });
+    } catch {
+      // Ignored during cleanup
+    }
+  }
+
+  async function adminGetUser(userId) {
+    try {
+      const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  async function getProfile(userId) {
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=full_name,phone`, {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          Accept: 'application/json',
+        },
+      });
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return rows[0] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function getAuditLogs(userId) {
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/admin_audit_logs?target_id=eq.${userId}&action=eq.ACCOUNT_DELETED_IMMEDIATELY&select=action,target_id,details,created_at`, {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          Accept: 'application/json',
+        },
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  }
 
   // Helper to create an authenticated test user with profile
   async function createTestUser(emailPrefix = 'sec.disc.001', role = 'admin') {
@@ -55,33 +107,56 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
     const fullName = `Test User ${Date.now()}`;
     const phone = `+9198${Math.floor(10000000 + Math.random() * 90000000)}`;
 
-    const { data: userData, error: createError } = await adminClient.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName, phone },
+    const createRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: fullName, phone },
+      }),
     });
-    if (createError) throw new Error(`Failed to create test user: ${createError.message}`);
+    if (!createRes.ok) throw new Error(`Failed to create test user: ${await createRes.text()}`);
+    const userData = await createRes.json();
 
-    const userId = userData.user.id;
+    const userId = userData.id;
     cleanupUserIds.add(userId);
 
     // Upsert into public.profiles
-    const { error: profileError } = await adminClient.from('profiles').upsert({
-      id: userId,
-      email,
-      full_name: fullName,
-      phone,
-      role,
+    const profileRes = await fetch(`${supabaseUrl}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id: userId,
+        email,
+        full_name: fullName,
+        phone,
+        role,
+      }),
     });
-    if (profileError) throw new Error(`Failed to create test profile: ${profileError.message}`);
+    if (!profileRes.ok) throw new Error(`Failed to create test profile: ${await profileRes.text()}`);
 
-    // Login via userClient to obtain session JWT
-    const { data: loginData, error: loginError } = await userClient.auth.signInWithPassword({
-      email,
-      password,
+    // Login via token endpoint to obtain session JWT
+    const loginRes = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
     });
-    if (loginError) throw new Error(`Failed to login test user: ${loginError.message}`);
+    if (!loginRes.ok) throw new Error(`Failed to login test user: ${await loginRes.text()}`);
+    const loginData = await loginRes.json();
 
     return {
       userId,
@@ -89,7 +164,7 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
       password,
       fullName,
       phone,
-      token: loginData.session.access_token,
+      token: loginData.access_token,
     };
   }
 
@@ -172,12 +247,7 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
     assert.ok(json.completed_at, 'Response must provide completed_at timestamp');
 
     // Verify audit log record in public.admin_audit_logs
-    const { data: auditLogs } = await adminClient
-      .from('admin_audit_logs')
-      .select('action, target_id, details')
-      .eq('target_id', user.userId)
-      .eq('action', 'ACCOUNT_DELETED_IMMEDIATELY');
-
+    const auditLogs = await getAuditLogs(user.userId);
     assert.ok(
       auditLogs && auditLogs.length > 0,
       'Audit log for ACCOUNT_DELETED_IMMEDIATELY must be recorded'
@@ -185,18 +255,11 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
     assert.strictEqual(auditLogs[0].action, 'ACCOUNT_DELETED_IMMEDIATELY');
 
     // Verify auth.users entry is purged
-    const { data: authUserCheck, error: authUserErr } = await adminClient.auth.admin.getUserById(
-      user.userId
-    );
-    assert.ok(!authUserCheck?.user || authUserErr, 'Auth user record must be purged from auth.users');
+    const authUserCheck = await adminGetUser(user.userId);
+    assert.ok(!authUserCheck || !authUserCheck.id, 'Auth user record must be purged from auth.users');
 
     // Verify profile is either scrubbed or removed via cascade
-    const { data: profileCheck } = await adminClient
-      .from('profiles')
-      .select('full_name, phone')
-      .eq('id', user.userId)
-      .maybeSingle();
-
+    const profileCheck = await getProfile(user.userId);
     if (profileCheck) {
       assert.strictEqual(
         profileCheck.full_name,
@@ -247,12 +310,8 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
     );
 
     // Verify victim profile remains completely UNTOUCHED
-    const { data: victimProfile } = await adminClient
-      .from('profiles')
-      .select('full_name, phone')
-      .eq('id', victim.userId)
-      .single();
-
+    const victimProfile = await getProfile(victim.userId);
+    assert.ok(victimProfile, 'Victim profile must still exist');
     assert.strictEqual(
       victimProfile.full_name,
       victim.fullName,
@@ -265,12 +324,9 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
     );
 
     // Verify victim auth user remains active in auth.users
-    const { data: victimAuth } = await adminClient.auth.admin.getUserById(victim.userId);
-    assert.strictEqual(
-      victimAuth.user?.id,
-      victim.userId,
-      'Victim auth user must remain active and unaffected'
-    );
+    const victimAuth = await adminGetUser(victim.userId);
+    assert.ok(victimAuth && victimAuth.id, 'Victim auth user must remain active and unaffected');
+    assert.strictEqual(victimAuth.id, victim.userId);
 
     // Attacker was deleted, remove from cleanup set
     cleanupUserIds.delete(attacker.userId);
@@ -307,12 +363,7 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
     );
 
     // Verify audit log exists with matching timestamp
-    const { data: auditLogs } = await adminClient
-      .from('admin_audit_logs')
-      .select('created_at, details')
-      .eq('target_id', user.userId)
-      .eq('action', 'ACCOUNT_DELETED_IMMEDIATELY');
-
+    const auditLogs = await getAuditLogs(user.userId);
     assert.ok(auditLogs && auditLogs.length > 0, 'Audit log must confirm immediate execution');
 
     cleanupUserIds.delete(user.userId);
