@@ -415,6 +415,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
       await verifyBtn.click();
 
       // Modal automatically closes upon successful phone verification
+      await expect(otpInput).toBeHidden({ timeout: 10000 });
       await page.waitForTimeout(500);
 
       // Re-open profile modal to verify authenticated profile state & sign-out
