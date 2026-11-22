@@ -71,3 +71,12 @@
 - **Ambiguity / Dilemma:** Should test assertions be updated to match the widened return, or should the database function be harmonized to honor all existing contracts?
 - **Conservative Decision:** Created forward migration `20261122000003_harmonize_notification_contracts.sql`. Under Standing Rule 5 ("Never weaken or delete a test"), harmonized `build_template_params` and `dispatch_booking_notification` in PostgreSQL to fulfill both the multi-channel notification requirements and the strict contractual signatures expected by existing queue and integration test suites.
 - **Impact:** All 11 tests pass in `test-whatsapp-integration.mjs` and all tests pass in `test-real-notification-queue.mjs` with 0 failures and 0 skipped tests.
+
+---
+
+## DEC-008: Disabling Local SMTP (Inbucket) on Port 54324
+- **Date / Stage:** 2026-11-22 / Stage 4 (Verification & Gate Hardening)
+- **Context:** GitHub Actions runner intermittently failed during `Start local Supabase and apply migrations` with `failed to start docker container "supabase_inbucket_Appointments": failed to bind host port 0.0.0.0:54324/tcp: address already in use` due to Docker networking recycling delays across container restart boundaries.
+- **Ambiguity / Dilemma:** Keep `local_smtp` enabled and rely on shell retry loops, or disable the container in `supabase/config.toml`?
+- **Conservative Decision:** In `supabase/config.toml`, set `[local_smtp] enabled = false`. Zero production, unit, or E2E tests depend on the inbucket SMTP web interface on port 54324 (all notification tests inspect database rows directly or mock delivery providers).
+- **Impact:** Eliminates port 54324 binding contention, speeds up Supabase local startup, and stabilizes CI runner execution without impacting application functionality.
