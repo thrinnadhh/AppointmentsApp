@@ -161,7 +161,7 @@ export const test = base.extend<AppTestFixtures>({
         if (error) {
           throw new Error(`Failed to hold booking via RPC: ${error.message}`);
         }
-        const json = data as any;
+        const json = data as Record<string, unknown> | null;
         if (!json || json.success === false) {
           throw new Error(`Failed to hold booking via RPC: ${json?.error || 'Unknown error'}`);
         }
@@ -218,7 +218,7 @@ export const test = base.extend<AppTestFixtures>({
         if (error) {
           throw new Error(`Failed to reschedule booking via RPC: ${error.message}`);
         }
-        const json = data as any;
+        const json = data as Record<string, unknown> | null;
         return { success: json?.success ?? true };
       },
 

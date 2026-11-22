@@ -73,7 +73,7 @@ function TeamManagementContent() {
     return doctors.some(
       (doc) =>
         doc.id === member.id ||
-        (doc as any)?.attributes?.user_id === member.id ||
+        (doc as { attributes?: { user_id?: string } })?.attributes?.user_id === member.id ||
         (doc.doctor_email && doc.doctor_email.toLowerCase() === (member.email || '').toLowerCase())
     );
   }, [doctors]);

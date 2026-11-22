@@ -122,7 +122,7 @@ export const StaffRosterTable = React.memo(function StaffRosterTable({
     const deptInfo = member.department ? ` (${member.department})` : '';
     return {
       roleTitle: member.role === 'merchant' ? 'Hospital Support Staff' : 'Customer Account',
-      roleType: member.role as any,
+      roleType: member.role as 'admin' | 'staff' | 'doctor' | 'merchant' | 'customer',
       badgeClass: 'bg-slate-100 text-slate-700 border-slate-300 font-medium',
       service: `General Hospital Operations & Support${deptInfo}`,
       idCard: null,
