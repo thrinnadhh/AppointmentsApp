@@ -47,7 +47,8 @@ patterns = [
     (re.compile(r'eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}'), '[REDACTED_JWT]'),
     (re.compile(r'Bearer\s+[a-zA-Z0-9_\-\.]{15,}'), 'Bearer [REDACTED]'),
     (re.compile(r'cfsk_ma_[a-zA-Z0-9_\-]{10,}'), '[REDACTED_CFSK]'),
-    (re.compile(r'(?i)(password|secret|api[_-]?key|token)\s*([:=])\s*["\']?([a-zA-Z0-9_\-\.]{8,})["\']?'), r'\1\2"[REDACTED]"')
+    (re.compile(r'whsec_[a-zA-Z0-9_\-]{10,}'), '[REDACTED_WHSEC]'),
+    (re.compile(r'(?i)"?(password|secret|api[_-]?key|token)"?\s*([:=])\s*["\']?([a-zA-Z0-9_\-\.]{8,})["\']?'), r'"\1"\2"[REDACTED]"')
 ]
 
 def redact_file(src_path, dst_paths):

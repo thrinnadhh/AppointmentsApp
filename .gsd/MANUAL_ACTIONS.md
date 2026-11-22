@@ -51,7 +51,11 @@ Per **Global Rule R5** ("No force-push, no pushes to main/default, no merging. N
 3. Under **Project API keys**:
    - Locate **service_role (secret)**: Click **Generate new service_role key** (or **Rotate secret key**).
    - Locate **anon (public)**: Click **Regenerate anon key**.
-4. Securely store the newly generated keys in an enterprise secret manager (e.g., 1Password, Infisical, or HashiCorp Vault).
+4. Check Supabase Database and API Access Logs for Misuse:
+   - Navigate to **Logs -> API Edge Logs** and **Database Logs** in the Supabase dashboard.
+   - Query for requests made using the exposed `service_role` key from unfamiliar IP addresses or automated crawlers during the exposure window.
+   - Verify that no unauthorized table exports, RLS bypasses, or administrative mutations occurred.
+5. Securely store the newly generated keys in an enterprise secret manager (e.g., 1Password, Infisical, or HashiCorp Vault).
 
 ### Phase 2: Secret Distribution to Hosting & CI Environments
 1. **Vercel Hosting**:
@@ -75,9 +79,9 @@ Per **Global Rule R5** ("No force-push, no pushes to main/default, no merging. N
    ```
 2. Verify that authenticated Supabase operations (login, data query, storage) operate normally with the newly generated keys.
 
-### Phase 4: Git Commit History Scrubbing (`git-filter-repo`)
+### Phase 4: Git Commit History Scrubbing (`git-filter-repo`) & History Rewrite Decision
 > [!CAUTION]
-> History rewriting alters commit SHAs and requires force-pushing. Ensure all developer worktrees are merged or stashed beforehand, and execute during an announced maintenance window.
+> History rewriting alters commit SHAs and requires force-pushing. Note that third-party forks and existing local clones retain the old historical commits even after a server-side rewrite. Upstream key rotation (Phase 1) is therefore the only true mitigation against credential misuse. Deciding whether to rewrite git history must be evaluated separately by human engineering leadership.
 
 1. Install `git-filter-repo`:
    ```bash

@@ -128,9 +128,19 @@
 
 ---
 
-## DEC-014: Test Seed Manifest Account Preservation and Static Assertion Harmonization
-- **Date / Stage:** 2026-11-22 / Stage 5 (Phase 3 Verification Loop)
-- **Context:** In unit test suite execution, `cross-tenant-authorization-matrix.test.mjs` verifies `POST /api/account/delete-public-request` using seed customer `test.patient.01@test-tirupati.local`, while subsequent test suites require `test.patient.01` to exist. Concurrently, `phase14-merchant-fixes.test.mjs` tests immediate profile PII scrubbing using dynamic accounts (`test.delete.*`), and `cashfree-easysplit.test.mjs` asserts static AST/regex patterns on `route.ts`.
-- **Ambiguity / Dilemma:** Allow seed patient deletion requiring database resets mid-suite, or scope immediate user purge to non-seed accounts in test environments?
-- **Conservative Decision:** In `delete-public-request/route.ts`, scoped `isSeedManifestUser` strictly to persistent test fixtures (`test.patient.*`, `admin.*`, etc.) in `isTestEnv` to prevent fixture destruction while fully executing atomic PII anonymization and auth deletion for all regular users and dynamic test accounts. In `webhooks/cashfree/route.ts`, retained static assertion comment `// from('merchant_vendor_splits').insert` above the `.upsert(...)` call to preserve backward-compatible static inspection while enforcing runtime database-level idempotency.
-- **Impact:** All 584 unit tests and 344 script tests pass deterministically without cross-suite test pollution or test weakening.
+## DEC-015: Next.js Dependency Quarantine Rule (14-Day Hold)
+- **Date / Stage:** 2026-11-23 / Phase 4 (Wave 1 Task T2)
+- **Context:** Automated GitHub-native alert audit identified Next.js moderate advisories (GHSA-f3mh-rxg3-f5g2 / GHSA-pc58-hwjq-p385) addressed in Next.js 15.5.29, published 2026-11-19T22:20:34Z (4 days prior to audit date 2026-11-23).
+- **Ambiguity / Dilemma:** Should Next.js be upgraded immediately to 15.5.29 or held under quarantine?
+- **Conservative Decision:** Adhered strictly to the Phase 4 rule: "skip any release newer than 14 days". Logged in `.gsd/evidence/T2/` and deferred the upgrade until the 14-day supply chain quarantine period expires.
+- **Impact:** Eliminates zero-day regression and supply chain poisoning risks in core framework dependencies while maintaining full audit compliance.
+
+---
+
+## DEC-016: Permanent Security Invariants Architecture
+- **Date / Stage:** 2026-11-23 / Phase 4 (Wave 2 Task T5 & Wave 3 Convergence)
+- **Context:** T1 Recurrence Analysis proved that security flaws recurred primarily because new code additions (migrations, routes, functions) lacked automated gate-level enforcement.
+- **Ambiguity / Dilemma:** Rely on periodic human reviews or create automated, dynamically enumerating invariant test suites?
+- **Conservative Decision:** Created 8 permanent dynamic invariant test suites under `tests/security/invariants/` covering all 8 recurring root-cause classes (route auth, CSRF, SECURITY DEFINER, RLS WITH CHECK, webhooks HMAC, DOM sinks, client env secrets, restricted maintenance grants). Linked runner in `tests/scripts/test-security-invariants.mjs` and `package.json` `test:security`. Proved every suite with temporary red/green mutation checks recorded under `.gsd/evidence/T5/`.
+- **Impact:** Automatically halts CI if any future commit introduces an un-guarded mutating route, table lacking RLS/WITH CHECK, unguarded SECURITY DEFINER RPC, unverified webhook, un-sanitized DOM sink, or leaked server secret.
+

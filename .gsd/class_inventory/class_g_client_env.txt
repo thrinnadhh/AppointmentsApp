@@ -1,0 +1,10 @@
+=== CLIENT-SIDE ENV INTERFACE & INLINER AUDIT ===
+COMPLIANT: 'SUPABASE_SERVICE_ROLE_KEY' absent from client-exposed AuthEnv interface
+COMPLIANT: 'CASHFREE_SECRET_KEY' absent from client-exposed AuthEnv interface
+COMPLIANT: 'CASHFREE_WEBHOOK_SECRET' absent from client-exposed AuthEnv interface
+COMPLIANT: 'CRON_SECRET' absent from client-exposed AuthEnv interface
+COMPLIANT: 'ADMIN_SECRET' absent from client-exposed AuthEnv interface
+COMPLIANT: 'SUPERADMIN_E2E_TOKEN' absent from client-exposed AuthEnv interface
+COMPLIANT: 'DELETION_TOKEN_SECRET' absent from client-exposed AuthEnv interface
+
+SUMMARY: checked_secrets=7 violations=0

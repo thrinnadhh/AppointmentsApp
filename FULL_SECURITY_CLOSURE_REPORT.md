@@ -6,8 +6,8 @@
 **Methodology:** Google Mantis + Chrome Modern Web Guidance + Elephant–Goldfish Model
 **Orchestrator:** Native Swarm Coordinator (`coordinator-mode`)
 **PR:** [https://github.com/thrinnadhh/AppointmentsApp/pull/25](https://github.com/thrinnadhh/AppointmentsApp/pull/25)
-**Evidence Archive:** `.gsd/evidence_archive.tar.gz` (SHA-256: `786a0921d16ad1417d6301980c93fd7af251dc23beff47904c78b24ca9b25ff9`)
-**Evidence Manifest Entries:** 731 files verified in `.gsd/evidence/MANIFEST.sha256`
+**Evidence Archive:** `.gsd/evidence_archive.tar.gz` (SHA-256: `9948fa977d23b6bc3e6f91a4263553061f38d7d9690f309b25f2a18cc11a7ab9`)
+**Evidence Manifest Entries:** 875 files verified in `.gsd/evidence/MANIFEST.sha256`
 
 ---
 
@@ -22,9 +22,9 @@
 | **VERIFIED_CLOSED (Empirically Patched & Mutation Verified)** | **1** | `.gsd/SECURITY_OPEN_WINDOWS.json` (`SEC-DISC-001`) |
 | **NEEDS_HUMAN (Governance & Infrastructure Safeguards)** | **1** | `.gsd/SECURITY_OPEN_WINDOWS.json` (`SEC-DISC-002`) |
 | **OPEN / UNADDRESSED Findings** | **0** | `.gsd/SECURITY_OPEN_WINDOWS.json` |
-| **Total Recorded Evidence Commands** | **182** | `.gsd/evidence/*/*.meta.json` |
-| **Evidence Commands Passing (exit_code=0)** | **154** | `.gsd/evidence/*/*.meta.json` |
-| **Evidence Commands Failing/Red (exit_code!=0)** | **28** | Baseline pre-existing & red tests |
+| **Total Recorded Evidence Commands** | **206** | `.gsd/evidence/*/*.meta.json` |
+| **Evidence Commands Passing (exit_code=0)** | **175** | `.gsd/evidence/*/*.meta.json` |
+| **Evidence Commands Failing/Red (exit_code!=0)** | **31** | Baseline pre-existing & red tests |
 
 ### 1.2 Campaign Gates Summary
 - **Stage 0 (Preflight & Baseline):** 100% of tools, agents, skills, and configs verified present and runnable. Baseline suite captured in `.gsd/evidence/BASELINE/`.
@@ -63,8 +63,8 @@
 4. **Auditable Evidence Archive & Secret Scrubbing:**
    - Redacted mock token stdout strings from `.gsd/evidence/` dumps.
    - Verified with `gitleaks detect --no-git --source . -v`: **0 leaks found**.
-   - Archived `.gsd/evidence/` into `.gsd/evidence_archive.tar.gz` with SHA-256 `786a0921d16ad1417d6301980c93fd7af251dc23beff47904c78b24ca9b25ff9`.
-   - Generated and verified `.gsd/evidence/MANIFEST.sha256` (731 entries).
+   - Archived `.gsd/evidence/` into `.gsd/evidence_archive.tar.gz` with SHA-256 `9948fa977d23b6bc3e6f91a4263553061f38d7d9690f309b25f2a18cc11a7ab9`.
+   - Generated and verified `.gsd/evidence/MANIFEST.sha256` (875 entries).
 
 ### 2.2 Task 2: Re-Opened Weak Dismissals (MODWEB-006, 004, 005, 007)
 
@@ -286,6 +286,10 @@ All exit codes and metadata captured via `.gsd/run_and_record.sh`:
 | `PREFLIGHT` | `test_run` | `0` | `2026-11-21T18:05:51Z` | `99d1b6ca` | [`.gsd/evidence/PREFLIGHT/test_run.meta.json`](.gsd/evidence/PREFLIGHT/test_run.meta.json) |
 | `PREFLIGHT` | `test_validate_existing_coverage_ledger` | `0` | `2026-11-21T18:08:34Z` | `99d1b6ca` | [`.gsd/evidence/PREFLIGHT/test_validate_existing_coverage_ledger.meta.json`](.gsd/evidence/PREFLIGHT/test_validate_existing_coverage_ledger.meta.json) |
 | `PREFLIGHT` | `test_validate_real_findings` | `0` | `2026-11-21T18:16:57Z` | `99d1b6ca` | [`.gsd/evidence/PREFLIGHT/test_validate_real_findings.meta.json`](.gsd/evidence/PREFLIGHT/test_validate_real_findings.meta.json) |
+| `PREFLIGHT_PHASE4` | `gate_pin_check` | `0` | `2026-11-22T19:07:59Z` | `f6645ef1` | [`.gsd/evidence/PREFLIGHT_PHASE4/gate_pin_check.meta.json`](.gsd/evidence/PREFLIGHT_PHASE4/gate_pin_check.meta.json) |
+| `PREFLIGHT_PHASE4` | `gate_test` | `1` | `2026-11-22T19:23:16Z` | `f6645ef1` | [`.gsd/evidence/PREFLIGHT_PHASE4/gate_test.meta.json`](.gsd/evidence/PREFLIGHT_PHASE4/gate_test.meta.json) |
+| `PREFLIGHT_PHASE4` | `git_status_check` | `0` | `2026-11-22T19:08:55Z` | `f6645ef1` | [`.gsd/evidence/PREFLIGHT_PHASE4/git_status_check.meta.json`](.gsd/evidence/PREFLIGHT_PHASE4/git_status_check.meta.json) |
+| `PREFLIGHT_PHASE4` | `shasum_check` | `0` | `2026-11-22T19:07:00Z` | `f6645ef1` | [`.gsd/evidence/PREFLIGHT_PHASE4/shasum_check.meta.json`](.gsd/evidence/PREFLIGHT_PHASE4/shasum_check.meta.json) |
 | `SEC-DISC-001` | `green_test` | `0` | `2026-11-21T19:00:23Z` | `99d1b6ca` | [`.gsd/evidence/SEC-DISC-001/green_test.meta.json`](.gsd/evidence/SEC-DISC-001/green_test.meta.json) |
 | `SEC-DISC-001` | `mutation_check` | `0` | `2026-11-21T19:00:54Z` | `99d1b6ca` | [`.gsd/evidence/SEC-DISC-001/mutation_check.meta.json`](.gsd/evidence/SEC-DISC-001/mutation_check.meta.json) |
 | `SEC-DISC-001` | `red_test` | `1` | `2026-11-21T18:58:15Z` | `99d1b6ca` | [`.gsd/evidence/SEC-DISC-001/red_test.meta.json`](.gsd/evidence/SEC-DISC-001/red_test.meta.json) |
@@ -353,6 +357,26 @@ All exit codes and metadata captured via `.gsd/run_and_record.sh`:
 | `STAGE6_CI` | `gh_pr_create` | `0` | `2026-11-21T19:30:54Z` | `b25a554f` | [`.gsd/evidence/STAGE6_CI/gh_pr_create.meta.json`](.gsd/evidence/STAGE6_CI/gh_pr_create.meta.json) |
 | `STAGE6_CI` | `git_push` | `0` | `2026-11-21T19:30:19Z` | `b25a554f` | [`.gsd/evidence/STAGE6_CI/git_push.meta.json`](.gsd/evidence/STAGE6_CI/git_push.meta.json) |
 | `STAGE6_CI` | `watch_ci` | `0` | `2026-11-21T19:32:14Z` | `b25a554f` | [`.gsd/evidence/STAGE6_CI/watch_ci.meta.json`](.gsd/evidence/STAGE6_CI/watch_ci.meta.json) |
+| `T2` | `audit_deps` | `0` | `2026-11-22T19:45:43Z` | `f6645ef1` | [`.gsd/evidence/T2/audit_deps.meta.json`](.gsd/evidence/T2/audit_deps.meta.json) |
+| `T2` | `gh_alerts_check` | `0` | `2026-11-22T19:24:51Z` | `f6645ef1` | [`.gsd/evidence/T2/gh_alerts_check.meta.json`](.gsd/evidence/T2/gh_alerts_check.meta.json) |
+| `T2` | `npm_audit` | `1` | `2026-11-22T19:17:26Z` | `f6645ef1` | [`.gsd/evidence/T2/npm_audit.meta.json`](.gsd/evidence/T2/npm_audit.meta.json) |
+| `T2` | `pnpm_audit` | `1` | `2026-11-22T19:20:00Z` | `f6645ef1` | [`.gsd/evidence/T2/pnpm_audit.meta.json`](.gsd/evidence/T2/pnpm_audit.meta.json) |
+| `T3` | `class_a_state_changing_routes` | `0` | `2026-11-22T20:05:49Z` | `f6645ef1` | [`.gsd/evidence/T3/class_a_state_changing_routes.meta.json`](.gsd/evidence/T3/class_a_state_changing_routes.meta.json) |
+| `T3` | `class_b_csrf_guard_routes` | `0` | `2026-11-22T20:05:49Z` | `f6645ef1` | [`.gsd/evidence/T3/class_b_csrf_guard_routes.meta.json`](.gsd/evidence/T3/class_b_csrf_guard_routes.meta.json) |
+| `T3` | `class_c_security_definer` | `0` | `2026-11-22T20:05:49Z` | `f6645ef1` | [`.gsd/evidence/T3/class_c_security_definer.meta.json`](.gsd/evidence/T3/class_c_security_definer.meta.json) |
+| `T3` | `class_d_rls_with_check` | `0` | `2026-11-22T20:05:49Z` | `f6645ef1` | [`.gsd/evidence/T3/class_d_rls_with_check.meta.json`](.gsd/evidence/T3/class_d_rls_with_check.meta.json) |
+| `T3` | `class_e_webhooks_hmac_replay` | `0` | `2026-11-22T20:05:50Z` | `f6645ef1` | [`.gsd/evidence/T3/class_e_webhooks_hmac_replay.meta.json`](.gsd/evidence/T3/class_e_webhooks_hmac_replay.meta.json) |
+| `T3` | `class_f_dom_sinks` | `0` | `2026-11-22T20:05:50Z` | `f6645ef1` | [`.gsd/evidence/T3/class_f_dom_sinks.meta.json`](.gsd/evidence/T3/class_f_dom_sinks.meta.json) |
+| `T3` | `class_g_client_env` | `0` | `2026-11-22T20:05:50Z` | `f6645ef1` | [`.gsd/evidence/T3/class_g_client_env.meta.json`](.gsd/evidence/T3/class_g_client_env.meta.json) |
+| `T3` | `class_g_unrestricted_grants` | `0` | `2026-11-22T20:05:51Z` | `f6645ef1` | [`.gsd/evidence/T3/class_g_unrestricted_grants.meta.json`](.gsd/evidence/T3/class_g_unrestricted_grants.meta.json) |
+| `T5` | `proof_client_env_secrets` | `0` | `2026-11-22T20:25:15Z` | `f6645ef1` | [`.gsd/evidence/T5/proof_client_env_secrets.meta.json`](.gsd/evidence/T5/proof_client_env_secrets.meta.json) |
+| `T5` | `proof_csrf_guard` | `0` | `2026-11-22T20:24:00Z` | `f6645ef1` | [`.gsd/evidence/T5/proof_csrf_guard.meta.json`](.gsd/evidence/T5/proof_csrf_guard.meta.json) |
+| `T5` | `proof_dom_sinks` | `0` | `2026-11-22T20:24:55Z` | `f6645ef1` | [`.gsd/evidence/T5/proof_dom_sinks.meta.json`](.gsd/evidence/T5/proof_dom_sinks.meta.json) |
+| `T5` | `proof_rls_with_check` | `0` | `2026-11-22T20:24:29Z` | `f6645ef1` | [`.gsd/evidence/T5/proof_rls_with_check.meta.json`](.gsd/evidence/T5/proof_rls_with_check.meta.json) |
+| `T5` | `proof_route_auth` | `0` | `2026-11-22T20:13:58Z` | `f6645ef1` | [`.gsd/evidence/T5/proof_route_auth.meta.json`](.gsd/evidence/T5/proof_route_auth.meta.json) |
+| `T5` | `proof_security_definer` | `0` | `2026-11-22T20:24:18Z` | `f6645ef1` | [`.gsd/evidence/T5/proof_security_definer.meta.json`](.gsd/evidence/T5/proof_security_definer.meta.json) |
+| `T5` | `proof_unrestricted_grants` | `0` | `2026-11-22T20:26:06Z` | `f6645ef1` | [`.gsd/evidence/T5/proof_unrestricted_grants.meta.json`](.gsd/evidence/T5/proof_unrestricted_grants.meta.json) |
+| `T5` | `proof_webhooks_hmac` | `0` | `2026-11-22T20:24:42Z` | `f6645ef1` | [`.gsd/evidence/T5/proof_webhooks_hmac.meta.json`](.gsd/evidence/T5/proof_webhooks_hmac.meta.json) |
 
 ---
 

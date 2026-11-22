@@ -1,0 +1,4 @@
+COMPLIANT (ACTIVE): /api/webhooks/cashfree -> Constant-time HMAC & 300s replay guard verified
+COMPLIANT (DECOMMISSIONED): /api/webhooks/razorpay -> HTTP 410 Gone unconditionally
+
+SUMMARY: total_webhooks=2 violations=0

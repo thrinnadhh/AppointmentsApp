@@ -28,7 +28,7 @@
     "test:mobile": "node tests/mobile/customer-mobile-android.test.mjs",
     "test": "pnpm test:e2e",
     "test:validation": "node --test tests/scripts/test-validation.mjs",
-    "test:security": "node --test tests/scripts/test-security.mjs tests/scripts/test-routes.mjs tests/scripts/test-validation.mjs"
+    "test:security": "node --test tests/scripts/test-security.mjs tests/scripts/test-routes.mjs tests/scripts/test-validation.mjs tests/scripts/test-security-invariants.mjs"
   },
   "keywords": [
     "appointments",

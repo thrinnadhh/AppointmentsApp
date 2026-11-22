@@ -55,3 +55,22 @@
   6. Added nonce-based Content-Security-Policy-Report-Only and Cross-Origin-Opener-Policy-Report-Only headers in next.config.mjs.
 - **Verification Evidence:** `.gsd/COVERAGE_LEDGER.json`, `.gsd/SECURITY_REMEDIATION_SPEC_PHASE3.md`, `tests/security/customer-self-deletion.test.mjs`, `tests/security/vendor-split-idempotency.test.mjs`, `tests/security/account-deletion-public-anonymization.test.mjs`.
 - **Confidence:** VERIFIED
+
+## Phase 4 Memory Entries
+
+### Entry 2026-11-23 (Phase 4 Root-Cause Investigation, Invariants, & Window Closure)
+- **Date (UTC):** 2026-11-23
+- **Phase:** Phase 4 Root-Cause Analysis, Invariant Locking & Convergence
+- **Commit SHA:** f6645ef1fbef47b407ced56459def21ecb2a9029
+- **What was learned:**
+  1. Recurrence analysis across 20 historical finding classes revealed that vulnerabilities repeated primarily due to `NEW_CODE_SAME_CLASS` (3), `DISMISSED_NO_DECISION` (5), `SCANNER_NOISE` (4), `FIX_NEVER_TESTED` (2), `SIBLING_NOT_FIXED` (2), and `REGRESSED_BY_LATER_COMMIT` (2), caused by the absence of automated gate-level invariant tests.
+  2. GitHub-native alert audit identified 5 CodeQL note-level unused variable alerts (disposition: FALSE_POSITIVE), 1 Dependabot 403 (BLOCKED_TOOL), and 1 Secret Scanning alert (synthetic test mock token, FALSE_POSITIVE).
+  3. Supply-chain 14-day quarantine rule applied to Next.js 15.5.29 (<14 days old).
+  4. Authored 8 deterministic class inventory scripts under `scripts/security/` and 8 permanent invariant test suites under `tests/security/invariants/` auditing mutating route auth, CSRF guards, SECURITY DEFINER functions, RLS WITH CHECK policies, webhook HMAC/replay guards, DOM sinks, server secrets in client bundles, and unrestricted execute grants.
+  5. Proved every invariant test with temporary red/green mutation checks recorded under `.gsd/evidence/T5/`.
+  6. Created `.gsd/RISK_REGISTER.md` cataloging 8 dismissed/deferred items with compensating controls and PENDING human decisions.
+  7. Updated `.gsd/MANUAL_ACTIONS.md` with complete step-by-step runbook for human key rotation in Supabase console, log review for misuse, and git history rewrite decision considerations.
+  8. Triple-method convergence confirmed across deterministic tools, manual review of changed files since 99d1b6c, and adversarial controls checks with zero new findings. Local gate passed with exit code 0 (`GATE RESULT: PASS`).
+- **Verification Evidence:** `.gsd/PREFLIGHT_PHASE4.md`, `.gsd/RECURRENCE_ANALYSIS.md`, `.gsd/RISK_REGISTER.md`, `.gsd/evidence/T2/`, `.gsd/evidence/T3/`, `.gsd/evidence/T5/`, `.gsd/evidence/MANIFEST.sha256`.
+- **Confidence:** VERIFIED
+
