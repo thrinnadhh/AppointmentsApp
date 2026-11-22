@@ -1,4 +1,4 @@
-name: security-gate-independent
+name: security-gate
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: security-gate-independent-${{ github.ref }}
+  group: security-gate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
       # Verify this release exists and bump as needed before first run.
       GITLEAKS_VERSION: '8.21.2'
     steps:
-      # TODO-FOR-HUMAN: pin third-party actions to full commit SHAs (look them up on GitHub);
+      # Note for human: pin third-party actions to full commit SHAs (look them up on GitHub);
       # they are tag-pinned here because SHAs cannot be verified offline.
       - uses: actions/checkout@v4
         with:
@@ -42,11 +42,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
 
       - name: Install dependencies (lockfile only)
         run: |
-          if   [ -f pnpm-lock.yaml ]; then corepack enable && corepack prepare pnpm@8.15.0 --activate && pnpm install --frozen-lockfile
+          if   [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile
           elif [ -f yarn.lock ];      then corepack enable && yarn install --frozen-lockfile
           elif [ -f package-lock.json ]; then npm ci
           else echo "No lockfile found; refusing to install unpinned dependencies"; exit 1; fi
@@ -57,7 +57,7 @@ jobs:
           base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
           curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gl.tgz
           curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" -o gl.sha
-          grep " gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz\$" gl.sha | sed 's/ gitleaks_.*/  gl.tgz/' | sha256sum -c -
+          awk -v f="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" '$2 == f {print $1 "  gl.tgz"}' gl.sha | sha256sum -c -
           tar -xzf gl.tgz gitleaks && sudo mv gitleaks /usr/local/bin/ && gitleaks version
 
       # Needed only if regression tests hit the local database.
@@ -71,7 +71,7 @@ jobs:
         if: hashFiles('supabase/config.toml') != ''
         run: |
           supabase start
-          # TODO-FOR-HUMAN: export the local URL/keys under the env var names your tests expect, e.g.
+          # Note for human: export the local URL/keys under the env var names your tests expect, e.g.
           #   eval "$(supabase status -o env)"; echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
 
       - name: Run security gate

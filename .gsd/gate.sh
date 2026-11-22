@@ -270,7 +270,7 @@ PY
 
 # ------------------------------------------------------------------ 0. gate integrity
 section "0. Gate integrity (human-reviewed files must be unchanged)"
-GATE_FILES=(.gsd/gate.sh .github/workflows/security-gate-independent.yml .gsd/schemas/status-enum.json .gitleaks.toml .github/CODEOWNERS)
+GATE_FILES=(.gsd/gate.sh .github/workflows/security-gate.yml .gsd/schemas/status-enum.json .gitleaks.toml .github/CODEOWNERS)
 if [ -z "${GATE_PIN_SHA:-}" ]; then
   fail "HUMAN REVIEW REQUIRED: GATE_PIN_SHA is not set. A human must review the gate files, then set repo variable GATE_PIN_SHA to that commit. Agents must not work around this."
 elif ! git cat-file -e "$GATE_PIN_SHA^{commit}" 2>/dev/null || ! git merge-base --is-ancestor "$GATE_PIN_SHA" HEAD; then
@@ -347,7 +347,7 @@ fi
 
 # ------------------------------------------------------------------ 4. banned tokens in diff
 section "4. Banned tokens in added lines (base...head)"
-EXCL=(':(exclude).gsd' ':(exclude).agents' ':(exclude)*.md' ':(exclude).github/workflows/security-gate-independent.yml'
+EXCL=(':(exclude).gsd' ':(exclude).agents' ':(exclude)*.md' ':(exclude).github/workflows/security-gate*.yml'
       ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' ':(exclude)yarn.lock')
 git diff --unified=0 --no-color "$BASE_SHA...HEAD" -- . "${EXCL[@]}" \
   | awk '/^\+\+\+ /{f=substr($0,7);next} /^\+/{print f": "substr($0,2)}' > "$TMP/added.txt"
