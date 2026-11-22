@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# .gsd/gate.sh  --  Independent security-closure gate.
+# .gsd/gate.sh (v2)  --  Independent security-closure gate.
 # Runs in CI on a machine the agent does not control. It does NOT trust agent-written
 # results: it re-proves red/green itself and validates ledgers against the real repo.
 #
 # Usage:  bash .gsd/gate.sh            run all checks (exit 1 on any failure)
 #         bash .gsd/gate.sh manifest   regenerate .gsd/evidence/MANIFEST.sha256
 #
-# Env: BASE_SHA (required in CI), GATE_PIN_SHA (commit whose gate files a human reviewed),
-#      LEDGER / COVERAGE / ENUM / EVID (paths), LEDGER_LIST_KEY / COVERAGE_LIST_KEY,
-#      RUNNER_NODE / RUNNER_TS / RUNNER_PLAYWRIGHT / RUNNER_PY, DB_RESET_CMD, GATE_TIMEOUT.
+# Env: BASE_SHA (fallback base), SCAN_BASE_SHA (start of the campaign: diff/secret scans),
+#      RED_BASE_SHA (pre-fix commit for red runs), GATE_PIN_SHA (human-reviewed gate commit),
+#      LEDGER / COVERAGE / ENUM / EVID, RUNNER_NODE / RUNNER_TS / RUNNER_PLAYWRIGHT / RUNNER_PY,
+#      DB_RESET_CMD, GATE_TIMEOUT.
 set -uo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)" || exit 2
@@ -27,8 +28,14 @@ if [ "${1:-run}" = "manifest" ]; then
 fi
 
 BASE_SHA="${BASE_SHA:-$(git merge-base origin/main HEAD 2>/dev/null || true)}"
-[ -n "$BASE_SHA" ] || { echo "FATAL: BASE_SHA not set and merge-base with origin/main not found"; exit 2; }
+SCAN_BASE_SHA="${SCAN_BASE_SHA:-$BASE_SHA}"
+RED_BASE_SHA="${RED_BASE_SHA:-$BASE_SHA}"
 HEAD_SHA="$(git rev-parse HEAD)"
+for s in "$SCAN_BASE_SHA" "$RED_BASE_SHA"; do
+  [ -n "$s" ] || { echo "FATAL: no base commit (set BASE_SHA / SCAN_BASE_SHA / RED_BASE_SHA)"; exit 2; }
+  git cat-file -e "$s^{commit}" 2>/dev/null || { echo "FATAL: commit $s not found (checkout needs fetch-depth: 0)"; exit 2; }
+  git merge-base --is-ancestor "$s" HEAD || { echo "FATAL: $s is not an ancestor of HEAD"; exit 2; }
+done
 
 FAILURES=0
 pass()    { echo "  PASS: $*"; }
@@ -40,11 +47,11 @@ BASEWT="$TMP/base"
 cleanup() { git worktree remove --force "$BASEWT" >/dev/null 2>&1 || true; rm -rf "$TMP"; }
 trap cleanup EXIT
 
-echo "gate: base=$BASE_SHA head=$HEAD_SHA"
+echo "gate v2: head=$HEAD_SHA scan_base=$SCAN_BASE_SHA red_base=$RED_BASE_SHA"
 
 # ------------------------------------------------------------------ python helper
 cat > "$TMP/gate_lib.py" <<'PY'
-import json, os, re, sys, glob
+import hashlib, json, glob, os, re, sys
 
 ROOT = os.getcwd()
 LEDGER, COVERAGE, ENUM, EVID = (os.environ[k] for k in ("LEDGER", "COVERAGE", "ENUM", "EVID"))
@@ -52,6 +59,7 @@ SAFE_PATH = re.compile(r"^[A-Za-z0-9_./@()\[\]-]+$")
 TEST_DIR = re.compile(r"(^|/)(tests?|__tests__|e2e|spec)(/|$)")
 CITE_STATUSES = {"VERIFIED_CLOSED", "FIXED_UNVERIFIED", "OPEN"}
 REASON_STATUSES = {"BLOCKED", "NEEDS_HUMAN", "DEFERRED", "NOT_EXAMINED"}
+FIELD_RX = re.compile(r"^([A-Z][A-Z0-9_]+):[ \t]*(.*)$")
 errors = 0
 
 def err(msg):
@@ -59,20 +67,12 @@ def err(msg):
     errors += 1
     print("  FAIL: " + msg)
 
+def warn(msg):
+    print("  WARN: " + msg)
+
 def die(msg):
     print("  FAIL: " + msg)
     sys.exit(1)
-
-def norm(k):
-    return re.sub(r"[^a-z0-9]", "", str(k).lower())
-
-def get(d, *names):
-    m = {norm(k): v for k, v in d.items()}
-    for n in names:
-        v = m.get(norm(n))
-        if v is not None and v != "" and v != []:
-            return v
-    return None
 
 def load(path):
     try:
@@ -85,28 +85,56 @@ def entries(doc, envkey):
     if isinstance(doc, list):
         return doc
     key = os.environ.get(envkey)
-    if key:
-        if isinstance(doc.get(key), list):
-            return doc[key]
-        die("%s=%s is not a list in the file" % (envkey, key))
+    if key and isinstance(doc.get(key), list):
+        return doc[key]
     lists = {k: v for k, v in doc.items() if isinstance(v, list) and v and isinstance(v[0], dict)}
     if len(lists) == 1:
         return next(iter(lists.values()))
     die("cannot choose entries list (candidates: %s); set %s" % (sorted(lists), envkey))
 
 def split_status(s):
-    m = re.fullmatch(r"([A-Z_]+)(?:\((.+)\))?", s.strip(), re.S)
+    m = re.fullmatch(r"([A-Z_]+)(?:\((.+)\))?", str(s).strip(), re.S)
     return (m.group(1), m.group(2)) if m else (None, None)
 
-def safe_repo_path(p):
+def safe_repo_path(p, must_be_file=False):
     if not isinstance(p, str) or not SAFE_PATH.match(p) or p.startswith("/") or ".." in p.split("/"):
         return None
     full = os.path.realpath(os.path.join(ROOT, p))
-    return full if full.startswith(ROOT + os.sep) else None
+    if not full.startswith(ROOT + os.sep):
+        return None
+    if must_be_file and not os.path.isfile(full):
+        return None
+    return full
+
+def parse_desc(desc):
+    out, cur = {}, None
+    for line in str(desc or "").splitlines():
+        m = FIELD_RX.match(line)
+        if m:
+            cur = m.group(1)
+            out[cur] = m.group(2).strip()
+        elif cur and line.strip():
+            out[cur] += " " + line.strip()
+    return out
+
+def norm_entry(e, report=True):
+    bad = err if report else (lambda m: None)
+    d = parse_desc(e.get("description"))
+    wid = str(e.get("fingerprint") or d.get("ISSUE_ID") or "?")
+    if d.get("ISSUE_ID") and e.get("fingerprint") and d["ISSUE_ID"] != e["fingerprint"]:
+        bad("%s: fingerprint != ISSUE_ID (%s)" % (wid, d["ISSUE_ID"]))
+    tm = re.match(r"\s*\[([A-Z_]+)\]", str(e.get("title", "")))
+    st_title = tm.group(1) if tm else None
+    st = d.get("STATUS") or st_title
+    if st_title and d.get("STATUS") and split_status(d["STATUS"])[0] != st_title:
+        bad("%s: title says [%s] but STATUS says %s" % (wid, st_title, d["STATUS"]))
+    return {"id": wid, "status": st, "file": d.get("FILE_PATH"), "lines": d.get("LINE_RANGE"),
+            "test": d.get("REQUIRED_REGRESSION_TEST"), "gov": d.get("GOVERNANCE_DOC"),
+            "cls": d.get("CLASSIFICATION")}
 
 def check_cite(wid, p, lr):
-    full = safe_repo_path(p)
-    if not full or not os.path.isfile(full):
+    full = safe_repo_path(p, True)
+    if not full:
         err("%s: FILE_PATH is not a file in this repo: %r" % (wid, p)); return
     nums = [int(x) for x in re.findall(r"\d+", str(lr or ""))]
     if not nums:
@@ -122,13 +150,9 @@ def check_cite(wid, p, lr):
 def exit_of(path):
     try:
         with open(path) as f:
-            j = json.load(f)
-    except Exception:
-        return None
-    v = get(j, "exit_code", "exitcode", "exit", "returncode", "code")
-    try:
+            v = json.load(f).get("exit_code")
         return int(v)
-    except (TypeError, ValueError):
+    except Exception:
         return None
 
 def check_closed_evidence(wid):
@@ -139,11 +163,11 @@ def check_closed_evidence(wid):
             err("%s: no %s evidence (%s/%s*.meta.json)" % (wid, kind, d, kind)); continue
         rc = exit_of(fs[0])
         if rc is None:
-            err("%s: cannot read an exit code from %s (adapt exit_of() to run_and_record.sh format)" % (wid, fs[0]))
+            err("%s: no integer exit_code in %s" % (wid, fs[0]))
         elif want_zero and rc != 0:
-            err("%s: green evidence has exit code %s" % (wid, rc))
+            err("%s: green evidence has exit_code %s" % (wid, rc))
         elif not want_zero and rc == 0:
-            err("%s: red evidence has exit code 0 (test never failed)" % wid)
+            err("%s: red evidence has exit_code 0 (test never failed)" % wid)
     if not glob.glob(os.path.join(d, "mutation*")):
         err("%s: no mutation-check evidence in %s" % (wid, d))
 
@@ -151,113 +175,157 @@ def load_enum():
     e = load(ENUM)
     return set(e["statuses"]), set(e.get("coverage_statuses", []))
 
+def ledger_ids():
+    try:
+        return {norm_entry(e, False)["id"] for e in entries(load(LEDGER), "LEDGER_LIST_KEY")}
+    except SystemExit:
+        return set()
+
 def mode_ledger():
     allowed, _ = load_enum()
     items = entries(load(LEDGER), "LEDGER_LIST_KEY")
-    counts = {}
+    counts, seen = {}, set()
     for e in items:
-        wid = str(get(e, "WINDOW_ID", "id") or "?")
-        raw = get(e, "STATUS", "FINAL_STATUS", "CLOSURE_STATUS")
-        if not isinstance(raw, str):
-            err("%s: no status field" % wid); continue
-        base, arg = split_status(raw)
+        n = norm_entry(e)
+        wid = n["id"]
+        if wid in seen:
+            err("%s: duplicate WINDOW_ID" % wid)
+        seen.add(wid)
+        if not n["status"]:
+            err("%s: no STATUS in description or title" % wid); continue
+        base, arg = split_status(n["status"])
         if base not in allowed:
-            err("%s: status %r is not in the allowed list" % (wid, raw)); continue
+            err("%s: status %r is not in the allowed list" % (wid, n["status"])); continue
         if base == "IN_PROGRESS":
             err("%s: IN_PROGRESS cannot pass the gate" % wid)
-        if base in REASON_STATUSES and not arg:
-            err("%s: %s requires a reason in parentheses" % (wid, base))
+        if base in REASON_STATUSES and not (arg or n["gov"] or n["cls"]):
+            err("%s: %s needs a reason (parenthesis, CLASSIFICATION or GOVERNANCE_DOC)" % (wid, base))
+        if n["gov"] and not safe_repo_path(n["gov"], True):
+            err("%s: GOVERNANCE_DOC %r does not exist" % (wid, n["gov"]))
         counts[base] = counts.get(base, 0) + 1
         if base in CITE_STATUSES:
-            check_cite(wid, get(e, "FILE_PATH"), get(e, "LINE_RANGE"))
+            check_cite(wid, n["file"], n["lines"])
         if base == "VERIFIED_CLOSED":
             check_closed_evidence(wid)
     print("  ledger entries: %d  %s" % (len(items), json.dumps(counts, sort_keys=True)))
     sys.exit(1 if errors else 0)
 
 def mode_closed(outpath):
-    items = entries(load(LEDGER), "LEDGER_LIST_KEY")
     rows = []
-    for e in items:
-        wid = str(get(e, "WINDOW_ID", "id") or "?")
-        raw = get(e, "STATUS", "FINAL_STATUS", "CLOSURE_STATUS")
-        base, _ = split_status(raw) if isinstance(raw, str) else (None, None)
+    for e in entries(load(LEDGER), "LEDGER_LIST_KEY"):
+        n = norm_entry(e, False)
+        base, _ = split_status(n["status"]) if n["status"] else (None, None)
         if base != "VERIFIED_CLOSED":
             continue
-        if not SAFE_PATH.match(wid.replace("-", "_")):
+        wid, t = n["id"], (n["test"] or "").strip()
+        if not SAFE_PATH.match(wid):
             err("%s: WINDOW_ID has unsafe characters" % wid); continue
-        t = get(e, "POC_OR_FAILING_TEST_PATH", "REGRESSION_TEST_PATH")
-        if not t:
-            cand = get(e, "REQUIRED_REGRESSION_TEST")
-            if isinstance(cand, str) and safe_repo_path(cand) and os.path.isfile(safe_repo_path(cand)):
-                t = cand
-        full = safe_repo_path(t) if t else None
-        if not full or not os.path.isfile(full) or not TEST_DIR.search(t):
-            err("%s: regression test path missing, unsafe, not in a tests/ dir, or not a file: %r" % (wid, t)); continue
-        sup = get(e, "REGRESSION_TEST_SUPPORT_FILES") or []
-        if isinstance(sup, str):
-            sup = [s.strip() for s in sup.split(",") if s.strip()]
-        ok = True
-        for s in sup:
-            sf = safe_repo_path(s)
-            if not sf or not os.path.isfile(sf) or not TEST_DIR.search(s):
-                err("%s: support file %r must be an existing file inside a tests/ dir" % (wid, s)); ok = False
-        if not ok:
-            continue
-        reset = "1" if str(get(e, "REQUIRES_DB_RESET")).lower() in ("true", "1", "yes") else "0"
-        rows.append("\t".join([wid, t, ",".join(sup) or "-", reset]))
+        full = safe_repo_path(t, True)
+        if not full or not TEST_DIR.search(t):
+            err("%s: REQUIRED_REGRESSION_TEST must be an existing file in a tests/ dir, got %r" % (wid, t)); continue
+        rows.append("\t".join([wid, t, "-", "0"]))
     with open(outpath, "w") as f:
         f.write("\n".join(rows) + ("\n" if rows else ""))
     sys.exit(1 if errors else 0)
 
-CITE_RX = re.compile(r"([\w./@()\[\]-]+\.[A-Za-z0-9]+)(?::|#L|\sL)(\d+)")
+REF_RX = re.compile(r"\s*REVIEWED_SAFE\(([^)]*)\)\s*:?\s*(.*)", re.S)
+
+def check_ref(uid, ref):
+    ok = False
+    for tok in re.split(r"[,\s;]+", ref):
+        tok = re.sub(r"#.*$", "", tok)
+        tok = re.sub(r":\d+(-\d+)?$", "", tok)
+        if not tok or not ("/" in tok or "." in tok):
+            continue
+        if not safe_repo_path(tok) or not os.path.exists(os.path.join(ROOT, tok)):
+            err("%s: proof reference %r does not exist in the repo" % (uid, tok)); return False
+        ok = True
+    if not ok:
+        err("%s: proof reference %r contains no repo path" % (uid, ref))
+    return ok
 
 def mode_coverage():
-    allowed, cov_allowed = load_enum()
-    cov_allowed = cov_allowed | allowed
-    doc = load(COVERAGE)
-    units = entries(doc, "COVERAGE_LIST_KEY")
-    window_ids = set()
-    try:
-        for e in entries(load(LEDGER), "LEDGER_LIST_KEY"):
-            window_ids.add(str(get(e, "WINDOW_ID", "id")))
-    except SystemExit:
-        pass
-    counts = {}
+    _, cov_allowed = load_enum()
+    units = entries(load(COVERAGE), "COVERAGE_LIST_KEY")
+    ids = ledger_ids()
+    counts, agents = {}, set()
     for u in units:
-        uid = str(get(u, "UNIT_ID", "id", "name") or "?")
-        raw = get(u, "DISPOSITION", "STATUS")
-        if not isinstance(raw, str):
-            err("%s: no disposition" % uid); continue
-        base, arg = split_status(raw)
-        if base not in cov_allowed:
-            err("%s: disposition %r not allowed" % (uid, raw)); continue
-        counts[base] = counts.get(base, 0) + 1
-        if base == "FINDING":
-            fid = (arg or str(get(u, "WINDOW_ID") or "")).strip()
-            if fid not in window_ids:
-                err("%s: FINDING references %r which is not in the ledger" % (uid, fid))
-        if base == "REVIEWED_SAFE":
-            proof = get(u, "PROOF_REFERENCE", "PROOF", "EVIDENCE", "JUSTIFICATION", "REASON")
-            if not isinstance(proof, str) or len(proof.strip()) < 60:
-                err("%s: REVIEWED_SAFE needs a proof reference of at least 60 chars (file:line + reasoning)" % uid); continue
-            cites = CITE_RX.findall(proof)
-            if not cites:
-                err("%s: proof has no file:line citation" % uid); continue
-            for p, ln in cites:
-                full = safe_repo_path(p)
-                if not full or not os.path.isfile(full):
-                    err("%s: proof cites missing file %s" % (uid, p)); continue
-                with open(full, errors="replace") as f:
-                    n = len(f.read().splitlines())
-                if int(ln) > n or int(ln) < 1:
-                    err("%s: proof cites %s:%s beyond end of file (%d lines)" % (uid, p, ln, n))
-        if base in REASON_STATUSES and not arg:
-            err("%s: %s requires a reason in parentheses" % (uid, base))
-    declared = get(doc, "TOTAL_UNITS", "INVENTORY_COUNT", "TOTAL") if isinstance(doc, dict) else None
-    if isinstance(declared, int) and declared != len(units):
-        err("declared total %d != actual units %d" % (declared, len(units)))
+        uid = str(u.get("surface") or u.get("id") or "?")
+        st = str(u.get("status") or u.get("disposition") or "").strip()
+        agents.add(str(u.get("agent_id")))
+        counts[st] = counts.get(st, 0) + 1
+        if u.get("unresolved"):
+            err("%s: has unresolved items: %r" % (uid, u["unresolved"]))
+        for p in (u.get("reviewed_paths") or []):
+            pp = re.sub(r"#.*$", "", str(p))
+            if not safe_repo_path(pp) or not (os.path.exists(os.path.join(ROOT, pp)) or glob.glob(os.path.join(ROOT, pp))):
+                err("%s: reviewed path %r does not exist" % (uid, p))
+        base, arg = split_status(st) if st else (None, None)
+        if st == "covered" or base == "REVIEWED_SAFE":
+            checks = u.get("local_checks") or []
+            good = False
+            for c in checks:
+                m = REF_RX.match(str((c or {}).get("result", "")))
+                if not m:
+                    continue
+                if len(m.group(2).strip()) < 40:
+                    err("%s: REVIEWED_SAFE reasoning shorter than 40 chars" % uid); continue
+                if check_ref(uid, m.group(1)):
+                    good = True
+            if not good and not any(REF_RX.match(str((c or {}).get("result", ""))) for c in checks):
+                err("%s: 'covered' but no local_check result of the form REVIEWED_SAFE(<path>): <reasoning>" % uid)
+        elif st == "candidate" or base == "FINDING":
+            fps = u.get("result_fingerprints") or ([arg] if arg else [])
+            if not fps:
+                err("%s: candidate with no result_fingerprints (unresolved)" % uid)
+            for fp in fps:
+                if fp not in ids:
+                    err("%s: references %r which is not in the findings ledger" % (uid, fp))
+        elif base in cov_allowed and base in REASON_STATUSES:
+            if not arg:
+                err("%s: %s requires a reason" % (uid, base))
+        else:
+            err("%s: unrecognised status %r" % (uid, st))
+    if len(units) > 10 and len(agents) == 1:
+        warn("all %d coverage units were authored by one agent_id (%s): no independent review is recorded" % (len(units), next(iter(agents))))
     print("  coverage units: %d  %s" % (len(units), json.dumps(counts, sort_keys=True)))
+    sys.exit(1 if errors else 0)
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def mode_manifest():
+    man = os.path.join(EVID, "MANIFEST.sha256")
+    if not os.path.isfile(man):
+        die("%s missing" % man)
+    listed = {}
+    for line in open(man, errors="replace"):
+        m = re.match(r"^([0-9a-fA-F]{64})\s+\*?(.+?)\s*$", line)
+        if m:
+            p = re.sub(r"^\./", "", m.group(2))
+            p = re.sub(r"^(\.gsd/)?evidence/", "", p)
+            listed[p] = m.group(1).lower()
+    if not listed:
+        die("manifest has no parseable '<sha256>  <path>' lines")
+    for p, h in sorted(listed.items()):
+        fp = os.path.join(EVID, p)
+        if not os.path.isfile(fp):
+            err("manifest lists missing file: %s" % p)
+        elif sha256(fp) != h:
+            err("hash mismatch: %s" % p)
+    unlisted = []
+    for dp, _, fs in os.walk(EVID):
+        for f in fs:
+            rel = os.path.relpath(os.path.join(dp, f), EVID)
+            if rel != "MANIFEST.sha256" and rel not in listed:
+                unlisted.append(rel)
+    if unlisted:
+        err("%d evidence file(s) not in manifest, e.g. %s" % (len(unlisted), ", ".join(sorted(unlisted)[:5])))
+    print("  manifest entries: %d   manifest sha256: %s" % (len(listed), sha256(man)))
     sys.exit(1 if errors else 0)
 
 if __name__ == "__main__":
@@ -265,12 +333,13 @@ if __name__ == "__main__":
     if mode == "ledger": mode_ledger()
     elif mode == "closed": mode_closed(sys.argv[2])
     elif mode == "coverage": mode_coverage()
+    elif mode == "manifest": mode_manifest()
     else: die("unknown mode")
 PY
 
 # ------------------------------------------------------------------ 0. gate integrity
 section "0. Gate integrity (human-reviewed files must be unchanged)"
-GATE_FILES=(.gsd/gate.sh .github/workflows/security-gate.yml .gsd/schemas/status-enum.json .gitleaks.toml .github/CODEOWNERS)
+GATE_FILES=(.gsd/gate.sh .github/workflows/security-gate-independent.yml .gsd/schemas/status-enum.json .gitleaks.toml .github/CODEOWNERS)
 if [ -z "${GATE_PIN_SHA:-}" ]; then
   fail "HUMAN REVIEW REQUIRED: GATE_PIN_SHA is not set. A human must review the gate files, then set repo variable GATE_PIN_SHA to that commit. Agents must not work around this."
 elif ! git cat-file -e "$GATE_PIN_SHA^{commit}" 2>/dev/null || ! git merge-base --is-ancestor "$GATE_PIN_SHA" HEAD; then
@@ -284,9 +353,24 @@ else
   [ $changed -eq 0 ] && pass "gate files identical to pinned commit $GATE_PIN_SHA"
 fi
 
-# ------------------------------------------------------------------ evidence availability
-if [ ! -d "$EVID" ] && [ -f .gsd/evidence.tar.gz ]; then
-  tar -xzf .gsd/evidence.tar.gz -C .gsd && echo "(extracted .gsd/evidence.tar.gz)"
+# ------------------------------------------------------------------ evidence source
+section "Evidence source"
+if [ -d "$EVID" ]; then
+  echo "  using working-tree evidence directory $EVID"
+else
+  extracted=0
+  for a in .gsd/evidence_archive.tar.gz .gsd/evidence.tar.gz; do
+    [ -f "$a" ] || continue
+    mkdir -p "$TMP/evx"
+    if tar -xzf "$a" -C "$TMP/evx" 2>"$LOGDIR/untar.log"; then
+      m="$(find "$TMP/evx" -name MANIFEST.sha256 -print -quit)"
+      if [ -n "$m" ]; then EVID="$(dirname "$m")"; export EVID; extracted=1; echo "  extracted $a -> evidence root"; break; fi
+      fail "$a contains no MANIFEST.sha256"
+    else
+      fail "cannot extract $a (see $LOGDIR/untar.log)"
+    fi
+  done
+  [ $extracted -eq 1 ] || fail "no evidence directory and no usable evidence archive (.gsd/evidence_archive.tar.gz)"
 fi
 
 # ------------------------------------------------------------------ 1. ledger
@@ -294,11 +378,11 @@ section "1. Findings ledger: statuses, citations, evidence"
 python3 "$TMP/gate_lib.py" ledger || FAILURES=$((FAILURES+1))
 
 # ------------------------------------------------------------------ 2. coverage
-section "2. Coverage ledger: dispositions and proof references"
+section "2. Coverage ledger: statuses, references, proofs"
 python3 "$TMP/gate_lib.py" coverage || FAILURES=$((FAILURES+1))
 
 # ------------------------------------------------------------------ 3. independent red/green
-section "3. Independent red (base) / green (head) re-proof"
+section "3. Independent red (pre-fix commit) / green (head) re-proof"
 runner_for() {
   case "$1" in
     *.spec.ts|*.spec.js) echo "${RUNNER_PLAYWRIGHT:-npx playwright test}";;
@@ -313,9 +397,8 @@ INFRA='ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|Cannot find (module|package)|Syntax
 
 if python3 "$TMP/gate_lib.py" closed "$TMP/closed.tsv"; then :; else FAILURES=$((FAILURES+1)); fi
 if [ -s "$TMP/closed.tsv" ]; then
-  git worktree add --detach "$BASEWT" "$BASE_SHA" >/dev/null 2>&1 || { fail "cannot create base worktree at $BASE_SHA"; }
+  git worktree add --detach "$BASEWT" "$RED_BASE_SHA" >/dev/null 2>&1 || fail "cannot create worktree at $RED_BASE_SHA"
   if [ -d "$BASEWT" ]; then
-    # reuse installed dependencies in the base worktree
     while IFS= read -r nm; do
       rel="${nm#./}"; [ -e "$BASEWT/$rel" ] || { mkdir -p "$BASEWT/$(dirname "$rel")"; ln -s "$ROOT/$rel" "$BASEWT/$rel"; }
     done < <(find . -maxdepth 4 -name node_modules -type d -prune -not -path './.gsd/*' 2>/dev/null)
@@ -323,18 +406,17 @@ if [ -s "$TMP/closed.tsv" ]; then
       runner="$(runner_for "$test")"
       if [ -z "$runner" ]; then fail "$id: no runner configured for $test"; continue; fi
       git -C "$BASEWT" checkout -q -- . 2>/dev/null; git -C "$BASEWT" clean -fdq
-      files="$test"; [ "$support" != "-" ] && files="$test ${support//,/ }"
-      for f in $files; do mkdir -p "$BASEWT/$(dirname "$f")"; cp "$ROOT/$f" "$BASEWT/$f"; done
+      mkdir -p "$BASEWT/$(dirname "$test")"; cp "$ROOT/$test" "$BASEWT/$test"
       [ "$reset" = "1" ] && run_in "$BASEWT" "${DB_RESET_CMD:-supabase db reset}" >"$LOGDIR/$id.base-reset.log" 2>&1
       run_in "$BASEWT" "$runner '$test'" >"$LOGDIR/$id.red.log" 2>&1; rc=$?
       if [ $rc -eq 0 ]; then
-        fail "$id: regression test PASSES on base commit (not a real regression test, or bug absent at base)"
+        fail "$id: regression test PASSES on pre-fix commit $RED_BASE_SHA (not a real regression test, or bug absent there)"
       elif [ $rc -eq 124 ] || [ $rc -eq 126 ] || [ $rc -eq 127 ]; then
-        fail "$id: base run errored (rc=$rc), not a genuine red; see $LOGDIR/$id.red.log"
+        fail "$id: pre-fix run errored (rc=$rc), not a genuine red; see $LOGDIR/$id.red.log"
       elif grep -Eq "$INFRA" "$LOGDIR/$id.red.log"; then
-        fail "$id: base failure looks infrastructural, not the vulnerability; see $LOGDIR/$id.red.log"; tail -n 15 "$LOGDIR/$id.red.log"
+        fail "$id: pre-fix failure looks infrastructural, not the vulnerability; see $LOGDIR/$id.red.log"; tail -n 15 "$LOGDIR/$id.red.log"
       else
-        pass "$id: RED on base (rc=$rc)"
+        pass "$id: RED on pre-fix commit (rc=$rc)"
       fi
       [ "$reset" = "1" ] && run_in "$ROOT" "${DB_RESET_CMD:-supabase db reset}" >"$LOGDIR/$id.head-reset.log" 2>&1
       run_in "$ROOT" "$runner '$test'" >"$LOGDIR/$id.green.log" 2>&1; rc=$?
@@ -346,49 +428,37 @@ else
 fi
 
 # ------------------------------------------------------------------ 4. banned tokens in diff
-section "4. Banned tokens in added lines (base...head)"
-EXCL=(':(exclude).gsd' ':(exclude).agents' ':(exclude)*.md' ':(exclude).github/workflows/security-gate*.yml'
+section "4. Banned tokens in lines added since campaign start"
+EXCL=(':(exclude).gsd' ':(exclude).agents' ':(exclude)*.md' ':(exclude).github/workflows/security-gate-independent.yml'
       ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' ':(exclude)yarn.lock')
-git diff --unified=0 --no-color "$BASE_SHA...HEAD" -- . "${EXCL[@]}" \
+git diff --unified=0 --no-color "$SCAN_BASE_SHA...HEAD" -- . "${EXCL[@]}" \
   | awk '/^\+\+\+ /{f=substr($0,7);next} /^\+/{print f": "substr($0,2)}' > "$TMP/added.txt"
 BANNED='(^|[^A-Za-z0-9_])(TODO|FIXME)([^A-Za-z0-9_]|$)|@ts-ignore|@ts-nocheck|eslint-disable|\b(it|test|describe)\.skip\b|\bxit\b|\bxdescribe\b|\.only\(|--no-verify'
 ANYRX='(:[[:space:]]*any\b|\bas any\b|<any>)'
 hits="$(grep -nE "$BANNED" "$TMP/added.txt" || true)"
 anyhits="$(grep -E '^[^:]+\.(ts|tsx): ' "$TMP/added.txt" | grep -nE "$ANYRX" || true)"
-if [ -n "$hits$anyhits" ]; then fail "banned tokens added by this diff:"; printf '%s\n%s\n' "$hits" "$anyhits" | sed '/^$/d;s/^/    /'
+if [ -n "$hits$anyhits" ]; then fail "banned tokens added since $SCAN_BASE_SHA:"; printf '%s\n%s\n' "$hits" "$anyhits" | sed '/^$/d;s/^/    /'
 else pass "no banned tokens in added lines"; fi
 
 # ------------------------------------------------------------------ 5. gitleaks + ignore file
 section "5. Secrets: gitleaks and .gitleaksignore"
-badignore="$(git diff --unified=0 --no-color "$BASE_SHA...HEAD" -- .gitleaksignore | grep -E '^\+[^+]' | sed 's/^+//' \
+badignore="$(git diff --unified=0 --no-color "$SCAN_BASE_SHA...HEAD" -- .gitleaksignore | grep -E '^\+[^+]' | sed 's/^+//' \
   | grep -vE '^[[:space:]]*(#|$)' | awk -F: '/[*?]/ || /\/[[:space:]]*$/ || NF<3 {print}' || true)"
 if [ -n "$badignore" ]; then fail ".gitleaksignore additions must be fingerprint-specific (no wildcards, no dirs):"; echo "$badignore" | sed 's/^/    /'
 else pass ".gitleaksignore additions (if any) are fingerprint-specific"; fi
-if git diff --quiet "$BASE_SHA...HEAD" -- .gitleaks.toml; then :; else fail "HUMAN REVIEW REQUIRED: .gitleaks.toml changed"; fi
+if git diff --quiet "$SCAN_BASE_SHA...HEAD" -- .gitleaks.toml; then :; else fail "HUMAN REVIEW REQUIRED: .gitleaks.toml changed"; fi
 if ! command -v gitleaks >/dev/null 2>&1; then
   fail "gitleaks not installed; cannot verify secrets"
 else
-  gitleaks detect --source . --log-opts "$BASE_SHA..HEAD" --redact --no-banner >"$LOGDIR/gitleaks-commits.log" 2>&1 \
-    && pass "gitleaks: no leaks in PR commits" || { fail "gitleaks found leaks in PR commits (see $LOGDIR/gitleaks-commits.log)"; tail -n 20 "$LOGDIR/gitleaks-commits.log"; }
-  if [ -d .gsd ]; then
-    gitleaks detect --no-git --source .gsd --redact --no-banner >"$LOGDIR/gitleaks-gsd.log" 2>&1 \
-      && pass "gitleaks: .gsd/ (including evidence) clean" || { fail "gitleaks found leaks in .gsd/ (see $LOGDIR/gitleaks-gsd.log)"; tail -n 20 "$LOGDIR/gitleaks-gsd.log"; }
-  fi
+  gitleaks detect --source . --log-opts "$SCAN_BASE_SHA..HEAD" --redact --no-banner >"$LOGDIR/gitleaks-commits.log" 2>&1 \
+    && pass "gitleaks: no leaks in commits since campaign start" || { fail "gitleaks found leaks (see $LOGDIR/gitleaks-commits.log)"; tail -n 20 "$LOGDIR/gitleaks-commits.log"; }
+  gitleaks detect --no-git --source "$EVID" --redact --no-banner >"$LOGDIR/gitleaks-evidence.log" 2>&1 \
+    && pass "gitleaks: evidence clean" || { fail "gitleaks found leaks in evidence (see $LOGDIR/gitleaks-evidence.log)"; tail -n 20 "$LOGDIR/gitleaks-evidence.log"; }
 fi
 
 # ------------------------------------------------------------------ 6. evidence manifest
 section "6. Evidence manifest"
-if [ ! -d "$EVID" ]; then
-  fail "evidence directory $EVID missing (commit redacted evidence or .gsd/evidence.tar.gz; it is currently gitignored if absent here)"
-elif [ ! -f "$EVID/MANIFEST.sha256" ]; then
-  fail "$EVID/MANIFEST.sha256 missing"
-else
-  ( cd "$EVID" && sha256sum -c --quiet MANIFEST.sha256 ) >"$LOGDIR/manifest.log" 2>&1 \
-    && pass "every listed evidence file matches its SHA256" || { fail "manifest mismatch"; head -n 10 "$LOGDIR/manifest.log"; }
-  extra="$( cd "$EVID" && find . -type f ! -name MANIFEST.sha256 | LC_ALL=C sort | while read -r f; do grep -qF "  $f" MANIFEST.sha256 || echo "$f"; done )"
-  [ -z "$extra" ] && pass "no unlisted evidence files" || { fail "evidence files not in manifest:"; echo "$extra" | sed 's/^/    /'; }
-  echo "  manifest sha256: $(sha256sum "$EVID/MANIFEST.sha256" | cut -d' ' -f1)"
-fi
+python3 "$TMP/gate_lib.py" manifest || FAILURES=$((FAILURES+1))
 
 # ------------------------------------------------------------------ result
 echo

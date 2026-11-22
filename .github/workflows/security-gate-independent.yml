@@ -1,4 +1,4 @@
-name: security-gate
+name: security-gate-independent
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: security-gate-${{ github.ref }}
+  group: security-gate-independent-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,17 +20,18 @@ jobs:
     env:
       # Set by a HUMAN (repo Settings > Variables) after reviewing the gate files.
       GATE_PIN_SHA: ${{ vars.GATE_PIN_SHA }}
-      # Verify this release exists and bump as needed before first run.
+      # Campaign start: the commit BEFORE any security fix (red runs and diff/secret scans start here).
+      SCAN_BASE_SHA: 99d1b6cadb30d64377b6d6f1b7d8194354f7ac78
+      RED_BASE_SHA: 99d1b6cadb30d64377b6d6f1b7d8194354f7ac78
       GITLEAKS_VERSION: '8.21.2'
     steps:
-      # Note for human: pin third-party actions to full commit SHAs (look them up on GitHub);
-      # they are tag-pinned here because SHAs cannot be verified offline.
+      # Human follow-up: pin third-party actions to full commit SHAs (tag-pinned here).
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Determine base commit
+      - name: Determine fallback base commit
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="${{ github.event.pull_request.base.sha }}"
@@ -57,7 +58,7 @@ jobs:
           base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
           curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gl.tgz
           curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" -o gl.sha
-          awk -v f="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" '$2 == f {print $1 "  gl.tgz"}' gl.sha | sha256sum -c -
+          grep " gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz\$" gl.sha | awk '{print $1 "  gl.tgz"}' | sha256sum -c -
           tar -xzf gl.tgz gitleaks && sudo mv gitleaks /usr/local/bin/ && gitleaks version
 
       # Needed only if regression tests hit the local database.
@@ -71,7 +72,7 @@ jobs:
         if: hashFiles('supabase/config.toml') != ''
         run: |
           supabase start
-          # Note for human: export the local URL/keys under the env var names your tests expect, e.g.
+          # Human follow-up: export the local URL/keys under the env var names your tests expect, e.g.
           #   eval "$(supabase status -o env)"; echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
 
       - name: Run security gate
