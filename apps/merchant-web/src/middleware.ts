@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validateCsrfRequest } from './lib/csrf-guard';
 
 // Strictly public user-facing page routes
 const PUBLIC_ROUTES = [
@@ -101,6 +102,35 @@ export function isAllowedOrigin(origin: string | null): boolean {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-nonce', nonce);
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseWs = supabaseUrl ? supabaseUrl.replace(/^http/, 'ws') : '';
+  const scopedSupabase = supabaseUrl ? `${supabaseUrl} ${supabaseWs}` : 'https://*.supabase.co wss://*.supabase.co';
+
+  const reportOnlyCsp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com https://sdk.cashfree.com`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' https: data: blob:",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    `connect-src 'self' https://api.cashfree.com https://sandbox.cashfree.com ${scopedSupabase} https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io`,
+    "frame-src 'self' https://api.razorpay.com https://sdk.cashfree.com https://sandbox.cashfree.com",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join('; ');
+
+  const applySecurityHeaders = (res: NextResponse) => {
+    res.headers.set('Content-Security-Policy-Report-Only', reportOnlyCsp);
+    res.headers.set('Cross-Origin-Opener-Policy-Report-Only', 'same-origin-allow-popups');
+    res.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+    return res;
+  };
 
   // If an OAuth code arrives on any route (e.g. /?code=...), route to /auth/callback to exchange for session
   if (req.nextUrl.searchParams.has('code') && !pathname.startsWith('/auth/')) {
@@ -240,27 +270,40 @@ export async function middleware(req: NextRequest) {
     const MAX_API_BODY_BYTES = 2 * 1024 * 1024; // 2MB
     const contentLength = req.headers.get('content-length');
     if (contentLength && parseInt(contentLength, 10) > MAX_API_BODY_BYTES) {
-      return NextResponse.json(
+      return applySecurityHeaders(NextResponse.json(
         { error: 'Payload Too Large: Request body exceeds maximum allowed size of 2MB' },
         { status: 413, headers: corsHeaders }
-      );
+      ));
+    }
+
+    // CSRF Protection Guard (MODWEB-006): Validate state-changing requests against CSRF
+    const csrfCheck = validateCsrfRequest(req);
+    if (!csrfCheck.allowed) {
+      return applySecurityHeaders(NextResponse.json(
+        { error: csrfCheck.reason || 'CSRF Rejected: Cross-site request forbidden for ambient credentials' },
+        { status: csrfCheck.statusCode || 403, headers: corsHeaders }
+      ));
     }
 
     const isPublicApi =
       PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route));
 
     if (!isPublicApi && !isE2EBypass && !isAuthenticated) {
-      return NextResponse.json(
+      return applySecurityHeaders(NextResponse.json(
         { error: 'Unauthorized: Authentication required' },
         { status: 401, headers: corsHeaders }
-      );
+      ));
     }
 
-    const res = NextResponse.next();
+    const res = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
     Object.entries(corsHeaders).forEach(([key, value]) => {
       res.headers.set(key, value);
     });
-    return res;
+    return applySecurityHeaders(res);
   }
 
   // 2. Public Page Routes Gate
@@ -272,7 +315,7 @@ export async function middleware(req: NextRequest) {
     ((['/', '/schedule', '/departments', '/audit-logs', '/consultation', '/team', '/settings'].includes(pathname)) && isDemo) ||
     isE2EBypass
   ) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
   // 3. Admin Page Routes Gate
@@ -280,7 +323,7 @@ export async function middleware(req: NextRequest) {
   if (isAdminRoute && !isAuthenticated && !isE2EBypass) {
     const adminLoginUrl = new URL('/admin/login', req.url);
     adminLoginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(adminLoginUrl);
+    return applySecurityHeaders(NextResponse.redirect(adminLoginUrl));
   }
 
   // 4. Standard Merchant Page Routes Gate
@@ -289,10 +332,10 @@ export async function middleware(req: NextRequest) {
     if (pathname !== '/') {
       loginUrl.searchParams.set('redirect', pathname);
     }
-    return NextResponse.redirect(loginUrl);
+    return applySecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
-  return NextResponse.next();
+  return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
 }
 
 export const config = {

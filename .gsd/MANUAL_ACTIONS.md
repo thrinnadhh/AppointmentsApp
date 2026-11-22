@@ -128,3 +128,30 @@ Per **Global Rule R5** ("No force-push, no pushes to main/default, no merging. N
 | **Cashfree Payout KYC** | Cashfree Merchant Dashboard | Audit and verify merchant vendor split assignments for any connected merchants. Ensure zero unverified vendor accounts are approved for live settlement. | Precaution against unauthorized split payout routing. |
 | **Meta WhatsApp Business** | Meta Developer Portal | Verify Webhook Callback URL and ensure `WA_APP_SECRET` and `WA_VERIFY_TOKEN` match values configured in Supabase Edge Function secrets. | Guarantees authentic incoming WhatsApp webhook delivery. |
 | **Upstash Redis** | Upstash Console | Verify production Redis credentials are bound in Vercel production environment so fail-closed rate limiters operate normally. | Protects against OTP and booking hold flooding. |
+
+---
+
+## 5. Security Header Promotion Criteria (MODWEB-004 & MODWEB-005)
+
+### MODWEB-004: CSP Nonce-Based script-src Promotion Criteria
+`Content-Security-Policy-Report-Only` is active in `apps/merchant-web/src/middleware.ts` generating a unique per-request base64 nonce (`x-nonce`), enforcing `'strict-dynamic'`, and whitelisting official gateway scripts (`https://sdk.cashfree.com`, `https://checkout.razorpay.com`).
+
+**Promotion from Report-Only to Enforcing Mode requires:**
+1. **Zero Hydration Violations over 14 Days**:
+   - Continuous inspection of CSP report ingestion endpoint `/api/security/csp-report` showing 0 legitimate Next.js framework script blocks in staging and production preview environments.
+2. **Payment Gateway Checkout Verification**:
+   - Verification across real iOS/Android WebViews and desktop Chrome/Firefox/Safari confirming Cashfree Drop checkout modal and Razorpay fallback render with zero script evaluation blocks.
+3. **Analytics & Monitoring Script Coverage**:
+   - Confirmation that all dynamically injected scripts (Sentry, Sentry Replay, web vitals) propagate the `x-nonce` attribute via `headers().get('x-nonce')` in server layout components.
+4. **Enforcement Migration Path**:
+   - Once criteria 1-3 are certified in staging, promote the header from `Content-Security-Policy-Report-Only` to `Content-Security-Policy` in `apps/merchant-web/src/middleware.ts` and retire the fallback policy in `next.config.mjs`.
+
+### MODWEB-005: COOP / CORP Promotion Criteria
+`Cross-Origin-Opener-Policy-Report-Only: same-origin-allow-popups` and `Cross-Origin-Resource-Policy: same-origin` are active in `apps/merchant-web/src/middleware.ts`.
+
+**Promotion to Enforcing Mode requires:**
+1. **Indian UPI & Gateway Redirect Validation**:
+   - Confirming UPI deep-linking intents (`upi://pay`, `phonepe://`, `gpay://`, `paytm://`) and banking 3DS redirect popups maintain unbroken opener context in all supported mobile browser engines.
+2. **Zero Cross-Origin Opener Violations**:
+   - Verify that Cashfree checkout modal callbacks (`window.postMessage` / `window.opener.postMessage`) do not generate COOP violation reports in browser telemetry.
+
