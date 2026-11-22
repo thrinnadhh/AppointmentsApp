@@ -61,7 +61,7 @@
 ### Entry 2026-11-23 (Phase 4 Root-Cause Investigation, Invariants, & Window Closure)
 - **Date (UTC):** 2026-11-23
 - **Phase:** Phase 4 Root-Cause Analysis, Invariant Locking & Convergence
-- **Commit SHA:** f6645ef1fbef47b407ced56459def21ecb2a9029
+- **Commit SHA:** eab1b44
 - **What was learned:**
   1. Recurrence analysis across 20 historical finding classes revealed that vulnerabilities repeated primarily due to `NEW_CODE_SAME_CLASS` (3), `DISMISSED_NO_DECISION` (5), `SCANNER_NOISE` (4), `FIX_NEVER_TESTED` (2), `SIBLING_NOT_FIXED` (2), and `REGRESSED_BY_LATER_COMMIT` (2), caused by the absence of automated gate-level invariant tests.
   2. GitHub-native alert audit identified 5 CodeQL note-level unused variable alerts (disposition: FALSE_POSITIVE), 1 Dependabot 403 (BLOCKED_TOOL), and 1 Secret Scanning alert (synthetic test mock token, FALSE_POSITIVE).
