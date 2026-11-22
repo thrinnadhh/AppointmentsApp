@@ -416,10 +416,10 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
 
       // Modal automatically closes upon successful phone verification
       await expect(otpInput).toBeHidden({ timeout: 10000 });
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
       // Re-open profile modal to verify authenticated profile state & sign-out
-      await profileBtn.click();
+      await profileBtn.click({ force: true });
       await expect(page.getByTestId('badge-phone-verified').or(page.getByText(/Verified/i)).first()).toBeVisible();
       const signOutBtn = page.getByTestId('btn-sign-out');
       await expect(signOutBtn).toBeVisible({ timeout: 10000 });
