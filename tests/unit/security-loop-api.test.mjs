@@ -128,7 +128,7 @@ describe('Wave 2: API Security & Auth Hardening (security-loop-api)', () => {
     pool = new Pool({ connectionString: DB_URL, max: 3 });
 
     // Fetch two bookings with customers
-    const custRes = await pool.query(`
+    let custRes = await pool.query(`
       SELECT p.id, p.email, p.phone, p.permanent_checkin_pin, b.id as booking_id, b.reference_code, b.booking_note, b.status, b.slot_start
       FROM public.profiles p
       JOIN public.bookings b ON b.customer_id = p.id
@@ -136,6 +136,35 @@ describe('Wave 2: API Security & Auth Hardening (security-loop-api)', () => {
       ORDER BY b.created_at DESC
       LIMIT 2;
     `);
+
+    if (custRes.rows.length < 2) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SET LOCAL app.trusted_write = 'true'");
+        await client.query(`
+          UPDATE public.bookings
+          SET status = 'CONFIRMED'
+          WHERE id IN (
+            SELECT b.id FROM public.bookings b
+            JOIN public.profiles p ON p.id = b.customer_id
+            WHERE p.role = 'customer'
+            LIMIT 2
+          );
+        `);
+        await client.query('COMMIT');
+      } finally {
+        client.release();
+      }
+      custRes = await pool.query(`
+        SELECT p.id, p.email, p.phone, p.permanent_checkin_pin, b.id as booking_id, b.reference_code, b.booking_note, b.status, b.slot_start
+        FROM public.profiles p
+        JOIN public.bookings b ON b.customer_id = p.id
+        WHERE p.role = 'customer' AND b.status = 'CONFIRMED'
+        ORDER BY b.created_at DESC
+        LIMIT 2;
+      `);
+    }
 
     assert.ok(custRes.rows.length >= 2, 'Must have at least 2 test bookings with customers in DB');
     customerA = custRes.rows[0];
