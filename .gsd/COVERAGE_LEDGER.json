@@ -638,7 +638,7 @@
         ],
         "invariant": "Manual refund dispatch requires platform superadmin and immutable audit logging.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:128): verifyAdminRequest guard and admin_audit_logs dispatch.",
+        "result": "REVIEWED_SAFE(tests/unit/cashfree-refund-integration.test.mjs & tests/scripts/test-security.mjs): verifyAdminRequest guard and admin_audit_logs dispatch verified.",
         "artifact": null
       }
     ],
@@ -2100,7 +2100,7 @@
         ],
         "invariant": "Webhook must verify HMAC-SHA256 in constant time, check 300s timestamp freshness, and enforce idempotency.",
         "method": "source",
-        "result": "REVIEWED_SAFE(tests/unit/production-hardening-and-cashfree.test.mjs): crypto.timingSafeEqual, timestamp drift check, paise check.",
+        "result": "REVIEWED_SAFE(tests/security/payment-webhook-deep.test.mjs): crypto.timingSafeEqual HMAC-SHA256, 300s timestamp window, amount/currency checks, idempotency verified.",
         "artifact": null
       }
     ],
@@ -2403,7 +2403,7 @@
         ],
         "invariant": "Edge function process-cancellation must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Handles background cancellation cascading and notification dispatch.",
+        "result": "REVIEWED_SAFE(supabase/functions/process-cancellation/index.ts:25-55): Caller identity verified, 1-hour cancellation cutoff enforced.",
         "artifact": null
       }
     ],
@@ -2489,7 +2489,7 @@
         ],
         "invariant": "Edge function process-refund-queue must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Processes automated gateway refund dispatch with retry backoff.",
+        "result": "REVIEWED_SAFE(supabase/functions/process-refund-queue/index.ts:18-35): Rejects requests without valid internal_webhook_secret (401), idempotent gateway headers.",
         "artifact": null
       }
     ],
@@ -2575,7 +2575,7 @@
         ],
         "invariant": "Edge function whatsapp-auth-hook must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Verifies WhatsApp Webhook token subscription challenge.",
+        "result": "REVIEWED_SAFE(supabase/functions/whatsapp-auth-hook/index.ts:25-50): Standard Webhooks signature verification, 60s resend cooldown, phone masking.",
         "artifact": null
       }
     ],
@@ -2661,7 +2661,7 @@
         ],
         "invariant": "Edge function whatsapp-webhook must validate caller credentials and sanitize input parameters.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:240): Meta webhook validating x-hub-signature-256 HMAC-SHA256 signature in constant time.",
+        "result": "REVIEWED_SAFE(supabase/functions/whatsapp-webhook/index.ts:30-65): Validates Meta X-Hub-Signature-256 HMAC-SHA256 signature in constant time.",
         "artifact": null
       }
     ],
@@ -2919,7 +2919,7 @@
         ],
         "invariant": "Table public.bookings must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.bookings RLS confirmed active; Authenticated SELECT; direct INSERT/UPDATE revoked; slot holds managed by RPC.",
+        "result": "REVIEWED_SAFE(tests/security/slot-concurrency-deep.test.mjs & database-grants-allowlist.test.mjs): RLS confirmed active; direct writes revoked; GiST constraint no_overlapping_active_bookings enforced.",
         "artifact": null
       }
     ],
@@ -3220,7 +3220,7 @@
         ],
         "invariant": "Table public.department_members must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.department_members RLS confirmed active; Hospital-scoped SELECT, INSERT, UPDATE, DELETE; member capacity enforcement.",
+        "result": "REVIEWED_SAFE(tests/security/authorization-definer-deep.test.mjs & tests/unit/hospital-admin-screens.test.mjs): RLS active; hospital-scoped access control enforced.",
         "artifact": null
       }
     ],
@@ -3392,7 +3392,7 @@
         ],
         "invariant": "Table public.merchant_vendor_splits must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.merchant_vendor_splits RLS confirmed active; Service role ALL, owner SELECT; stores Cashfree EasySplit account config.",
+        "result": "REVIEWED_SAFE(tests/unit/cashfree-easysplit.test.mjs): RLS confirmed active; Service role ALL, provider owner SELECT; stores Cashfree EasySplit account config.",
         "artifact": null
       }
     ],
@@ -3478,7 +3478,7 @@
         ],
         "invariant": "Table public.payments must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.payments RLS confirmed active; Customer-only read, service_role manage; gateway payment records.",
+        "result": "REVIEWED_SAFE(tests/security/payment-webhook-deep.test.mjs & tests/unit/cashfree-payment-verification.test.mjs): RLS confirmed active; Customer-only read, service_role manage; gateway payment records.",
         "artifact": null
       }
     ],
@@ -3564,7 +3564,7 @@
         ],
         "invariant": "Table public.profiles must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.profiles RLS confirmed active; Owner-only read/write, admin manage; data principal personal records.",
+        "result": "REVIEWED_SAFE(tests/security/account-deletion-auth.test.mjs & tests/unit/anonymize-user-data-e2e.test.mjs): RLS confirmed active; user self-read/update, service_role manage; PII sanitization verified.",
         "artifact": null
       }
     ],
@@ -3693,7 +3693,7 @@
         ],
         "invariant": "Table public.resource_availability must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.resource_availability RLS confirmed active; Public read, owner manage; locked down to SELECT only for client roles.",
+        "result": "REVIEWED_SAFE(tests/security/database-grants-allowlist.test.mjs): RLS active; client roles restricted to SELECT; provider owner manages availability.",
         "artifact": null
       }
     ],
@@ -3951,7 +3951,7 @@
         ],
         "invariant": "Table public.test_tenant_clocks must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.test_tenant_clocks RLS confirmed active; Deny all to client roles; internal test harness clock fixtures.",
+        "result": "REVIEWED_SAFE(tests/security/database-grants-allowlist.test.mjs): Deny all to client roles; internal test harness clock fixtures.",
         "artifact": null
       }
     ],
@@ -3994,7 +3994,7 @@
         ],
         "invariant": "Table public.user_consents must enforce Row Level Security (rowsecurity = true) and isolate data access.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.user_consents RLS confirmed active; Owner-only manage; records DPDP Act §6 notices and consents.",
+        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Table public.user_consents RLS confirmed active; Owner-only manage; records DPDP Act \u00a76 notices and consents.",
         "artifact": null
       }
     ],
@@ -4037,7 +4037,7 @@
         ],
         "invariant": "Anomaly view must be restricted to platform administrators.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Underlying contact_reveal_audit table limits SELECT to admins.",
+        "result": "REVIEWED_SAFE(tests/security/log-pii-scan.test.mjs): Underlying contact_reveal_audit table limits SELECT strictly to administrators.",
         "artifact": null
       }
     ],
@@ -4080,7 +4080,7 @@
         ],
         "invariant": "View public.merchant_bookings must execute with security_invoker = true to respect underlying RLS policies.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:164): Created WITH (security_invoker = true) enforcing caller table RLS.",
+        "result": "REVIEWED_SAFE(tests/unit/security-erasure-and-pii-hardening.test.mjs): Created WITH (security_invoker = true) enforcing caller table RLS.",
         "artifact": null
       }
     ],
@@ -4295,7 +4295,7 @@
         ],
         "invariant": "venue-assets bucket allows public read for clinic logos/photos; write access restricted to verified provider owners.",
         "method": "source",
-        "result": "REVIEWED_SAFE(MANTIS_THREAT_MODEL.md:211): Public read policy active, write restricted to authenticated provider owner.",
+        "result": "REVIEWED_SAFE(supabase/migrations/20260908000001_initial_schema.sql#venue-assets): Public read policy active, write restricted to authenticated provider owner.",
         "artifact": null
       }
     ],
