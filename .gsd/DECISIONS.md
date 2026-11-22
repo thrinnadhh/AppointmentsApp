@@ -53,3 +53,12 @@
 - **Ambiguity / Dilemma:** Should the entire swarm stall waiting for Playwright E2E to finish, or should preflight finalize the unit, security, validation, and static baselines while Playwright records in the background?
 - **Conservative Decision:** Per coordinator directive #6, finalized and published `.gsd/PREFLIGHT.md` and `.gsd/DECISIONS.md` immediately, while leaving `playwright_e2e` actively logging to `.gsd/evidence/BASELINE/playwright_e2e.stdout`. Upon completion of task-116 at T+1478s (exit code 1, 174 passed, 27 failed, 74 not run), the finalized test outcomes were merged into `.gsd/PREFLIGHT.md` and marked as `PREEXISTING`.
 - **Impact:** Prevented pipeline deadlock, unblocked downstream discovery analysis (Stage 1), and fully integrated comprehensive E2E baseline execution metrics without data loss.
+
+---
+
+## DEC-006: Restoration of Consultant Notification Authorization and Hospital Admin Standby Queue Permissions
+- **Date / Stage:** 2026-11-22 / Stage 4 (Verification & Gate Hardening)
+- **Context:** Notification dispatch trigger in `complete_booking` previously threw 42501 for consultants because migration `20261121000001` omitted `is_caller_authorized_for_resource`. Additionally, `expire_stale_standby_queue(integer, uuid)` had its `EXECUTE` grant revoked from `authenticated` in migration `20261120000006`, blocking hospital admins from clearing their late queues.
+- **Ambiguity / Dilemma:** Should `dispatch_booking_notification` check resource assignment or only provider-level ownership? Should `expire_stale_standby_queue` be executable by authenticated callers or only service_role?
+- **Conservative Decision:** Created forward migration `20261122000002_restore_consultant_notification_authorization.sql`. In `dispatch_booking_notification`, restored `is_caller_authorized_for_resource(v_booking.provider_id, v_booking.resource_id, v_caller_id)` to preserve the principle of least privilege while permitting consultants to complete consultations. In `expire_stale_standby_queue`, restored `GRANT EXECUTE TO authenticated` because the function itself enforces strict in-body tenant isolation (`IF auth.role() = 'authenticated' ...`).
+- **Impact:** Fixed doctor appointment completion and hospital admin standby queue sweep without weakening cross-tenant boundaries. Fully verified in `tests/unit/hospital-hardened-rpcs.test.mjs` (7/7 pass) and `tests/unit/phase1-security-blockers.test.mjs` (24/24 pass).
