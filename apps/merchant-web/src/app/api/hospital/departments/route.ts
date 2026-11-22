@@ -36,22 +36,47 @@ export async function GET(req: NextRequest) {
           .select('id, name, type, department, department_id, attributes')
           .eq('provider_id', ctx.merchantId);
 
-        const existingNames = new Set((data || []).map((d: any) => (d.name || '').toLowerCase().trim()));
+        interface ResourceSyncItem {
+          id: string;
+          name: string | null;
+          type: string | null;
+          department: string | null;
+          department_id: string | null;
+          attributes: Record<string, unknown> | null;
+        }
+
+        const existingNames = new Set(
+          (data || []).map((d: { name?: string | null }) => (d.name || '').toLowerCase().trim())
+        );
         const missingDeptsToCreate: { name: string; resourceIds: string[] }[] = [];
 
-        (resList || []).forEach((res: any) => {
+        ((resList || []) as unknown as ResourceSyncItem[]).forEach((res) => {
           const attr = res.attributes || {};
-          const customDept = (attr.department && typeof attr.department === 'string' && attr.department.trim() && attr.department.trim() !== 'General')
-            ? attr.department.trim()
-            : null;
-          const colDept = (res.department && typeof res.department === 'string' && res.department.trim() && res.department.trim() !== 'General')
-            ? res.department.trim()
-            : null;
-          const typeDept = (res.type && typeof res.type === 'string' && res.type.trim() && res.type.trim() !== 'doctor' && res.type.trim() !== 'General')
-            ? res.type.trim()
-            : null;
+          const customDept =
+            attr.department &&
+            typeof attr.department === 'string' &&
+            attr.department.trim() &&
+            attr.department.trim() !== 'General'
+              ? attr.department.trim()
+              : null;
+          const colDept =
+            res.department &&
+            typeof res.department === 'string' &&
+            res.department.trim() &&
+            res.department.trim() !== 'General'
+              ? res.department.trim()
+              : null;
+          const typeDept =
+            res.type &&
+            typeof res.type === 'string' &&
+            res.type.trim() &&
+            res.type.trim() !== 'doctor' &&
+            res.type.trim() !== 'General'
+              ? res.type.trim()
+              : null;
 
-          const deptName = customDept || colDept || typeDept || (attr.department && attr.department !== 'doctor' ? attr.department : null) || null;
+          const rawAttrDept = typeof attr.department === 'string' && attr.department !== 'doctor' ? attr.department : null;
+          const deptName: string | null = customDept || colDept || typeDept || rawAttrDept || null;
 
           if (deptName) {
             const norm = deptName.toLowerCase().trim();
@@ -109,7 +134,7 @@ export async function GET(req: NextRequest) {
             .maybeSingle();
 
           if (defaultDept) {
-            data = [{ ...defaultDept, department_members: [] } as any];
+            data = [{ ...defaultDept, department_members: [] }] as NonNullable<typeof data>;
           }
         }
       } catch (syncErr) {
@@ -117,20 +142,21 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const departments: HospitalDepartment[] = (data || []).map((d: any) => {
-      const activeOrInvitedMembers = (d.department_members || []).filter(
-        (m: any) => m.status === 'invited' || m.status === 'active'
+    const departments: HospitalDepartment[] = (data || []).map((d: Record<string, unknown>) => {
+      const members = (d.department_members as Array<{ status?: string }> | undefined) || [];
+      const activeOrInvitedMembers = members.filter(
+        (m) => m.status === 'invited' || m.status === 'active'
       );
       return {
-        id: d.id,
-        merchant_id: d.merchant_id,
-        name: d.name,
+        id: d.id as string,
+        merchant_id: d.merchant_id as string,
+        name: d.name as string,
         is_preset: Boolean(d.is_preset),
         is_active: d.is_active !== undefined ? Boolean(d.is_active) : true,
-        allowed_modules: d.allowed_modules || ['appointments', 'queue_schedule', 'check_in'],
+        allowed_modules: (d.allowed_modules as HospitalModule[]) || ['appointments', 'queue_schedule', 'check_in'],
         member_count: activeOrInvitedMembers.length,
-        created_at: d.created_at,
-        updated_at: d.updated_at,
+        created_at: (d.created_at as string) || new Date().toISOString(),
+        updated_at: (d.updated_at as string) || new Date().toISOString(),
       };
     });
 

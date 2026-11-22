@@ -281,11 +281,11 @@ export const test = base.extend<AppTestFixtures>({
     const merchantPortal = new Proxy({} as MerchantPortalPage, {
       get(target, prop: string | symbol) {
         if (prop === 'then') return undefined;
-        return (...args: any[]) => {
+        return (...args: unknown[]) => {
           return getMerchantPortal().then((instance) => {
-            const val = (instance as any)[prop];
+            const val = (instance as unknown as Record<string | symbol, unknown>)[prop];
             if (typeof val === 'function') {
-              return val.apply(instance, args);
+              return (val as (...a: unknown[]) => unknown).apply(instance, args);
             }
             return val;
           });
@@ -337,11 +337,11 @@ export const test = base.extend<AppTestFixtures>({
     const merchantPortal = new Proxy({} as MerchantPortalPage, {
       get(target, prop: string | symbol) {
         if (prop === 'then') return undefined;
-        return (...args: any[]) => {
+        return (...args: unknown[]) => {
           return getMerchantPortal().then((instance) => {
-            const val = (instance as any)[prop];
+            const val = (instance as unknown as Record<string | symbol, unknown>)[prop];
             if (typeof val === 'function') {
-              return val.apply(instance, args);
+              return (val as (...a: unknown[]) => unknown).apply(instance, args);
             }
             return val;
           });
@@ -369,11 +369,11 @@ export const test = base.extend<AppTestFixtures>({
     const adminDashboard = new Proxy({} as AdminDashboardPage, {
       get(target, prop: string | symbol) {
         if (prop === 'then') return undefined;
-        return (...args: any[]) => {
+        return (...args: unknown[]) => {
           return getAdminDashboard().then((instance) => {
-            const val = (instance as any)[prop];
+            const val = (instance as unknown as Record<string | symbol, unknown>)[prop];
             if (typeof val === 'function') {
-              return val.apply(instance, args);
+              return (val as (...a: unknown[]) => unknown).apply(instance, args);
             }
             return val;
           });

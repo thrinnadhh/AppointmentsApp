@@ -50,10 +50,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Call update_city_status RPC
-    const { data: rpcRes, error: rpcErr } = await (supabaseAdmin.rpc as any)('update_city_status', {
+    const { data: rpcRes, error: rpcErr } = await supabaseAdmin.rpc('update_city_status' as never, {
       p_city_id: cityId,
       p_status: status,
-    });
+    } as never);
 
     if (rpcErr) {
       return NextResponse.json({ error: rpcErr.message }, { status: 500 });

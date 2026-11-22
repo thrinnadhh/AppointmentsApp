@@ -244,7 +244,7 @@ export function UnifiedAddStaffModal({
       // 3. If Consultant, create or link doctor resource
       if (role === 'consultant' && providerId) {
         const docDeptName = selectedDepartment?.name || 'General';
-        const { data: resData, error: resError } = await (supabase.rpc as any)('merchant_upsert_resource', {
+        const { data: resData, error: resError } = await supabase.rpc('merchant_upsert_resource' as never, {
           p_provider_id: providerId,
           p_name: fullName.trim(),
           p_category: 'doctor',
@@ -257,14 +257,15 @@ export function UnifiedAddStaffModal({
             department_id: finalDeptParam,
             doctor_email: email.trim().toLowerCase(),
           },
-        });
+        } as never);
         if (resError) {
           throw new Error(resError.message || 'Failed to register doctor resource');
         }
-        if (resData?.resource?.id && finalDeptParam && !finalDeptParam.startsWith('dept-')) {
-          await (supabase.from('resources') as any)
-            .update({ department_id: finalDeptParam })
-            .eq('id', resData.resource.id);
+        const resourceObj = (resData as unknown as Record<string, unknown>)?.resource as Record<string, unknown> | undefined;
+        if (resourceObj?.id && finalDeptParam && !finalDeptParam.startsWith('dept-')) {
+          await supabase.from('resources' as never)
+            .update({ department_id: finalDeptParam } as never)
+            .eq('id', resourceObj.id as string);
         }
       }
 

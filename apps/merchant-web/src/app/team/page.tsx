@@ -96,12 +96,12 @@ function TeamManagementContent() {
       } else if (currentProviderId) {
         const [membershipsRes, deptMembersRes] = await Promise.all([
           supabase
-            .from('merchant_memberships' as any)
+            .from('merchant_memberships' as never)
             .select('user_id, role, profile:profiles(id, full_name, email, phone, created_at)')
             .eq('provider_id', currentProviderId)
             .is('deleted_at', null),
           supabase
-            .from('department_members' as any)
+            .from('department_members' as never)
             .select('user_id, email, role, department_id, departments(name), profile:profiles(id, full_name, email, phone, created_at)')
             .eq('merchant_id', currentProviderId)
             .eq('status', 'active'),
@@ -110,47 +110,52 @@ function TeamManagementContent() {
         const rosterMap = new Map<string, TeamMember>();
 
         if (membershipsRes.data) {
-          membershipsRes.data.forEach((m: any) => {
+          membershipsRes.data.forEach((m: Record<string, unknown>) => {
             if (m.profile) {
-              rosterMap.set(m.profile.id, {
-                ...m.profile,
-                membershipRole: m.role,
-              });
+              const prof = m.profile as Record<string, unknown>;
+              rosterMap.set(prof.id as string, {
+                ...prof,
+                membershipRole: m.role as string,
+              } as unknown as TeamMember);
             }
           });
         }
 
         if (deptMembersRes.data) {
-          deptMembersRes.data.forEach((dm: any) => {
-            const profileId = dm.profile?.id || dm.user_id;
+          deptMembersRes.data.forEach((dm: Record<string, unknown>) => {
+            const prof = dm.profile as Record<string, unknown> | null;
+            const profileId = (prof?.id as string) || (dm.user_id as string);
             const existing = profileId ? rosterMap.get(profileId) : null;
-            const deptName = dm.departments?.name || null;
+            const deptObj = dm.departments as Record<string, unknown> | null;
+            const deptName = (deptObj?.name as string) || null;
             if (existing) {
               if (dm.role === 'consultant' || dm.role === 'doctor') {
                 existing.membershipRole = 'doctor';
               }
-              (existing as any).department = deptName || (existing as any).department;
-              (existing as any).department_id = dm.department_id || (existing as any).department_id;
-            } else if (dm.profile) {
-              rosterMap.set(dm.profile.id, {
-                ...dm.profile,
-                membershipRole: (dm.role === 'consultant' || dm.role === 'doctor') ? 'doctor' : dm.role,
+              const existingRecord = existing as unknown as Record<string, unknown>;
+              existingRecord.department = deptName || existingRecord.department;
+              existingRecord.department_id = (dm.department_id as string) || existingRecord.department_id;
+            } else if (prof) {
+              rosterMap.set(prof.id as string, {
+                ...prof,
+                membershipRole: (dm.role === 'consultant' || dm.role === 'doctor') ? 'doctor' : (dm.role as string),
                 department: deptName,
                 department_id: dm.department_id,
-              } as any);
+              } as unknown as TeamMember);
             } else if (dm.email) {
-              const syntheticId = dm.user_id || `dept-member-${dm.email}`;
+              const emailStr = dm.email as string;
+              const syntheticId = (dm.user_id as string) || `dept-member-${emailStr}`;
               rosterMap.set(syntheticId, {
                 id: syntheticId,
-                email: dm.email,
-                full_name: dm.email.split('@')[0],
+                email: emailStr,
+                full_name: emailStr.split('@')[0],
                 role: 'merchant',
-                membershipRole: (dm.role === 'consultant' || dm.role === 'doctor') ? 'doctor' : dm.role,
+                membershipRole: (dm.role === 'consultant' || dm.role === 'doctor') ? 'doctor' : (dm.role as string),
                 phone: null,
                 created_at: new Date().toISOString(),
                 department: deptName,
                 department_id: dm.department_id,
-              } as any);
+              } as unknown as TeamMember);
             }
           });
         }
@@ -265,7 +270,9 @@ function TeamManagementContent() {
 
     doctors.forEach((doc) => {
       const email = doc.doctor_email?.toLowerCase();
-      const attrUserId = (doc as any)?.attributes?.user_id;
+      const docRecord = doc as unknown as Record<string, unknown>;
+      const docAttributes = docRecord?.attributes as Record<string, unknown> | undefined;
+      const attrUserId = docAttributes?.user_id as string | undefined;
 
       // If already in list, ensure marked as doctor with department
       const existingMember = list.find(
@@ -274,11 +281,12 @@ function TeamManagementContent() {
 
       if (existingMember) {
         existingMember.membershipRole = 'doctor';
-        if (!(existingMember as any).department && doc.department) {
-          (existingMember as any).department = doc.department;
+        const existingRecord = existingMember as unknown as Record<string, unknown>;
+        if (!existingRecord.department && doc.department) {
+          existingRecord.department = doc.department;
         }
-        if (!(existingMember as any).department_id && (doc as any).department_id) {
-          (existingMember as any).department_id = (doc as any).department_id;
+        if (!existingRecord.department_id && docRecord.department_id) {
+          existingRecord.department_id = docRecord.department_id;
         }
         if (!existingMember.full_name?.toLowerCase().startsWith('dr.') && doc.name) {
           existingMember.full_name = `Dr. ${doc.name}`;
@@ -293,8 +301,8 @@ function TeamManagementContent() {
           phone: null,
           created_at: new Date().toISOString(),
           department: doc.department || null,
-          department_id: (doc as any).department_id || null,
-        } as any);
+          department_id: (docRecord.department_id as string) || null,
+        } as unknown as TeamMember);
         existingIds.add(attrUserId);
         if (email) existingEmails.add(email);
       } else if (email && !existingEmails.has(email)) {
@@ -307,8 +315,8 @@ function TeamManagementContent() {
           phone: null,
           created_at: new Date().toISOString(),
           department: doc.department || null,
-          department_id: (doc as any).department_id || null,
-        } as any);
+          department_id: (docRecord.department_id as string) || null,
+        } as unknown as TeamMember);
         existingEmails.add(email);
       } else if (!existingIds.has(`doc-${doc.id}`)) {
         list.push({
@@ -320,8 +328,8 @@ function TeamManagementContent() {
           phone: null,
           created_at: new Date().toISOString(),
           department: doc.department || null,
-          department_id: (doc as any).department_id || null,
-        } as any);
+          department_id: (docRecord.department_id as string) || null,
+        } as unknown as TeamMember);
         existingIds.add(`doc-${doc.id}`);
       }
 

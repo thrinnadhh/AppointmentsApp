@@ -144,12 +144,12 @@ export async function POST(req: NextRequest) {
 
       // Execute immediate atomic PII anonymization and deletion
       try {
-        await (supabaseAdmin.rpc as any)('delete_account_immediately', {
+        await supabaseAdmin.rpc('delete_account_immediately' as never, {
           p_reason: typeof reason === 'string' ? reason.slice(0, 500) : 'Requested via verified public web page',
-        });
+        } as never);
       } catch (rpcErr) {
         // Fallback to anonymize_user_data directly
-        await (supabaseAdmin.rpc as any)('anonymize_user_data', { p_user_id: userId });
+        await supabaseAdmin.rpc('anonymize_user_data' as never, { p_user_id: userId } as never);
       }
 
       // Purge auth user record immediately
@@ -160,15 +160,15 @@ export async function POST(req: NextRequest) {
       }
 
       // Record completed deletion record with zero grace period
-      await (supabaseAdmin as any)
-        .from('account_deletion_requests')
+      await supabaseAdmin
+        .from('account_deletion_requests' as never)
         .upsert({
           user_id: userId,
           reason: typeof reason === 'string' ? reason.slice(0, 500) : 'Requested via public web page (Immediate Deletion)',
           requested_at: nowIso,
           scheduled_for: nowIso,
           completed_at: nowIso,
-        });
+        } as never);
     }
 
     return NextResponse.json({

@@ -315,18 +315,19 @@ export async function POST(request: NextRequest) {
     }
 
     // BUG-06: Persist department assignment into department_members
-    let targetDeptId = body.departmentId || body.department_id || (doctor as any)?.department_id;
+    const doctorObj = doctor as Record<string, unknown> | null;
+    let targetDeptId = body.departmentId || body.department_id || doctorObj?.department_id;
 
     // If targetDeptId is missing or synthetic, resolve or auto-create from doctor's department
     if ((!targetDeptId || (typeof targetDeptId === 'string' && targetDeptId.startsWith('dept-'))) && doctor) {
-      const docAttr = (doctor as any).attributes || {};
+      const docAttr = (doctorObj?.attributes as Record<string, unknown>) || {};
       const docDeptName = (docAttr.department && docAttr.department !== 'General')
-        ? docAttr.department
+        ? (docAttr.department as string)
         : (doctor.department && doctor.department !== 'General')
           ? doctor.department
           : (doctor.type && doctor.type !== 'doctor' && doctor.type !== 'General')
             ? doctor.type
-            : (docAttr.department || doctor.department || 'General Medicine');
+            : ((docAttr.department as string) || doctor.department || 'General Medicine');
 
       if (docDeptName) {
         const { data: foundDept } = await supabaseAdmin
@@ -356,7 +357,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Link doctor resource to this department if not yet linked
-        if (targetDeptId && !(doctor as any).department_id) {
+        if (targetDeptId && !doctorObj?.department_id) {
           await supabaseAdmin
             .from('resources')
             .update({ department_id: targetDeptId })

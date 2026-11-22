@@ -59,10 +59,14 @@ export const StaffRosterTable = React.memo(function StaffRosterTable({
 
     // 2. Doctor / Specialist
     const matchedDoctor = doctors.find(
-      (d) => (d.doctor_email && d.doctor_email.toLowerCase() === (member.email || '').toLowerCase()) ||
-             (d as any)?.attributes?.user_id === member.id ||
-             (d as any)?.id === member.id ||
-             member.id === `doc-${d.id}`
+      (d) => {
+        const dRec = d as unknown as Record<string, unknown>;
+        const dAttr = dRec?.attributes as Record<string, unknown> | undefined;
+        return (d.doctor_email && d.doctor_email.toLowerCase() === (member.email || '').toLowerCase()) ||
+               dAttr?.user_id === member.id ||
+               dRec?.id === member.id ||
+               member.id === `doc-${d.id}`;
+      }
     );
 
     const isDoc =
@@ -75,7 +79,8 @@ export const StaffRosterTable = React.memo(function StaffRosterTable({
       member.full_name?.toLowerCase().startsWith('dr ');
 
     if (isDoc) {
-      const deptName = matchedDoctor?.department || member.department || (member as any)?.department_name || 'General Medicine';
+      const memberRec = member as unknown as Record<string, unknown>;
+      const deptName = matchedDoctor?.department || member.department || (memberRec?.department_name as string) || 'General Medicine';
       const docName = matchedDoctor?.name || member.full_name?.replace(/^Dr\.\s*/i, '') || member.full_name || 'Specialist';
       return {
         roleTitle: 'Doctor / Specialist',

@@ -30,12 +30,8 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
     }
 
     supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-    anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!anonKey || !serviceRoleKey) {
-      throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY in environment');
-    }
+    anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+    serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 
     adminClient = createClient(supabaseUrl, serviceRoleKey);
     userClient = createClient(supabaseUrl, anonKey);
@@ -96,6 +92,26 @@ describe('SEC-DISC-001: Authenticated In-App Account Deletion Security & Auth Co
       token: loginData.session.access_token,
     };
   }
+
+  // ---------------------------------------------------------------------------
+  // Test Case 0: SEC-DISC-001 Invariant & Route Implementation Structure
+  // ---------------------------------------------------------------------------
+  it('0. SEC-DISC-001 Invariant: Route must invoke delete_account_immediately via user-scoped client and eliminate 30-day grace period', () => {
+    const routePath = path.resolve(process.cwd(), 'apps/merchant-web/src/app/api/account/delete/route.ts');
+    assert.ok(fs.existsSync(routePath), 'Account deletion route must exist');
+    const content = fs.readFileSync(routePath, 'utf8');
+
+    // In SEC-DISC-001, old implementation scheduled deletion with 30-day grace period via request_account_deletion
+    assert.ok(!content.includes('request_account_deletion'), 'Route must not schedule deletion with 30-day grace period (SEC-DISC-001)');
+
+    // Invariant: Route must invoke delete_account_immediately using user-scoped supabase client (not supabaseAdmin without user context)
+    assert.match(content, /supabase\.rpc\(\s*['"]delete_account_immediately['"]/, 'Route must invoke delete_account_immediately via user-scoped supabase client');
+    assert.ok(!content.includes("supabaseAdmin.rpc('delete_account_immediately'"), 'Route must not invoke delete_account_immediately via service-role supabaseAdmin without user context');
+
+    // Invariant: Route must purge user from auth.users and confirm immediate deletion
+    assert.match(content, /auth\.admin\.deleteUser/, 'Route must purge user from auth.users');
+    assert.match(content, /immediate:\s*true/, 'Route must return immediate: true');
+  });
 
   // ---------------------------------------------------------------------------
   // Test Case 1: Rejection of Unauthenticated Callers
