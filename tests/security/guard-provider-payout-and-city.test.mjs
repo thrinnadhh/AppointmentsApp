@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
-const DRAFT_PATH = 'supabase/migrations_draft/20261120000004_guard_provider_payout_and_city.sql';
-const ROLLBACK_PATH = 'supabase/migrations_rollback/20261120000004_rollback_provider_payout_and_city.sql';
+const MIGRATION_PATH = 'supabase/migrations/20261120000004_guard_provider_payout_and_city.sql';
 
 function runSql(query) {
   const cmd = 'docker exec -i supabase_db_Appointments psql -U postgres -d postgres -t -A';
@@ -12,29 +11,20 @@ function runSql(query) {
 }
 
 describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Guard Verification', () => {
-  it('1. Draft forward migration and rollback migration exist and are isolated from auto-execution', () => {
-    assert.ok(existsSync(DRAFT_PATH), `Draft migration must exist at ${DRAFT_PATH}`);
-    assert.ok(existsSync(ROLLBACK_PATH), `Rollback script must exist at ${ROLLBACK_PATH}`);
-    assert.ok(
-      !existsSync('supabase/migrations/20261120000004_guard_provider_payout_and_city.sql'),
-      'Draft migration must NOT exist in supabase/migrations/ to prevent auto-execution during db reset'
-    );
+  it('1. Migration file exists and defines protected column list', () => {
+    assert.ok(existsSync(MIGRATION_PATH), `Migration must exist at ${MIGRATION_PATH}`);
 
-    const draftContent = readFileSync(DRAFT_PATH, 'utf-8');
-    const rollbackContent = readFileSync(ROLLBACK_PATH, 'utf-8');
+    const migrationContent = readFileSync(MIGRATION_PATH, 'utf-8');
 
-    assert.match(draftContent, /NEW\.city IS DISTINCT FROM OLD\.city/);
-    assert.match(draftContent, /NEW\.cashfree_vendor_status IS DISTINCT FROM OLD\.cashfree_vendor_status/);
-    assert.match(draftContent, /NEW\.cashfree_vendor_id IS DISTINCT FROM OLD\.cashfree_vendor_id/);
-    assert.match(draftContent, /NEW\.bank_ifsc IS DISTINCT FROM OLD\.bank_ifsc/);
-    assert.match(draftContent, /NEW\.payout_upi_id IS DISTINCT FROM OLD\.payout_upi_id/);
-
-    assert.doesNotMatch(rollbackContent, /NEW\.city IS DISTINCT FROM OLD\.city/);
-    assert.doesNotMatch(rollbackContent, /NEW\.cashfree_vendor_status IS DISTINCT FROM OLD\.cashfree_vendor_status/);
+    assert.match(migrationContent, /NEW\.city IS DISTINCT FROM OLD\.city/);
+    assert.match(migrationContent, /NEW\.cashfree_vendor_status IS DISTINCT FROM OLD\.cashfree_vendor_status/);
+    assert.match(migrationContent, /NEW\.cashfree_vendor_id IS DISTINCT FROM OLD\.cashfree_vendor_id/);
+    assert.match(migrationContent, /NEW\.bank_ifsc IS DISTINCT FROM OLD\.bank_ifsc/);
+    assert.match(migrationContent, /NEW\.payout_upi_id IS DISTINCT FROM OLD\.payout_upi_id/);
   });
 
-  it('2. Transactional execution of draft migration blocks tenant owner from modifying city & payout credentials', () => {
-    const draftSql = readFileSync(DRAFT_PATH, 'utf-8');
+  it('2. Applying migration blocks tenant owner from modifying city & payout credentials', () => {
+    const migrationSql = readFileSync(MIGRATION_PATH, 'utf-8');
 
     // Get an existing provider and owner id
     const provRow = runSql(`SELECT id || ':' || owner_id FROM public.providers WHERE owner_id IS NOT NULL LIMIT 1;`);
@@ -44,7 +34,7 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
     // Test each protected column in an isolated transaction
     const script = `
       BEGIN;
-      ${draftSql}
+      ${migrationSql}
 
       SET LOCAL ROLE authenticated;
       SET LOCAL request.jwt.claims = '{"sub": "${ownerId}", "role": "authenticated"}';
@@ -96,17 +86,17 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
     `;
 
     const out = runSql(script);
-    assert.ok(!out.includes('UNEXPECTED_SUCCESS'), 'All protected updates were successfully blocked by draft trigger');
+    assert.ok(!out.includes('UNEXPECTED_SUCCESS'), 'All protected updates were successfully blocked by trigger');
   });
 
-  it('3. Legitimate writers (service_role, admin, app.trusted_write) can modify all fields under draft migration', () => {
-    const draftSql = readFileSync(DRAFT_PATH, 'utf-8');
+  it('3. Legitimate writers (service_role, admin, app.trusted_write) can modify all fields', () => {
+    const migrationSql = readFileSync(MIGRATION_PATH, 'utf-8');
     const provRow = runSql(`SELECT id FROM public.providers LIMIT 1;`);
     const provId = provRow.trim();
 
     const script = `
       BEGIN;
-      ${draftSql}
+      ${migrationSql}
 
       -- Under service_role, vendor status, city, bank credentials, and payout_upi_id update must succeed
       SET LOCAL ROLE service_role;
@@ -129,32 +119,6 @@ describe('SEC-WIN-017 & SEC-WIN-019 / Provider Governance & Payout Credential Gu
     `;
 
     const out = runSql(script);
-    assert.ok(!out.includes('ERROR'), 'Legitimate writers must not be blocked by draft trigger');
-  });
-
-  it('4. Rollback script restores previous definition where city and payout fields are unblocked', () => {
-    const draftSql = readFileSync(DRAFT_PATH, 'utf-8');
-    const rollbackSql = readFileSync(ROLLBACK_PATH, 'utf-8');
-    const provRow = runSql(`SELECT id || ':' || owner_id FROM public.providers WHERE owner_id IS NOT NULL LIMIT 1;`);
-    const [provId, ownerId] = provRow.split(':');
-
-    const script = `
-      BEGIN;
-      ${draftSql}
-      ${rollbackSql}
-
-      -- Under tenant owner, city and cashfree_vendor_status modification proceeds without trigger error as before
-      SET LOCAL ROLE authenticated;
-      SET LOCAL request.jwt.claims = '{"sub": "${ownerId}", "role": "authenticated"}';
-      UPDATE public.providers 
-      SET city = 'RevertedCity',
-          cashfree_vendor_status = 'ACTIVE'
-      WHERE id = '${provId}';
-
-      ROLLBACK;
-    `;
-
-    const out = runSql(script);
-    assert.ok(!out.includes('ERROR'), 'Rollback must restore original behavior');
+    assert.ok(!out.includes('ERROR'), 'Legitimate writers must not be blocked by trigger');
   });
 });

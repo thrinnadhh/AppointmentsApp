@@ -44,7 +44,7 @@ export async function seedHospitalTestData() {
   console.log('🌱 [SEED] Creating isolated test accounts & entities...');
 
   // Helper to ensure an auth user exists and return their ID
-  async function ensureUser(email, role = 'merchant', fullName = 'Test User') {
+  async function ensureUser(email, role = 'merchant', fullName = 'Test User', phone = null) {
     const cleanEmail = email.trim().toLowerCase();
     const userCheck = await pgPool.query(
       'SELECT id, email FROM auth.users WHERE lower(email) = lower($1)',
@@ -81,6 +81,7 @@ export async function seedHospitalTestData() {
         email,
         full_name: fullName,
         role,
+        ...(phone ? { phone } : {}),
         updated_at: new Date().toISOString()
       })
     });
@@ -113,7 +114,7 @@ export async function seedHospitalTestData() {
   const patientIds = [];
   for (let i = 1; i <= 15; i++) {
     const num = i < 10 ? `0${i}` : `${i}`;
-    const pId = await ensureUser(`test.patient.${num}@test-tirupati.local`, 'customer', `Test Patient ${num}`);
+    const pId = await ensureUser(`test.patient.${num}@test-tirupati.local`, 'customer', `Test Patient ${num}`, `+9199000000${num}`);
     patientIds.push({ id: pId, name: `Test Patient ${num}`, num });
   }
 

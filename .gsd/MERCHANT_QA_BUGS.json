@@ -1,0 +1,89 @@
+{
+  "campaign": "Merchant App QA Bug Closure & Independent Verification",
+  "branch": "phase-14-merchant-fixes",
+  "created_at": "2026-11-21T21:00:00+05:30",
+  "verified_at": "2026-11-21T22:30:00+05:30",
+  "status": "ALL_VERIFIED_PASS",
+  "commits": {
+    "database": "1d91292 (feat(db): add single hospitalAdmin index, immediate deletion RPC, and department_id column)",
+    "backend": "2c70ef7 (fix(api): implement immediate account deletion, single hospitalAdmin 409 guard, and department persistence)",
+    "frontend": "c1a372a (fix(ui): update privacy copy, immediate deletion portal, doctor roster filters, single-admin modal, and department persistence)",
+    "tests_and_refinements": "a27a64a (test(merchant): add automated verification suite for all 6 merchant bug fixes and refine frontdesk dept upsert)"
+  },
+  "test_suite": "tests/unit/phase14-merchant-fixes.test.mjs",
+  "test_suite_result": {
+    "total": 10,
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0
+  },
+  "bugs": {
+    "BUG-01": {
+      "title": "Privacy Page Modification",
+      "description": "Merchant App Privacy Policy copy must be audited and updated against actual codebase behavior (immediate account deletion with zero grace period, notification/audit log masking, and Cashfree/WhatsApp data processing).",
+      "status": "VERIFIED_PASS",
+      "assigned_to": "frontend-specialist",
+      "files_modified": ["apps/merchant-web/src/app/privacy/page.tsx"],
+      "verification_criteria": "Privacy page renders accurate immediate-deletion, log masking, and Cashfree/WhatsApp processing details.",
+      "empirical_evidence": "Privacy copy updated with DPDPA §12 zero grace period immediate anonymization, Cashfree Payments & EasySplit PCI-DSS Level 1 gateway, WhatsApp Cloud API notifications, and field-level telemetry masking. Verified by automated test."
+    },
+    "BUG-02": {
+      "title": "Immediate Account Deletion — Zero Postponement",
+      "description": "Remove any postponement, grace-period timer, or delayed deletion queue in merchant/staff account deletion. Execution must be immediate upon user confirmation (atomic PII deletion/anonymization, session revoke, auth user deletion, immediate redirect/sign out with accurate message).",
+      "status": "VERIFIED_PASS",
+      "assigned_to": "database-architect,backend-specialist,frontend-specialist",
+      "files_modified": [
+        "apps/merchant-web/src/app/account/delete/page.tsx",
+        "apps/merchant-web/src/app/api/account/delete/route.ts",
+        "apps/merchant-web/src/app/api/account/delete-public-request/route.ts",
+        "supabase/migrations/20261121000002_immediate_account_deletion_and_single_admin.sql"
+      ],
+      "verification_criteria": "Account deletion executes immediately with zero delayed queue/postponement and revokes auth session.",
+      "empirical_evidence": "Database RPC delete_account_immediately invoked immediately; profiles.full_name scrubbed to 'Deleted User', phone to NULL, push token scrubbed, and session revoked via supabase.auth.signOut(). Tested and verified with 200 OK and scheduled_for=null."
+    },
+    "BUG-03": {
+      "title": "Doctors Not Showing in Team Filter — Master Hospital Staff",
+      "description": "Fix role enum/casing mismatch ('doctor' vs 'consultant' vs 'DOCTOR'), join condition, or query filter so doctors appear properly when filtering by Doctors on the Team / Master Hospital Staff screen.",
+      "status": "VERIFIED_PASS",
+      "assigned_to": "backend-specialist,frontend-specialist",
+      "files_modified": [
+        "apps/merchant-web/src/app/team/page.tsx",
+        "apps/merchant-web/src/components/team/StaffRosterTable.tsx",
+        "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts"
+      ],
+      "verification_criteria": "Filtering by Doctors in Team / Master Hospital Staff displays all active doctor/consultant accounts.",
+      "empirical_evidence": "loadTeam now queries both merchant_memberships and department_members with departments(name); allRosterMembers merges resource doctors ensuring membershipRole='doctor'; StaffRosterTable checks doctor and consultant roles properly."
+    },
+    "BUG-04_05": {
+      "title": "Strictly One hospitalAdmin per Hospital + Remove from Provision Staff + Fix False Success Toast",
+      "description": "Enforce at most one active hospitalAdmin per hospital with a PostgreSQL partial unique index and backend validation (409 Conflict). Remove hospitalAdmin from Provision Staff assignable role options when an admin already exists. Ensure UI never fires false-positive success toasts on mutation failure.",
+      "status": "VERIFIED_PASS",
+      "assigned_to": "database-architect,backend-specialist,frontend-specialist",
+      "files_modified": [
+        "supabase/migrations/20261121000002_immediate_account_deletion_and_single_admin.sql",
+        "apps/merchant-web/src/app/api/hospital/members/route.ts",
+        "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts",
+        "apps/merchant-web/src/components/team/UnifiedAddStaffModal.tsx",
+        "apps/merchant-web/src/app/team/page.tsx"
+      ],
+      "verification_criteria": "DB partial unique index blocks duplicate hospitalAdmin; UI removes hospitalAdmin option when present; UI toast only fires on true 2xx success.",
+      "empirical_evidence": "PostgreSQL index idx_merchant_memberships_single_hospital_admin blocks duplicates (PostgreSQL error 23505); API returns HTTP 409 Conflict; UnifiedAddStaffModal hides Hospital Admin role tab when hasHospitalAdmin is true; UI throws and prevents success toast on error."
+    },
+    "BUG-06": {
+      "title": "'Assign to Department' Broken in Consultant/Doctor & Frontdesk Flows",
+      "description": "Fix department assignment dropping/failure across form state, API payloads, DB persistence, and staff roster view for both Consultant/Doctor and Frontdesk staff.",
+      "status": "VERIFIED_PASS",
+      "assigned_to": "database-architect,backend-specialist,frontend-specialist",
+      "files_modified": [
+        "supabase/migrations/20261121000002_immediate_account_deletion_and_single_admin.sql",
+        "apps/merchant-web/src/components/team/UnifiedAddStaffModal.tsx",
+        "apps/merchant-web/src/app/team/page.tsx",
+        "apps/merchant-web/src/app/api/admin/doctor-assignments/route.ts",
+        "apps/merchant-web/src/components/team/AssignFrontDeskModal.tsx",
+        "apps/merchant-web/src/components/team/StaffRosterTable.tsx"
+      ],
+      "verification_criteria": "Adding/editing Consultant or Frontdesk with a department persists department_id to DB and renders correctly on reload.",
+      "empirical_evidence": "Added department_id column to public.resources; UnifiedAddStaffModal passes selectedDeptId to resources and department_members; POST /api/admin/doctor-assignments persists front desk department assignments into department_members; department displays on staff roster rows."
+    }
+  }
+}

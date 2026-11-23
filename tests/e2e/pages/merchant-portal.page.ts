@@ -143,32 +143,14 @@ export class MerchantPortalPage {
     email = process.env.TEST_MERCHANT_EMAIL || 'svims.clinic@tirupati-appointments.com',
     password = process.env.TEST_MERCHANT_PASSWORD || 'SvimsClinic2026!'
   ) {
-    if (!this.page.url().includes('localhost:3000')) {
-      await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await this.page.bringToFront().catch(() => {});
+    if (!this.page.url().includes('/login')) {
+      await this.page.goto('http://localhost:3000/login?mode=signin', { waitUntil: 'domcontentloaded' });
     }
-
-    // Programmatic sign-in via window.supabase (instant, bypasses DOM hydration races)
-    const programmaticSuccess = await this.page.evaluate(async ({ email, password }) => {
-      try {
-        const client = (window as any).supabase;
-        if (!client) return false;
-        const { error } = await client.auth.signInWithPassword({ email, password });
-        return !error;
-      } catch {
-        return false;
-      }
-    }, { email, password }).catch(() => false);
-
-    if (programmaticSuccess) {
-      await this.page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    // If redirected away from /login because session already exists, return
+    if (!this.page.url().includes('/login')) {
       return;
     }
-
-    // Fallback to UI form login
-    if (!this.page.url().includes('/login')) {
-      await this.page.goto('http://localhost:3000/login?mode=signin', { waitUntil: 'domcontentloaded' }).catch(() => {});
-    }
-    // Wait for Next.js React hydration marker to ensure controlled inputs retain value
     await this.page.locator('[data-hydrated="true"]').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
     const signinTab = this.page.getByTestId('auth-tab-signin');
@@ -177,7 +159,10 @@ export class MerchantPortalPage {
     }
 
     const emailInput = this.page.getByTestId('login-email');
-    await expect(emailInput).toBeVisible({ timeout: 15000 });
+    if (!(await emailInput.isVisible().catch(() => false))) {
+      if (!this.page.url().includes('/login')) return;
+      await expect(emailInput).toBeVisible({ timeout: 15000 });
+    }
     await emailInput.click();
     await emailInput.fill(email);
     await expect(emailInput).toHaveValue(email);
@@ -192,12 +177,13 @@ export class MerchantPortalPage {
   }
 
   async ensureAuthenticated(email?: string, password?: string) {
-    if (this.page.url().includes('/login')) {
-      await this.loginAsMerchant(email, password);
-      return;
-    }
-    const isDashboard = await this.overviewHeading.or(this.bookingsHeading).first().isVisible().catch(() => false);
-    if (!isDashboard) {
+    console.log('[DEBUG merchant-portal] ensureAuthenticated called, current url:', this.page.url());
+    const cookies = await this.page.context().cookies().catch(() => []);
+    const hasAuth = cookies.some((c) => c.name.includes('auth-token') || c.name.includes('-auth'));
+    console.log('[DEBUG merchant-portal] hasAuth:', hasAuth, 'cookies:', cookies.map(c => c.name));
+
+    if (!hasAuth || this.page.url().includes('/login')) {
+      console.log('[DEBUG merchant-portal] Needs login, calling loginAsMerchant');
       await this.loginAsMerchant(email, password);
     }
   }
@@ -223,17 +209,20 @@ export class MerchantPortalPage {
   }
 
   async gotoBookings(email?: string, password?: string) {
-    if (this.page.url().includes('/bookings') && (await this.bookingsHeading.isVisible().catch(() => false))) {
-      return;
-    }
+    await this.page.bringToFront().catch(() => {});
     await this.ensureAuthenticated(email, password);
-    const navLink = this.navBookings.or(this.page.getByRole('link', { name: /^Bookings$/i })).first();
-    if (await navLink.isVisible().catch(() => false)) {
-      await navLink.click();
-    } else {
-      await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    if (!this.page.url().includes('/bookings')) {
+      const bookingsNavLink = this.page.getByRole('link', { name: 'Bookings' }).filter({ visible: true }).first();
+      if (await bookingsNavLink.isVisible().catch(() => false)) {
+        await bookingsNavLink.click();
+        await this.page.waitForURL('**/bookings', { timeout: 10000 }).catch(() => {});
+      }
+      if (!this.page.url().includes('/bookings')) {
+        await this.page.goto('http://localhost:3000/bookings', { waitUntil: 'commit' });
+      }
     }
     await expect(this.bookingsHeading).toBeVisible({ timeout: 25000 });
+    await this.filterByDate('ALL');
   }
 
   async gotoTeam() {
@@ -349,10 +338,19 @@ export class MerchantPortalPage {
     }
     const card = this.getBookingCard(identifier);
     await expect(card).toBeVisible();
-    const completeBtn = card.getByRole('button', { name: /Complete|Check-In|Admit/i });
-    await expect(completeBtn).toBeVisible();
-    await completeBtn.click();
-    await expect(this.page.getByText(/Booking updated to COMPLETED|COMPLETED/i).first()).toBeVisible({ timeout: 10000 });
+
+    const admitBtn = card.getByRole('button', { name: /Admit Patient/i });
+    if (await admitBtn.isVisible().catch(() => false)) {
+      await admitBtn.click();
+      const doneBtn = card.getByRole('button', { name: /Done \/ Complete|Complete/i });
+      await expect(doneBtn).toBeVisible({ timeout: 15000 });
+      await doneBtn.click();
+    } else {
+      const completeBtn = card.getByRole('button', { name: /Done \/ Complete|Complete/i });
+      await expect(completeBtn).toBeVisible({ timeout: 10000 });
+      await completeBtn.click();
+    }
+    await expect(this.page.getByText(/Booking updated to COMPLETED|COMPLETED/i).first()).toBeVisible({ timeout: 15000 });
   }
 
   async markBookingNoShow(identifier: string): Promise<string> {

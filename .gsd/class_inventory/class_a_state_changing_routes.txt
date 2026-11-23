@@ -1,0 +1,35 @@
+COMPLIANT: /api/account/delete [DELETE] -> guarded by getRouteSupabaseClient
+ALLOWLISTED: /api/account/delete-public-request [POST] -> PUBLIC_DELETION_OTP_VERIFIED
+COMPLIANT: /api/admin/cities/status [PATCH] -> guarded by verifyAdminRequest
+COMPLIANT: /api/admin/doctor-assignments [POST,DELETE] -> guarded by verifyStaffManagerRequest
+COMPLIANT: /api/admin/refunds [POST] -> guarded by verifyAdminRequest
+ALLOWLISTED: /api/auth/otp/send [POST] -> PUBLIC_RATE_LIMITED_OTP
+ALLOWLISTED: /api/auth/otp/verify [POST] -> PUBLIC_RATE_LIMITED_OTP
+COMPLIANT: /api/bookings/admit [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/cancel [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/checkin [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/collect-fee [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/confirm [POST] -> guarded by supabaseAdmin
+COMPLIANT: /api/bookings/emergency-choice [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/end [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/offline [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/override [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/reorder [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/bookings/start [POST] -> guarded by verifyAuthenticatedUser
+ALLOWLISTED: /api/cities/waitlist [POST] -> PUBLIC_LEAD_FORM
+ALLOWLISTED: /api/cron/security-monitor [POST] -> CRON_SECRET_BEARER
+COMPLIANT: /api/doctor/emergency-cancel [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/hospital/audit-logs [POST] -> guarded by supabaseAdmin
+COMPLIANT: /api/hospital/departments [POST,PUT,DELETE] -> guarded by supabaseAdmin
+COMPLIANT: /api/hospital/members [POST,PUT,DELETE] -> guarded by supabaseAdmin
+COMPLIANT: /api/merchant/doctor-status [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/merchants/cashfree-vendor [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/notifications/push [POST] -> guarded by supabaseAdmin
+COMPLIANT: /api/payments/create-order [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/payments/verify [POST] -> guarded by verifyAuthenticatedUser
+COMPLIANT: /api/prescriptions/signed-url [POST] -> guarded by supabaseAdmin
+COMPLIANT: /api/queue/broadcast [POST] -> guarded by verifyAuthenticatedUser
+ALLOWLISTED: /api/webhooks/cashfree [POST] -> WEBHOOK_HMAC_SIGNATURE
+ALLOWLISTED: /api/webhooks/razorpay [POST] -> DECOMMISSIONED_HTTP_410
+
+SUMMARY: total_mutating=33 violations=0

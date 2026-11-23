@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   UserPlus,
   Mail,
@@ -13,6 +13,7 @@ import {
   Check,
   Sparkles
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export interface FrontDeskManager {
   assignment_id: string;
@@ -30,6 +31,7 @@ export interface DoctorWithAssignments {
   name: string;
   type: string;
   department: string;
+  department_id?: string | null;
   deposit_amount: number;
   duration_minutes: number;
   capacity: number;
@@ -45,6 +47,8 @@ export interface TeamMember {
   full_name: string | null;
   role: 'admin' | 'merchant' | 'customer';
   membershipRole?: string;
+  department?: string | null;
+  department_id?: string | null;
   phone: string | null;
   created_at: string;
 }
@@ -78,6 +82,17 @@ export function AssignFrontDeskModal({
   const [assignExistingUserId, setAssignExistingUserId] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+
+  const assignableStaffMembers = useMemo(() => {
+    if (!doctor) return [];
+    return allRosterMembers.filter(
+      (m) =>
+        !m.id.startsWith('doc-') &&
+        !m.id.startsWith('fd-') &&
+        !isDoctorUser(m) &&
+        !doctor.front_desk_managers?.some((fd) => fd.user_id === m.id)
+    );
+  }, [allRosterMembers, isDoctorUser, doctor]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -114,6 +129,7 @@ export function AssignFrontDeskModal({
       const payload: any = {
         providerId,
         doctorId: doctor.id,
+        departmentId: doctor.department_id || undefined,
       };
 
       const requiresIdCard = (doctor.front_desk_managers?.length || 0) >= 1;
@@ -156,9 +172,15 @@ export function AssignFrontDeskModal({
         payload.idCardNumber = newFdIdCard.trim() || undefined;
       }
 
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch('/api/admin/doctor-assignments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -373,19 +395,11 @@ export function AssignFrontDeskModal({
                   className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
                 >
                   <option value="">-- Choose a staff member --</option>
-                  {allRosterMembers
-                    .filter(
-                      (m) =>
-                        !m.id.startsWith('doc-') &&
-                        !m.id.startsWith('fd-') &&
-                        !isDoctorUser(m) &&
-                        !doctor.front_desk_managers.some((fd) => fd.user_id === m.id)
-                    )
-                    .map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.full_name || 'Staff'} ({m.email || 'No email'})
-                      </option>
-                    ))}
+                  {assignableStaffMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.full_name || 'Staff'} ({m.email || 'No email'})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -476,7 +490,7 @@ export function AssignFrontDeskModal({
             <button
               type="submit"
               disabled={isAssigning}
-              className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-[0.97] rounded-lg shadow-sm transition-all duration-75 disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2 cursor-pointer"
             >
               {isAssigning ? (
                 <>

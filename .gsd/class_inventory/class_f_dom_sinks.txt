@@ -1,0 +1,3 @@
+COMPLIANT (ALLOWLISTED): apps/merchant-web/src/app/admin/login/page.tsx:614 -> Sanitized via sanitizeQrSvg (DOMParser tag whitelist, event handler stripping, href stripping)
+
+SUMMARY: total_dom_sinks=1 violations=0

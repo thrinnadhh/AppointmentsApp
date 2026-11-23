@@ -1,0 +1,21 @@
+{
+  "statuses": [
+    "VERIFIED_CLOSED",
+    "FIXED_UNVERIFIED",
+    "OPEN",
+    "UNCONFIRMED",
+    "FALSE_POSITIVE",
+    "BLOCKED",
+    "NEEDS_HUMAN",
+    "DEFERRED",
+    "NOT_EXAMINED",
+    "IN_PROGRESS"
+  ],
+  "coverage_statuses": [
+    "REVIEWED_SAFE",
+    "FINDING",
+    "BLOCKED",
+    "NOT_EXAMINED"
+  ],
+  "notes": "BLOCKED, NEEDS_HUMAN, DEFERRED and NOT_EXAMINED must carry a reason: BLOCKED(reason). FINDING takes the window id: FINDING(SEC-XXX-001). REVIEWED_SAFE needs a proof reference with file:line citations."
+}

@@ -98,3 +98,6 @@ story-manifest.json
 .gsd/SEMGREP_*.json
 .gsd/semgrep_*.json
 .gsd/JWT_DECODE_RESULTS.json
+
+# Security Window Closure raw evidence logs
+.gsd/evidence/

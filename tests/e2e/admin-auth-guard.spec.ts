@@ -35,7 +35,7 @@ test.describe('Admin Authentication & RBAC Gate (Phase 1)', () => {
     // Verify rejection alert
     const errorAlert = page.getByTestId('admin-login-error');
     await expect(errorAlert).toBeVisible();
-    await expect(errorAlert).toContainText(/Access Denied/i);
+    await expect(errorAlert).toContainText(/Access Denied|Access Rejected/i);
 
     // Verify user remained on login page and did not enter /admin
     expect(page.url()).toContain('/admin/login');

@@ -1,0 +1,114 @@
+=== 1. PUBLIC TABLES RLS CHECK ===
+COMPLIANT: public.account_deletion_requests -> RLS_ENABLED
+COMPLIANT: public.admin_audit_logs -> RLS_ENABLED
+COMPLIANT: public.app_logs -> RLS_ENABLED
+COMPLIANT: public.appointment_checkin_codes -> RLS_ENABLED
+COMPLIANT: public.audit_logs -> RLS_ENABLED
+COMPLIANT: public.bookings -> RLS_ENABLED
+COMPLIANT: public.categories -> RLS_ENABLED
+COMPLIANT: public.cities -> RLS_ENABLED
+COMPLIANT: public.city_settlements -> RLS_ENABLED
+COMPLIANT: public.city_waitlist -> RLS_ENABLED
+COMPLIANT: public.contact_reveal_audit -> RLS_ENABLED
+COMPLIANT: public.crash_alert_dedup -> RLS_ENABLED
+COMPLIANT: public.department_members -> RLS_ENABLED
+COMPLIANT: public.departments -> RLS_ENABLED
+COMPLIANT: public.doctor_front_desk_assignments -> RLS_ENABLED
+COMPLIANT: public.merchant_memberships -> RLS_ENABLED
+COMPLIANT: public.merchant_vendor_splits -> RLS_ENABLED
+COMPLIANT: public.notification_logs -> RLS_ENABLED
+COMPLIANT: public.payments -> RLS_ENABLED
+COMPLIANT: public.platform_config -> RLS_ENABLED
+COMPLIANT: public.profiles -> RLS_ENABLED
+COMPLIANT: public.providers -> RLS_ENABLED
+COMPLIANT: public.push_tokens -> RLS_ENABLED
+COMPLIANT: public.resource_availability -> RLS_ENABLED
+COMPLIANT: public.resource_leaves -> RLS_ENABLED
+COMPLIANT: public.resources -> RLS_ENABLED
+COMPLIANT: public.staff_checkin_rate_limits -> RLS_ENABLED
+COMPLIANT: public.sub_categories -> RLS_ENABLED
+COMPLIANT: public.test_provider_clock_links -> RLS_ENABLED
+COMPLIANT: public.test_tenant_clocks -> RLS_ENABLED
+COMPLIANT: public.user_consents -> RLS_ENABLED
+
+=== 2. POLICIES USING & WITH CHECK AUDIT ===
+COMPLIANT: public.account_deletion_requests.Users see own deletion request [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.admin_audit_logs.Admins can view audit logs [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.admin_audit_logs.Service role full access to audit logs [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.app_logs.Only admins can view app logs [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.app_logs.Service role full access to app logs [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.appointment_checkin_codes.customers_read_own_checkin_codes [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.audit_logs.insert_audit_logs [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.audit_logs.owner_read_audit_logs [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.bookings.Customers can create bookings [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.bookings.bookings_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.bookings.bookings_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.categories.Categories are readable by everyone [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.cities.cities_admin_delete [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.cities.cities_admin_insert [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.cities.cities_admin_update [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.cities.cities_select_anon [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.cities.cities_select_authenticated [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.city_settlements.city_settlements_delete_policy [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.city_settlements.city_settlements_insert_policy [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.city_settlements.city_settlements_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.city_settlements.city_settlements_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.city_waitlist.city_waitlist_delete_policy [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.city_waitlist.city_waitlist_insert_policy [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.city_waitlist.city_waitlist_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.city_waitlist.city_waitlist_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.contact_reveal_audit.Admins only read reveal audits [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.crash_alert_dedup.Admins and service role view dedup [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.crash_alert_dedup.Service role full access dedup [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.department_members.department_members_delete_policy [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.department_members.department_members_insert_policy [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.department_members.department_members_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.department_members.department_members_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.departments.departments_delete_policy [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.departments.departments_insert_policy [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.departments.departments_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.departments.departments_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.doctor_front_desk_assignments.doctor_front_desk_assignments_delete_policy [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.doctor_front_desk_assignments.doctor_front_desk_assignments_insert_policy [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.doctor_front_desk_assignments.doctor_front_desk_assignments_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.doctor_front_desk_assignments.doctor_front_desk_assignments_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.merchant_memberships.merchant_memberships_delete_policy [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.merchant_memberships.merchant_memberships_insert_policy [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.merchant_memberships.merchant_memberships_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.merchant_memberships.merchant_memberships_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.merchant_vendor_splits.merchant_vendor_splits_select_owner [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.merchant_vendor_splits.merchant_vendor_splits_service_role [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.notification_logs.notification_logs_delete_policy [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.notification_logs.notification_logs_insert_policy [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.notification_logs.notification_logs_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.notification_logs.notification_logs_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.payments.Users can read own payments [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.platform_config.service_role_only_platform_config [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.profiles.Users can insert own profile [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.profiles.users_read_own_profile [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.profiles.users_update_own_profile [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.providers.Active providers are readable by everyone [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.providers.merchants_insert_provider [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.providers.merchants_update_provider [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.push_tokens.push_tokens_delete_own [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.push_tokens.push_tokens_insert_own [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.push_tokens.push_tokens_select_own [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.push_tokens.push_tokens_update_own [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.resource_availability.Availability is readable by everyone [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.resource_availability.Merchants can delete availability [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.resource_availability.Merchants can insert availability [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.resource_availability.Merchants can update availability [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.resource_leaves.resource_leaves_manage_policy [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.resource_leaves.resource_leaves_select_policy [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.resources.resources_anon_select [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.resources.resources_authenticated_select [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.resources.resources_delete_policy [DELETE] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.resources.resources_insert_policy [INSERT] -> (has_using=false, has_with_check=true)
+COMPLIANT: public.resources.resources_update_policy [UPDATE] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.staff_checkin_rate_limits.staff_checkin_rate_limits_deny_all [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.sub_categories.Subcategories are readable by everyone [SELECT] -> (has_using=true, has_with_check=false)
+COMPLIANT: public.test_provider_clock_links.test_provider_clock_links_deny_all [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.test_tenant_clocks.test_tenant_clocks_deny_all [ALL] -> (has_using=true, has_with_check=true)
+COMPLIANT: public.user_consents.Users manage own consents [ALL] -> (has_using=true, has_with_check=true)
+
+SUMMARY: tables=31 policies=78 violations=0

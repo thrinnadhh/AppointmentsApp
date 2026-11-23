@@ -10,6 +10,13 @@
 
 **All canonical rules are in [PROJECT_RULES.md](../PROJECT_RULES.md).**
 
+### Canonical Rule Hierarchy
+1. `.agents/rules/completion-honesty.md` (Status vocabulary, closure criteria, anti-skip rules)
+2. `.agents/rules/security-care.md` (Secrets, blast radius, regression-safety, local DB only)
+3. `.agents/rules/parallel-execution.md` (File-disjoint locks, worktree isolation, swarm gates)
+4. `.agents/rules/core-protocol.md` & `.agents/rules/code-rules.md`
+5. `PROJECT_RULES.md`
+
 This file provides Gemini-specific integration. For the complete methodology, see PROJECT_RULES.md.
 
 ---

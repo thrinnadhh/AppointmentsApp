@@ -1,0 +1,5 @@
+# Security gate and governance code owners
+.gsd/gate.sh @thrinnadhh
+.github/workflows/security-gate.yml @thrinnadhh
+.agents/rules/* @thrinnadhh
+.gitleaksignore @thrinnadhh

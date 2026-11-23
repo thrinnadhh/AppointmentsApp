@@ -13,6 +13,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
 const isCI = process.env.CI === 'true';
@@ -119,6 +120,37 @@ describe('Packet 1.1: Database Grants, Privileges, and RLS WITH CHECK Compliance
     const output = runSql(sql);
     const dangerous = output ? output.split('\n').filter(Boolean) : [];
     assert.deepEqual(dangerous, [], `Dangerous default write ACL found for anon under postgres: ${dangerous.join(', ')}`);
+  });
+
+  it('6. Maintenance and queue RPCs EXECUTE lockdown (SEC-WIN-020)', () => {
+    const migrationPath = 'supabase/migrations/20261120000006_lockdown_maintenance_and_queue_rpcs.sql';
+    assert.ok(existsSync(migrationPath), `Migration ${migrationPath} must exist`);
+
+    const migrationSql = readFileSync(migrationPath, 'utf-8');
+
+    const script = `
+      BEGIN;
+      ${migrationSql}
+
+      SELECT p.proname || '::authenticated=' || has_function_privilege('authenticated', p.oid, 'EXECUTE') || '::service_role=' || has_function_privilege('service_role', p.oid, 'EXECUTE')
+      FROM pg_proc p
+      JOIN pg_namespace n ON p.pronamespace = n.oid
+      WHERE n.nspname = 'public'
+        AND p.proname IN ('purge_old_app_logs', 'expire_stale_standby_queue', 'mask_old_notification_logs', 'enqueue_refund_request', 'dispatch_booking_notification')
+      ORDER BY p.proname;
+
+      ROLLBACK;
+    `;
+    const cmd = 'docker exec -i supabase_db_Appointments psql -U postgres -d postgres -t -A';
+    const output = execSync(cmd, { input: script, encoding: 'utf-8', timeout: 10000 }).trim();
+
+    const lines = output.split('\n').filter(Boolean);
+    
+    assert.ok(lines.some(l => l === 'purge_old_app_logs::authenticated=false::service_role=true'), `purge_old_app_logs must be service_role only: ${output}`);
+    assert.ok(lines.some(l => l === 'expire_stale_standby_queue::authenticated=false::service_role=true'), `expire_stale_standby_queue must be service_role only: ${output}`);
+    assert.ok(lines.some(l => l === 'mask_old_notification_logs::authenticated=false::service_role=true'), `mask_old_notification_logs must be service_role only: ${output}`);
+    assert.ok(lines.some(l => l === 'enqueue_refund_request::authenticated=false::service_role=true'), `enqueue_refund_request must be service_role only: ${output}`);
+    assert.ok(lines.some(l => l === 'dispatch_booking_notification::authenticated=true::service_role=true'), `dispatch_booking_notification must remain callable by authenticated: ${output}`);
   });
 
 });

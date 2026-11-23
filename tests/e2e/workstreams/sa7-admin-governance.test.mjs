@@ -151,10 +151,10 @@ describe('Sub-Agent SA7: Administrative Governance & Department Lifecycle', () =
     }
   });
 
-  // H3: Department Capacity Limit (Max 3 Members)
-  it('H3: Concurrency-safe trigger enforces max 3 members per department (4th member rejected)', async () => {
+  // H3: Department Member Capacity (Unlimited Doctors & Members Allowed)
+  it('H3: Allows any number of doctors/members per department (4th member accepted without ceiling)', async () => {
     try {
-      // testDept currently has 1 member (from H2). Let's add 2 more members to reach limit 3.
+      // testDept currently has 1 member (from H2). Let's add 2 more members to reach 3.
       const memberEmail2 = `cardio2.${tenant.prefix.toLowerCase()}@hospital-test.local`;
       const memberEmail3 = `cardio3.${tenant.prefix.toLowerCase()}@hospital-test.local`;
       const memberEmail4 = `cardio4.${tenant.prefix.toLowerCase()}@hospital-test.local`;
@@ -187,7 +187,7 @@ describe('Sub-Agent SA7: Administrative Governance & Department Lifecycle', () =
       });
       assert.equal(res3.status, 201, 'Member 3 added');
 
-      // Attempt to add 4th member -> MUST BE REJECTED by trigger
+      // Attempt to add 4th member -> MUST SUCCEED (no 3-member ceiling)
       const res4 = await fetch(`${url}/rest/v1/department_members`, {
         method: 'POST',
         headers: serviceHeaders,
@@ -199,18 +199,16 @@ describe('Sub-Agent SA7: Administrative Governance & Department Lifecycle', () =
           status: 'active'
         })
       });
-      assert.ok(res4.status === 400 || res4.status === 409 || res4.status === 500, '4th member must be rejected');
-      const errData = await res4.json();
-      assert.ok(errData.message?.includes('already has 3 members'), `Expected error message about 3 members limit: ${JSON.stringify(errData)}`);
+      assert.equal(res4.status, 201, '4th member must be accepted without 3-member limit');
 
       writer.addCaseResult({
         caseId: 'H3',
-        scenario: 'Department member capacity constraint (Max 3)',
+        scenario: 'Department member capacity (Unlimited Doctors & Members)',
         status: 'PASS',
-        evidence: `Members 1, 2, 3 accepted. 4th member insertion was rejected by trg_check_department_member_limit.`
+        evidence: `Members 1, 2, 3, and 4 accepted into department without rejection.`
       });
     } catch (err) {
-      writer.addCaseResult({ caseId: 'H3', scenario: 'Max 3 member constraint', status: 'FAIL', evidence: err.message });
+      writer.addCaseResult({ caseId: 'H3', scenario: 'Unlimited member capability', status: 'FAIL', evidence: err.message });
       throw err;
     }
   });

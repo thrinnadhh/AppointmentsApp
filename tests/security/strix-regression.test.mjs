@@ -361,11 +361,11 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
 
       assert.strictEqual(
         res.status,
-        400,
-        `Webhook signed with wrong/unauthorized secret must be rejected with 400, got ${res.status}`
+        410,
+        `Decommissioned Razorpay webhook must return 410 Gone, got ${res.status}`
       );
       const data = await res.json();
-      assert.strictEqual(data.error, 'Invalid webhook signature');
+      assert.ok(data.code === 'RAZORPAY_DECOMMISSIONED' || data.error?.includes('decommissioned'));
 
       // Assert booking status remains unchanged in database
       const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${testBookingId}`, {
@@ -393,15 +393,15 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       const rawBody = JSON.stringify(payloadObj);
       const validSig = crypto.createHmac('sha256', currentWebhookSecret).update(rawBody).digest('hex');
 
-      // a) Missing signature -> 401
+      // a) Missing signature -> 410
       const noSigRes = await fetch(`${APP_URL}/api/webhooks/razorpay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: rawBody
       });
-      assert.strictEqual(noSigRes.status, 401, 'Missing signature must return 401');
+      assert.strictEqual(noSigRes.status, 410, 'Decommissioned webhook must return 410');
 
-      // b) Malformed signature (non-hex / wrong length) -> 400
+      // b) Malformed signature (non-hex / wrong length) -> 410
       const malformedRes = await fetch(`${APP_URL}/api/webhooks/razorpay`, {
         method: 'POST',
         headers: {
@@ -410,9 +410,9 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         },
         body: rawBody
       });
-      assert.strictEqual(malformedRes.status, 400, 'Malformed signature header must return 400');
+      assert.strictEqual(malformedRes.status, 410, 'Decommissioned webhook must return 410');
 
-      // c) Valid signature over modified body (tampered payload) -> 400
+      // c) Valid signature over modified body (tampered payload) -> 410
       const tamperedBody = JSON.stringify({ ...payloadObj, tampered: true });
       const tamperedRes = await fetch(`${APP_URL}/api/webhooks/razorpay`, {
         method: 'POST',
@@ -422,17 +422,16 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         },
         body: tamperedBody
       });
-      assert.strictEqual(tamperedRes.status, 400, 'Signature over modified body must return 400');
+      assert.strictEqual(tamperedRes.status, 410, 'Decommissioned webhook must return 410');
     });
 
-    it('2.3 Fail-Closed: Webhook handler fails closed (500) if RAZORPAY_WEBHOOK_SECRET is unset', () => {
-      // 1. Verify source implementation enforces fail-closed guard
+    it('2.3 Fail-Closed / Decommissioned: Webhook handler safely returns HTTP 410 Gone unconditionally', () => {
+      // 1. Verify source implementation enforces decommissioned 410 guard
       const routeSource = fs.readFileSync(path.join(ROOT_DIR, 'apps/merchant-web/src/app/api/webhooks/razorpay/route.ts'), 'utf8');
       assert.ok(
-        routeSource.includes('if (!webhookSecret)') &&
-        routeSource.includes('status: 500') &&
-        routeSource.includes('CRITICAL SECURITY ERROR: RAZORPAY_WEBHOOK_SECRET environment variable is missing'),
-        'Webhook route must implement fail-closed guard throwing or returning 500 when RAZORPAY_WEBHOOK_SECRET is unset'
+        routeSource.includes('status: 410') &&
+        routeSource.includes('RAZORPAY_DECOMMISSIONED'),
+        'Webhook route must unconditionally return HTTP 410 Gone'
       );
 
       // 2. Assert fail-closed logic behavior
@@ -450,7 +449,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       assert.throws(() => testSecretResolution(undefined, 'production'), /CRITICAL SECURITY ERROR/);
     });
 
-    it('2.4 Parameter Tampering: Wrong amount or non-existent order_id with valid signature is rejected', async () => {
+    it('2.4 Parameter Tampering: Decommissioned webhook returns 410 for any payload', async () => {
       // Wrong amount (e.g. 5000 paise instead of 2000 paise)
       const wrongAmountPayload = JSON.stringify({
         event: 'payment.captured',
@@ -475,9 +474,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         },
         body: wrongAmountPayload
       });
-      assert.strictEqual(wrongAmtRes.status, 400, 'Payment amount mismatch must return 400');
-      const wrongAmtData = await wrongAmtRes.json();
-      assert.ok(wrongAmtData.error?.includes('mismatch'), 'Must report amount mismatch error');
+      assert.strictEqual(wrongAmtRes.status, 410, 'Decommissioned webhook must return 410');
 
       // Unknown order_id
       const unknownOrderPayload = JSON.stringify({
@@ -503,7 +500,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         },
         body: unknownOrderPayload
       });
-      assert.strictEqual(unkRes.status, 404, 'Unknown order must return 404');
+      assert.strictEqual(unkRes.status, 410, 'Decommissioned webhook must return 410');
     });
 
     it('2.4b Payment Verify API Parameter Tampering: Fabricated order_id or wrong amount is rejected', async () => {
@@ -585,7 +582,7 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       }
     });
 
-    it('2.5 Positive Control: Legitimate payment.captured confirms booking; duplicate webhook is idempotent', async () => {
+    it('2.5 Decommission Invariant: Razorpay webhook returns 410 without modifying database bookings', async () => {
       const paymentId = `pay_legit_${Date.now()}`;
       const legitimatePayload = JSON.stringify({
         event: 'payment.captured',
@@ -602,8 +599,8 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
       });
       const signature = crypto.createHmac('sha256', currentWebhookSecret).update(legitimatePayload).digest('hex');
 
-      // First webhook call -> confirms booking
-      const firstRes = await fetch(`${APP_URL}/api/webhooks/razorpay`, {
+      // Razorpay webhook call -> returns 410 Gone
+      const res = await fetch(`${APP_URL}/api/webhooks/razorpay`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -611,30 +608,16 @@ describe('=== Strix Pentest Security Regression Test Suite ===', () => {
         },
         body: legitimatePayload
       });
-      assert.strictEqual(firstRes.status, 200, `Legitimate webhook must return 200, got ${firstRes.status}`);
-      const firstData = await firstRes.json();
-      assert.strictEqual(firstData.status, 'CONFIRMED');
+      assert.strictEqual(res.status, 410, `Decommissioned webhook must return 410, got ${res.status}`);
+      const resData = await res.json();
+      assert.strictEqual(resData.code, 'RAZORPAY_DECOMMISSIONED');
 
-      // Verify booking updated in database
+      // Verify booking status remains unchanged in database
       const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${testBookingId}`, {
         headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
       });
       const [booking] = await checkRes.json();
-      assert.strictEqual(booking.status, 'CONFIRMED', 'Booking must be CONFIRMED in DB');
-      assert.strictEqual(booking.payment_status, 'CAPTURED', 'Payment status must be CAPTURED in DB');
-
-      // Second webhook call with identical event -> idempotent no-op
-      const secondRes = await fetch(`${APP_URL}/api/webhooks/razorpay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-razorpay-signature': signature
-        },
-        body: legitimatePayload
-      });
-      assert.strictEqual(secondRes.status, 200, `Idempotent replay must return 200, got ${secondRes.status}`);
-      const secondData = await secondRes.json();
-      assert.strictEqual(secondData.idempotent, true, 'Second call must be flagged as idempotent');
+      assert.strictEqual(booking.status, 'PENDING_PAYMENT', 'Booking status must not be modified by decommissioned route');
     });
 
     it('2.6 Working Tree Hygiene: Asserts zero hardcoded webhook secret fallbacks in target test and route files', () => {

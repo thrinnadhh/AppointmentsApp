@@ -25,9 +25,10 @@ function TeamManagementContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const doctorParam = searchParams.get('doctorId');
+  const providerParam = searchParams.get('providerId');
   const handledDoctorParamRef = useRef<string | null>(null);
 
-  const { activeProvider, isSuperAdmin, isHospitalAdmin, verticalConfig } = useMerchantTenant();
+  const { activeProvider, isSuperAdmin, isHospitalAdmin, verticalConfig, switchActiveProvider, isLoading: tenantLoading } = useMerchantTenant();
   
   // State
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -39,6 +40,13 @@ function TeamManagementContent() {
   const [doctorSearch, setDoctorSearch] = useState('');
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Auto-sync activeProvider with providerParam if URL query param was provided
+  useEffect(() => {
+    if (providerParam && activeProvider?.id !== providerParam) {
+      switchActiveProvider(providerParam);
+    }
+  }, [providerParam, activeProvider?.id, switchActiveProvider]);
 
   const copyToClipboard = useCallback((text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -65,30 +73,94 @@ function TeamManagementContent() {
     return doctors.some(
       (doc) =>
         doc.id === member.id ||
-        (doc as any)?.attributes?.user_id === member.id ||
+        (doc as { attributes?: { user_id?: string } })?.attributes?.user_id === member.id ||
         (doc.doctor_email && doc.doctor_email.toLowerCase() === (member.email || '').toLowerCase())
     );
   }, [doctors]);
 
   const loadTeam = useCallback(async () => {
+    const currentProviderId = providerParam || activeProvider?.id;
+    if (!currentProviderId && !isSuperAdmin) {
+      if (!tenantLoading) {
+        setMembers([]);
+        setLoading(false);
+      }
+      return;
+    }
+
     setLoading(true);
     try {
-      if (isSuperAdmin) {
+      if (isSuperAdmin && !currentProviderId) {
         const data = await fetchAllProfiles();
         setMembers(data as TeamMember[]);
-      } else if (activeProvider?.id) {
-        const { data, error } = await supabase
-          .from('merchant_memberships' as any)
-          .select('user_id, role, profile:profiles(id, full_name, email, phone, created_at)')
-          .eq('provider_id', activeProvider.id);
-        if (!error && data) {
-          const mapped = data
-            .map((m: any) => (m.profile ? { ...m.profile, membershipRole: m.role } : null))
-            .filter(Boolean);
-          setMembers(mapped as TeamMember[]);
-        } else {
-          setMembers([]);
+      } else if (currentProviderId) {
+        const [membershipsRes, deptMembersRes] = await Promise.all([
+          supabase
+            .from('merchant_memberships' as never)
+            .select('user_id, role, profile:profiles(id, full_name, email, phone, created_at)')
+            .eq('provider_id', currentProviderId)
+            .is('deleted_at', null),
+          supabase
+            .from('department_members' as never)
+            .select('user_id, email, role, department_id, departments(name), profile:profiles(id, full_name, email, phone, created_at)')
+            .eq('merchant_id', currentProviderId)
+            .eq('status', 'active'),
+        ]);
+
+        const rosterMap = new Map<string, TeamMember>();
+
+        if (membershipsRes.data) {
+          membershipsRes.data.forEach((m: Record<string, unknown>) => {
+            if (m.profile) {
+              const prof = m.profile as Record<string, unknown>;
+              rosterMap.set(prof.id as string, {
+                ...prof,
+                membershipRole: m.role as string,
+              } as unknown as TeamMember);
+            }
+          });
         }
+
+        if (deptMembersRes.data) {
+          deptMembersRes.data.forEach((dm: Record<string, unknown>) => {
+            const prof = dm.profile as Record<string, unknown> | null;
+            const profileId = (prof?.id as string) || (dm.user_id as string);
+            const existing = profileId ? rosterMap.get(profileId) : null;
+            const deptObj = dm.departments as Record<string, unknown> | null;
+            const deptName = (deptObj?.name as string) || null;
+            if (existing) {
+              if (dm.role === 'consultant' || dm.role === 'doctor') {
+                existing.membershipRole = 'doctor';
+              }
+              const existingRecord = existing as unknown as Record<string, unknown>;
+              existingRecord.department = deptName || existingRecord.department;
+              existingRecord.department_id = (dm.department_id as string) || existingRecord.department_id;
+            } else if (prof) {
+              rosterMap.set(prof.id as string, {
+                ...prof,
+                membershipRole: (dm.role === 'consultant' || dm.role === 'doctor') ? 'doctor' : (dm.role as string),
+                department: deptName,
+                department_id: dm.department_id,
+              } as unknown as TeamMember);
+            } else if (dm.email) {
+              const emailStr = dm.email as string;
+              const syntheticId = (dm.user_id as string) || `dept-member-${emailStr}`;
+              rosterMap.set(syntheticId, {
+                id: syntheticId,
+                email: emailStr,
+                full_name: emailStr.split('@')[0],
+                role: 'merchant',
+                membershipRole: (dm.role === 'consultant' || dm.role === 'doctor') ? 'doctor' : (dm.role as string),
+                phone: null,
+                created_at: new Date().toISOString(),
+                department: deptName,
+                department_id: dm.department_id,
+              } as unknown as TeamMember);
+            }
+          });
+        }
+
+        setMembers(Array.from(rosterMap.values()));
       } else {
         setMembers([]);
       }
@@ -98,17 +170,25 @@ function TeamManagementContent() {
     } finally {
       setLoading(false);
     }
-  }, [activeProvider?.id, isSuperAdmin]);
+  }, [providerParam, activeProvider?.id, isSuperAdmin, tenantLoading]);
 
   const loadDoctorAssignments = useCallback(async () => {
-    if (!activeProvider?.id) {
-      setDoctors([]);
-      setLoadingDoctors(false);
+    const currentProviderId = providerParam || activeProvider?.id;
+    if (!currentProviderId) {
+      if (!tenantLoading) {
+        setDoctors([]);
+        setLoadingDoctors(false);
+      }
       return;
     }
     setLoadingDoctors(true);
     try {
-      const res = await fetch(`/api/admin/doctor-assignments?providerId=${activeProvider.id}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch(`/api/admin/doctor-assignments?providerId=${currentProviderId}`, { headers });
       const json = await res.json();
       if (res.ok && json.success) {
         setDoctors(json.doctors || []);
@@ -121,7 +201,7 @@ function TeamManagementContent() {
     } finally {
       setLoadingDoctors(false);
     }
-  }, [activeProvider?.id]);
+  }, [providerParam, activeProvider?.id, tenantLoading]);
 
   useEffect(() => {
     loadTeam();
@@ -149,7 +229,11 @@ function TeamManagementContent() {
     }
   }, [doctorParam, pathname, router, searchParams]);
 
-  const handleUnassignFrontDesk = async (
+  const handleOpenAssignModal = useCallback((d: DoctorWithAssignments) => {
+    setSelectedDoctorForAssignment(d);
+  }, []);
+
+  const handleUnassignFrontDesk = useCallback(async (
     doctorId: string, 
     doctorName: string, 
     userId: string, 
@@ -176,7 +260,7 @@ function TeamManagementContent() {
       const msg = err instanceof Error ? err.message : 'Error unassigning front desk manager';
       setSuccessBanner(`Error: ${msg}`);
     }
-  };
+  }, [activeProvider?.id, loadDoctorAssignments]);
 
   // Merge members with doctors or front desk staff
   const allRosterMembers = useMemo(() => {
@@ -186,8 +270,28 @@ function TeamManagementContent() {
 
     doctors.forEach((doc) => {
       const email = doc.doctor_email?.toLowerCase();
-      const attrUserId = (doc as any)?.attributes?.user_id;
-      if (attrUserId && !existingIds.has(attrUserId)) {
+      const docRecord = doc as unknown as Record<string, unknown>;
+      const docAttributes = docRecord?.attributes as Record<string, unknown> | undefined;
+      const attrUserId = docAttributes?.user_id as string | undefined;
+
+      // If already in list, ensure marked as doctor with department
+      const existingMember = list.find(
+        (m) => (attrUserId && m.id === attrUserId) || (email && (m.email || '').toLowerCase() === email)
+      );
+
+      if (existingMember) {
+        existingMember.membershipRole = 'doctor';
+        const existingRecord = existingMember as unknown as Record<string, unknown>;
+        if (!existingRecord.department && doc.department) {
+          existingRecord.department = doc.department;
+        }
+        if (!existingRecord.department_id && docRecord.department_id) {
+          existingRecord.department_id = docRecord.department_id;
+        }
+        if (!existingMember.full_name?.toLowerCase().startsWith('dr.') && doc.name) {
+          existingMember.full_name = `Dr. ${doc.name}`;
+        }
+      } else if (attrUserId && !existingIds.has(attrUserId)) {
         list.push({
           id: attrUserId,
           email: doc.doctor_email || null,
@@ -196,7 +300,9 @@ function TeamManagementContent() {
           membershipRole: 'doctor',
           phone: null,
           created_at: new Date().toISOString(),
-        });
+          department: doc.department || null,
+          department_id: (docRecord.department_id as string) || null,
+        } as unknown as TeamMember);
         existingIds.add(attrUserId);
         if (email) existingEmails.add(email);
       } else if (email && !existingEmails.has(email)) {
@@ -208,8 +314,23 @@ function TeamManagementContent() {
           membershipRole: 'doctor',
           phone: null,
           created_at: new Date().toISOString(),
-        });
+          department: doc.department || null,
+          department_id: (docRecord.department_id as string) || null,
+        } as unknown as TeamMember);
         existingEmails.add(email);
+      } else if (!existingIds.has(`doc-${doc.id}`)) {
+        list.push({
+          id: `doc-${doc.id}`,
+          email: null,
+          full_name: `Dr. ${doc.name}`,
+          role: 'merchant',
+          membershipRole: 'doctor',
+          phone: null,
+          created_at: new Date().toISOString(),
+          department: doc.department || null,
+          department_id: (docRecord.department_id as string) || null,
+        } as unknown as TeamMember);
+        existingIds.add(`doc-${doc.id}`);
       }
 
       doc.front_desk_managers?.forEach((fd) => {
@@ -250,7 +371,7 @@ function TeamManagementContent() {
         doc.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
         (doc.department || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
         (doc.doctor_email || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
-        doc.front_desk_managers.some((fd) => 
+        (doc.front_desk_managers || []).some((fd) => 
           (fd.full_name || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
           (fd.email || '').toLowerCase().includes(doctorSearch.toLowerCase()) ||
           (fd.id_card_number || '').toLowerCase().includes(doctorSearch.toLowerCase())
@@ -267,7 +388,16 @@ function TeamManagementContent() {
     return doctors.reduce((sum, d) => sum + (d.front_desk_managers?.length || 0), 0);
   }, [doctors]);
 
-  if (!activeProvider && !isSuperAdmin) {
+  if (tenantLoading && !activeProvider && !providerParam) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 text-center text-slate-500 bg-white rounded-2xl border border-slate-200 mt-8">
+        <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
+        Loading team and desk credentials...
+      </div>
+    );
+  }
+
+  if (!activeProvider && !providerParam && !isSuperAdmin) {
     return (
       <div className="max-w-xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-2xl text-center shadow-sm">
         <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -310,7 +440,7 @@ function TeamManagementContent() {
           {isHospitalAdmin && (
             <button
               onClick={() => setIsAddStaffOpen(true)}
-              className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm cursor-pointer gap-2"
+              className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-[0.97] text-white text-sm font-semibold rounded-xl transition-all duration-75 select-none shadow-sm cursor-pointer gap-2"
             >
               <UserPlus className="w-4 h-4" />
               <span>+ Provision Staff</span>
@@ -322,7 +452,7 @@ function TeamManagementContent() {
               loadTeam();
               loadDoctorAssignments();
             }}
-            className="inline-flex items-center px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 active:bg-slate-100 active:scale-[0.97] transition-all duration-75 select-none shadow-xs cursor-pointer"
             title="Refresh All"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${(loading || loadingDoctors) ? 'animate-spin text-emerald-600' : ''}`} />
@@ -422,7 +552,7 @@ function TeamManagementContent() {
                 isHospitalAdmin={isHospitalAdmin}
                 copiedId={copiedId}
                 onCopy={copyToClipboard}
-                onOpenAssignModal={(d: DoctorWithAssignments) => setSelectedDoctorForAssignment(d)}
+                onOpenAssignModal={handleOpenAssignModal}
                 onUnassign={handleUnassignFrontDesk}
               />
             ))}
@@ -442,7 +572,7 @@ function TeamManagementContent() {
       {selectedDoctorForAssignment && (
         <AssignFrontDeskModal
           doctor={selectedDoctorForAssignment}
-          providerId={activeProvider?.id}
+          providerId={activeProvider?.id || providerParam || undefined}
           allRosterMembers={allRosterMembers}
           onClose={handleCloseAssignModal}
           onSuccess={(msg) => {
@@ -465,8 +595,9 @@ function TeamManagementContent() {
             loadDoctorAssignments();
             loadTeam();
           }}
-          providerId={activeProvider?.id}
+          providerId={activeProvider?.id || providerParam || undefined}
           doctors={doctors}
+          hasHospitalAdmin={adminCount > 0 || isHospitalAdmin || Boolean(activeProvider?.owner_id)}
         />
       )}
     </div>

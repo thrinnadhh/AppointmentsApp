@@ -41,7 +41,7 @@ export default function AccountDeletionPage() {
     }
 
     if (!hasConfirmed) {
-      setError('Please confirm that you understand the 30-day grace period and irreversible deletion.');
+      setError('Please confirm that you understand account deletion is immediate, permanent, and irreversible.');
       return;
     }
 
@@ -70,15 +70,9 @@ export default function AccountDeletionPage() {
       }
 
       setIsSuccess(true);
-      setResultMessage(data.message);
-      if (data.scheduled_for) {
-        const formatted = new Date(data.scheduled_for).toLocaleDateString('en-IN', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        });
-        setScheduledDate(formatted);
-      }
+      setResultMessage(data.message || 'Your account and personal data have been permanently erased.');
+      // Ensure client-side session is cleared immediately
+      await supabase.auth.signOut().catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while submitting your request.');
     } finally {
@@ -157,10 +151,10 @@ export default function AccountDeletionPage() {
             </div>
           </div>
 
-          <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-900 leading-relaxed flex items-start gap-3">
-            <span className="text-lg">⏳</span>
+          <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-900 leading-relaxed flex items-start gap-3">
+            <span className="text-lg">⚡</span>
             <div>
-              <strong>30-Day Grace Period:</strong> In compliance with industry standards, your account will enter a 30-day scheduled grace period. You may cancel this deletion request at any time during these 30 days by emailing <a href="mailto:grievance@appointments4u.in" className="underline font-semibold text-amber-950">grievance@appointments4u.in</a>. After 30 days, personal data is permanently and irreversibly scrubbed.
+              <strong>Immediate &amp; Permanent Erasure:</strong> In accordance with DPDPA 2023 regulations, once you confirm this request, your account, credentials, and personal data are permanently deleted immediately with zero grace period or delay. Active sessions are revoked instantaneously.
             </div>
           </div>
         </div>
@@ -171,21 +165,15 @@ export default function AccountDeletionPage() {
             <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center text-2xl font-bold">
               ✓
             </div>
-            <h2 className="text-2xl font-bold text-emerald-950">Deletion Request Scheduled</h2>
+            <h2 className="text-2xl font-bold text-emerald-950">Account Deleted Successfully</h2>
             <p className="text-sm text-emerald-800 max-w-md mx-auto leading-relaxed">
-              {resultMessage}
+              {resultMessage || 'Your account and personal data have been permanently erased. All active sessions have been revoked.'}
             </p>
-            {scheduledDate && (
-              <div className="inline-block bg-white px-4 py-2 rounded-xl border border-emerald-200 text-sm font-semibold text-emerald-900">
-                Scheduled Anonymization Date: {scheduledDate}
-              </div>
-            )}
+            <div className="inline-block bg-white px-4 py-2 rounded-xl border border-emerald-200 text-sm font-semibold text-emerald-900">
+              Status: Erased Immediately
+            </div>
             <p className="text-xs text-emerald-700 pt-2">
-              Need to cancel this request? Contact our Grievance Officer at{' '}
-              <a href="mailto:grievance@appointments4u.in" className="underline font-semibold">
-                grievance@appointments4u.in
-              </a>{' '}
-              within the next 30 days.
+              All personal records and authentication credentials have been scrubbed in compliance with DPDPA 2023.
             </p>
             <div className="pt-4">
               <Link
@@ -278,7 +266,7 @@ export default function AccountDeletionPage() {
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                 />
                 <span className="text-xs text-slate-600 leading-normal select-none">
-                  I understand that submitting this request initiates a <strong>30-day grace period</strong>. After 30 days, my personal profile, contact information, and bookings history will be permanently and irreversibly anonymized.
+                  I understand that submitting this request initiates <strong>immediate and permanent account deletion</strong>. My personal profile, contact information, and account credentials will be permanently and irreversibly scrubbed with zero grace period.
                 </span>
               </label>
             </div>

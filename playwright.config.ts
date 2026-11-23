@@ -17,9 +17,16 @@ process.env.TEST_MERCHANT_EMAIL = process.env.TEST_MERCHANT_EMAIL || 'admin.apex
 process.env.TEST_MERCHANT_PASSWORD = process.env.TEST_MERCHANT_PASSWORD || 'HospitalTest2026!';
 process.env.TEST_SALON_EMAIL = process.env.TEST_SALON_EMAIL || 'naturals.salon@tirupati-appointments.com';
 process.env.TEST_SALON_PASSWORD = process.env.TEST_SALON_PASSWORD || 'NaturalsSalon2026!';
-// E2E secrets: use environment or standard non-production local test bypass key
-process.env.ADMIN_SECRET = process.env.ADMIN_SECRET || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
-process.env.SUPERADMIN_E2E_TOKEN = process.env.SUPERADMIN_E2E_TOKEN || 'tirupati_e2e_secure_bypass_key_2026_x9k2';
+// E2E secrets: use environment or active non-production local test bypass key
+process.env.ADMIN_SECRET = (process.env.ADMIN_SECRET && process.env.ADMIN_SECRET !== 'tirupati_e2e_secure_bypass_key_2026_x9k2')
+  ? process.env.ADMIN_SECRET
+  : (process.env.SUPERADMIN_E2E_TOKEN && process.env.SUPERADMIN_E2E_TOKEN !== 'tirupati_e2e_secure_bypass_key_2026_x9k2'
+    ? process.env.SUPERADMIN_E2E_TOKEN
+    : 'c4b9e28f11a84f378a5e92c0199e7d3bf2830fa1e57c6b2d88a104c9ef7190ad');
+
+process.env.SUPERADMIN_E2E_TOKEN = (process.env.SUPERADMIN_E2E_TOKEN && process.env.SUPERADMIN_E2E_TOKEN !== 'tirupati_e2e_secure_bypass_key_2026_x9k2')
+  ? process.env.SUPERADMIN_E2E_TOKEN
+  : process.env.ADMIN_SECRET;
 process.env.ALLOW_MOCK_PAYMENTS = 'true';
 process.env.ENABLE_E2E_BYPASS = 'true';
 

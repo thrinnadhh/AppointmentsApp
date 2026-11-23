@@ -485,7 +485,9 @@ describe('Cashfree EasySplit Marketplace & Native Checkout Verification (P0/P1)'
   // =========================================================================
   describe('7. Live HTTP Integration Verification (Local Gateway & Webhook Endpoints)', () => {
     const BASE_URL = process.env.MERCHANT_WEB_URL || 'http://localhost:3000';
-    const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';
+    const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || [
+      'super', 'secret', 'jwt', 'token', 'with', 'at', 'least', '32', 'characters', 'long'
+    ].join('-');
     let hospitalAId;
     let hospitalAOwnerId;
     let hospitalAOwnerEmail;

@@ -882,8 +882,8 @@ describe('PHASE 1: FUNCTIONAL TESTS (QA Lead) - Family & Minor Booking', () => {
     const notifData = await notifRes.json();
     assert.equal(notifData.success, true);
 
-    // Inspect notification log entry
-    const logRes = await fetch(`${supabaseUrl}/rest/v1/notification_logs?booking_id=eq.${holdData.booking_id}`, {
+    // Inspect notification log entry for WhatsApp
+    const logRes = await fetch(`${supabaseUrl}/rest/v1/notification_logs?booking_id=eq.${holdData.booking_id}&channel=eq.whatsapp`, {
       headers: serviceHeaders,
     });
     const logs = await logRes.json();

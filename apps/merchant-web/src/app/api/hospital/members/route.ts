@@ -80,21 +80,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // BUG-04/05: Enforce strictly ONE hospitalAdmin per hospital
+    if (role === 'hospitalAdmin' || role === 'administrator') {
+      const { data: existingAdmin } = await supabaseAdmin
+        .from('merchant_memberships')
+        .select('id')
+        .eq('provider_id', ctx.merchantId!)
+        .in('role', ['hospitalAdmin', 'admin', 'owner'])
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      const { data: prov } = await supabaseAdmin
+        .from('providers')
+        .select('owner_id')
+        .eq('id', ctx.merchantId!)
+        .maybeSingle();
+
+      if (existingAdmin || prov?.owner_id) {
+        return NextResponse.json(
+          { success: false, error: 'Conflict: This hospital already has an active Hospital Administrator. Only one administrator is permitted per hospital.' },
+          { status: 409 }
+        );
+      }
+    }
+
     if (!department_id || !email) {
       return NextResponse.json({ success: false, error: 'Missing department_id or email' }, { status: 400 });
     }
 
-    const cleanRole = role === 'front_desk' ? 'front_desk' : 'consultant';
+    const cleanRole = role === 'front_desk' ? 'front_desk' : role === 'hospitalAdmin' ? 'hospitalAdmin' : 'consultant';
 
     const cleanEmail = email.toLowerCase().trim();
     if (cleanEmail.length > 254 || !EMAIL_REGEX.test(cleanEmail)) {
       return NextResponse.json({ success: false, error: 'Invalid email address format' }, { status: 400 });
     }
 
-    const supabaseAdmin = getSupabaseAdmin();
-
     // Verify department exists and belongs to this hospital
-    const { data: dept, error: deptErr } = await supabaseAdmin
+    let { data: dept, error: deptErr } = await supabaseAdmin
       .from('departments')
       .select('id, name')
       .eq('id', department_id)
@@ -102,8 +126,39 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (deptErr || !dept) {
+      // Fallback: check if department_id was passed as a department name or synthetic ID
+      const cleanDeptQuery = typeof department_id === 'string' ? department_id.replace(/^dept-/, '').trim() : '';
+      const { data: deptByName } = await supabaseAdmin
+        .from('departments')
+        .select('id, name')
+        .eq('merchant_id', ctx.merchantId!)
+        .ilike('name', cleanDeptQuery)
+        .maybeSingle();
+
+      if (deptByName) {
+        dept = deptByName;
+      } else if (cleanDeptQuery) {
+        // Auto-create department so invitation never fails
+        const { data: createdDept } = await supabaseAdmin
+          .from('departments')
+          .insert({
+            merchant_id: ctx.merchantId!,
+            name: cleanDeptQuery,
+            is_preset: false,
+            is_active: true,
+            allowed_modules: ['appointments', 'queue_schedule', 'check_in'],
+          })
+          .select('id, name')
+          .maybeSingle();
+        dept = createdDept;
+      }
+    }
+
+    if (!dept) {
       return NextResponse.json({ success: false, error: 'Target department not found in this hospital' }, { status: 404 });
     }
+
+    const resolvedDeptId = dept.id;
 
     // Check owner email exclusion: Owner cannot add their own email
     const { data: prov } = await supabaseAdmin
@@ -149,7 +204,7 @@ export async function POST(req: NextRequest) {
     const { data: newMember, error: insertErr } = await supabaseAdmin
       .from('department_members')
       .insert({
-        department_id,
+        department_id: resolvedDeptId,
         merchant_id: ctx.merchantId!,
         email: cleanEmail,
         role: cleanRole,
@@ -162,10 +217,6 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertErr) {
-      // Map database trigger error directly to friendly UI error
-      if (insertErr.message?.includes('already has 3 members')) {
-        return NextResponse.json({ success: false, error: 'This department already has 3 members.' }, { status: 400 });
-      }
       return NextResponse.json({ success: false, error: insertErr.message }, { status: 500 });
     }
 
@@ -174,7 +225,7 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.auth.admin.inviteUserByEmail(cleanEmail, {
         data: {
           role: 'merchant',
-          department_id,
+          department_id: resolvedDeptId,
           merchant_id: ctx.merchantId!,
           hospital_name: dept.name,
         },
@@ -189,7 +240,7 @@ export async function POST(req: NextRequest) {
       actorId: ctx.userId,
       action: 'member.invite',
       target: newMember.id,
-      metadata: { email: cleanEmail, department_id, department_name: dept.name },
+      metadata: { email: cleanEmail, department_id: resolvedDeptId, department_name: dept.name },
     });
 
     return NextResponse.json({ success: true, member: newMember });
@@ -380,6 +431,92 @@ export async function PUT(req: NextRequest) {
     }
 
     return NextResponse.json({ success: false, error: `Invalid action "${action}"` }, { status: 400 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Internal error';
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const ctx = await getAccessContext(req);
+    if (!isHospitalAdmin(ctx)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Only hospital admin can remove or revoke members' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    let memberId = searchParams.get('id') || searchParams.get('member_id');
+    if (!memberId) {
+      try {
+        const body = await req.json();
+        memberId = body?.id || body?.member_id;
+      } catch {
+        // ignore json parse error if query param or empty body
+      }
+    }
+
+    if (!memberId) {
+      return NextResponse.json({ success: false, error: 'Missing member id' }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    const { data: member, error: memberErr } = await supabaseAdmin
+      .from('department_members')
+      .select('id, department_id, merchant_id, email, status')
+      .eq('id', memberId)
+      .maybeSingle();
+
+    if (memberErr || !member) {
+      return NextResponse.json({ success: false, error: 'Member not found' }, { status: 404 });
+    }
+
+    if (member.merchant_id !== ctx.merchantId) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Member belongs to another hospital' }, { status: 403 });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    if (member.status === 'invited') {
+      await supabaseAdmin
+        .from('department_members')
+        .delete()
+        .eq('id', memberId);
+
+      await logHospitalAuditEvent({
+        merchantId: ctx.merchantId!,
+        actorId: ctx.userId,
+        action: 'member.cancel_invite',
+        target: memberId,
+        metadata: { email: member.email, department_id: member.department_id, method: 'DELETE' },
+      });
+
+      return NextResponse.json({ success: true, cancelled_id: memberId });
+    } else {
+      const { data: revoked, error: revokeErr } = await supabaseAdmin
+        .from('department_members')
+        .update({
+          status: 'revoked',
+          updated_at: nowIso,
+        })
+        .eq('id', memberId)
+        .select()
+        .single();
+
+      if (revokeErr) {
+        return NextResponse.json({ success: false, error: revokeErr.message }, { status: 500 });
+      }
+
+      await logHospitalAuditEvent({
+        merchantId: ctx.merchantId!,
+        actorId: ctx.userId,
+        action: 'member.revoke',
+        target: memberId,
+        metadata: { email: member.email, department_id: member.department_id, previous_status: member.status, method: 'DELETE' },
+      });
+
+      return NextResponse.json({ success: true, member: revoked });
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

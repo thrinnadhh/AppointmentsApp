@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // 1. Fetch resources/doctors for this provider
     let query = supabaseAdmin
       .from('resources')
-      .select('id, provider_id, name, type, department, deposit_amount, duration_minutes, capacity, attributes, is_active')
+      .select('id, provider_id, name, type, department, department_id, deposit_amount, duration_minutes, capacity, attributes, is_active, departments(id, name)')
       .eq('provider_id', providerId)
       .order('name', { ascending: true });
 
@@ -106,10 +106,26 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      // Extract custom department name prioritizing custom specialty over default 'General'
+      const customDept = (attr.department && typeof attr.department === 'string' && attr.department.trim() && attr.department.trim() !== 'General')
+        ? attr.department.trim()
+        : null;
+      const colDept = (doc.department && typeof doc.department === 'string' && doc.department.trim() && doc.department.trim() !== 'General')
+        ? doc.department.trim()
+        : null;
+      const typeDept = (doc.type && typeof doc.type === 'string' && doc.type.trim() && doc.type.trim() !== 'doctor' && doc.type.trim() !== 'General')
+        ? doc.type.trim()
+        : null;
+
+      const deptName = doc.departments?.name || customDept || colDept || typeDept || doc.department || attr.department || 'General Medicine';
+      const resolvedDeptId = doc.department_id || doc.departments?.id || attr.department_id || null;
+
       return {
         ...doc,
-        doctor_email: attr.email || null,
-        has_login: Boolean(attr.email || attr.user_id),
+        department: deptName,
+        department_id: resolvedDeptId,
+        doctor_email: attr.email || attr.doctor_email || null,
+        has_login: Boolean(attr.email || attr.doctor_email || attr.user_id),
         front_desk_managers: combined,
       };
     });
@@ -160,10 +176,34 @@ export async function POST(request: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
+    // BUG-04/05: Enforce strictly ONE hospitalAdmin per hospital
+    if (body.role === 'hospitalAdmin' || body.role === 'administrator') {
+      const { data: existingAdmin } = await supabaseAdmin
+        .from('merchant_memberships')
+        .select('id')
+        .eq('provider_id', providerId)
+        .in('role', ['hospitalAdmin', 'admin', 'owner'])
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      const { data: prov } = await supabaseAdmin
+        .from('providers')
+        .select('owner_id')
+        .eq('id', providerId)
+        .maybeSingle();
+
+      if (existingAdmin || prov?.owner_id) {
+        return NextResponse.json(
+          { error: 'Conflict: This hospital already has an active Hospital Administrator. Only one administrator is permitted per hospital.' },
+          { status: 409 }
+        );
+      }
+    }
+
     // Verify doctor exists and belongs to this venue
     const { data: doctor, error: docError } = await supabaseAdmin
       .from('resources')
-      .select('id, name, provider_id, attributes')
+      .select('id, name, type, provider_id, attributes, department_id, department')
       .eq('id', doctorId)
       .eq('provider_id', providerId)
       .maybeSingle();
@@ -272,6 +312,102 @@ export async function POST(request: NextRequest) {
       }
     } catch (err) {
       console.warn('doctor_front_desk_assignments upsert error, falling back to attributes:', err);
+    }
+
+    // BUG-06: Persist department assignment into department_members
+    const doctorObj = doctor as Record<string, unknown> | null;
+    let targetDeptId = body.departmentId || body.department_id || doctorObj?.department_id;
+
+    // If targetDeptId is missing or synthetic, resolve or auto-create from doctor's department
+    if ((!targetDeptId || (typeof targetDeptId === 'string' && targetDeptId.startsWith('dept-'))) && doctor) {
+      const docAttr = (doctorObj?.attributes as Record<string, unknown>) || {};
+      const docDeptName = (docAttr.department && docAttr.department !== 'General')
+        ? (docAttr.department as string)
+        : (doctor.department && doctor.department !== 'General')
+          ? doctor.department
+          : (doctor.type && doctor.type !== 'doctor' && doctor.type !== 'General')
+            ? doctor.type
+            : ((docAttr.department as string) || doctor.department || 'General Medicine');
+
+      if (docDeptName) {
+        const { data: foundDept } = await supabaseAdmin
+          .from('departments')
+          .select('id')
+          .eq('merchant_id', providerId)
+          .ilike('name', docDeptName.trim())
+          .maybeSingle();
+
+        if (foundDept?.id) {
+          targetDeptId = foundDept.id;
+        } else {
+          const { data: createdDept } = await supabaseAdmin
+            .from('departments')
+            .insert({
+              merchant_id: providerId,
+              name: docDeptName.trim(),
+              is_preset: false,
+              is_active: true,
+              allowed_modules: ['appointments', 'queue_schedule', 'check_in'],
+            })
+            .select('id')
+            .maybeSingle();
+          if (createdDept?.id) {
+            targetDeptId = createdDept.id;
+          }
+        }
+
+        // Link doctor resource to this department if not yet linked
+        if (targetDeptId && !doctorObj?.department_id) {
+          await supabaseAdmin
+            .from('resources')
+            .update({ department_id: targetDeptId })
+            .eq('id', doctorId);
+        }
+      }
+    }
+
+    if (targetDeptId && targetUserId && providerId && targetEmail) {
+      try {
+        const cleanTargetEmail = targetEmail.toLowerCase().trim();
+        const { data: existingDeptMember } = await supabaseAdmin
+          .from('department_members')
+          .select('id')
+          .eq('merchant_id', providerId)
+          .eq('email', cleanTargetEmail)
+          .maybeSingle();
+
+        if (existingDeptMember) {
+          const { error: updErr } = await supabaseAdmin
+            .from('department_members')
+            .update({
+              department_id: targetDeptId,
+              user_id: targetUserId,
+              role: 'front_desk',
+              status: 'active',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingDeptMember.id);
+          if (updErr) {
+            console.error('[BUG-06] Failed to update department_members:', updErr);
+          }
+        } else {
+          const { error: insErr } = await supabaseAdmin
+            .from('department_members')
+            .insert({
+              department_id: targetDeptId,
+              merchant_id: providerId,
+              email: cleanTargetEmail,
+              user_id: targetUserId,
+              role: 'front_desk',
+              status: 'active',
+            });
+          if (insErr) {
+            console.error('[BUG-06] Failed to insert department_members:', insErr);
+          }
+        }
+      } catch (deptErr) {
+        console.warn('Failed to upsert department_members for front desk:', deptErr);
+      }
     }
 
     // 2. Synchronize onto doctor's resource.attributes for client resilience (strip id_card_number from public attributes)

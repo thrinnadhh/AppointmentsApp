@@ -428,14 +428,14 @@ function App() {
         setIsPhoneVerified(true);
         setOtpSent(false);
         setAuthOtp('');
-        setProfileVisible(false);
+        if (activeResource && activeSlot) {
+          setProfileVisible(false);
+          setCheckoutVisible(true);
+        }
         setCustomerProfile((prev) => ({
           ...prev,
           phone: formattedPhone,
         }));
-        if (activeResource && activeSlot) {
-          setCheckoutVisible(true);
-        }
         setConfirmationToast('Phone verified! Signed in with Supabase.');
         setTimeout(() => setConfirmationToast(null), 4000);
       } else {

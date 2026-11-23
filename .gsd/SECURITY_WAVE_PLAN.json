@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "2.0.0",
+  "generated_at": "2026-11-21T18:40:00Z",
+  "campaign": "security/window-closure-20261121",
+  "waves": [
+    {
+      "wave": 1,
+      "name": "Database Schema, RLS, & SQL Functions",
+      "description": "Supabase PostgreSQL database schema, migrations, RLS policies, and function definitions",
+      "lead_role": "database-architect",
+      "status": "CLEAN",
+      "notes": "Stage 1 verification confirmed 31/31 public tables have active RLS, 3 views enforce security_invoker, and 100% of SECURITY DEFINER functions have search_path pinned. 0 open windows in database plane.",
+      "tasks": []
+    },
+    {
+      "wave": 2,
+      "name": "API Routes, Server Actions, Edge Functions, & Webhooks",
+      "description": "Next.js App Router API handlers, Server Actions, Supabase Edge Functions, payment webhooks, and Fetch Metadata guards",
+      "lead_role": "backend-specialist",
+      "status": "OPEN",
+      "tasks": [
+        {
+          "task_id": "TASK-W2-01",
+          "issue_ids": [
+            "SEC-DISC-001"
+          ],
+          "title": "Fix auth context mismatch in DELETE /api/account/delete by invoking delete_account_immediately with user-scoped client",
+          "layer": "api",
+          "assignee": "backend-specialist",
+          "target_files": [
+            "apps/merchant-web/src/app/api/account/delete/route.ts",
+            "tests/security/account-deletion-auth.test.mjs"
+          ],
+          "regression_test": "tests/security/account-deletion-auth.test.mjs",
+          "commit_message": "fix(api): invoke delete_account_immediately with user-scoped auth client (SEC-DISC-001)",
+          "verification_command": "node --test tests/security/account-deletion-auth.test.mjs",
+          "notes": "Standing Rule 3: Author failing test in tests/security/account-deletion-auth.test.mjs first (showing pre-patch FAIL due to HTTP 500 'Not authenticated'), then update apps/merchant-web/src/app/api/account/delete/route.ts to invoke delete_account_immediately via user-scoped supabase client (showing post-patch PASS)."
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "name": "Next.js Headers, CSP, Cookies, DOM Sinks, & Mobile WebView Bridges",
+      "description": "Frontend security boundaries, modern web headers, cookie security, postMessage validation, and React Native WebView bridges",
+      "lead_role": "frontend-specialist",
+      "status": "CLEAN",
+      "notes": "Stage 1 verification evaluated 10 modern web candidates (MODWEB-001 through MODWEB-010); all were reviewed safe, unconfirmed, or defense-in-depth hygiene. 0 open windows requiring code changes in Wave 3.",
+      "tasks": []
+    },
+    {
+      "wave": 4,
+      "name": "CI/CD, CodeQL/Gitleaks Rules, & Infrastructure Governance",
+      "description": "CI workflows, secret scanning rules, dependency updates, and manual infrastructure rotation tracking",
+      "lead_role": "devops-engineer",
+      "status": "OPEN",
+      "tasks": [
+        {
+          "task_id": "TASK-W4-01",
+          "issue_ids": [
+            "SEC-DISC-002"
+          ],
+          "title": "Document upstream credential rotation and git-filter-repo procedures in .gsd/MANUAL_ACTIONS.md",
+          "layer": "governance",
+          "assignee": "devops-engineer",
+          "target_files": [
+            ".gsd/MANUAL_ACTIONS.md"
+          ],
+          "regression_test": "gitleaks detect -v",
+          "commit_message": "docs(security): document credential rotation and git-filter-repo procedures (SEC-DISC-002)",
+          "verification_command": "test -f .gsd/MANUAL_ACTIONS.md && grep -q 'SEC-DISC-002' .gsd/MANUAL_ACTIONS.md",
+          "notes": "Global Rule R5 (NEEDS_HUMAN): Production cloud credentials leaked in historical commits 9305ab5c, 34b7d2c7, and 5e515195 require human rotation in Supabase Cloud Console and subsequent git-filter-repo scrubbing. No git history rewriting or force-pushing will be executed during automated campaign."
+        }
+      ]
+    }
+  ],
+  "governance_items": [
+    {
+      "issue_id": "SEC-DISC-002",
+      "title": "Leaked Supabase Cloud Credentials in Historical Git Commits",
+      "status": "NEEDS_HUMAN",
+      "rationale": "Historical commits 9305ab5c, 34b7d2c7, and 5e515195 contain hardcoded Supabase API keys for project ynkdnwhubfknnnzjtpeg. Governed by Rule R5: Human rotation in Supabase Console followed by git-filter-repo. Documented in .gsd/MANUAL_ACTIONS.md."
+    },
+    {
+      "issue_id": "SEC-DISC-003",
+      "title": "Inconsistent Test Bypass Guard in Account Export",
+      "status": "UNCONFIRMED",
+      "rationale": "Bypass logic is gated by process.env.NODE_ENV !== 'production' and completely dead in compiled production release builds. No failing RED reproduction on unfixed production code."
+    },
+    {
+      "issue_id": "MODWEB-001",
+      "title": "Admin MFA QR Code SVG DOM Sink",
+      "status": "REVIEWED_SAFE",
+      "rationale": "Sanitized via DOMParser whitelist and sourced directly from trusted Supabase Auth GoTrue service. Defense-in-depth Trusted Types recommendation."
+    },
+    {
+      "issue_id": "MODWEB-002",
+      "title": "Absence of Clear-Site-Data Header on Session Logout",
+      "status": "REVIEWED_SAFE",
+      "rationale": "Client invokes supabase.auth.signOut() immediately invalidating refresh token and server session. Defense-in-depth header recommendation."
+    },
+    {
+      "issue_id": "MODWEB-003",
+      "title": "Browser Client Auth Storage Prefix Hygiene",
+      "status": "REVIEWED_SAFE",
+      "rationale": "Complies with standard @supabase/ssr Next.js App Router browser client architecture."
+    }
+  ]
+}

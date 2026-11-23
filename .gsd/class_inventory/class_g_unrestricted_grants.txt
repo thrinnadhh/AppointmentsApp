@@ -1,0 +1,20 @@
+=== RESTRICTED MAINTENANCE PROCEDURES PRIVILEGE AUDIT ===
+COMPLIANT (SERVICE_ROLE_ONLY): advance_test_clock(p_prefix text, p_minutes integer) -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): cancel_unpaid_pending_bookings() -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): cron_daily_cleanup() -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): cron_expire_no_shows() -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): cron_trigger_queue_consumers() -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): enqueue_booking_reminders() -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): enqueue_refund_request(p_booking_id uuid, p_actor_id uuid, p_reason text) -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (AUTHENTICATED_WITH_RBAC): expire_stale_standby_queue(p_threshold_minutes integer, p_provider_id uuid) -> Authenticated execution gated by in-function RBAC check
+COMPLIANT (AUTHENTICATED_WITH_RBAC): mask_old_notification_logs(p_days integer) -> Authenticated execution gated by in-function RBAC check
+COMPLIANT (SERVICE_ROLE_ONLY): purge_expired_waitlist_entries() -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): purge_old_app_logs(p_retention_days integer) -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): read_queue_with_dlq(p_queue text, p_dlq text, p_vt integer, p_qty integer, p_max_reads integer) -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): release_expired_holds() -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): replay_dlq_message(p_dlq text, p_target_queue text, p_dlq_msg_id bigint) -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): set_booking_slot_for_reminder(p_booking_id uuid, p_minutes_from_now integer) -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): set_test_clock(p_prefix text, p_time timestamp with time zone) -> Revoked from anon/authenticated (service_role only)
+COMPLIANT (SERVICE_ROLE_ONLY): trigger_whatsapp_sender_cron() -> Revoked from anon/authenticated (service_role only)
+
+SUMMARY: restricted_procedures=17 violations=0

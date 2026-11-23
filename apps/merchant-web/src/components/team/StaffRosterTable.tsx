@@ -23,7 +23,7 @@ interface StaffRosterTableProps {
   ownerId?: string | null;
 }
 
-export function StaffRosterTable({
+export const StaffRosterTable = React.memo(function StaffRosterTable({
   members,
   doctors,
   loading,
@@ -44,6 +44,7 @@ export function StaffRosterTable({
     if (
       member.role === 'admin' ||
       member.membershipRole === 'admin' ||
+      member.membershipRole === 'hospitalAdmin' ||
       member.membershipRole === 'owner' ||
       (ownerId && member.id === ownerId)
     ) {
@@ -58,15 +59,34 @@ export function StaffRosterTable({
 
     // 2. Doctor / Specialist
     const matchedDoctor = doctors.find(
-      (d) => (d.doctor_email && d.doctor_email.toLowerCase() === (member.email || '').toLowerCase()) ||
-             (d as any)?.attributes?.user_id === member.id
+      (d) => {
+        const dRec = d as unknown as Record<string, unknown>;
+        const dAttr = dRec?.attributes as Record<string, unknown> | undefined;
+        return (d.doctor_email && d.doctor_email.toLowerCase() === (member.email || '').toLowerCase()) ||
+               dAttr?.user_id === member.id ||
+               dRec?.id === member.id ||
+               member.id === `doc-${d.id}`;
+      }
     );
-    if (matchedDoctor) {
+
+    const isDoc =
+      Boolean(matchedDoctor) ||
+      member.membershipRole?.toLowerCase() === 'doctor' ||
+      member.membershipRole?.toLowerCase() === 'consultant' ||
+      member.role?.toLowerCase() === 'doctor' ||
+      member.role?.toLowerCase() === 'consultant' ||
+      member.full_name?.toLowerCase().startsWith('dr.') ||
+      member.full_name?.toLowerCase().startsWith('dr ');
+
+    if (isDoc) {
+      const memberRec = member as unknown as Record<string, unknown>;
+      const deptName = matchedDoctor?.department || member.department || (memberRec?.department_name as string) || 'General Medicine';
+      const docName = matchedDoctor?.name || member.full_name?.replace(/^Dr\.\s*/i, '') || member.full_name || 'Specialist';
       return {
         roleTitle: 'Doctor / Specialist',
         roleType: 'doctor' as const,
         badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold',
-        service: `${matchedDoctor.department || 'General Medicine'} — Consultation Desk (Dr. ${matchedDoctor.name})`,
+        service: `${deptName} — Consultation Desk (${docName.startsWith('Dr.') ? docName : `Dr. ${docName}`})`,
         idCard: null,
       };
     }
@@ -85,22 +105,26 @@ export function StaffRosterTable({
         }
       }
     }
-    if (assignedDoctors.length > 0) {
+    if (assignedDoctors.length > 0 || member.membershipRole === 'front_desk') {
+      const deskService = assignedDoctors.length > 0
+        ? `Reception Desk for ${assignedDoctors.join(', ')}`
+        : `${member.department || 'Hospital'} — Reception & Front Desk`;
       return {
         roleTitle: 'Front Desk Manager',
         roleType: 'frontdesk' as const,
         badgeClass: 'bg-teal-100 text-teal-900 border-teal-300 font-bold',
-        service: `Reception Desk for ${assignedDoctors.join(', ')}`,
+        service: deskService,
         idCard: fdIdCard,
       };
     }
 
     // 4. General Staff
+    const deptInfo = member.department ? ` (${member.department})` : '';
     return {
       roleTitle: member.role === 'merchant' ? 'Hospital Support Staff' : 'Customer Account',
-      roleType: member.role as any,
+      roleType: member.role as 'admin' | 'staff' | 'doctor' | 'merchant' | 'customer',
       badgeClass: 'bg-slate-100 text-slate-700 border-slate-300 font-medium',
-      service: 'General Hospital Operations & Support',
+      service: `General Hospital Operations & Support${deptInfo}`,
       idCard: null,
     };
   };
@@ -296,4 +320,4 @@ export function StaffRosterTable({
       </div>
     </div>
   );
-}
+});

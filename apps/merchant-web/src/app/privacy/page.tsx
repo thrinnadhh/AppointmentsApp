@@ -110,25 +110,26 @@ export default function PrivacyPolicyPage() {
 
         <Section title="3. How Long We Keep Your Data">
           <ul className="list-disc list-inside space-y-2 text-slate-700">
-            <li>Booking records: <strong>3 years</strong> (for merchant revenue audit and dispute resolution)</li>
-            <li>Payment ledger: <strong>7 years</strong> (statutory requirement under Indian accounting rules)</li>
-            <li>Auth logs: <strong>90 days</strong></li>
+            <li>Booking records: <strong>3 years</strong> (for merchant revenue audit, clinical dispute resolution, and medical reconciliation)</li>
+            <li>Payment ledger: <strong>7 years</strong> (statutory requirement under Indian accounting rules and RBI guidelines)</li>
+            <li>Auth &amp; Session logs: <strong>90 days</strong> (all phone numbers and emails masked)</li>
             <li>Marketing consent: Until you withdraw it or delete your account</li>
-            <li>Account deletion: Data is anonymised after a <strong>30-day grace period</strong></li>
+            <li>Account deletion: Personal data is permanently scrubbed and anonymised <strong>immediately upon confirmation with zero grace period</strong> (DPDPA §12 compliance)</li>
           </ul>
         </Section>
 
         <Section title="4. Who We Share Data With">
           <ul className="list-disc list-inside space-y-2 text-slate-700">
-            <li><strong>Service Providers you book with</strong> — healthcare clinics and consultants see your booking details to deliver care</li>
-            <li><strong>Razorpay / PayU</strong> — payment processors (PCI-DSS Level 1 certified; their privacy policy applies to payment transactions)</li>
-            <li><strong>MSG91 / Twilio</strong> — SMS gateway for authentication OTPs and booking confirmations</li>
-            <li><strong>Meta / WhatsApp Cloud API</strong> — real-time booking confirmation and reminder delivery (when WhatsApp updates are enabled)</li>
-            <li><strong>Expo / EAS (Expo Push)</strong> — mobile push notification gateway</li>
+            <li><strong>Service Providers you book with</strong> — healthcare clinics and consultants receive your booking details strictly to deliver healthcare services</li>
+            <li><strong>Cashfree Payments &amp; EasySplit</strong> — PCI-DSS Level 1 certified payment gateway and marketplace settlement processor handling ₹10 reservation deposits and merchant payouts</li>
+            <li><strong>Meta / WhatsApp Cloud API</strong> — real-time digital appointment passes, OPD queue notifications, and automated booking reminders</li>
+            <li><strong>SMS &amp; Communications Gateways</strong> — encrypted transactional SMS delivery for OTP verification</li>
+            <li><strong>Masked Audit &amp; Notification Telemetry</strong> — persistent logs and database traces enforce field-level PII masking to protect personal identity</li>
+            <li><strong>Expo / EAS (Expo Push)</strong> — mobile push notification delivery for real-time queue advancements</li>
             <li><strong>Upstash Redis</strong> — distributed slot lock concurrency and rate limiting (using pseudonymized hashes to protect identity)</li>
-            <li><strong>Vercel</strong> — web application hosting and secure edge computing</li>
+            <li><strong>Vercel &amp; Cloud Infrastructure</strong> — secure web application hosting and edge computing</li>
             <li><strong>Supabase</strong> — cloud database, authentication, and private encrypted document storage (SOC 2 Type II certified)</li>
-            <li><strong>Sentry</strong> — application error diagnostics and telemetry (with sensitive user identity scrubbed)</li>
+            <li><strong>Sentry</strong> — application error diagnostics and telemetry (with sensitive user identity strictly scrubbed)</li>
           </ul>
           <p className="mt-3 text-slate-600">We do <strong>not</strong> sell your data to third parties. We do not use your data for advertising profiling.</p>
         </Section>
@@ -136,12 +137,12 @@ export default function PrivacyPolicyPage() {
         <Section title="5. Your Data Rights">
           <div className="grid sm:grid-cols-2 gap-3">
             {[
-              { right: 'Right to Access', desc: 'Request a copy of all data we hold about you.' },
-              { right: 'Right to Correction', desc: 'Ask us to correct inaccurate personal data.' },
-              { right: 'Right to Erasure', desc: 'Request account deletion via Settings → Account → Delete Account. 30-day grace period applies.' },
+              { right: 'Right to Access', desc: 'Request a copy of all personal data we hold about you.' },
+              { right: 'Right to Correction', desc: 'Ask us to correct inaccurate personal data or contact details.' },
+              { right: 'Right to Erasure', desc: 'Request immediate account deletion via Settings → Account → Delete Account. Deletion and PII scrubbing execute immediately with zero postponement.' },
               { right: 'Right to Withdraw Consent', desc: 'Toggle optional consents off at any time in Settings → Privacy.' },
               { right: 'Right to Grievance Redressal', desc: 'Raise a concern with our Grievance Officer within 48 hours.' },
-              { right: 'Right to Nominate', desc: 'Nominate another individual to exercise data rights in case of death or incapacity (to be operationalized following central government procedural rules).' },
+              { right: 'Right to Nominate', desc: 'Nominate another individual to exercise data rights in case of death or incapacity (DPDPA §14).' },
             ].map(({ right, desc }) => (
               <div key={right} className="rounded-lg border border-slate-200 bg-white p-4">
                 <p className="font-semibold text-slate-800 text-sm">{right}</p>

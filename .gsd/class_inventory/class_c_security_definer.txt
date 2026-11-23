@@ -1,0 +1,163 @@
+COMPLIANT: private.cancel_booking(p_booking_id uuid, p_reason text, p_initiated_by text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.cancel_doctor_emergency(p_doctor_resource_id uuid, p_effective_from timestamp with time zone, p_reason text, p_doctor_arrived boolean) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.check_cooling_period_eligibility(p_customer_id uuid, p_provider_id uuid, p_target_slot timestamp with time zone) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.complete_booking(p_booking_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.confirm_booking_by_merchant(p_booking_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.create_booking_hold(p_resource_id uuid, p_slot_start timestamp with time zone, p_slot_end timestamp with time zone, p_customer_id uuid, p_booking_for_someone_else boolean, p_patient_name text, p_patient_phone text, p_patient_relationship text, p_booked_for text, p_patient_age smallint, p_booking_note text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (UTILITY): private.get_active_cities(p_include_expanding boolean) -> PINNED_SEARCH_PATH (Parameter-agnostic utility / batch worker)
+COMPLIANT: private.get_masked_customer_info(p_customer_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.get_merchant_bookings(p_provider_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.get_nearby_providers(p_lat numeric, p_lng numeric, p_category text, p_radius_meters integer) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.get_provider_details(p_provider_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.get_user_authorized_providers(p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.hospital_accessible_resource_ids(p_provider_id uuid, p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.hospital_role(p_provider_id uuid, p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.is_admin(p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (UTILITY): private.is_city_director_for_city(p_city_id text, p_user_id uuid) -> PINNED_SEARCH_PATH (Parameter-agnostic utility / batch worker)
+COMPLIANT (UTILITY): private.is_hospital_provider(p_provider_id uuid) -> PINNED_SEARCH_PATH (Parameter-agnostic utility / batch worker)
+COMPLIANT: private.is_merchant_owner_or_admin(p_provider_id uuid, p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.log_client_event(p_platform text, p_level text, p_message text, p_component text, p_stack_trace text, p_metadata jsonb, p_device_info jsonb, p_session_id text, p_severity text, p_category text, p_source text, p_error_code text, p_role text, p_city_id text, p_vertical text, p_appointment_id text, p_app_version text, p_platform_os text, p_device_model text, p_environment text, p_fingerprint text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.mark_customer_reached(p_booking_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.mark_present_manually(p_booking_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.merchant_update_cooling_period(p_provider_id uuid, p_cooling_period_days integer) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.override_hospital_queue_position(p_booking_id uuid, p_override_position integer, p_caller_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.reassign_booking_resource(p_booking_id uuid, p_new_resource_id uuid, p_reason text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.record_no_show(p_booking_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.reorder_hospital_queue(p_provider_id uuid, p_doctor_id uuid, p_booking_ids uuid[], p_caller_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.request_account_deletion(p_reason text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.reschedule_booking_slot(p_booking_id uuid, p_new_slot_start timestamp with time zone, p_new_slot_end timestamp with time zone) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.reveal_customer_contact(p_booking_id uuid, p_reason text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.search_directory(p_query text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (UTILITY): private.search_directory_public(p_query text) -> PINNED_SEARCH_PATH (Parameter-agnostic utility / batch worker)
+COMPLIANT (UTILITY): private.submit_city_waitlist(p_city_name text, p_phone text, p_vertical_interest text, p_notes text) -> PINNED_SEARCH_PATH (Parameter-agnostic utility / batch worker)
+COMPLIANT: private.sync_customer_profile(p_full_name text, p_phone text, p_email text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: private.verify_checkin_code(p_shop_id uuid, p_code text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public._handle_ddl_setup() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public._record_checkin_failure(p_user_id uuid, p_now timestamp with time zone) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.admin_create_resource(p_provider_id uuid, p_name text, p_type text, p_department text, p_price numeric, p_deposit_amount numeric, p_duration_minutes integer, p_capacity integer, p_attributes jsonb) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.admin_create_user(p_email text, p_password text, p_full_name text, p_role text, p_phone text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.admin_create_venue(p_name text, p_category_id text, p_address text, p_phone text, p_opening_time time without time zone, p_closing_time time without time zone, p_description text, p_email text, p_owner_id uuid, p_latitude numeric, p_longitude numeric) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.admin_delete_resource(p_resource_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.admin_fetch_city_waitlist(p_city_id text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.admin_fetch_merchants(p_city_id text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.admin_get_caller_profile() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.admin_update_merchant_status(p_provider_id uuid, p_status text, p_admin_token text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.admin_update_provider_operational_settings(p_provider_id uuid, p_is_active boolean, p_auto_accept boolean, p_daily_limit integer, p_admin_token text, p_weekly_hours jsonb) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.advance_test_clock(p_prefix text, p_minutes integer) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.anonymize_user_data(p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.assert_booking_actor(p_customer_id uuid, p_provider_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.assign_clinic_queue_position() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.atomic_assign_checkin_arrival(p_booking_id uuid, p_arrived_at timestamp with time zone) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.auto_ensure_booking_customer() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.auto_link_merchant_by_email(p_user_id uuid, p_email text) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (UTILITY): public.build_template_params(p_event_type text, p_booking jsonb) -> PINNED_SEARCH_PATH (Parameter-agnostic utility / batch worker)
+COMPLIANT (WRAPPER): public.cancel_booking(p_booking_id uuid, p_reason text, p_initiated_by text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.cancel_doctor_emergency(p_doctor_resource_id uuid, p_effective_from timestamp with time zone, p_reason text, p_doctor_arrived boolean) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.cancel_unpaid_pending_bookings() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.check_and_send_booking_reminders() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.check_cooling_period_eligibility(p_customer_id uuid, p_provider_id uuid, p_target_slot timestamp with time zone) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.check_department_member_limit() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.check_rate_limit(p_key text, p_max_hits integer, p_window_seconds integer) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.check_user_exists_by_phone(p_phone text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.choose_emergency_option(p_booking_id uuid, p_choice text, p_new_slot_start timestamp with time zone, p_new_slot_end timestamp with time zone) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.claim_queued_notifications(p_limit integer) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.collect_consultation_fee(p_booking_id uuid, p_collected_by uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.complete_booking(p_booking_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.compute_gst_for_booking(p_booking_id uuid) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.confirm_booking_by_merchant(p_booking_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.confirm_booking_payment(p_booking_id uuid, p_gateway_payment_id text, p_deposit_amount numeric) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.create_booking_hold(p_resource_id uuid, p_slot_start timestamp with time zone, p_slot_end timestamp with time zone, p_customer_id uuid, p_booking_for_someone_else boolean, p_patient_name text, p_patient_phone text, p_patient_relationship text, p_booked_for text, p_patient_age smallint, p_booking_note text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.cron_daily_cleanup() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.cron_expire_no_shows() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.cron_trigger_queue_consumers() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.delete_account_immediately(p_reason text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.dispatch_booking_notification(p_booking_id uuid, p_event_type text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.enqueue_booking_reminders() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.enqueue_refund_request(p_booking_id uuid, p_actor_id uuid, p_reason text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.expire_stale_standby_queue(p_threshold_minutes integer, p_provider_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.generate_appointment_checkin_code_for_booking(p_booking_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.generate_invoice_number(p_booking_id uuid) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.get_active_cities(p_include_expanding boolean) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.get_admin_audit_logs(p_limit integer, p_admin_token text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.get_admin_city_stats() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.get_admin_velocity_analytics(p_time_window text, p_city_id text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.get_city_director_stats(p_from date, p_until date) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.get_masked_customer_info(p_customer_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.get_merchant_bookings(p_provider_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.get_nearby_providers(p_lat numeric, p_lng numeric, p_category text, p_radius_meters integer) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.get_or_create_customer_checkin_pin(p_customer_id uuid) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.get_provider_details(p_provider_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.get_test_clock(p_provider_id uuid) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.get_test_clock_for_prefix(p_prefix text) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.get_user_authorized_providers(p_user_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.get_user_department_id(p_user_id uuid, p_merchant_id uuid) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.get_vault_secret_by_name(p_secret_name text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.guard_profile_governance() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.guard_provider_governance() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.handle_booking_checkin_code_trigger() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.handle_booking_event_webhook_trigger() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.handle_booking_notification_trigger() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.handle_new_auth_user() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.hospital_accessible_resource_ids(p_provider_id uuid, p_user_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.hospital_accessible_resource_ids_for_user(p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.hospital_role(p_provider_id uuid, p_user_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.increment_booking_version() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.is_admin(p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.is_caller_authorized_for_resource(p_provider_id uuid, p_resource_id uuid, p_user_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.is_city_director_for_city(p_city_id text, p_user_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.is_hospital_owner(p_user_id uuid, p_merchant_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.is_hospital_provider(p_provider_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.is_merchant_owner_or_admin(p_provider_id uuid, p_user_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.log_admin_action(p_action text, p_target_type text, p_target_id text, p_details jsonb) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.log_client_event(p_platform text, p_level text, p_message text, p_component text, p_stack_trace text, p_metadata jsonb, p_device_info jsonb, p_session_id text, p_severity text, p_category text, p_source text, p_error_code text, p_role text, p_city_id text, p_vertical text, p_appointment_id text, p_app_version text, p_platform_os text, p_device_model text, p_environment text, p_fingerprint text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.mark_customer_reached(p_booking_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.mark_present_manually(p_booking_id uuid, p_reason text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.mask_old_notification_logs(p_days integer) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.merchant_add_resource_leave(p_provider_id uuid, p_resource_id anyelement, p_doctor_name text, p_leave_date date, p_reason text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.merchant_delete_resource(p_resource_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.merchant_delete_resource_leave(p_leave_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.merchant_move_booking_to_standby(p_booking_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.merchant_register_shop_for_user(p_user_id uuid, p_shop_name text, p_category_id text, p_address text, p_phone text, p_full_name text, p_raw_meta jsonb, p_photo_url text, p_city text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.merchant_save_operational_settings(p_provider_id uuid, p_cooling_period_days integer, p_auto_confirm_holds boolean, p_whatsapp_confirmations boolean, p_reminder_offset_hours integer, p_business_name text, p_gstin text, p_support_phone text, p_support_email text, p_jurisdiction text, p_payout_upi_id text, p_min_deposit_amount numeric, p_cancellation_window_hours integer, p_cashfree_app_id text, p_cashfree_vendor_id text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.merchant_save_weekly_schedule(p_provider_id uuid, p_schedule jsonb, p_slot_duration_minutes integer) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.merchant_self_register(p_full_name text, p_email text, p_password text, p_phone text, p_shop_name text, p_category_id text, p_address text, p_photo_url text) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.merchant_update_cooling_period(p_provider_id uuid, p_cooling_period_days integer) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.merchant_upsert_resource(p_provider_id uuid, p_name text, p_category text, p_price numeric, p_deposit_amount numeric, p_duration_minutes integer, p_capacity integer, p_resource_id uuid, p_attributes jsonb) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.override_hospital_queue_position(p_booking_id uuid, p_override_position integer, p_caller_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.process_expired_account_deletions() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.protect_booking_payment_fields() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.purge_expired_waitlist_entries() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.purge_old_app_logs(p_retention_days integer) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.read_queue_with_dlq(p_queue text, p_dlq text, p_vt integer, p_qty integer, p_max_reads integer) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.reassign_booking_resource(p_booking_id uuid, p_new_resource_id uuid, p_reason text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.reclaim_expired_hold_or_refund(p_booking_id uuid, p_payment_id text, p_order_id text, p_amount numeric, p_currency text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.record_no_show(p_booking_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.release_expired_holds() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.remove_stale_push_token(p_token text) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (WRAPPER): public.reorder_hospital_queue(p_provider_id uuid, p_doctor_id uuid, p_booking_ids uuid[], p_caller_id uuid) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT: public.replay_dlq_message(p_dlq text, p_target_queue text, p_dlq_msg_id bigint) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.request_account_deletion(p_reason text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.reschedule_booking_slot(p_booking_id uuid, p_new_slot_start timestamp with time zone, p_new_slot_end timestamp with time zone) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.reset_test_bookings(p_provider_id uuid, p_customer_id uuid) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.reset_test_customer_strikes(p_customer_id uuid, p_count integer) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.reset_test_provider_strikes(p_provider_id uuid, p_count integer) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.reveal_contact(p_booking_id uuid) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.reveal_customer_contact(p_booking_id uuid, p_reason text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.search_directory(p_query text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.search_directory_public(p_query text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.set_booking_reference_code() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT (LOCKED): public.set_booking_slot_for_reminder(p_booking_id uuid, p_minutes_from_now integer) -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.set_test_clock(p_prefix text, p_time timestamp with time zone) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.submit_city_waitlist(p_city_name text, p_phone text, p_vertical_interest text, p_notes text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (WRAPPER): public.sync_customer_profile(p_full_name text, p_phone text, p_email text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+COMPLIANT (LOCKED): public.sync_resource_user_id() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.trg_audit_booking_status_change() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.trg_audit_doctor_assignments() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.trg_audit_resource_services() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (LOCKED): public.trg_push_tokens_updated_at() -> PINNED_SEARCH_PATH and SERVICE_ROLE_ONLY (revoked from anon/auth)
+COMPLIANT: public.trigger_whatsapp_sender_cron() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.update_city_status(p_city_id text, p_status text, p_target integer, p_admin_token text) -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT: public.validate_booking_update() -> PINNED_SEARCH_PATH and IN_FUNCTION_AUTH_CHECK
+COMPLIANT (WRAPPER): public.verify_checkin_code(p_shop_id uuid, p_code text) -> PINNED_SEARCH_PATH (Delegates to guarded procedure)
+
+SUMMARY: total_security_definer=161 violations=0

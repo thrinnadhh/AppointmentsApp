@@ -48,7 +48,7 @@ interface DoctorAssignmentCardProps {
   onUnassign: (doctorId: string, doctorName: string, userId: string, managerName: string) => void;
 }
 
-export function DoctorAssignmentCard({
+export const DoctorAssignmentCard = React.memo(function DoctorAssignmentCard({
   doctor,
   isHospitalAdmin,
   copiedId,
@@ -152,9 +152,9 @@ export function DoctorAssignmentCard({
               data-testid="add-front-desk-manager-btn"
               onClick={() => onOpenAssignModal(doctor)}
               disabled={isFull}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg transition-all duration-75 select-none active:scale-[0.96] active:bg-emerald-200 cursor-pointer ${
                 isFull
-                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed active:scale-100'
                   : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-2xs'
               }`}
               title={isFull ? 'Maximum 4 Front Desk Managers reached' : 'Assign receptionist'}
@@ -176,7 +176,7 @@ export function DoctorAssignmentCard({
             </div>
           ) : (
             <div className="space-y-2">
-              {doctor.front_desk_managers.map((fd, index) => (
+              {(doctor.front_desk_managers || []).map((fd, index) => (
                 <div
                   key={fd.user_id || index}
                   className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 hover:border-slate-300 transition-colors shadow-2xs"
@@ -248,4 +248,4 @@ export function DoctorAssignmentCard({
       </div>
     </div>
   );
-}
+});

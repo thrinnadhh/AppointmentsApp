@@ -374,6 +374,7 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     // 3. UI Verification: Customer Mobile App Phone OTP Sign In
     await page.addInitScript(() => {
       try {
+        localStorage.clear();
         localStorage.setItem('dpdp_consent_granted', 'true');
       } catch {}
     });
@@ -395,42 +396,45 @@ test.describe.serial('Merchant Registration to Customer Dashboard Reflection E2E
     await expect(page.getByText('Customer Profile & Sign In')).toBeVisible();
     await expect(page.getByText(/Phone Verification|1-Tap Phone OTP Authentication/i)).toBeVisible();
 
+    // If an active session was restored, sign out first to ensure testing the full OTP flow
+    const existingSignOutBtn = page.getByTestId('btn-sign-out');
+    if (await existingSignOutBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await existingSignOutBtn.click();
+      await expect(page.getByText('⚡ Guest')).toBeVisible({ timeout: 5000 });
+    }
+
     // Check Send OTP button
     const sendOtpBtn = page.getByTestId('btn-send-otp');
-    if (await sendOtpBtn.isVisible()) {
-      const phoneInput = page.getByTestId('input-phone-auth');
-      if (await phoneInput.isVisible()) {
-        await phoneInput.fill(testPhone);
-      }
-      await page.waitForTimeout(1500);
-      await sendOtpBtn.click();
-
-      // Verify OTP Code Input appears
-      const otpInput = page.getByTestId('input-otp-code');
-      await expect(otpInput).toBeVisible();
-      await otpInput.fill(testOtp);
-
-      // Click Verify
-      const verifyBtn = page.getByTestId('btn-verify-otp');
-      await verifyBtn.click();
-
-      // Modal automatically closes upon successful phone verification
-      await page.waitForTimeout(500);
-
-      // Re-open profile modal to verify authenticated profile state & sign-out
-      await profileBtn.click();
-      await expect(page.getByTestId('badge-phone-verified').or(page.getByText(/Verified/i)).first()).toBeVisible();
-      const signOutBtn = page.getByTestId('btn-sign-out');
-      await expect(signOutBtn).toBeVisible({ timeout: 10000 });
-      await signOutBtn.click();
-      await expect(page.getByText('⚡ Guest')).toBeVisible({ timeout: 10000 });
-    } else {
-      // If already authenticated from previous session, verify sign out works
-      const signOutBtn = page.getByTestId('btn-sign-out');
-      await expect(signOutBtn).toBeVisible();
-      await signOutBtn.click();
-      await expect(page.getByText('⚡ Guest')).toBeVisible();
+    await expect(sendOtpBtn).toBeVisible({ timeout: 10000 });
+    const phoneInput = page.getByTestId('input-phone-auth');
+    if (await phoneInput.isVisible()) {
+      await phoneInput.fill(testPhone);
     }
+    await page.waitForTimeout(1500);
+    await sendOtpBtn.click();
+
+    // Verify OTP Code Input appears
+    const otpInput = page.getByTestId('input-otp-code');
+    await expect(otpInput).toBeVisible({ timeout: 10000 });
+    await otpInput.fill(testOtp);
+
+    // Click Verify
+    const verifyBtn = page.getByTestId('btn-verify-otp');
+    await verifyBtn.click();
+
+    // Verify phone verification succeeded and OTP input is dismissed
+    await expect(otpInput).toBeHidden({ timeout: 10000 });
+
+    // If profile modal is already open, signOutBtn is directly visible.
+    // Otherwise, re-open via profileBtn.
+    const signOutBtn = page.getByTestId('btn-sign-out');
+    if (!await signOutBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await profileBtn.click();
+    }
+    await expect(page.getByTestId('badge-phone-verified').or(page.getByText(/Verified/i)).first()).toBeVisible({ timeout: 10000 });
+    await expect(signOutBtn).toBeVisible({ timeout: 10000 });
+    await signOutBtn.click();
+    await expect(page.getByText('⚡ Guest')).toBeVisible({ timeout: 10000 });
 
     // Clean up Supabase session
     await customerSupabase.auth.signOut();

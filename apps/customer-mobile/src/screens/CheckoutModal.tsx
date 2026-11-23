@@ -13,7 +13,15 @@ import {
   StatusBar,
   TextInput,
 } from 'react-native';
-import { Resource, Slot, getPlatformFee, CoolingPeriodEligibilityResult } from '@appointments/shared';
+import {
+  Resource,
+  Slot,
+  getPlatformFee,
+  CoolingPeriodEligibilityResult,
+  isValidCashfreeScriptUrl,
+  CASHFREE_SDK_ORIGIN,
+  CASHFREE_SDK_URL,
+} from '@appointments/shared';
 import {
   createHoldOnSupabase,
   confirmBookingPaymentOnSupabase,
@@ -45,9 +53,15 @@ const loadRazorpayScript = (): Promise<boolean> => {
   });
 };
 
-const loadCashfreeScript = (): Promise<boolean> => {
+export { CASHFREE_SDK_ORIGIN, CASHFREE_SDK_URL, isValidCashfreeScriptUrl };
+
+const loadCashfreeScript = (src: string = CASHFREE_SDK_URL): Promise<boolean> => {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') return resolve(false);
+    if (!isValidCashfreeScriptUrl(src)) {
+      console.error('[Cashfree Loader] Untrusted script source rejected:', src);
+      return resolve(false);
+    }
     if ((window as any).Cashfree) return resolve(true);
     const existing = document.querySelector('script[src*="cashfree.com"]');
     if (existing) {
@@ -55,7 +69,7 @@ const loadCashfreeScript = (): Promise<boolean> => {
       return;
     }
     const script = document.createElement('script');
-    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.src = src;
     script.crossOrigin = 'anonymous';
     script.async = true;
     script.onload = () => resolve(true);

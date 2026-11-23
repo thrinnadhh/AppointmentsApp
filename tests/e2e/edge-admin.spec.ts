@@ -27,6 +27,17 @@ const ADMIN_BYPASS = process.env.SUPERADMIN_E2E_TOKEN || process.env.ADMIN_SECRE
 const MERCHANT_A_PROVIDER_ID = '11111111-1111-1111-1111-111111111111';
 
 test.describe('Admin — Edge & Boundary Cases', () => {
+  test.beforeAll(async () => {
+    // Ensure admin user exists with deterministic password
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 100 });
+    const adminUser = users?.find(u => u.email === (process.env.TEST_ADMIN_EMAIL || 'admin@appointments-tirupati.com'));
+    if (adminUser) {
+      await supabaseAdmin.auth.admin.updateUserById(adminUser.id, {
+        password: process.env.TEST_ADMIN_PASSWORD || 'AdminSecure2026!',
+        email_confirm: true,
+      });
+    }
+  });
 
   // ─── EC-ADMIN-01: Invalid city regression ACTIVE → PLANNED ─────────────────
   test('EC-ADMIN-01: Cannot regress an ACTIVE city back to PLANNED or EXPANDING', async () => {
@@ -146,7 +157,6 @@ test.describe('Admin — Edge & Boundary Cases', () => {
 
   // ─── EC-ADMIN-04: MFA brute force ──────────────────────────────────────────
   test('EC-ADMIN-04: Five consecutive bad TOTP codes trigger lockout warning on admin login @wip', async ({ page }) => {
-    test.skip(true, 'WIP: MFA enrollment not seeded for dev admin account');
     await page.context().clearCookies();
     const adminPage = new AdminDashboardPage(page);
 
@@ -180,7 +190,7 @@ test.describe('Admin — Edge & Boundary Cases', () => {
 
     // After 5 wrong codes, either lockout message OR still showing invalid code error is acceptable
     // The key assertion: user never reached the dashboard
-    expect(page.url()).not.toContain('/admin');
+    expect(new URL(page.url()).pathname).not.toBe('/admin');
     expect(page.url()).toContain('/admin/login');
   });
 
@@ -213,9 +223,8 @@ test.describe('Admin — Edge & Boundary Cases', () => {
 
   // ─── EC-ADMIN-07: Launch city with zero merchants ──────────────────────────
   test('EC-ADMIN-07: Launching a PLANNED city to ACTIVE with zero merchants shows warning or requires confirmation @wip', async ({ request }) => {
-    test.skip(true, 'WIP: Empty city activation warning logic and seed under development');
     // Use a specially seeded empty city (no merchants)
-    const res = await request.patch(`${BASE}/api/admin/doctor-assignments`, {
+    const res = await request.patch(`${BASE}/api/admin/cities/status`, {
       headers: { 'x-admin-bypass-key': ADMIN_BYPASS },
       data: { cityId: 'empty-test-city', status: 'ACTIVE' },
     });

@@ -2591,4 +2591,94 @@ describe('Group 8: Adversarial Cross-Tenant Authorization Matrix', () => {
     );
   });
 
+  // 42. /api/admin/cities/status: Super Admin vs Hospital Admin & Customer
+  it('42. /api/admin/cities/status: Super Admin vs Hospital Admin & Customer', async () => {
+    // 42.1 Unauthenticated PATCH must return 401
+    const unauthRes = await fetch(`${appBaseUrl}/api/admin/cities/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cityId: 'test-city-id', status: 'ACTIVE' }),
+    });
+    assert.equal(unauthRes.status, 401, 'Unauthenticated PATCH must return 401');
+
+    // 42.2 Non-admin (Hospital Admin) must return 403
+    const crossResAdmin = await fetch(`${appBaseUrl}/api/admin/cities/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminA.token}` },
+      body: JSON.stringify({ cityId: 'test-city-id', status: 'ACTIVE' }),
+    });
+    assert.equal(crossResAdmin.status, 403, 'Hospital Admin PATCH must return 403');
+
+    // 42.3 Customer must return 403
+    const crossResCust = await fetch(`${appBaseUrl}/api/admin/cities/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custA.token}` },
+      body: JSON.stringify({ cityId: 'test-city-id', status: 'ACTIVE' }),
+    });
+    assert.equal(crossResCust.status, 403, 'Customer PATCH must return 403');
+
+    // 42.4 Super Admin authorized (status 200 or 422 for empty test city)
+    const superHeaders = { 'Content-Type': 'application/json' };
+    if (adminSuper?.token) {
+      superHeaders.Authorization = `Bearer ${adminSuper.token}`;
+    } else if (superadminE2eToken) {
+      superHeaders['x-admin-token'] = superadminE2eToken;
+    }
+    const authRes = await fetch(`${appBaseUrl}/api/admin/cities/status`, {
+      method: 'PATCH',
+      headers: superHeaders,
+      body: JSON.stringify({ cityId: 'test-city-id', status: 'ACTIVE' }),
+    });
+    assert.ok([200, 422].includes(authRes.status), 'Superadmin authorized (200 or 422 validation)');
+
+    recordResult(
+      '/api/admin/cities/status',
+      'PATCH',
+      'Super Admin (proved 200/422)',
+      'Hospital Admin & Customer (proved 401/403)',
+      'apps/merchant-web/src/app/api/admin/cities/status/route.ts:9',
+      'PASS'
+    );
+  });
+
+  // 43. /api/customers/[id]/profile: Super Admin vs Hospital Admin & Customer
+  it('43. /api/customers/[id]/profile: Super Admin vs Hospital Admin & Customer', async () => {
+    // 43.1 Unauthenticated GET must return 401
+    const unauthRes = await fetch(`${appBaseUrl}/api/customers/${custA.user.id}/profile`);
+    assert.equal(unauthRes.status, 401, 'Unauthenticated GET must return 401');
+
+    // 43.2 Hospital Admin must return 403
+    const crossResAdmin = await fetch(`${appBaseUrl}/api/customers/${custA.user.id}/profile`, {
+      headers: { Authorization: `Bearer ${adminA.token}` },
+    });
+    assert.equal(crossResAdmin.status, 403, 'Hospital Admin GET must return 403');
+
+    // 43.3 Another customer must return 403
+    const crossResCust = await fetch(`${appBaseUrl}/api/customers/${custA.user.id}/profile`, {
+      headers: { Authorization: `Bearer ${custB.token}` },
+    });
+    assert.equal(crossResCust.status, 403, 'Customer B GET on Customer A must return 403');
+
+    // 43.4 Super Admin authorized (status 200 or 404)
+    const superHeaders = {};
+    if (adminSuper?.token) {
+      superHeaders.Authorization = `Bearer ${adminSuper.token}`;
+    } else if (superadminE2eToken) {
+      superHeaders['x-admin-token'] = superadminE2eToken;
+    }
+    const authRes = await fetch(`${appBaseUrl}/api/customers/${custA.user.id}/profile`, {
+      headers: superHeaders,
+    });
+    assert.ok([200, 404].includes(authRes.status), 'Superadmin authorized (200 or 404)');
+
+    recordResult(
+      '/api/customers/[id]/profile',
+      'GET',
+      'Super Admin (proved 200/404)',
+      'Hospital Admin & Customer B (proved 401/403)',
+      'apps/merchant-web/src/app/api/customers/[id]/profile/route.ts:12',
+      'PASS'
+    );
+  });
+
 });
