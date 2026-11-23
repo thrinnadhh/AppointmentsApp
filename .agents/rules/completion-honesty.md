@@ -1,6 +1,6 @@
 # Completion & Honesty Protocol
 ## Allowed statuses (nothing else may be written anywhere)
-VERIFIED_CLOSED | FIXED_UNVERIFIED | OPEN | UNCONFIRMED | FALSE_POSITIVE | BLOCKED(<reason>) | NEEDS_HUMAN(<action>) | DEFERRED(<reason>) | NOT_EXAMINED(<scope>) | IN_PROGRESS
+VERIFIED_CLOSED | FIXED_UNVERIFIED | OPEN | UNCONFIRMED | FALSE_POSITIVE | BLOCKED(<reason>) | NEEDS_HUMAN(<action>) | DEFERRED(<reason>) | NOT_EXAMINED(<scope>) | IN_PROGRESS | REVIEWED_SAFE | FINDING(<id>)
 "Done", "complete", "all clear", "100%", "should be fine" are NOT statuses.
 ## VERIFIED_CLOSED requires ALL of
 1. Regression test FAILS on the pre-fix commit (red evidence from run_and_record.sh).

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# .gsd/gate.sh (v3)  --  Independent security-closure gate.
+# .gsd/gate.sh (v4)  --  Independent security-closure gate.
 # Runs in CI on a machine the agent does not control. It does NOT trust agent-written
 # results: it re-proves red/green itself and validates ledgers against the real repo.
 #
@@ -47,7 +47,7 @@ BASEWT="$TMP/base"
 cleanup() { git worktree remove --force "$BASEWT" >/dev/null 2>&1 || true; rm -rf "$TMP"; }
 trap cleanup EXIT
 
-echo "gate v3: head=$HEAD_SHA scan_base=$SCAN_BASE_SHA red_base=$RED_BASE_SHA"
+echo "gate v4: head=$HEAD_SHA scan_base=$SCAN_BASE_SHA red_base=$RED_BASE_SHA"
 
 # ------------------------------------------------------------------ python helper
 cat > "$TMP/gate_lib.py" <<'PY'
@@ -342,12 +342,25 @@ def mode_manifest():
     print("  manifest entries: %d   manifest sha256: %s" % (len(listed), sha256(man)))
     sys.exit(1 if errors else 0)
 
+def mode_required(csv):
+    want = [w.strip() for w in csv.split(",") if w.strip()]
+    status = {}
+    for e in entries(load(LEDGER), "LEDGER_LIST_KEY"):
+        n = norm_entry(e, False)
+        status[n["id"]] = split_status(n["status"])[0] if n["status"] else None
+    for w in want:
+        if status.get(w) != "VERIFIED_CLOSED":
+            err("required window %s is %s, expected VERIFIED_CLOSED" % (w, status.get(w, "missing from ledger")))
+    print("  required windows checked: %s" % ", ".join(want))
+    sys.exit(1 if errors else 0)
+
 if __name__ == "__main__":
     mode = sys.argv[1]
     if mode == "ledger": mode_ledger()
     elif mode == "closed": mode_closed(sys.argv[2])
     elif mode == "coverage": mode_coverage()
     elif mode == "manifest": mode_manifest()
+    elif mode == "required": mode_required(sys.argv[2])
     else: die("unknown mode")
 PY
 
@@ -390,6 +403,14 @@ fi
 # ------------------------------------------------------------------ 1. ledger
 section "1. Findings ledger: statuses, citations, evidence"
 python3 "$TMP/gate_lib.py" ledger || FAILURES=$((FAILURES+1))
+
+# ------------------------------------------------------------------ 1b. required windows
+section "1b. Required windows (must exist and be VERIFIED_CLOSED)"
+if [ -n "${REQUIRED_CLOSED:-}" ]; then
+  python3 "$TMP/gate_lib.py" required "$REQUIRED_CLOSED" || FAILURES=$((FAILURES+1))
+else
+  echo "  WARN: REQUIRED_CLOSED not set; a gate with no windows to re-prove proves nothing"
+fi
 
 # ------------------------------------------------------------------ 2. coverage
 section "2. Coverage ledger: statuses, references, proofs"

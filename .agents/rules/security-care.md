@@ -6,4 +6,4 @@
 - Before adding any dependency: check it exists, its maintainers and recent version history; prefer none. Record in DECISIONS.md.
 - Every fix gets a "regression risk" note: could it open a new authz gap, break Cashfree checkout or the WebViews, or log users out mid-payment? Test that path.
 - Security headers (CSP, COOP) ship in Report-Only mode first. Promotion to enforcing is a NEEDS_HUMAN action.
-- Do not edit gate files (.gsd/gate.sh, security-gate.yml, .agents/rules/*) after the setup commit. If a change is truly needed, record NEEDS_HUMAN.
+- Do not edit gate files (.gsd/gate.sh, security-gate-independent.yml, .agents/rules/*) after the setup commit. If a change is truly needed, record NEEDS_HUMAN.

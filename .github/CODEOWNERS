@@ -1,5 +1,12 @@
-# Security gate and governance code owners
+# Security gate and governance code owners (enforced only if 'Require review from Code Owners' is on;
+# the real protection is the pinned GATE_PIN_SHA check)
 .gsd/gate.sh @thrinnadhh
-.github/workflows/security-gate.yml @thrinnadhh
+.gsd/schemas/status-enum.json @thrinnadhh
+.github/workflows/security-gate-independent.yml @thrinnadhh
+.github/CODEOWNERS @thrinnadhh
 .agents/rules/* @thrinnadhh
+.gitleaks.toml @thrinnadhh
 .gitleaksignore @thrinnadhh
+AGENTS.md @thrinnadhh
+CLAUDE.md @thrinnadhh
+.gemini/GEMINI.md @thrinnadhh
