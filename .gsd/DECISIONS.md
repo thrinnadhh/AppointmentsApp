@@ -144,3 +144,13 @@
 - **Conservative Decision:** Created 8 permanent dynamic invariant test suites under `tests/security/invariants/` covering all 8 recurring root-cause classes (route auth, CSRF, SECURITY DEFINER, RLS WITH CHECK, webhooks HMAC, DOM sinks, client env secrets, restricted maintenance grants). Linked runner in `tests/scripts/test-security-invariants.mjs` and `package.json` `test:security`. Proved every suite with temporary red/green mutation checks recorded under `.gsd/evidence/T5/`.
 - **Impact:** Automatically halts CI if any future commit introduces an un-guarded mutating route, table lacking RLS/WITH CHECK, unguarded SECURITY DEFINER RPC, unverified webhook, un-sanitized DOM sink, or leaked server secret.
 
+---
+
+## DEC-017: User Adoption of Option A for Patient Reason & Notes Encryption
+- **Date / Stage:** 2026-11-23 / Post-Phase 4 Human Governance
+- **Context:** Decision memo in `docs/decisions.md:506` evaluated Option A (Database Volume Encryption AES-256 + Strict RLS Isolation) vs Option B (Application-Level Envelope Encryption with AWS/GCP KMS) vs Option C (pgcrypto/pgsodium).
+- **Ambiguity / Dilemma:** Select enterprise cloud KMS envelope encryption (Option B) incurring recurring API costs, 50-100ms decryption latency, and loss of SQL searchability, or adopt native volume encryption + strict RLS (Option A).
+- **User Decision:** User explicitly directed: "lets not use the aws or gcp at current go with the database volume encryption + strict RLS isolation".
+- **Impact:** Formally selected Option A. Resolves pending architecture decision without introducing external AWS/GCP cloud dependencies or query latency overhead, while maintaining full data-at-rest encryption and strict RLS tenant isolation.
+
+
