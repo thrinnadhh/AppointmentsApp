@@ -65,7 +65,7 @@ jobs:
       # Needed only if regression tests hit the local database.
       - name: Install Supabase CLI
         if: hashFiles('supabase/config.toml') != ''
-        uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v1
+        uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: latest
 
